@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CrmPageContent, CrmPageShell, CrmPageTitleRow } from "@/components/crm/crm-page-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Calendar, Clock, Users, Plus, Navigation, CheckCircle2, AlertCircle } from "lucide-react";
 
@@ -31,31 +32,32 @@ const getStatusColor = (status: string) => {
 
 export default function FieldDayPage() {
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Field Day</h1>
-          <p className="text-sm text-muted-foreground">Manage site visits and field activities</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select defaultValue="today">
-            <SelectTrigger className="w-40 h-9 rounded-[5px]">
-              <SelectValue placeholder="Select date" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="tomorrow">Tomorrow</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button className="rounded-[5px]">
-            <Plus className="h-4 w-4 mr-2" />
-            Schedule Visit
-          </Button>
-        </div>
-      </div>
+    <CrmPageShell>
+      <CrmPageContent>
+        <CrmPageTitleRow
+          title="Field Day"
+          subtitle="Manage site visits and field activities"
+          actions={
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row">
+              <Select defaultValue="today">
+                <SelectTrigger className="h-9 w-full rounded-[5px] sm:w-40">
+                  <SelectValue placeholder="Select date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button className="h-9 w-full rounded-[5px] sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Schedule Visit
+              </Button>
+            </div>
+          }
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="rounded-[5px]">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -110,32 +112,32 @@ export default function FieldDayPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {fieldVisits.map((visit) => (
-                <div key={visit.id} className="p-4 border border-border rounded-[5px] hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                <div key={visit.id} className="rounded-[5px] border border-border p-4 transition-colors hover:bg-muted/50">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-medium">{visit.site}</h3>
                         <Badge variant={getStatusColor(visit.status) as "default" | "secondary" | "outline"} className="rounded-[5px]">
                           {visit.status}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">{visit.client}</p>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
                         <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
+                          <MapPin className="h-3 w-3 shrink-0" />
                           {visit.location}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                          <Calendar className="h-3 w-3 shrink-0" />
                           {visit.date}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-3 w-3 shrink-0" />
                           {visit.time}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">{visit.assignee.split(" ").map(n => n[0]).join("")}</AvatarFallback>
                       </Avatar>
@@ -197,6 +199,7 @@ export default function FieldDayPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </CrmPageContent>
+    </CrmPageShell>
   );
 }

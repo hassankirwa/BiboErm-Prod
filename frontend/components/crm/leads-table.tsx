@@ -73,7 +73,7 @@ function getAssignedUser(userId: string) {
 
 export function LeadsTable() {
   return (
-    <div className="rounded-md border border-border bg-card">
+    <div className="min-w-0 overflow-x-auto rounded-md border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">

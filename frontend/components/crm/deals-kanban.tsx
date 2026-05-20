@@ -31,13 +31,16 @@ function getContact(contactId: string) {
 
 export function DealsKanban() {
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-4 sm:gap-4">
       {stages.map((stage) => {
         const stageDeals = mockDeals.filter((d) => d.stage === stage.id);
         const stageValue = stageDeals.reduce((acc, d) => acc + d.value, 0);
 
         return (
-          <div key={stage.id} className="flex-shrink-0 w-72">
+          <div
+            key={stage.id}
+            className="w-[min(85vw,280px)] shrink-0 sm:w-72"
+          >
             <Card className={`border-border ${stage.color}`}>
               <CardHeader className="p-3 pb-2">
                 <div className="flex items-center justify-between">

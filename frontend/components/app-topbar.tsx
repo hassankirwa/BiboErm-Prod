@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Search, Bell, MessageSquare, HelpCircle, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,73 +16,98 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
+function SearchField({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <div className="relative w-full">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search projects, clients, documents..."
+          className="h-9 w-full rounded-full border-border bg-muted/40 pl-9 pr-3 text-sm md:pr-14"
+        />
+        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground lg:inline-block">
+          ⌘ K
+        </kbd>
+      </div>
+    </div>
+  );
+}
+
 export function AppTopbar() {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4">
-      <SidebarTrigger className="-ml-1 shrink-0" />
+    <header className="sticky top-0 z-30 w-full max-w-full shrink-0 border-b border-border bg-card">
+      <div className="flex h-14 items-center gap-2 overflow-hidden px-3 sm:gap-3 sm:px-4">
+        <SidebarTrigger className="shrink-0 md:hidden" />
 
-      <div className="mx-auto hidden max-w-xl flex-1 md:flex">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search projects, clients, documents..."
-            className="h-9 w-full rounded-[5px] border-border bg-muted/40 pl-9 pr-14 text-sm"
+        <Link href="/workspace" className="flex min-w-0 shrink-0 items-center">
+          <Image
+            src="/image.png"
+            alt="BIBO Windows & Doors"
+            width={140}
+            height={40}
+            className="h-7 w-auto max-w-[120px] object-contain sm:h-8 sm:max-w-none"
+            priority
           />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-block">
-            ⌘ K
-          </kbd>
-        </div>
-      </div>
+        </Link>
 
-      <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="relative h-9 w-9" asChild>
-          <Link href="/notifications">
-            <Bell className="h-4 w-4" />
+        <SearchField className="mx-auto hidden min-w-0 max-w-xl flex-1 md:block" />
+
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
+          <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0" asChild>
+            <Link href="/notifications">
+              <Bell className="h-4 w-4" />
+              <Badge
+                variant="destructive"
+                className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
+              >
+                7
+              </Badge>
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative hidden h-9 w-9 shrink-0 sm:inline-flex"
+          >
+            <MessageSquare className="h-4 w-4" />
             <Badge
               variant="destructive"
               className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
             >
-              7
+              3
             </Badge>
-          </Link>
-        </Button>
-        <Button variant="ghost" size="icon" className="relative h-9 w-9">
-          <MessageSquare className="h-4 w-4" />
-          <Badge
-            variant="destructive"
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
-          >
-            3
-          </Badge>
-        </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <HelpCircle className="h-4 w-4" />
-        </Button>
+          </Button>
+          <Button variant="ghost" size="icon" className="hidden h-9 w-9 shrink-0 sm:inline-flex">
+            <HelpCircle className="h-4 w-4" />
+          </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="ml-1 flex items-center gap-2 rounded-[5px] px-2 py-1 hover:bg-muted/60">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  JK
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden text-left lg:block">
-                <p className="text-sm font-medium leading-none">John Kamau</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">System Admin</p>
-              </div>
-              <ChevronDown className="hidden h-4 w-4 text-muted-foreground lg:block" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex shrink-0 items-center gap-1 rounded-[5px] px-1 py-1 hover:bg-muted/60 sm:gap-2 sm:px-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                    JK
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden text-left md:block">
+                  <p className="text-sm font-medium leading-none">John Kamau</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">System Admin</p>
+                </div>
+                <ChevronDown className="hidden h-4 w-4 text-muted-foreground md:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      <SearchField className="border-t border-border/60 px-3 py-2.5 md:hidden" />
     </header>
   );
 }
