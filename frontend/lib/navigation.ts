@@ -1,7 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutGrid,
-  Bell,
+  Star,
+  Clock,
+  Pin,
   Settings,
   Headphones,
   Users,
@@ -94,9 +96,9 @@ export const departments: Department[] = [
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/crm/leads" },
-        { name: "Reports", path: "/crm/activities" },
-        { name: "Analytics", path: "/analytics" },
+        { name: "Home", path: "/crm" },
+        { name: "Reports", path: "/crm/reports" },
+        { name: "Analytics", path: "/crm/analytics" },
       ],
       groups: [
         {
@@ -107,6 +109,7 @@ export const departments: Department[] = [
             { name: "Contacts", path: "/crm/contacts" },
             { name: "Accounts", path: "/crm/accounts" },
             { name: "Deals", path: "/crm/deals" },
+            { name: "Documents", path: "/crm/activities" },
             { name: "Campaigns", path: "/crm/field-day" },
           ],
         },
@@ -396,7 +399,7 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "crm",
     name: "CRM",
-    href: "/crm/leads",
+    href: "/crm",
     icon: Users,
     iconClassName: "bg-blue-100 text-blue-600",
     badge: { label: "12 New Leads", className: "text-blue-600" },
@@ -547,14 +550,14 @@ export const workspaceApps: WorkspaceApp[] = [
 
 export const workspaceNavItems = [
   { name: "Workspace", href: "/workspace", icon: LayoutGrid },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Notifications", href: "/notifications", icon: Bell },
+  { name: "Favorites", href: "/workspace/favorites", icon: Star },
+  { name: "Recent", href: "/workspace/recent", icon: Clock },
+  { name: "Pinned", href: "/workspace/pinned", icon: Pin },
 ] as const;
 
 export const workspaceFooterNavItems = [
   { name: "Settings", href: "/workspace/settings", icon: Settings },
-  { name: "Help", href: "/workspace/help", icon: Headphones },
+  { name: "Help Center", href: "/workspace/help", icon: Headphones },
 ] as const;
 
 export function isWorkspaceNavActive(pathname: string, href: string): boolean {

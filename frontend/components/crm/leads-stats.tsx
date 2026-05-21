@@ -42,7 +42,7 @@ const stats = [
 
 export function LeadsStats() {
   return (
-    <div className="grid gap-4 md:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (

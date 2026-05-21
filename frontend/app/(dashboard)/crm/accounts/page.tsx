@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Building2, Search, Plus, MoreHorizontal, Mail, Phone, MapPin, Filter } from "lucide-react";
+import { CrmPageContent, CrmPageShell, CrmPageTitleRow } from "@/components/crm/crm-page-shell";
+import { Building2, Search, Plus, MoreHorizontal, MapPin, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const accounts = [
@@ -17,19 +18,20 @@ const accounts = [
 
 export default function AccountsPage() {
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Accounts</h1>
-          <p className="text-sm text-muted-foreground">Manage customer and partner accounts</p>
-        </div>
-        <Button className="rounded-[5px]">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Account
-        </Button>
-      </div>
+    <CrmPageShell>
+      <CrmPageContent>
+        <CrmPageTitleRow
+          title="Accounts"
+          subtitle="Manage customer and partner accounts"
+          actions={
+            <Button className="h-9 w-full rounded-[5px] sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Account
+            </Button>
+          }
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="rounded-[5px]">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -78,17 +80,17 @@ export default function AccountsPage() {
         </Card>
       </div>
 
-      <Card className="rounded-[5px]">
+      <Card className="min-w-0 rounded-[5px]">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle className="text-base font-medium">All Accounts</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="relative min-w-0 w-full sm:w-56">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="Search accounts..." className="pl-9 w-64 h-9 rounded-[5px]" />
+                <Input placeholder="Search accounts..." className="h-9 w-full rounded-[5px] pl-9" />
               </div>
               <Select defaultValue="all">
-                <SelectTrigger className="w-32 h-9 rounded-[5px]">
+                <SelectTrigger className="h-9 w-full rounded-[5px] sm:w-32">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -98,14 +100,14 @@ export default function AccountsPage() {
                   <SelectItem value="partner">Partner</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className="rounded-[5px]">
-                <Filter className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-9 w-full rounded-[5px] sm:w-auto">
+                <Filter className="mr-2 h-4 w-4" />
                 Filters
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -173,6 +175,7 @@ export default function AccountsPage() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      </CrmPageContent>
+    </CrmPageShell>
   );
 }

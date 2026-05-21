@@ -238,11 +238,11 @@
   }
 }
 
-/* App sidebar — force white bg, black text, red accents */
+/* App sidebar — light grey bg, compact nav, red accents */
 [data-slot="sidebar"],
 [data-slot="sidebar"] [data-sidebar="sidebar"],
 [data-slot="sidebar-inner"] {
-  --sidebar: #ffffff;
+  --sidebar: #f5f5f5;
   --sidebar-foreground: #1a1a1a;
   --sidebar-border: #e5e5e5;
   --sidebar-accent: #fef2f2;
@@ -250,7 +250,7 @@
   --sidebar-primary: #ec2024;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-ring: #ec2024;
-  background-color: #ffffff !important;
+  background-color: #f5f5f5 !important;
   color: #1a1a1a !important;
 }
 
@@ -271,9 +271,9 @@
   left: 0;
   top: 50%;
   height: 1.75rem;
-  width: 4px;
+  width: 3px;
   transform: translateY(-50%);
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 3px 3px 0;
   background-color: #ec2024;
 }
 
@@ -301,4 +301,35 @@
 .sidebar-scroll-area::-webkit-scrollbar-thumb {
   background-color: #ff9999;
   border-radius: 1px;
+}
+
+/* Leaflet lead map markers */
+.lead-map-marker {
+  background: transparent;
+  border: none;
+}
+
+.lead-map-marker-pin {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lead-map-marker-pin--focused {
+  border-width: 3px;
+  box-shadow: 0 0 0 4px rgb(236 32 36 / 0.25), 0 4px 10px rgb(0 0 0 / 0.3);
+  transform: rotate(-45deg) scale(1.15);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 6px;
+}
+
+.leaflet-container {
+  font-family: inherit;
 }
