@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowRight, Eye, EyeOff, Mail } from "lucide-react";
+import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,122 +23,127 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4">
-      <Image
-        src="/background.jpeg"
-        alt=""
-        fill
-        className="object-cover"
-        priority
-      />
-      <div className="absolute inset-0 bg-white/50" aria-hidden />
-      <div className="relative z-10 w-full max-w-md">
-        <div className="liquid-glass px-6 py-8 sm:px-8">
-          <div className="liquid-glass-shine" aria-hidden />
-          <div className="liquid-glass-glow" aria-hidden />
-          <div className="liquid-glass-content">
-          <div className="mb-6 flex justify-center">
-            <Image
-              src="/image.png"
-              alt="BIBO Windows & Doors"
-              width={300}
-              height={80}
-              className="h-auto w-full max-w-[280px] object-contain drop-shadow-sm"
-              priority
+    <AuthSplitLayout>
+      <header className="mb-8">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">
+          Sign in
+        </h2>
+        <p className="mt-1.5 text-sm text-neutral-500">
+          Use your Bibo work account.
+        </p>
+      </header>
+
+      <form onSubmit={handleLogin} className="space-y-5">
+        <div className="space-y-2">
+          <label
+            htmlFor="email"
+            className="text-sm font-medium text-foreground"
+          >
+            <span className="lg:hidden">Email</span>
+            <span className="hidden lg:inline">Email address</span>
+          </label>
+          <div className="login-field login-field-email group relative">
+            <input
+              id="email"
+              type="email"
+              placeholder="you@bibo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="login-input pr-11"
+            />
+            <Mail
+              className="pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground/50"
+              aria-hidden
             />
           </div>
+        </div>
 
-          <Card className="gap-4 border-0 bg-transparent py-0 shadow-none">
-            <CardHeader className="space-y-1 px-0 pb-2">
-              <CardTitle className="text-xl font-semibold text-foreground">
-                Sign in
-              </CardTitle>
-              <CardDescription className="text-foreground/70">
-                Enter your credentials to access your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-0">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="liquid-glass-input h-9 rounded-[10px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0 text-xs text-foreground/70 hover:text-primary"
-                  >
-                    Forgot password?
-                  </Button>
-                </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="liquid-glass-input h-9 pr-10 rounded-[10px]"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-9 w-9 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <label
-                  htmlFor="remember"
-                  className="text-sm text-muted-foreground cursor-pointer"
-                >
-                  Remember me
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-9 rounded-[10px]"
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing in..." : "Sign in"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-          <p className="mt-5 text-center text-xs text-foreground/70">
-            {"Don't have an account? "}
-            <Button variant="link" className="h-auto p-0 text-xs text-primary">
-              Contact administrator
-            </Button>
-          </p>
+        <div className="space-y-2">
+          <label
+            htmlFor="password"
+            className="text-sm font-medium text-foreground"
+          >
+            Password
+          </label>
+          <div className="login-field relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className="login-input pr-11"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOff className="size-[18px]" />
+              ) : (
+                <Eye className="size-[18px]" />
+              )}
+            </button>
           </div>
         </div>
-      </div>
-    </div>
+
+        <div className="login-options-row hidden items-center justify-between pt-1 lg:flex">
+          <div className="flex items-center gap-2.5">
+            <Checkbox id="remember" className="border-border" />
+            <label
+              htmlFor="remember"
+              className="cursor-pointer text-sm text-muted-foreground/90"
+            >
+              Keep me signed in
+            </label>
+          </div>
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:text-primary/90"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={cn(
+            "login-submit-btn flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60",
+            "mt-1 lg:mt-2"
+          )}
+        >
+          {isLoading ? "Signing in..." : "Sign In"}
+          {!isLoading && (
+            <ArrowRight className="size-4 max-lg:hidden" aria-hidden />
+          )}
+        </button>
+
+        <p className="login-mobile-forgot text-center lg:hidden">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-primary hover:text-primary/90"
+          >
+            Forgot password?
+          </Link>
+        </p>
+      </form>
+
+      <p className="mt-8 text-center text-sm text-neutral-500">
+        Need access?{" "}
+        <Link
+          href="/recover-email"
+          className="font-medium text-primary hover:text-primary/90"
+        >
+          Contact IT Admin
+        </Link>
+      </p>
+    </AuthSplitLayout>
   );
 }
