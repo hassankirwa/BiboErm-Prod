@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockDeals } from "@/lib/mock-data";
+import { mockDeals } from "@/lib/data/crm";
 import { TrendingUp, DollarSign, Target, CheckCircle } from "lucide-react";
 
 const totalValue = mockDeals.reduce((acc, d) => acc + d.value, 0);

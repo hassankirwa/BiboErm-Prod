@@ -297,7 +297,7 @@ export const departments: Department[] = [
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/hr/employees" },
+        { name: "Home", path: "/hr" },
         { name: "Reports", path: "/analytics" },
         { name: "Analytics", path: "/analytics" },
       ],
@@ -393,6 +393,8 @@ export type WorkspaceApp = {
   icon: LucideIcon;
   iconClassName: string;
   badge?: { label: string; className: string };
+  /** Spatie permission required to show this app tile */
+  permission?: string;
 };
 
 export const workspaceApps: WorkspaceApp[] = [
@@ -403,6 +405,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Users,
     iconClassName: "bg-blue-100 text-blue-600",
     badge: { label: "12 New Leads", className: "text-blue-600" },
+    permission: "leads.view",
   },
   {
     id: "field-day",
@@ -417,6 +420,7 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/projects",
     icon: FolderKanban,
     iconClassName: "bg-purple-100 text-purple-600",
+    permission: "projects.view",
   },
   {
     id: "estimations",
@@ -432,6 +436,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Warehouse,
     iconClassName: "bg-orange-100 text-orange-600",
     badge: { label: "3 Low Stock", className: "text-orange-600" },
+    permission: "warehouse.stock.view",
   },
   {
     id: "contacts",
@@ -477,6 +482,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Receipt,
     iconClassName: "bg-emerald-100 text-emerald-600",
     badge: { label: "4 Pending", className: "text-teal-600" },
+    permission: "procurement.po.create",
   },
   {
     id: "production",
@@ -485,6 +491,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Factory,
     iconClassName: "bg-sky-100 text-sky-600",
     badge: { label: "4 Delayed", className: "text-sky-600" },
+    permission: "production.schedule.manage",
   },
   {
     id: "qc",
@@ -492,6 +499,7 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/qc/inspections",
     icon: ShieldCheck,
     iconClassName: "bg-cyan-100 text-cyan-600",
+    permission: "qc.inspect",
   },
   {
     id: "dispatch",
@@ -516,14 +524,16 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: CircleDollarSign,
     iconClassName: "bg-green-100 text-green-700",
     badge: { label: "2 Overdue", className: "text-green-600" },
+    permission: "payroll.view",
   },
   {
     id: "hr",
     name: "HR",
-    href: "/hr/employees",
+    href: "/hr",
     icon: UserCog,
     iconClassName: "bg-rose-100 text-rose-600",
     badge: { label: "1 On Leave", className: "text-rose-600" },
+    permission: "employees.view",
   },
   {
     id: "analytics",
@@ -545,8 +555,23 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/it/users",
     icon: Monitor,
     iconClassName: "bg-slate-100 text-slate-600",
+    permission: "users.view",
   },
 ];
+
+export function filterAppsByPermissions(
+  apps: WorkspaceApp[],
+  permissions: string[],
+  roles: string[] = []
+): WorkspaceApp[] {
+  const isSuperAdmin = roles.includes("super_admin");
+
+  return apps.filter((app) => {
+    if (!app.permission) return true;
+    if (isSuperAdmin) return true;
+    return permissions.includes(app.permission);
+  });
+}
 
 export const workspaceNavItems = [
   { name: "Workspace", href: "/workspace", icon: LayoutGrid },
@@ -568,11 +593,50 @@ export function isWorkspaceNavActive(pathname: string, href: string): boolean {
 }
 
 const workspaceShellPrefixes = [
-  "/workspace",
   "/analytics",
   "/projects",
   "/notifications",
 ];
+
+const SLUG_TO_DEPARTMENT_ID: Record<string, string> = {
+  sales_marketing: "crm",
+  production: "production",
+  warehouse: "warehouse",
+  procurement: "procurement",
+  quality_control: "qc",
+  hr: "hr",
+  finance: "finance",
+  it: "it",
+  project_management: "projects",
+  operations: "analytics",
+  reception: "crm",
+};
+
+export function getDepartmentNavForSlug(slug: string): Department | null {
+  const departmentId = SLUG_TO_DEPARTMENT_ID[slug];
+  if (!departmentId) return null;
+  return departments.find((department) => department.id === departmentId) ?? null;
+}
+
+export function getPrimaryDepartmentNav(
+  authDepartments: Array<{ slug: string; is_primary: boolean }>
+): Department | null {
+  if (!authDepartments.length) return null;
+  const primary =
+    authDepartments.find((department) => department.is_primary) ??
+    authDepartments[0];
+  if (!primary) return null;
+  return getDepartmentNavForSlug(primary.slug);
+}
+
+export function isWorkspaceSettingsPath(pathname: string): boolean {
+  return (
+    pathname === "/workspace/settings" ||
+    pathname.startsWith("/workspace/settings/") ||
+    pathname === "/workspace/help" ||
+    pathname.startsWith("/workspace/help/")
+  );
+}
 
 export function getActiveDepartment(pathname: string): Department | null {
   if (

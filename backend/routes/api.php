@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminLookupController;
 use App\Http\Controllers\Admin\InviteUserController;
 use App\Http\Controllers\Admin\ResendInviteController;
 use App\Http\Controllers\Admin\RevokeInvitationController;
@@ -13,11 +14,24 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RecoverEmailController;
 use App\Http\Controllers\Auth\RefreshSessionController;
 use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\Auth\TwoFactorLoginController;
+use App\Http\Controllers\Hr\HrDashboardController;
+use App\Http\Controllers\Hr\HrEmployeeController;
+use App\Http\Controllers\Hr\HrEmployeeIdentityController;
+use App\Http\Controllers\Hr\HrEmployeeLookupController;
 use App\Http\Controllers\Hr\HrEmployeeProfileController;
+use App\Http\Controllers\Hr\HrProfileChangeRequestController;
+use App\Http\Controllers\ProfileChangeRequestController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StoredFileController;
+use App\Http\Controllers\TwoFactorSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:bibo-login')->post('auth/login', [LoginController::class, 'store']);
+
+Route::middleware('throttle:bibo-2fa-verify')->post('auth/two-factor/verify', [TwoFactorLoginController::class, 'verify']);
+
+Route::middleware('throttle:bibo-2fa-resend')->post('auth/two-factor/resend', [TwoFactorLoginController::class, 'resend']);
 
 Route::middleware('throttle:bibo-refresh')->post('auth/refresh', [RefreshSessionController::class, 'store']);
 
@@ -29,18 +43,37 @@ Route::middleware('throttle:bibo-reset-password')->post('auth/reset-password', [
 
 Route::middleware('throttle:bibo-recover-email')->post('auth/recover-email', [RecoverEmailController::class, 'store']);
 
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('auth/change-password', [ChangePasswordController::class, 'update'])
+        ->middleware('device.trusted');
+});
+
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('auth/logout', [LogoutController::class, 'destroy']);
     Route::get('auth/me', [AuthMeController::class, 'show']);
 
-    Route::post('auth/change-password', [ChangePasswordController::class, 'update'])
-        ->middleware('device.trusted');
-
+    Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile', [ProfileController::class, 'update'])
         ->middleware('device.trusted');
 
     Route::post('profile/avatar', [ProfileController::class, 'avatar'])
+        ->middleware(['device.trusted', 'throttle:bibo-upload']);
+
+    Route::post('profile/change-requests', [ProfileChangeRequestController::class, 'store'])
         ->middleware('device.trusted');
+
+    Route::post('profile/two-factor/enable', [TwoFactorSettingsController::class, 'enable'])
+        ->middleware('device.trusted');
+
+    Route::post('profile/two-factor/disable', [TwoFactorSettingsController::class, 'disable'])
+        ->middleware('device.trusted');
+
+    Route::get('files/{category}/{owner}/{filename}', [StoredFileController::class, 'show'])
+        ->where([
+            'category' => '[a-zA-Z0-9._-]+',
+            'owner' => '[a-zA-Z0-9._-]+',
+            'filename' => '[a-zA-Z0-9._-]+',
+        ]);
 });
 
 Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
@@ -54,6 +87,11 @@ Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
 
         Route::middleware('permission:users.view')->get('users', [UserManagementController::class, 'index']);
 
+        Route::middleware('role_or_permission:users.invite|users.view')->prefix('lookups')->group(function () {
+            Route::get('departments', [AdminLookupController::class, 'departments']);
+            Route::get('roles', [AdminLookupController::class, 'roles']);
+        });
+
         Route::middleware('permission:users.suspend')
             ->patch('users/{user}/status', [UserManagementController::class, 'updateStatus']);
 
@@ -64,9 +102,27 @@ Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
 Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
     ->prefix('hr')
     ->group(function () {
+        Route::middleware('permission:employees.view')->group(function () {
+            Route::get('dashboard/stats', [HrDashboardController::class, 'stats']);
+            Route::get('dashboard/pending-profile-changes', [HrDashboardController::class, 'pendingProfileChanges']);
+            Route::get('employees/suggested-number', [HrEmployeeLookupController::class, 'suggestedEmployeeNumber']);
+            Route::get('employees', [HrEmployeeController::class, 'index']);
+            Route::get('employees/{user}', [HrEmployeeController::class, 'show']);
+        });
+
         Route::middleware('permission:employees.update_hr_details')
             ->put('employees/{user}', [HrEmployeeProfileController::class, 'upsert']);
 
         Route::middleware('permission:employees.approve')
             ->post('employees/{user}/approve', [HrEmployeeProfileController::class, 'approve']);
+
+        Route::middleware('permission:users.update_identity')->group(function () {
+            Route::patch('employees/{user}/identity', [HrEmployeeIdentityController::class, 'update']);
+            Route::post('employees/{user}/reset-password', [HrEmployeeIdentityController::class, 'resetPassword']);
+        });
+
+        Route::middleware('permission:profile_changes.review')->group(function () {
+            Route::post('profile-change-requests/{profileChangeRequest}/approve', [HrProfileChangeRequestController::class, 'approve']);
+            Route::post('profile-change-requests/{profileChangeRequest}/reject', [HrProfileChangeRequestController::class, 'reject']);
+        });
     });

@@ -5,16 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Auth\InvitationService;
-use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
 
 class ResendInviteController extends Controller
 {
-    public function store(User $user, InvitationService $invitations): Response
+    public function store(User $user, InvitationService $invitations): JsonResponse
     {
         /** @var User $actor */
         $actor = request()->user();
-        $invitations->resendForUser($user, $actor);
 
-        return response()->noContent();
+        $result = $invitations->resendForUser($user, $actor);
+
+        return response()->json($result->toArray());
     }
 }

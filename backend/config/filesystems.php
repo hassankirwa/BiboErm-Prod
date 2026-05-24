@@ -47,6 +47,13 @@ return [
             'report' => false,
         ],
 
+        'bibo' => [
+            'driver' => 'local',
+            'root' => env('BIBO_STORAGE_PATH', dirname(base_path()).DIRECTORY_SEPARATOR.'storage'),
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
@@ -75,6 +82,10 @@ return [
 
     'links' => [
         public_path('storage') => storage_path('app/public'),
+        public_path('media') => env(
+            'BIBO_STORAGE_PUBLIC_PATH',
+            dirname(base_path()).DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'public'
+        ),
     ],
 
 ];

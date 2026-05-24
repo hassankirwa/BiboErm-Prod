@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockWarehouseItems } from "@/lib/mock-data";
+import { mockWarehouseItems } from "@/lib/data/warehouse";
 import { Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 
 const totalItems = mockWarehouseItems.length;

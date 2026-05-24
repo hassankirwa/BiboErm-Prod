@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { mockDeals, mockContacts } from "@/lib/mock-data";
+import { mockDeals, mockContacts } from "@/lib/data/crm";
 import { Calendar, DollarSign } from "lucide-react";
 import type { DealStage } from "@/lib/types";
 

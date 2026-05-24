@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockProjects } from "@/lib/mock-data";
+import { mockProjects } from "@/lib/data/projects";
 import { FolderKanban, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 
 const activeProjects = mockProjects.filter((p) => p.stage !== "complete");

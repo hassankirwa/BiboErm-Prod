@@ -6,7 +6,7 @@ import { Plus, Calendar } from "lucide-react";
 
 export default function ProductionSchedulePage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Production Schedule"
         subtitle="Manage production pipeline"
@@ -23,8 +23,8 @@ export default function ProductionSchedulePage() {
           </div>
         }
       />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="min-w-0 w-full">
+        <div className="space-y-6 p-6">
           <ProductionStats />
           <ProductionSchedule />
         </div>

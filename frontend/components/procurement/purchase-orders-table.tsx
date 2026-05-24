@@ -26,7 +26,8 @@ import {
   FileText,
   Trash2,
 } from "lucide-react";
-import { mockPurchaseOrders, mockSuppliers, mockProjects } from "@/lib/mock-data";
+import { mockPurchaseOrders, mockSuppliers } from "@/lib/data/procurement";
+import { mockProjects } from "@/lib/data/projects";
 
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",

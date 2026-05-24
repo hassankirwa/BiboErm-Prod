@@ -14,7 +14,7 @@ import {
 
 export default function NCRPage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Non-Conformance Reports"
         subtitle="Track and resolve quality issues"
@@ -25,8 +25,8 @@ export default function NCRPage() {
           </Button>
         }
       />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="min-w-0 w-full">
+        <div className="space-y-6 p-6">
           <NCRStats />
           <div className="flex items-center gap-3">
             <div className="relative w-80">

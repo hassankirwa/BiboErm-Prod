@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { mockProjects } from "@/lib/mock-data";
+import { mockProjects } from "@/lib/data/projects";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, MapPin, Calendar, AlertCircle } from "lucide-react";
 import Link from "next/link";

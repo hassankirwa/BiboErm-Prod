@@ -25,6 +25,8 @@ final class DepartmentRoleAssignmentRules
             throw ValidationException::withMessages(['role_id' => ['Invalid role.']]);
         }
 
+        DepartmentRoleCatalog::assertRoleAllowedForDepartment($departmentId, $roleId);
+
         foreach ($additionalAssignments as $i => $row) {
             if (! isset($row['department_id'], $row['role_id'])) {
                 throw ValidationException::withMessages(["{$additionalKeyPrefix}.{$i}" => ['Each row requires department_id and role_id.']]);
@@ -37,6 +39,12 @@ final class DepartmentRoleAssignmentRules
             if (! Role::query()->whereKey($row['role_id'])->exists()) {
                 throw ValidationException::withMessages(["{$additionalKeyPrefix}.{$i}.role_id" => ['Invalid role.']]);
             }
+
+            DepartmentRoleCatalog::assertRoleAllowedForDepartment(
+                (int) $row['department_id'],
+                (int) $row['role_id'],
+                "{$additionalKeyPrefix}.{$i}.role_id",
+            );
         }
     }
 }

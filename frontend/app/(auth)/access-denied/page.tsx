@@ -1,9 +1,17 @@
+"use client";
+
 import Link from "next/link";
 import { Mail, ShieldX } from "lucide-react";
 import { AuthCardLayout } from "@/components/auth/auth-card-layout";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function AccessDeniedPage() {
+  const { user } = useAuth();
+
+  const statusLabel =
+    user?.status === "inactive" ? "Inactive" : "Suspended";
+
   return (
     <AuthCardLayout centered>
       <div className="flex flex-col items-center text-center">
@@ -16,23 +24,21 @@ export default function AccessDeniedPage() {
           administrator to reinstate access.
         </p>
 
-        <div className="auth-info-box mt-6 w-full text-left text-xs">
-          <div className="flex justify-between gap-4 py-1">
-            <span className="text-muted-foreground">Account</span>
-            <span className="font-semibold">john.kamau@bibo.com</span>
+        {user && (
+          <div className="auth-info-box mt-6 w-full text-left text-xs">
+            <div className="flex justify-between gap-4 py-1">
+              <span className="text-muted-foreground">Account</span>
+              <span className="font-semibold">{user.email}</span>
+            </div>
+            <div className="flex justify-between gap-4 py-1">
+              <span className="text-muted-foreground">Status</span>
+              <span className="auth-status-badge auth-status-suspended">
+                <span className="auth-status-dot" />
+                {statusLabel}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between gap-4 py-1">
-            <span className="text-muted-foreground">Status</span>
-            <span className="auth-status-badge auth-status-suspended">
-              <span className="auth-status-dot" />
-              Suspended
-            </span>
-          </div>
-          <div className="flex justify-between gap-4 py-1">
-            <span className="text-muted-foreground">Since</span>
-            <span className="font-medium">May 18, 2026</span>
-          </div>
-        </div>
+        )}
 
         <Button className="mt-6 w-full" asChild>
           <a href="mailto:support@bibo.com">
@@ -42,10 +48,10 @@ export default function AccessDeniedPage() {
         </Button>
 
         <Link
-          href="mailto:support@bibo.com"
+          href="/"
           className="mt-4 text-xs text-muted-foreground hover:text-foreground"
         >
-          support@bibo.com
+          Back to sign in
         </Link>
       </div>
     </AuthCardLayout>

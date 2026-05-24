@@ -4,7 +4,7 @@ import { CrmHomeTables } from "@/components/crm/crm-home-tables";
 
 export default function CrmHomePage() {
   return (
-    <div className="relative h-full min-h-0 w-full max-w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f0]">
+    <div className="relative w-full min-w-0 bg-[#f0f0f0]">
       <div className="relative w-full min-h-full min-w-0">
         <CrmPageBackground />
 

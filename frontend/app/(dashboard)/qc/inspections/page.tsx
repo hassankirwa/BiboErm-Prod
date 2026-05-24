@@ -15,7 +15,7 @@ import {
 
 export default function QCInspectionsPage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="QC Inspections"
         subtitle="Quality control and inspections"
@@ -26,8 +26,8 @@ export default function QCInspectionsPage() {
           </Button>
         }
       />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="min-w-0 w-full">
+        <div className="space-y-6 p-6">
           <QCStats />
           <div className="flex items-center gap-3">
             <div className="relative w-80">

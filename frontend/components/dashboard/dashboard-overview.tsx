@@ -9,7 +9,7 @@ import {
   Factory,
   ClipboardCheck,
 } from "lucide-react";
-import { mockDashboardMetrics } from "@/lib/mock-data";
+import { mockDashboardMetrics } from "@/lib/data/dashboard";
 
 const metrics = [
   {

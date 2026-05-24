@@ -24,7 +24,8 @@ import {
   Users,
   DollarSign,
 } from "lucide-react";
-import { mockProjects, mockContacts, mockUsers } from "@/lib/mock-data";
+import { mockProjects } from "@/lib/data/projects";
+import { mockContacts, mockUsers } from "@/lib/data/crm";
 
 const stageColors: Record<string, string> = {
   awaiting_deposit: "bg-muted text-muted-foreground",

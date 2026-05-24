@@ -8,14 +8,32 @@ import { AuthCardLayout } from "@/components/auth/auth-card-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError } from "@/lib/api/client";
+import * as authApi from "@/lib/api/auth";
 
 export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await authApi.forgotPassword(email);
+      setSubmitted(true);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.firstError() ?? "Unable to send reset link.");
+      } else {
+        setError("Unable to send reset link. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -42,6 +60,10 @@ export default function ForgotPasswordPage() {
         />
       )}
 
+      {error && (
+        <AuthBanner variant="error" title={error} />
+      )}
+
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Work email</Label>
@@ -60,8 +82,8 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={submitted}>
-          {submitted ? "Link sent" : "Send reset link"}
+        <Button type="submit" className="w-full" disabled={submitted || isLoading}>
+          {submitted ? "Link sent" : isLoading ? "Sending..." : "Send reset link"}
         </Button>
       </form>
 

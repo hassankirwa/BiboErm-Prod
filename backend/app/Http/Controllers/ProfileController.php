@@ -8,8 +8,10 @@ use App\Models\User;
 use App\Models\UserProfile;
 use App\Services\Audit\OwenAuditLogger;
 use App\Services\Media\AvatarStorageService;
+use App\Services\Profile\ProfileChangeRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProfileController extends Controller
 {
@@ -18,10 +20,66 @@ class ProfileController extends Controller
         private readonly AvatarStorageService $avatars,
     ) {}
 
+    public function show(): JsonResponse
+    {
+        /** @var User $user */
+        $user = request()->user();
+
+        /** @var UserProfile $profile */
+        $profile = UserProfile::query()->firstOrCreate(['user_id' => $user->id]);
+
+        $user->loadMissing('employeeProfile');
+
+        $pendingRequest = app(ProfileChangeRequestService::class)->pendingForUser($user->id);
+
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'two_factor_enabled' => (bool) $user->two_factor_enabled,
+                'status' => $user->status,
+            ],
+            'profile' => $this->profilePayload($profile),
+            'employee_number' => $user->employeeProfile?->employee_number,
+            'pending_change_request' => ProfileChangeRequestService::serialize($pendingRequest),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function profilePayload(UserProfile $profile): array
+    {
+        $profile = $profile->fresh();
+
+        return [
+            'id' => $profile->id,
+            'user_id' => $profile->user_id,
+            'phone' => $profile->phone,
+            'avatar_url' => $profile->avatar_url,
+            'avatar_path' => $profile->avatar_path,
+            'gender' => $profile->gender,
+            'address' => $profile->address,
+            'emergency_contact_name' => $profile->emergency_contact_name,
+            'emergency_contact_phone' => $profile->emergency_contact_phone,
+            'emergency_contact_relationship' => $profile->emergency_contact_relationship,
+            'preferences' => $profile->preferences,
+            'created_at' => $profile->created_at,
+            'updated_at' => $profile->updated_at,
+        ];
+    }
+
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
+
+        if ($user->status === User::STATUS_ACTIVE) {
+            throw ValidationException::withMessages([
+                'profile' => [__('Submit a profile change request from Settings to update your information.')],
+            ]);
+        }
 
         /** @var UserProfile $profile */
         $profile = UserProfile::query()->firstOrCreate(['user_id' => $user->id]);
@@ -52,7 +110,7 @@ class ProfileController extends Controller
             ])->save();
         }
 
-        return response()->json(['message' => __('Profile saved.'), 'profile' => $profile->fresh()]);
+        return response()->json(['message' => __('Profile saved.'), 'profile' => $this->profilePayload($profile->fresh())]);
     }
 
     public function avatar(AvatarUploadRequest $request): JsonResponse
@@ -87,6 +145,7 @@ class ProfileController extends Controller
             'message' => __('Avatar uploaded.'),
             'avatar_path' => $path['path'],
             'avatar_url' => $path['url'],
+            'profile' => $this->profilePayload($profile->fresh()),
         ]);
     }
 

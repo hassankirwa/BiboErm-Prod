@@ -1,13 +1,26 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Clock, RefreshCw } from "lucide-react";
 import { AuthCardLayout } from "@/components/auth/auth-card-layout";
 import { OnboardingStepper } from "@/components/auth/onboarding-stepper";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-context";
+import { resolveHomeRoute } from "@/lib/auth/redirect";
 
 const pendingSteps = [
   { id: 1, label: "Accept Invite", status: "done" as const },
   { id: 2, label: "Your Profile", status: "done" as const },
   { id: 3, label: "HR Review", status: "active" as const },
 ];
+
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
+
+function formatLastChecked(date: Date): string {
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 function HrReviewIllustration() {
   return (
@@ -89,8 +102,39 @@ function HrReviewIllustration() {
 }
 
 export default function PendingHrPage() {
+  const router = useRouter();
+  const { refreshMe } = useAuth();
+  const [checking, setChecking] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  const checkStatus = useCallback(async () => {
+    setChecking(true);
+    try {
+      const payload = await refreshMe();
+      setLastChecked(new Date());
+
+      if (payload?.user.status === "active") {
+        router.replace(resolveHomeRoute(payload.departments, payload.roles));
+      }
+    } finally {
+      setChecking(false);
+    }
+  }, [refreshMe, router]);
+
+  const checkStatusRef = useRef(checkStatus);
+  checkStatusRef.current = checkStatus;
+
+  useEffect(() => {
+    const tick = () => {
+      void checkStatusRef.current();
+    };
+
+    const interval = window.setInterval(tick, POLL_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, []);
+
   return (
-    <AuthCardLayout wide centered={false}>
+    <AuthCardLayout extraWide centered={false}>
       <OnboardingStepper steps={pendingSteps} />
 
       <HrReviewIllustration />
@@ -99,7 +143,8 @@ export default function PendingHrPage() {
         <h1 className="auth-card-title">Almost there!</h1>
         <p className="auth-card-sub mx-auto max-w-md">
           Your profile is complete. HR is now setting up your employment
-          record. You&apos;ll receive an email the moment your account is ready.
+          record. We&apos;ll email you as soon as your account is ready — you
+          don&apos;t need to keep this page open.
         </p>
       </div>
 
@@ -108,10 +153,23 @@ export default function PendingHrPage() {
         <div className="flex-1">
           Average review time: <strong>under 24 hours</strong>
         </div>
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="auth-pending-pulse" />
-          Checking...
+        <div className="text-xs text-muted-foreground">
+          {lastChecked
+            ? `Last checked ${formatLastChecked(lastChecked)}`
+            : "Auto-checks every 5 minutes"}
         </div>
+      </div>
+
+      <div className="flex justify-center">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={checking}
+          onClick={() => void checkStatus()}
+        >
+          <RefreshCw className={`size-4 ${checking ? "animate-spin" : ""}`} />
+          {checking ? "Checking…" : "Check status"}
+        </Button>
       </div>
 
       <p className="text-center">

@@ -9,7 +9,7 @@ export default function NotificationsPage() {
         title="Notifications"
         subtitle="Alerts and updates across your operations"
       />
-      <div className="flex-1 overflow-auto p-6">
+      <div className="min-w-0 w-full p-6">
         <Card className="max-w-lg rounded-[10px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
+use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,7 +18,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->booting(function (): void {
+            config(['filesystems.disks.bibo.root' => BiboStorage::rootPath()]);
+        });
     }
 
     /**
@@ -25,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        BiboStorage::ensureCategoryDirectoriesExist();
+
         RateLimiter::for('bibo-login', function (Request $request): Limit {
             $limit = max(1, (int) config('bibo.rate_limit.login_per_minute', 5));
 
@@ -71,6 +76,28 @@ class AppServiceProvider extends ServiceProvider
             $key = $user instanceof User ? (string) $user->getKey() : (string) $request->ip();
 
             return Limit::perHour($limit)->by($key);
+        });
+
+        RateLimiter::for('bibo-upload', function (Request $request): Limit {
+            $limit = max(1, (int) config('bibo.rate_limit.upload_per_minute', 10));
+
+            $user = $request->user();
+
+            $key = $user instanceof User ? 'user:'.$user->getKey() : (string) $request->ip();
+
+            return Limit::perMinute($limit)->by($key);
+        });
+
+        RateLimiter::for('bibo-2fa-verify', function (Request $request): Limit {
+            $limit = max(1, (int) config('bibo.rate_limit.two_factor_verify_per_minute', 10));
+
+            return Limit::perMinute($limit)->by((string) $request->ip());
+        });
+
+        RateLimiter::for('bibo-2fa-resend', function (Request $request): Limit {
+            $limit = max(1, (int) config('bibo.rate_limit.two_factor_resend_per_minute', 3));
+
+            return Limit::perMinute($limit)->by((string) $request->ip());
         });
 
         UserDepartmentRole::saved(function (UserDepartmentRole $row): void {

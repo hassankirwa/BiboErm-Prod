@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Profile;
 
+use App\Models\UserProfile;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateProfileRequest extends FormRequest
 {
@@ -22,7 +24,7 @@ class UpdateProfileRequest extends FormRequest
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
             'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
-            'gender' => ['nullable', 'string', 'max:20'],
+            'gender' => ['nullable', 'string', Rule::in(UserProfile::GENDERS)],
         ];
     }
 }

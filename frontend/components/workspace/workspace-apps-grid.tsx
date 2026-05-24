@@ -1,13 +1,19 @@
+"use client";
+
 import Link from "next/link";
-import { workspaceApps } from "@/lib/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { filterAppsByPermissions, workspaceApps } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceAppsGrid() {
+  const { permissions, roles } = useAuth();
+  const apps = filterAppsByPermissions(workspaceApps, permissions, roles);
+
   return (
     <section className="min-w-0 w-full">
       <h2 className="mb-3 text-sm font-semibold text-foreground">Your Apps</h2>
       <div className="grid w-full min-w-0 grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-        {workspaceApps.map((app) => {
+        {apps.map((app) => {
           const Icon = app.icon;
           return (
             <Link

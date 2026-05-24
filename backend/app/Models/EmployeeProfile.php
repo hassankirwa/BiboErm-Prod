@@ -7,6 +7,42 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmployeeProfile extends Model
 {
+    public const EMPLOYMENT_FULL_TIME = 'full_time';
+
+    public const EMPLOYMENT_PART_TIME = 'part_time';
+
+    public const EMPLOYMENT_CONTRACT = 'contract';
+
+    /**
+     * @var list<string>
+     */
+    public const EMPLOYMENT_TYPES = [
+        self::EMPLOYMENT_FULL_TIME,
+        self::EMPLOYMENT_PART_TIME,
+        self::EMPLOYMENT_CONTRACT,
+    ];
+
+    public const CONTRACT_PERMANENT = 'permanent';
+
+    public const CONTRACT_FIXED_TERM = 'fixed_term';
+
+    public const CONTRACT_PROBATION = 'probation';
+
+    public const CONTRACT_INTERN = 'intern';
+
+    public const CONTRACT_CONSULTANT = 'consultant';
+
+    /**
+     * @var list<string>
+     */
+    public const CONTRACT_TYPES = [
+        self::CONTRACT_PERMANENT,
+        self::CONTRACT_FIXED_TERM,
+        self::CONTRACT_PROBATION,
+        self::CONTRACT_INTERN,
+        self::CONTRACT_CONSULTANT,
+    ];
+
     protected $fillable = [
         'user_id',
         'employee_number',

@@ -20,7 +20,11 @@ class EnsureUserIsActive
             }
 
             if ($user->status === User::STATUS_INVITED) {
-                return response()->json(['message' => __('Please accept your invitation first.')], Response::HTTP_FORBIDDEN);
+                $changingPassword = $request->is('api/auth/change-password');
+
+                if (! $changingPassword || ! $user->must_change_password) {
+                    return response()->json(['message' => __('Please accept your invitation first.')], Response::HTTP_FORBIDDEN);
+                }
             }
         }
 

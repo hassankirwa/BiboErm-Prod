@@ -5,25 +5,81 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Mail } from "lucide-react";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { TwoFactorLoginStep } from "@/components/auth/two-factor-login-step";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/auth-context";
+import { ApiError } from "@/lib/api/client";
+import { isTwoFactorChallenge, type TwoFactorChallenge } from "@/lib/auth/types";
+import { resolveAuthRedirect } from "@/lib/auth/redirect";
 import { cn } from "@/lib/utils";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const { login, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState<TwoFactorChallenge | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    router.push("/workspace");
+    setError(null);
+
+    try {
+      const result = await login(email, password, remember);
+
+      if (isTwoFactorChallenge(result)) {
+        setTwoFactorChallenge(result);
+        return;
+      }
+
+      if (result.user.must_change_password) {
+        router.push("/change-password");
+        return;
+      }
+
+      if (result.user.status === "suspended" || result.user.status === "inactive") {
+        router.push("/access-denied");
+        return;
+      }
+
+      router.push(
+        resolveAuthRedirect(
+          result.user.status,
+          result.departments,
+          result.redirect,
+          result.roles
+        )
+      );
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 403) {
+          router.push("/access-denied");
+          return;
+        }
+        setError(err.firstError() ?? "Invalid credentials.");
+      } else {
+        setError("Unable to sign in. Please try again.");
+      }
+    }
   };
 
   return (
     <AuthSplitLayout>
+      {twoFactorChallenge ? (
+        <TwoFactorLoginStep
+          challenge={twoFactorChallenge}
+          onBack={() => {
+            setTwoFactorChallenge(null);
+            setError(null);
+          }}
+          onChallengeUpdate={setTwoFactorChallenge}
+        />
+      ) : (
+        <>
       <header className="mb-8">
         <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">
           Sign in
@@ -32,6 +88,12 @@ export default function LoginPage() {
           Use your Bibo work account.
         </p>
       </header>
+
+      {error && (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleLogin} className="space-y-5">
         <div className="space-y-2">
@@ -95,7 +157,12 @@ export default function LoginPage() {
 
         <div className="login-options-row hidden items-center justify-between pt-1 lg:flex">
           <div className="flex items-center gap-2.5">
-            <Checkbox id="remember" className="border-border" />
+            <Checkbox
+              id="remember"
+              className="border-border"
+              checked={remember}
+              onCheckedChange={(checked) => setRemember(checked === true)}
+            />
             <label
               htmlFor="remember"
               className="cursor-pointer text-sm text-muted-foreground/90"
@@ -113,14 +180,14 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={loading}
           className={cn(
             "login-submit-btn flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60",
             "mt-1 lg:mt-2"
           )}
         >
-          {isLoading ? "Signing in..." : "Sign In"}
-          {!isLoading && (
+          {loading ? "Signing in..." : "Sign In"}
+          {!loading && (
             <ArrowRight className="size-4 max-lg:hidden" aria-hidden />
           )}
         </button>
@@ -144,6 +211,16 @@ export default function LoginPage() {
           Contact IT Admin
         </Link>
       </p>
+        </>
+      )}
     </AuthSplitLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthGuard mode="auth">
+      <LoginForm />
+    </AuthGuard>
   );
 }

@@ -11,6 +11,7 @@ import {
   PieChart,
   Settings,
   Headphones,
+  LayoutGrid,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,9 +34,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/auth-context";
+import { canAccessWorkspaceHub, isWorkspaceHubPath } from "@/lib/auth/redirect";
 import {
   getActiveDepartment,
+  getPrimaryDepartmentNav,
   isWorkspaceNavActive,
+  isWorkspaceSettingsPath,
   workspaceNavItems,
   workspaceFooterNavItems,
 } from "@/lib/navigation";
@@ -168,11 +173,21 @@ function WorkspaceContent({ pathname }: { pathname: string }) {
 function DepartmentContent({
   department,
   pathname,
+  showWorkspaceLink = false,
 }: {
   department: NonNullable<ReturnType<typeof getActiveDepartment>>;
   pathname: string;
+  showWorkspaceLink?: boolean;
 }) {
   const nav = department.nav;
+  const workspaceLink = showWorkspaceLink ? (
+    <NavItem
+      href="/workspace"
+      name="Workspace"
+      icon={LayoutGrid}
+      isActive={false}
+    />
+  ) : null;
 
   if (!nav) {
     return (
@@ -182,6 +197,7 @@ function DepartmentContent({
             <SidebarGroup className="p-0">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1 px-3">
+                  {workspaceLink}
                   {department.subModules.map((sub) => (
                     <NavItem
                       key={sub.path}
@@ -209,6 +225,7 @@ function DepartmentContent({
         <SidebarGroup className="shrink-0 p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1 px-3">
+              {workspaceLink}
               {nav.topItems.map((item) => {
                 const Icon = topItemIcons[item.name] ?? Home;
                 const isActive = pathname === item.path;
@@ -318,19 +335,44 @@ function DepartmentContent({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { roles, departments } = useAuth();
+  const canWorkspace = canAccessWorkspaceHub(roles);
+  const isSuperAdmin = roles.includes("super_admin");
   const activeDepartment = getActiveDepartment(pathname);
-  const isWorkspace = activeDepartment === null;
+  const primaryDepartment = getPrimaryDepartmentNav(departments);
+
+  const showWorkspaceSidebar =
+    (isWorkspaceHubPath(pathname) && canWorkspace) ||
+    (isWorkspaceSettingsPath(pathname) && canWorkspace);
+
+  const showDepartmentSidebar =
+    activeDepartment !== null ||
+    (isWorkspaceSettingsPath(pathname) && !canWorkspace && primaryDepartment !== null);
+
+  const sidebarDepartment =
+    activeDepartment ?? (showDepartmentSidebar ? primaryDepartment : null);
 
   return (
     <Sidebar
       collapsible="offcanvas"
       className="top-14 z-20 !h-[calc(100dvh-3.5rem)] border-r border-neutral-200 bg-[#f5f5f5]"
     >
-      {isWorkspace ? (
+      {showWorkspaceSidebar ? (
         <WorkspaceContent pathname={pathname} />
-      ) : (
-        <DepartmentContent department={activeDepartment} pathname={pathname} />
-      )}
+      ) : sidebarDepartment ? (
+        <DepartmentContent
+          department={sidebarDepartment}
+          pathname={pathname}
+          showWorkspaceLink={isSuperAdmin && !isWorkspaceHubPath(pathname)}
+        />
+      ) : primaryDepartment ? (
+        <DepartmentContent
+          department={primaryDepartment}
+          pathname={pathname}
+        />
+      ) : canWorkspace ? (
+        <WorkspaceContent pathname={pathname} />
+      ) : null}
     </Sidebar>
   );
 }

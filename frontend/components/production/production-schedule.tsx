@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { mockProductionOrders, mockProjects } from "@/lib/mock-data";
+import { mockProductionOrders } from "@/lib/data/production";
+import { mockProjects } from "@/lib/data/projects";
 import { Calendar, Users, ChevronRight, AlertCircle } from "lucide-react";
 import type { ProductionStage } from "@/lib/types";
 

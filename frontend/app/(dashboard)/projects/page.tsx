@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 
 export default function ProjectsPage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Projects"
         subtitle="Manage all your projects"
@@ -18,8 +18,8 @@ export default function ProjectsPage() {
           </Button>
         }
       />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="min-w-0 w-full">
+        <div className="space-y-6 p-6">
           <ProjectsStats />
           <ProjectsFilters />
           <ProjectsGrid />

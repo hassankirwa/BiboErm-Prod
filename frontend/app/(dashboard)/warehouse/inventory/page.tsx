@@ -7,7 +7,7 @@ import { Plus, Download } from "lucide-react";
 
 export default function InventoryPage() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Inventory"
         subtitle="Manage warehouse stock"
@@ -24,8 +24,8 @@ export default function InventoryPage() {
           </div>
         }
       />
-      <div className="flex-1 overflow-auto">
-        <div className="p-6 space-y-6">
+      <div className="min-w-0 w-full">
+        <div className="space-y-6 p-6">
           <InventoryStats />
           <InventoryFilters />
           <InventoryTable />

@@ -28,7 +28,7 @@ import {
   Trash2,
   FileText,
 } from "lucide-react";
-import { mockSuppliers } from "@/lib/mock-data";
+import { mockSuppliers } from "@/lib/data/procurement";
 
 const categoryLabels: Record<string, string> = {
   aluminium_profile: "Aluminium",

@@ -21,6 +21,9 @@ class RolePermissionSeeder extends Seeder
             'users.view',
             'users.update',
             'users.suspend',
+            'users.update_identity',
+            'employees.view',
+            'profile_changes.review',
             'audit.view',
         ]);
 
@@ -30,6 +33,8 @@ class RolePermissionSeeder extends Seeder
             'employees.approve',
             'users.invite',
             'users.view',
+            'users.update_identity',
+            'profile_changes.review',
         ]);
 
         $grant('sales_representative', [

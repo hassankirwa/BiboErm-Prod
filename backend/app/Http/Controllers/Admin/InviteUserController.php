@@ -17,7 +17,7 @@ class InviteUserController extends Controller
         /** @var User $actor */
         $actor = $request->user();
 
-        $created = $invitations->createInvitation(
+        $result = $invitations->createInvitation(
             email: $data['email'],
             name: $data['name'] ?? null,
             departmentId: (int) $data['department_id'],
@@ -26,9 +26,6 @@ class InviteUserController extends Controller
             invitedBy: $actor,
         );
 
-        return response()->json([
-            'message' => __('Invitation sent.'),
-            'user_id' => $created->id,
-        ], JsonResponse::HTTP_CREATED);
+        return response()->json($result->toArray(), JsonResponse::HTTP_CREATED);
     }
 }

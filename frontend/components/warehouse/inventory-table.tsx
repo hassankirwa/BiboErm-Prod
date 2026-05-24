@@ -27,7 +27,7 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
-import { mockWarehouseItems } from "@/lib/mock-data";
+import { mockWarehouseItems } from "@/lib/data/warehouse";
 
 const categoryLabels: Record<string, string> = {
   aluminium_profile: "Aluminium Profile",

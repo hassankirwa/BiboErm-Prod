@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockProductionOrders } from "@/lib/mock-data";
+import { mockProductionOrders } from "@/lib/data/production";
 import { Factory, Scissors, Wrench, CheckCircle } from "lucide-react";
 
 const stats = [

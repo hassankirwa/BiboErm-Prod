@@ -6,9 +6,8 @@ use App\Http\Controllers\Auth\Concerns\SendsAuthResponses;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
-use App\Services\Audit\OwenAuditLogger;
-use App\Services\Auth\RefreshTokenService;
-use App\Services\Device\DeviceTrustService;
+use App\Services\Auth\LoginCompletionService;
+use App\Services\Auth\TwoFactorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,9 +16,8 @@ class LoginController extends Controller
     use SendsAuthResponses;
 
     public function __construct(
-        private readonly RefreshTokenService $refreshTokens,
-        private readonly DeviceTrustService $devices,
-        private readonly OwenAuditLogger $audit,
+        private readonly LoginCompletionService $loginCompletion,
+        private readonly TwoFactorService $twoFactor,
     ) {}
 
     public function store(LoginRequest $request): JsonResponse
@@ -28,15 +26,15 @@ class LoginController extends Controller
             return response()->json(['message' => 'Invalid credentials.'], 422);
         }
 
-        $request->session()->regenerate();
-
         /** @var User $user */
         $user = Auth::user();
 
         if ($user->status === User::STATUS_INVITED) {
-            Auth::logout();
+            if (! $user->must_change_password) {
+                Auth::logout();
 
-            return response()->json(['message' => 'Please complete your invitation acceptance first.'], 422);
+                return response()->json(['message' => 'Please complete your invitation acceptance first.'], 422);
+            }
         }
 
         if (in_array($user->status, [User::STATUS_SUSPENDED, User::STATUS_INACTIVE], true)) {
@@ -45,22 +43,24 @@ class LoginController extends Controller
             return response()->json(['message' => 'Your account is not active.'], 403);
         }
 
-        $this->devices->enforceForUser($user, $request->header('X-Device-Id'));
+        if ($user->two_factor_enabled) {
+            $remember = $request->boolean('remember');
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        $user->forceFill(['last_login_at' => now()])->save();
+            $challenge = $this->twoFactor->issueChallenge($user, $remember);
 
-        $this->devices->touchOrCreate($user, $request->header('X-Device-Id'), $request);
+            return response()->json([
+                'two_factor_required' => true,
+                'challenge_token' => $challenge['token'],
+                'email_hint' => $challenge['email_hint'],
+                'expires_in' => $challenge['expires_in'],
+                'mail_sent' => $challenge['mail_sent'],
+                'mail_warning' => $challenge['mail_warning'],
+            ]);
+        }
 
-        $this->audit->log(
-            module: 'auth',
-            action: 'login',
-            entityType: 'user',
-            entityId: $user->id,
-            newValues: ['email' => $user->email, 'status' => $user->status],
-        );
-
-        $cookie = $this->refreshTokens->issueRefreshTokenCookie($user);
-
-        return response()->json($this->authPayload($user->fresh()))->withCookie($cookie);
+        return $this->loginCompletion->complete($user, $request, $request->boolean('remember'));
     }
 }

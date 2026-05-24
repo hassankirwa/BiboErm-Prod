@@ -43,6 +43,7 @@ class User extends Authenticatable
         'invited_by',
         'onboarding_completed_at',
         'must_change_password',
+        'two_factor_enabled',
         'refresh_token_hash',
         'refresh_token_expires_at',
         'refresh_token_issued_at',
@@ -67,6 +68,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
             'must_change_password' => 'boolean',
+            'two_factor_enabled' => 'boolean',
             'refresh_token_expires_at' => 'datetime',
             'refresh_token_issued_at' => 'datetime',
             'last_login_at' => 'datetime',
@@ -120,6 +122,14 @@ class User extends Authenticatable
     public function devices(): HasMany
     {
         return $this->hasMany(UserDevice::class);
+    }
+
+    /**
+     * @return HasMany<ProfileChangeRequest, User>
+     */
+    public function profileChangeRequests(): HasMany
+    {
+        return $this->hasMany(ProfileChangeRequest::class);
     }
 
     /**

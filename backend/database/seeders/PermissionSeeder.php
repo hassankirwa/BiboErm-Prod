@@ -18,6 +18,8 @@ class PermissionSeeder extends Seeder
         'employees.view',
         'employees.update_hr_details',
         'employees.approve',
+        'profile_changes.review',
+        'users.update_identity',
         'leads.view',
         'leads.create',
         'deals.approve_discount',

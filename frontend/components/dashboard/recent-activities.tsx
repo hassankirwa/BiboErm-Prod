@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Mail, MapPin, CheckCircle, Clock } from "lucide-react";
-import { mockActivities } from "@/lib/mock-data";
+import { mockActivities } from "@/lib/data/dashboard";
 
 const activityIcons = {
   call: Phone,

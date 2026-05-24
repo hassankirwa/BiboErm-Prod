@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Scrollable full-height wrapper for CRM module pages */
+/** Full-width layout shell for CRM module pages — scroll is handled by the dashboard layout. */
 export function CrmPageShell({
   children,
   className,
@@ -10,10 +10,8 @@ export function CrmPageShell({
   className?: string;
 }) {
   return (
-    <div className="flex h-full min-h-0 w-full max-w-full min-w-0 flex-col bg-background">
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        <div className={cn("min-w-0 w-full max-w-full", className)}>{children}</div>
-      </div>
+    <div className={cn("min-w-0 w-full max-w-full bg-background", className)}>
+      {children}
     </div>
   );
 }

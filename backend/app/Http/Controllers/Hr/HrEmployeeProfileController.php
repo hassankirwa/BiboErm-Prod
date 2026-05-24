@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\EmployeeHrUpsertRequest;
+use App\Mail\AccountApprovedMail;
 use App\Models\EmployeeProfile;
 use App\Models\User;
 use App\Services\Audit\OwenAuditLogger;
+use App\Services\Mail\OutgoingMailService;
+use App\Support\UserHomeRoute;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +17,7 @@ class HrEmployeeProfileController extends Controller
 {
     public function __construct(
         private readonly OwenAuditLogger $audit,
+        private readonly OutgoingMailService $mail,
     ) {}
 
     public function upsert(User $user, EmployeeHrUpsertRequest $request): JsonResponse
@@ -60,6 +64,11 @@ class HrEmployeeProfileController extends Controller
 
         $user->forceFill(['status' => User::STATUS_ACTIVE])->save();
 
+        $mailResult = $this->mail->send(
+            new AccountApprovedMail($user, UserHomeRoute::forUser($user)),
+            $user->email,
+        );
+
         $this->audit->log(
             module: 'employees',
             action: 'approve',
@@ -71,6 +80,8 @@ class HrEmployeeProfileController extends Controller
 
         return response()->json([
             'message' => __('Account approved.'),
+            'mail_sent' => $mailResult->sent,
+            'mail_warning' => $mailResult->warning,
             'user' => [
                 'id' => $user->id,
                 'status' => $user->status,

@@ -11,6 +11,10 @@ import { PasswordStrength } from "@/components/auth/password-strength";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/auth-context";
+import { ApiError } from "@/lib/api/client";
+import { resolveAuthRedirect } from "@/lib/auth/redirect";
+import * as authApi from "@/lib/api/auth";
 
 const inviteSteps = [
   { id: 1, label: "Accept Invite", status: "active" as const },
@@ -21,15 +25,38 @@ const inviteSteps = [
 function AcceptInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const state = searchParams.get("state");
+  const { setFromPayload } = useAuth();
+  const token = searchParams.get("token") ?? "";
+  const demoState = searchParams.get("state");
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [inviteState, setInviteState] = useState<"expired" | "revoked" | null>(
+    demoState === "expired" || demoState === "revoked" ? demoState : null
+  );
 
-  if (state === "expired") {
+  if (!token && !inviteState) {
+    return (
+      <AuthCardLayout centered>
+        <div className="flex flex-col items-center text-center">
+          <h1 className="auth-card-title">Invalid invitation link</h1>
+          <p className="auth-card-sub mx-auto max-w-sm">
+            This link is missing a token. Check your email for the full invitation
+            link or ask your admin to resend it.
+          </p>
+          <Button className="mt-6 w-full" variant="secondary" asChild>
+            <Link href="/">Back to login</Link>
+          </Button>
+        </div>
+      </AuthCardLayout>
+    );
+  }
+
+  if (inviteState === "expired") {
     return (
       <AuthCardLayout centered>
         <div className="flex flex-col items-center text-center">
@@ -42,7 +69,9 @@ function AcceptInviteContent() {
             new one.
           </p>
           <div className="mt-6 flex w-full flex-col gap-2">
-            <Button className="w-full">Request new invite</Button>
+            <Button className="w-full" asChild>
+              <a href="mailto:support@bibo.com">Request new invite</a>
+            </Button>
             <Button variant="ghost" className="w-full" asChild>
               <Link href="/">Back to login</Link>
             </Button>
@@ -52,7 +81,7 @@ function AcceptInviteContent() {
     );
   }
 
-  if (state === "revoked") {
+  if (inviteState === "revoked") {
     return (
       <AuthCardLayout centered>
         <div className="flex flex-col items-center text-center">
@@ -74,9 +103,46 @@ function AcceptInviteContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    if (password.length < 10) {
+      setError("Password must be at least 10 characters.");
+      return;
+    }
+
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    router.push("/onboarding/profile");
+    try {
+      const payload = await authApi.acceptInvite(token, password, confirm);
+      setFromPayload(payload);
+      router.push(
+        resolveAuthRedirect(
+          payload.user.status,
+          payload.departments,
+          payload.redirect,
+          payload.roles
+        )
+      );
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const msg = err.firstError() ?? err.message;
+        if (msg.toLowerCase().includes("expired")) {
+          setInviteState("expired");
+        } else if (msg.toLowerCase().includes("invalid") || msg.toLowerCase().includes("revoked")) {
+          setInviteState("revoked");
+        } else {
+          setError(msg);
+        }
+      } else {
+        setError("Unable to accept invitation. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -85,27 +151,18 @@ function AcceptInviteContent() {
 
       <div>
         <h1 className="auth-card-title text-left text-2xl">
-          Welcome, Aisha! 👋
+          Welcome! 👋
         </h1>
         <p className="auth-card-sub text-left">
           Set your password to activate your Bibo account.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email (verified)</Label>
-          <div className="relative">
-            <Input
-              id="email"
-              value="aisha.mwangi@bibo.com"
-              readOnly
-              className="bg-muted/40 pr-10"
-            />
-            <Check className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-green-600" />
-          </div>
-        </div>
+      {error && (
+        <AuthBanner variant="error" title={error} />
+      )}
 
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="password">New password</Label>
           <div className="relative">
@@ -115,6 +172,7 @@ function AcceptInviteContent() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={10}
               className="pr-10"
             />
             <button
@@ -142,6 +200,7 @@ function AcceptInviteContent() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
+              minLength={10}
               className="pr-10"
             />
             <button

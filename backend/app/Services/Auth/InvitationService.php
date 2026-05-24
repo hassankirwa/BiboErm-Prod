@@ -8,11 +8,11 @@ use App\Models\UserInvitation;
 use App\Models\UserProfile;
 use App\Mail\UserInvitedMail;
 use App\Services\Audit\OwenAuditLogger;
+use App\Services\Mail\OutgoingMailService;
 use App\Support\DepartmentRoleAssignmentRules;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -20,6 +20,7 @@ class InvitationService
 {
     public function __construct(
         private readonly OwenAuditLogger $audit,
+        private readonly OutgoingMailService $mail,
     ) {}
 
     /**
@@ -32,7 +33,7 @@ class InvitationService
         int $roleId,
         array $additionalAssignments,
         User $invitedBy,
-    ): User {
+    ): InvitationResult {
         $email = mb_strtolower(trim($email));
 
         if (User::query()->where('email', $email)->exists()) {
@@ -41,7 +42,7 @@ class InvitationService
 
         DepartmentRoleAssignmentRules::validate($departmentId, $roleId, $additionalAssignments);
 
-        return DB::transaction(function () use ($email, $name, $departmentId, $roleId, $additionalAssignments, $invitedBy) {
+        $user = DB::transaction(function () use ($email, $name, $departmentId, $roleId, $additionalAssignments, $invitedBy) {
             $tempPasswordPlain = Str::password(18);
 
             $user = User::query()->create([
@@ -119,8 +120,6 @@ class InvitationService
                 'expires_at' => Carbon::now()->addHours($hours),
             ]);
 
-            Mail::to($email)->queue(new UserInvitedMail($user, $plainToken, $tempPasswordPlain, $invitation));
-
             $this->audit->log(
                 module: 'users',
                 action: 'invite',
@@ -135,8 +134,17 @@ class InvitationService
                 ]
             );
 
-            return $user;
+            return [$user, $plainToken, $tempPasswordPlain, $invitation];
         });
+
+        [$created, $plainToken, $tempPasswordPlain, $invitation] = $user;
+
+        $mailResult = $this->mail->send(
+            new UserInvitedMail($created, $plainToken, $tempPasswordPlain, $invitation),
+            $created->email,
+        );
+
+        return InvitationResult::fromMail($created, $mailResult);
     }
 
     public function acceptInvitation(string $plainToken, string $password): User
@@ -202,13 +210,13 @@ class InvitationService
         );
     }
 
-    public function resendForUser(User $user, User $invitedBy): void
+    public function resendForUser(User $user, User $invitedBy): InvitationResult
     {
         if ($user->status !== User::STATUS_INVITED) {
             throw ValidationException::withMessages(['user' => ['User is not awaiting invitation acceptance.']]);
         }
 
-        DB::transaction(function () use ($user, $invitedBy) {
+        [$plainToken, $tempPasswordPlain, $invitation] = DB::transaction(function () use ($user, $invitedBy) {
             UserInvitation::query()
                 ->where('user_id', $user->id)
                 ->whereNull('accepted_at')
@@ -243,8 +251,6 @@ class InvitationService
                 'expires_at' => Carbon::now()->addHours($hours),
             ]);
 
-            Mail::to($user->email)->queue(new UserInvitedMail($user, $plainToken, $tempPasswordPlain, $invitation));
-
             $this->audit->log(
                 module: 'users',
                 action: 'resend_invite',
@@ -252,6 +258,15 @@ class InvitationService
                 entityId: $user->id,
                 newValues: ['invitation_id' => $invitation->id],
             );
+
+            return [$plainToken, $tempPasswordPlain, $invitation];
         });
+
+        $mailResult = $this->mail->send(
+            new UserInvitedMail($user, $plainToken, $tempPasswordPlain, $invitation),
+            $user->email,
+        );
+
+        return InvitationResult::fromMail($user, $mailResult);
     }
 }

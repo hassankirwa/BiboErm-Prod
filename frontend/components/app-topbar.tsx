@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, Bell, MessageSquare, HelpCircle, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/auth-context";
 
 function SearchField({ className }: { className?: string }) {
   return (
@@ -35,12 +37,22 @@ function SearchField({ className }: { className?: string }) {
 }
 
 export function AppTopbar() {
+  const router = useRouter();
+  const { user, roles, logout, homeRoute } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/");
+  };
+
+  const roleLabel = roles[0]?.replace(/_/g, " ") ?? "User";
+
   return (
     <header className="sticky top-0 z-30 w-full max-w-full shrink-0 border-b border-border bg-card">
       <div className="flex h-14 items-center gap-2 overflow-hidden px-3 sm:gap-3 sm:px-4">
         <SidebarTrigger className="shrink-0 md:hidden" />
 
-        <Link href="/workspace" className="flex min-w-0 shrink-0 items-center">
+        <Link href={homeRoute} className="flex min-w-0 shrink-0 items-center">
           <Image
             src="/image.png"
             alt="BIBO Windows & Doors"
@@ -85,23 +97,26 @@ export function AppTopbar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex shrink-0 items-center gap-1 rounded-[5px] px-1 py-1 hover:bg-muted/60 sm:gap-2 sm:px-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    JK
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={user?.name ?? "User"}
+                  src={user?.avatar_url}
+                  className="h-8 w-8"
+                />
                 <div className="hidden text-left md:block">
-                  <p className="text-sm font-medium leading-none">John Kamau</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">System Admin</p>
+                  <p className="text-sm font-medium leading-none">{user?.name ?? "User"}</p>
+                  <p className="mt-0.5 text-xs capitalize text-muted-foreground">{roleLabel}</p>
                 </div>
                 <ChevronDown className="hidden h-4 w-4 text-muted-foreground md:block" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/workspace/settings">Profile & settings</Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
+                Sign out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

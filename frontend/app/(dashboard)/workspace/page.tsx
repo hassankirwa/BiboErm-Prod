@@ -1,10 +1,20 @@
+"use client";
+
+import { useAuth } from "@/contexts/auth-context";
+import { canAccessWorkspaceHub } from "@/lib/auth/redirect";
 import Image from "next/image";
 import { WorkspaceAppsGrid } from "@/components/workspace/workspace-apps-grid";
 import { WorkspaceSummaryWidgets } from "@/components/workspace/workspace-summary-widgets";
 
 export default function WorkspacePage() {
+  const { roles } = useAuth();
+
+  if (!canAccessWorkspaceHub(roles)) {
+    return null;
+  }
+
   return (
-    <div className="relative h-full min-h-0 w-full max-w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f0]">
+    <div className="relative w-full min-w-0 bg-[#f0f0f0]">
       <div className="relative w-full min-h-full min-w-0">
         <div
           aria-hidden
@@ -18,7 +28,6 @@ export default function WorkspacePage() {
             sizes="100vw"
             className="object-cover object-center md:object-[72%_center]"
           />
-          {/* Stronger overlay on small screens for readability */}
           <div className="absolute inset-0 bg-[#f5f5f5]/80 md:bg-gradient-to-r md:from-[#f5f5f5]/55 md:via-[#f5f5f5]/20 md:to-transparent" />
         </div>
 

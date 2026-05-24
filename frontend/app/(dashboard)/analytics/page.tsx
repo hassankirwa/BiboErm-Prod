@@ -19,7 +19,7 @@ export default function AnalyticsPage() {
           </Button>
         }
       />
-      <div className="flex-1 overflow-auto">
+      <div className="min-w-0 w-full">
         <div className="space-y-6 p-6">
           <DashboardOverview />
           <div className="grid gap-6 lg:grid-cols-2">

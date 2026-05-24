@@ -29,7 +29,7 @@ import {
   MapPin,
   FolderPlus,
 } from "lucide-react";
-import { mockContacts, mockAccounts } from "@/lib/mock-data";
+import { mockContacts, mockAccounts } from "@/lib/data/crm";
 
 function getInitials(name: string): string {
   return name

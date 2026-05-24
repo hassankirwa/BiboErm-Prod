@@ -4,14 +4,14 @@ namespace App\Mail;
 
 use App\Models\User;
 use App\Models\UserInvitation;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class UserInvitedMail extends Mailable implements ShouldQueue
+class UserInvitedMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use SerializesModels;
 
     public function __construct(
         public User $user,
@@ -20,20 +20,20 @@ class UserInvitedMail extends Mailable implements ShouldQueue
         public UserInvitation $invitation,
     ) {}
 
-    public function envelope(): \Illuminate\Mail\Mailables\Envelope
+    public function envelope(): Envelope
     {
-        return new \Illuminate\Mail\Mailables\Envelope(
-            subject: __('You have been invited to Bibo ERM'),
+        return new Envelope(
+            subject: __('Your Bibo ERM login details'),
         );
     }
 
-    public function content(): \Illuminate\Mail\Mailables\Content
+    public function content(): Content
     {
-        return new \Illuminate\Mail\Mailables\Content(
-            markdown: 'emails.users.invited',
+        return new Content(
+            view: 'emails.users.invitation-html',
             with: [
                 'acceptUrl' => rtrim((string) config('app.frontend_url'), '/').'/accept-invite?token='.$this->plainInviteToken,
-                'loginUrl' => rtrim((string) config('app.frontend_url'), '/').'/login',
+                'loginUrl' => rtrim((string) config('app.frontend_url'), '/').'/',
                 'temporaryPassword' => $this->tempPasswordPlain,
                 'expiresAt' => $this->invitation->expires_at,
             ],

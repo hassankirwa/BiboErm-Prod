@@ -28,7 +28,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
-import { mockLeads, mockUsers } from "@/lib/mock-data";
+import { mockLeads, mockUsers } from "@/lib/data/crm";
 
 const statusColors: Record<string, string> = {
   new: "bg-info/10 text-info border-info/20",

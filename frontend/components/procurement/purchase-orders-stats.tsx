@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockPurchaseOrders } from "@/lib/mock-data";
+import { mockPurchaseOrders } from "@/lib/data/procurement";
 import { FileText, Clock, CheckCircle, Truck } from "lucide-react";
 
 const totalOrders = mockPurchaseOrders.length;

@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockLeads } from "@/lib/mock-data";
+import { mockLeads } from "@/lib/data/crm";
 import { Users, UserCheck, Phone, FileText, HandshakeIcon } from "lucide-react";
 
 const stats = [
