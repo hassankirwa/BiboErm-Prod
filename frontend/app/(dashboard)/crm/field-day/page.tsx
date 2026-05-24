@@ -1,205 +1,287 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CrmPageContent, CrmPageShell, CrmPageTitleRow } from "@/components/crm/crm-page-shell";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Calendar, Clock, Users, Plus, Navigation, CheckCircle2, AlertCircle } from "lucide-react";
-
-const fieldVisits = [
-  { id: "FD001", site: "Westlands Tower Project", client: "ABC Construction", assignee: "James Kamau", date: "2024-01-15", time: "09:00 AM", status: "Completed", type: "Site Survey", location: "Westlands, Nairobi" },
-  { id: "FD002", site: "Mombasa Mall Extension", client: "XYZ Developers", assignee: "Sarah Otieno", date: "2024-01-15", time: "02:00 PM", status: "In Progress", type: "Installation Check", location: "Nyali, Mombasa" },
-  { id: "FD003", site: "Kisumu Lakefront", client: "Metro Building", assignee: "David Njoroge", date: "2024-01-16", time: "10:00 AM", status: "Scheduled", type: "Measurement", location: "Kisumu CBD" },
-  { id: "FD004", site: "Nakuru Heights", client: "Prime Properties", assignee: "James Kamau", date: "2024-01-16", time: "03:00 PM", status: "Scheduled", type: "Quality Check", location: "Nakuru Town" },
-  { id: "FD005", site: "Thika Road Office Park", client: "Urban Architects", assignee: "Sarah Otieno", date: "2024-01-17", time: "11:00 AM", status: "Pending", type: "Site Survey", location: "Thika Road" },
-];
-
-const teamMembers = [
-  { name: "James Kamau", role: "Field Engineer", visits: 8, location: "On Site" },
-  { name: "Sarah Otieno", role: "Sales Rep", visits: 6, location: "In Transit" },
-  { name: "David Njoroge", role: "Technician", visits: 5, location: "Office" },
-  { name: "Mary Wanjiku", role: "Field Engineer", visits: 7, location: "On Site" },
-];
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "Completed": return "default";
-    case "In Progress": return "secondary";
-    case "Scheduled": return "outline";
-    default: return "outline";
-  }
-};
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar, MapPin, Plus, Users } from "lucide-react";
+import {
+  createFieldDay,
+  fetchFieldDays,
+  type ApiFieldDay,
+} from "@/lib/api/crm/field-day";
+import { fetchUsers } from "@/lib/api/users";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
+import { toast } from "sonner";
 
 export default function FieldDayPage() {
+  const [fieldDays, setFieldDays] = useState<ApiFieldDay[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dateFilter, setDateFilter] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [officers, setOfficers] = useState<{ id: number; name: string }[]>([]);
+
+  const [form, setForm] = useState({
+    field_date: new Date().toISOString().slice(0, 10),
+    field_officer_id: "",
+    notes: "",
+  });
+
+  const loadFieldDays = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetchFieldDays({
+        field_date: dateFilter || undefined,
+        per_page: 50,
+      });
+      setFieldDays(res.data);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load field days.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateFilter]);
+
+  useEffect(() => {
+    loadFieldDays();
+  }, [loadFieldDays]);
+
+  useEffect(() => {
+    fetchUsers({ role: "field_officer" })
+      .then((res) =>
+        setOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
+      )
+      .catch(() => {});
+  }, []);
+
+  async function handleCreate() {
+    setSaving(true);
+    try {
+      await ensureCsrfCookie();
+      await createFieldDay({
+        field_date: form.field_date,
+        field_officer_id: Number(form.field_officer_id),
+        notes: form.notes || undefined,
+      });
+      setDialogOpen(false);
+      setForm({
+        field_date: new Date().toISOString().slice(0, 10),
+        field_officer_id: "",
+        notes: "",
+      });
+      toast.success("Field day created.");
+      loadFieldDays();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to create field day.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const uniqueOfficers = new Set(fieldDays.map((fd) => fd.field_officer_id)).size;
+  const totalPins = fieldDays.reduce(
+    (n, fd) => n + (fd.pins?.length ?? 0),
+    0,
+  );
+
   return (
-    <CrmPageShell>
-      <CrmPageContent>
-        <CrmPageTitleRow
-          title="Field Day"
-          subtitle="Manage site visits and field activities"
-          actions={
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row">
-              <Select defaultValue="today">
-                <SelectTrigger className="h-9 w-full rounded-[5px] sm:w-40">
-                  <SelectValue placeholder="Select date" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button className="h-9 w-full rounded-[5px] sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
-                Schedule Visit
-              </Button>
-            </div>
-          }
+    <div className="flex h-full flex-col">
+      <AppHeader
+        title="Field Day"
+        subtitle="Manage field officer routes and visit pins"
+        actions={
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/crm/site-visits/today">Today&apos;s Visits</Link>
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              New Field Day
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="flex-1 space-y-6 overflow-auto p-6">
+        <Input
+          type="date"
+          className="h-9 w-44"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
         />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-[5px]">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
               <div>
-                <p className="text-sm text-muted-foreground">Today&apos;s Visits</p>
-                <p className="text-2xl font-semibold">8</p>
+                <p className="text-sm text-muted-foreground">Field days</p>
+                <p className="text-2xl font-semibold">{fieldDays.length}</p>
               </div>
               <Calendar className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-[5px]">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
               <div>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-                <p className="text-2xl font-semibold text-primary">3</p>
-              </div>
-              <Navigation className="h-8 w-8 text-primary/50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-[5px]">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-semibold text-success">4</p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-success/50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-[5px]">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Team on Field</p>
-                <p className="text-2xl font-semibold">6</p>
+                <p className="text-sm text-muted-foreground">Officers</p>
+                <p className="text-2xl font-semibold">{uniqueOfficers}</p>
               </div>
               <Users className="h-8 w-8 text-muted-foreground/50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <Card className="rounded-[5px]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Scheduled Visits</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {fieldVisits.map((visit) => (
-                <div key={visit.id} className="rounded-[5px] border border-border p-4 transition-colors hover:bg-muted/50">
-                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-medium">{visit.site}</h3>
-                        <Badge variant={getStatusColor(visit.status) as "default" | "secondary" | "outline"} className="rounded-[5px]">
-                          {visit.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{visit.client}</p>
-                      <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-4">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          {visit.location}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 shrink-0" />
-                          {visit.date}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 shrink-0" />
-                          {visit.time}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">{visit.assignee.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                      </Avatar>
-                      <Badge variant="outline" className="rounded-[5px]">{visit.type}</Badge>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Total pins</p>
+                <p className="text-2xl font-semibold">{totalPins}</p>
+              </div>
+              <MapPin className="h-8 w-8 text-muted-foreground/50" />
             </CardContent>
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <Card className="rounded-[5px]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Field Team</CardTitle>
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Spinner className="h-8 w-8 text-primary" />
+          </div>
+        ) : error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-8 text-center text-sm text-destructive">
+            {error}
+          </div>
+        ) : fieldDays.length === 0 ? (
+          <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
+            No field days for this date.
+          </div>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Field Days</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {teamMembers.map((member, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border border-border rounded-[5px]">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="text-xs">{member.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                    </Avatar>
+              {fieldDays.map((fd) => (
+                <div
+                  key={fd.id}
+                  className="rounded-[5px] border border-border p-4 hover:bg-muted/50"
+                >
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-sm">{member.name}</p>
-                      <p className="text-xs text-muted-foreground">{member.role}</p>
+                      <p className="font-medium">
+                        {fd.field_officer?.name ??
+                          `Officer #${fd.field_officer_id}`}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(fd.field_date).toLocaleDateString()}
+                      </p>
+                      {fd.notes && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {fd.notes}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant={member.location === "On Site" ? "default" : member.location === "In Transit" ? "secondary" : "outline"} className="rounded-[5px]">
-                      {member.location}
+                    <Badge variant="outline">
+                      {(fd.pins?.length ?? 0) + " pins"}
                     </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">{member.visits} visits</p>
                   </div>
                 </div>
               ))}
             </CardContent>
           </Card>
-
-          <Card className="rounded-[5px]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start rounded-[5px]">
-                <Navigation className="h-4 w-4 mr-2" />
-                Track Team Location
-              </Button>
-              <Button variant="outline" className="w-full justify-start rounded-[5px]">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                Report Issue
-              </Button>
-              <Button variant="outline" className="w-full justify-start rounded-[5px]">
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Submit Visit Report
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        )}
       </div>
-      </CrmPageContent>
-    </CrmPageShell>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Field Day</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fd-date">Date</Label>
+              <Input
+                id="fd-date"
+                type="date"
+                value={form.field_date}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, field_date: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Field officer</Label>
+              <Select
+                value={form.field_officer_id}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, field_officer_id: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select officer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {officers.map((o) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fd-notes">Notes</Label>
+              <Textarea
+                id="fd-notes"
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleCreate}
+              disabled={saving || !form.field_date || !form.field_officer_id}
+            >
+              {saving ? "Creating..." : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
+

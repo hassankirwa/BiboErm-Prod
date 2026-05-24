@@ -17,11 +17,13 @@ import { cn } from "@/lib/utils";
 import { leadKanbanStages } from "@/lib/leads-kanban-data";
 import {
   emptyLeadForm,
-  leadFormValuesToKanbanCard,
   type LeadFormValues,
 } from "@/lib/lead-form-config";
-import { addLead } from "@/lib/leads-state";
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
+import { createLead } from "@/lib/api/crm/leads";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
+import { toast } from "sonner";
 
 export function LeadCreateForm() {
   const router = useRouter();
@@ -42,13 +44,30 @@ export function LeadCreateForm() {
     value: LeadFormValues[K]
   ) => setForm((f) => ({ ...f, [key]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.location.trim()) return;
+    if (!form.title.trim() || !form.phone.trim()) return;
     setSubmitting(true);
-    const card = leadFormValuesToKanbanCard(form);
-    addLead(card);
-    router.push(`/crm/leads/${card.id}`);
+    try {
+      await ensureCsrfCookie();
+      const lead = await createLead({
+        name: form.title.trim(),
+        contact_person_name: form.title.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim() || null,
+        account_name: form.company.trim() || null,
+        site_address: form.location.trim() || null,
+        requirement_description: form.notes.trim() || form.title.trim(),
+        product_interests: [],
+        estimated_value: form.estimatedValue || undefined,
+      });
+      router.push(`/crm/leads/${lead.id}`);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to create lead.",
+      );
+      setSubmitting(false);
+    }
   };
 
   return (

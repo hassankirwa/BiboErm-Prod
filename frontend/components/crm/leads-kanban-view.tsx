@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   leadKanbanStages,
   type LeadActivityType,
+  type LeadKanbanCard,
   type LeadKanbanStageId,
 } from "@/lib/leads-kanban-data";
 import {
@@ -23,10 +24,13 @@ import {
 
 export function LeadsKanbanView({
   returnView = "kanban",
+  apiCards,
 }: {
   returnView?: string;
+  apiCards?: LeadKanbanCard[];
 }) {
-  const cards = useLeadCards();
+  const localCards = useLeadCards();
+  const cards = apiCards ?? localCards;
   const [addLeadStage, setAddLeadStage] = useState<LeadKanbanStageId | null>(
     null
   );

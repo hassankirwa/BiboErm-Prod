@@ -167,31 +167,38 @@ function LeadMobileCard({
 export function LeadsListTable({
   search,
   returnView = "list",
+  apiRows,
+  totalCount,
 }: {
   search: string;
   returnView?: string;
+  apiRows?: LeadListRow[];
+  totalCount?: number;
 }) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState("25");
   const [starred, setStarred] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
+  const sourceRows = apiRows ?? leadsListRows;
+  const recordTotal = totalCount ?? (apiRows ? apiRows.length : LEADS_TOTAL_COUNT);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return leadsListRows;
-    return leadsListRows.filter(
+    if (!q) return sourceRows;
+    return sourceRows.filter(
       (r) =>
         r.leadName.toLowerCase().includes(q) ||
         r.company.toLowerCase().includes(q) ||
         r.email.toLowerCase().includes(q) ||
         r.owner.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, sourceRows]);
 
   const perPage = Number(rowsPerPage);
-  const totalPages = Math.max(1, Math.ceil(LEADS_TOTAL_COUNT / perPage));
+  const totalPages = Math.max(1, Math.ceil(recordTotal / perPage));
   const start = (page - 1) * perPage + 1;
-  const end = Math.min(page * perPage, LEADS_TOTAL_COUNT, start + filtered.length - 1);
+  const end = Math.min(page * perPage, recordTotal, start + filtered.length - 1);
   const displayEnd = Math.min(end, start + filtered.length - 1);
 
   const allSelected =
@@ -309,7 +316,7 @@ export function LeadsListTable({
       {/* Pagination */}
       <div className="mt-4 flex min-w-0 flex-col gap-3 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p className="text-center sm:text-left">
-          Showing {start} to {displayEnd} of {LEADS_TOTAL_COUNT} leads
+          Showing {start} to {displayEnd} of {recordTotal} leads
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <div className="flex items-center gap-2">
