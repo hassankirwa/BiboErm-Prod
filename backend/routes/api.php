@@ -82,5 +82,6 @@ Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () 
     require __DIR__.'/api/crm/activities.php';
     require __DIR__.'/api/crm/field-day.php';
     require __DIR__.'/api/crm/lookups.php';
+    require __DIR__.'/api/crm/reports.php';
 });
 }); // v1

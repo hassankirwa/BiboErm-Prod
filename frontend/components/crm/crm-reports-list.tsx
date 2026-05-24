@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
   HelpCircle,
   Plus,
   Search,
@@ -21,7 +22,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { CrmPageContent } from "@/components/crm/crm-page-shell";
-import { crmReports, reportFolderFilters } from "@/lib/crm-reports-data";
+import {
+  downloadCrmReportExport,
+  fetchCrmReports,
+  type CrmReport,
+} from "@/lib/api/crm/reports";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import { Spinner } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 11;
 
@@ -31,12 +38,16 @@ function ReportCard({
   starred,
   onSelect,
   onToggleStar,
+  onExport,
+  exporting,
 }: {
-  report: (typeof crmReports)[0];
+  report: CrmReport;
   selected: boolean;
   starred: boolean;
   onSelect: (checked: boolean) => void;
   onToggleStar: () => void;
+  onExport: () => void;
+  exporting: boolean;
 }) {
   return (
     <div className="space-y-3 rounded-[10px] border border-border/80 bg-card p-4 shadow-sm">
@@ -61,6 +72,8 @@ function ReportCard({
           <button
             type="button"
             className="text-left text-sm font-semibold text-primary hover:underline"
+            onClick={onExport}
+            disabled={exporting}
           >
             {report.name}
           </button>
@@ -71,33 +84,66 @@ function ReportCard({
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
         <div>
-          <p className="text-muted-foreground">Last Accessed</p>
+          <p className="text-muted-foreground">Records</p>
           <p className="mt-0.5 font-medium text-foreground">
-            {report.lastAccessed ?? "—"}
+            {report.record_count ?? "—"}
           </p>
         </div>
         <div>
-          <p className="text-muted-foreground">Created By</p>
-          <p className="mt-0.5 font-medium text-foreground">
-            {report.createdBy ?? "—"}
-          </p>
+          <p className="text-muted-foreground">Folder</p>
+          <p className="mt-0.5 font-medium text-foreground">{report.folder}</p>
         </div>
       </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={onExport}
+        disabled={exporting}
+      >
+        <Download className="h-3.5 w-3.5" />
+        {exporting ? "Exporting…" : "Export CSV"}
+      </Button>
     </div>
   );
 }
 
 export function CrmReportsList() {
+  const [reports, setReports] = useState<CrmReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [folder, setFolder] = useState("All Reports");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [starred, setStarred] = useState<Set<string>>(
-    () => new Set(crmReports.filter((r) => r.starred).map((r) => r.id))
-  );
+  const [starred, setStarred] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLoading(true);
+    fetchCrmReports()
+      .then(setReports)
+      .catch(() => setReports([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const folderFilters = useMemo(() => {
+    const folders = Array.from(new Set(reports.map((r) => r.folder))).sort();
+    return ["All Reports", ...folders];
+  }, [reports]);
+
+  const handleExport = async (reportId: string) => {
+    setExportingId(reportId);
+    try {
+      await ensureCsrfCookie();
+      await downloadCrmReportExport(reportId);
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
-    return crmReports.filter((report) => {
+    return reports.filter((report) => {
       const matchesFolder =
         folder === "All Reports" || report.folder === folder;
       const q = search.trim().toLowerCase();
@@ -108,7 +154,7 @@ export function CrmReportsList() {
         report.folder.toLowerCase().includes(q);
       return matchesFolder && matchesSearch;
     });
-  }, [folder, search]);
+  }, [folder, search, reports]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -197,7 +243,7 @@ export function CrmReportsList() {
             <SelectValue placeholder="All Reports" />
           </SelectTrigger>
           <SelectContent>
-            {reportFolderFilters.map((f) => (
+            {folderFilters.map((f) => (
               <SelectItem key={f} value={f}>
                 {f}
               </SelectItem>
@@ -238,6 +284,12 @@ export function CrmReportsList() {
         </div>
       </div>
 
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Spinner className="h-8 w-8 text-primary" />
+        </div>
+      ) : (
+        <>
       {/* Mobile / tablet: card list */}
       <div className="space-y-3 md:hidden">
         {pageItems.length === 0 ? (
@@ -260,6 +312,8 @@ export function CrmReportsList() {
                 });
               }}
               onToggleStar={() => toggleStar(report.id)}
+              onExport={() => handleExport(report.id)}
+              exporting={exportingId === report.id}
             />
           ))
         )}
@@ -299,10 +353,10 @@ export function CrmReportsList() {
                   Description
                 </th>
                 <th className="px-2 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-foreground">
-                  Last Accessed
+                  Records
                 </th>
                 <th className="px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-foreground">
-                  Created By
+                  Export
                 </th>
               </tr>
             </thead>
@@ -355,6 +409,8 @@ export function CrmReportsList() {
                       <button
                         type="button"
                         className="line-clamp-2 text-left text-sm font-medium text-primary hover:underline"
+                        onClick={() => handleExport(report.id)}
+                        disabled={exportingId === report.id}
                       >
                         {report.name}
                       </button>
@@ -365,10 +421,20 @@ export function CrmReportsList() {
                       </p>
                     </td>
                     <td className="px-2 py-3 align-middle text-sm text-muted-foreground">
-                      {report.lastAccessed ?? "—"}
+                      {report.record_count ?? "—"}
                     </td>
-                    <td className="px-3 py-3 align-middle text-sm text-muted-foreground">
-                      {report.createdBy ?? "—"}
+                    <td className="px-3 py-3 align-middle">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => handleExport(report.id)}
+                        disabled={exportingId === report.id}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        CSV
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -378,6 +444,8 @@ export function CrmReportsList() {
         </div>
         {pagination}
       </div>
+        </>
+      )}
     </CrmPageContent>
   );
 }

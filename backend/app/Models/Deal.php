@@ -131,7 +131,7 @@ class Deal extends Model
 
     public function lossReason(): BelongsTo
     {
-        return $this->belongsTo(LossReason::class, 'loss_reason_id');
+        return $this->belongsTo(CrmLossReason::class, 'loss_reason_id');
     }
 
     public function siteVisits(): HasMany

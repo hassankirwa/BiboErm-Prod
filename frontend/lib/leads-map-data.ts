@@ -54,6 +54,10 @@ const NAME_LOCATION_HINTS: { pattern: RegExp; location: string }[] = [
   { pattern: /upper hill/i, location: "Upper Hill, Nairobi" },
 ];
 
+export function resolveCoordsForLocation(location: string): [number, number] | null {
+  return resolveCoords(location);
+}
+
 function resolveCoords(location: string): [number, number] | null {
   const exact = LOCATION_COORDS[location];
   if (exact) return exact;

@@ -30,6 +30,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { createActivity } from "@/lib/api/crm/activities";
+import { ensureCsrfCookie } from "@/lib/api/client";
 import type { LeadKanbanCard } from "@/lib/leads-kanban-data";
 
 const EMAIL_TEMPLATES = [
@@ -73,6 +75,7 @@ export function LeadComposeEmail({
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const senderName = lead.owner;
   const senderEmail = `${lead.owner.toLowerCase().replace(/\s+/g, ".")}@bibo.co.ke`;
@@ -88,17 +91,39 @@ export function LeadComposeEmail({
     setBody(t.body);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!canSend) return;
     setSending(true);
-    window.setTimeout(() => {
-      setSending(false);
+    setSendError(null);
+    try {
+      await ensureCsrfCookie();
+      const emailBody = [
+        body.trim(),
+        cc.trim() ? `Cc: ${cc.trim()}` : "",
+        bcc.trim() ? `Bcc: ${bcc.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      await createActivity({
+        lead_id: Number(leadId),
+        activity_type: "email",
+        type: "email",
+        subject: subject.trim(),
+        description: emailBody || undefined,
+        body: emailBody || undefined,
+      });
+
       if (variant === "page") {
         router.push(leadBackHref);
       } else {
         onClose?.();
       }
-    }, 500);
+    } catch {
+      setSendError("Could not log email activity. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleExpand = () => {
@@ -209,6 +234,12 @@ export function LeadComposeEmail({
           </Link>{" "}
           before sending.
         </div>
+      )}
+
+      {sendError && (
+        <p className="border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-xs text-destructive">
+          {sendError}
+        </p>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">

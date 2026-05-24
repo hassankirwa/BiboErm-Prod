@@ -25,9 +25,18 @@ import {
 export function LeadsKanbanView({
   returnView = "kanban",
   apiCards,
+  onStageChange,
+  onAddLead,
+  onActivitySave,
 }: {
   returnView?: string;
   apiCards?: LeadKanbanCard[];
+  onStageChange?: (leadId: string, stageId: LeadKanbanStageId) => Promise<void>;
+  onAddLead?: (values: import("@/lib/lead-form-config").LeadFormValues) => Promise<void>;
+  onActivitySave?: (
+    leadId: string,
+    payload: { subject: string; description?: string; due_at?: string; activity_type?: string },
+  ) => Promise<void>;
 }) {
   const localCards = useLeadCards();
   const cards = apiCards ?? localCards;
@@ -65,9 +74,13 @@ export function LeadsKanbanView({
     });
   };
 
-  const handleDrop = (stageId: LeadKanbanStageId, leadId: string) => {
+  const handleDrop = async (stageId: LeadKanbanStageId, leadId: string) => {
     if (!leadId) return;
-    moveLeadToStage(leadId, stageId);
+    if (onStageChange) {
+      await onStageChange(leadId, stageId);
+    } else {
+      moveLeadToStage(leadId, stageId);
+    }
     setDraggingId(null);
     setDropTargetStage(null);
   };
@@ -178,20 +191,12 @@ export function LeadsKanbanView({
         onOpenChange={(open) => !open && setActivityModal(null)}
         activityType={activityModal?.activityType ?? null}
         leadTitle={activityModal?.leadTitle ?? ""}
-        onSave={() => {
-          if (activityModal) {
-            setLeadActivity(
-              activityModal.cardId,
-              activityModal.activityType
-            );
-          }
-        }}
-        onMarkDone={() => {
-          if (activityModal) {
-            setLeadActivity(
-              activityModal.cardId,
-              activityModal.activityType
-            );
+        onSave={async (payload) => {
+          if (!activityModal) return;
+          if (onActivitySave) {
+            await onActivitySave(activityModal.cardId, payload);
+          } else {
+            setLeadActivity(activityModal.cardId, activityModal.activityType);
           }
         }}
       />
@@ -201,8 +206,12 @@ export function LeadsKanbanView({
           open={!!addLeadStage}
           onOpenChange={(open) => !open && setAddLeadStage(null)}
           defaultStageId={addLeadStage}
-          onSubmit={(values) => {
-            addLead(addLeadFormToKanbanCard(values));
+          onSubmit={async (values) => {
+            if (onAddLead) {
+              await onAddLead(values);
+            } else {
+              addLead(addLeadFormToKanbanCard(values));
+            }
           }}
         />
       )}

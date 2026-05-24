@@ -81,6 +81,10 @@ class PermissionSeeder extends Seeder
         'finance.manage',
         'payroll.view',
         'hr.view',
+        'hr.manage',
+        'users.manage',
+        'devices.manage',
+        'it.manage',
     ];
 
     public function run(): void

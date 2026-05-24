@@ -17,7 +17,7 @@ class CreateProjectFromDealController extends Controller
 
     public function __invoke(Request $request, Deal $deal): JsonResponse
     {
-        $this->authorize('update', $deal);
+        $this->authorize('createProject', $deal);
 
         $result = $this->dealToProjectService->createFromDeal($deal, $request->user());
 

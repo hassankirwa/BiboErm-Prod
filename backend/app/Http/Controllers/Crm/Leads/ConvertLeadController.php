@@ -20,7 +20,7 @@ class ConvertLeadController extends Controller
 
     public function __invoke(Request $request, Lead $lead): JsonResponse
     {
-        $this->authorize('update', $lead);
+        $this->authorize('convert', $lead);
 
         $validated = $request->validate([
             'create_contact' => ['sometimes', 'boolean'],

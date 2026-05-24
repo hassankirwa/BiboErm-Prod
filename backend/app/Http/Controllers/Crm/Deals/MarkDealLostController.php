@@ -16,7 +16,7 @@ class MarkDealLostController extends Controller
 
     public function __invoke(Request $request, Deal $deal): DealResource
     {
-        $this->authorize('update', $deal);
+        $this->authorize('markLost', $deal);
 
         $validated = $request->validate([
             'loss_reason_id' => ['nullable', 'exists:crm_loss_reasons,id'],

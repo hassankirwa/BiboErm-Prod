@@ -30,7 +30,7 @@ import {
   fetchFieldDays,
   type ApiFieldDay,
 } from "@/lib/api/crm/field-day";
-import { fetchUsers } from "@/lib/api/users";
+import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -75,7 +75,7 @@ export default function FieldDayPage() {
   }, [loadFieldDays]);
 
   useEffect(() => {
-    fetchUsers({ role: "field_officer" })
+    fetchCrmAssignableUsers({ role: "field_officer" })
       .then((res) =>
         setOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
       )

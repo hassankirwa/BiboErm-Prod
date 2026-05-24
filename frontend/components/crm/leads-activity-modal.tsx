@@ -44,7 +44,12 @@ export function LeadsActivityModal({
   onOpenChange: (open: boolean) => void;
   activityType: LeadActivityType | null;
   leadTitle: string;
-  onSave?: () => void;
+  onSave?: (payload: {
+    subject: string;
+    description?: string;
+    due_at?: string;
+    activity_type?: string;
+  }) => void | Promise<void>;
   onMarkDone?: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -188,8 +193,13 @@ export function LeadsActivityModal({
             <Button
               type="button"
               className="w-full sm:w-auto"
-              onClick={() => {
-                onSave?.();
+              onClick={async () => {
+                await onSave?.({
+                  subject: title,
+                  description: note || undefined,
+                  due_at: dueDate ? `${dueDate}T12:00:00` : undefined,
+                  activity_type: activityType ?? undefined,
+                });
                 onOpenChange(false);
               }}
             >

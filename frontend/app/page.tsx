@@ -7,19 +7,31 @@ import { ArrowRight, Eye, EyeOff, Mail } from "lucide-react";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
+import { ApiError } from "@/lib/api/errors";
+import { toast } from "sonner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("sales@bibo.local");
+  const [password, setPassword] = useState("password");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    router.push("/workspace");
+    try {
+      await login(email, password, true);
+      router.push("/crm/leads");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Sign in failed. Try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

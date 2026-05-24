@@ -68,7 +68,7 @@ import {
 } from "@/lib/api/crm/quotations";
 import { scheduleSiteVisit } from "@/lib/api/crm/site-visits";
 import type { ApiDealPayment } from "@/lib/api/crm/types";
-import { fetchUsers } from "@/lib/api/users";
+import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -188,7 +188,7 @@ export default function DealDetailPage({
   }, [loadDeal]);
 
   useEffect(() => {
-    fetchUsers({ role: "field_officer" })
+    fetchCrmAssignableUsers({ role: "field_officer" })
       .then((res) =>
         setFieldOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
       )

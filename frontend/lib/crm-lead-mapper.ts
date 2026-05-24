@@ -3,6 +3,8 @@ import { leadDisplayName } from "@/lib/api/crm/leads";
 import { getUserInitials } from "@/lib/api/auth";
 import type { LeadKanbanCard, LeadKanbanStageId } from "@/lib/leads-kanban-data";
 import type { LeadListRow } from "@/lib/leads-list-data";
+import type { LeadMapMarker } from "@/lib/leads-map-data";
+import { resolveCoordsForLocation } from "@/lib/leads-map-data";
 
 const stageLabels: Record<string, { label: string; className: string }> = {
   new: { label: "New Lead", className: "bg-blue-100 text-blue-700" },
@@ -78,7 +80,9 @@ export function apiLeadToKanbanCard(lead: ApiLead): LeadKanbanCard {
     title: leadDisplayName(lead),
     location: lead.site_address ?? lead.area_estate ?? "—",
     owner: ownerName,
-    nextActionDate: lead.next_follow_up_at?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+    nextActionDate:
+      lead.next_follow_up_at?.slice(0, 10) ??
+      new Date().toISOString().slice(0, 10),
     estimatedValue: Number(lead.estimated_value ?? lead.estimated_budget ?? 0),
     tag: stageLabels[(lead.status ?? "new").toLowerCase()]?.label ?? "New",
     company: lead.account_name ?? lead.company ?? undefined,
@@ -86,5 +90,55 @@ export function apiLeadToKanbanCard(lead: ApiLead): LeadKanbanCard {
     email: lead.email ?? undefined,
     source: lead.source ?? lead.lead_source?.label ?? undefined,
     notes: lead.requirement_description ?? undefined,
+    latitude: lead.latitude ?? null,
+    longitude: lead.longitude ?? null,
   };
+}
+
+export function apiLeadToMapMarkers(leads: ApiLead[]): LeadMapMarker[] {
+  const cards = leads.map(apiLeadToKanbanCard);
+  return apiCardsToMapMarkers(cards);
+}
+
+export function apiCardsToMapMarkers(cards: LeadKanbanCard[]): LeadMapMarker[] {
+  const defaultNairobi: [number, number] = [-1.2864, 36.8172];
+
+  return cards.map((card) => {
+    const hasCoords =
+      card.latitude != null &&
+      card.longitude != null &&
+      !Number.isNaN(card.latitude) &&
+      !Number.isNaN(card.longitude);
+
+    const coords: [number, number] = hasCoords
+      ? [Number(card.latitude), Number(card.longitude)]
+      : resolveCoordsForLocation(card.location) ??
+        resolveCoordsForLocation(card.title) ??
+        defaultNairobi;
+    return {
+      id: card.id,
+      title: card.title,
+      location: card.location,
+      lat: coords[0],
+      lng: coords[1],
+      stage: card.tag,
+      stageClassName: "",
+      owner: card.owner,
+      company: card.company ?? "—",
+    };
+  });
+}
+
+export function apiCardsToCalendarEvents(
+  cards: LeadKanbanCard[],
+): import("@/lib/leads-calendar-data").LeadCalendarEvent[] {
+  return cards.map((card) => ({
+    id: `lead-${card.id}`,
+    leadId: card.id,
+    title: card.title,
+    date: card.nextActionDate,
+    startTime: "09:00",
+    endTime: "10:00",
+    type: "follow_up" as const,
+  }));
 }

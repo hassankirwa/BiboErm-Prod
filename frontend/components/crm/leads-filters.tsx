@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Filter, Download, RefreshCw } from "lucide-react";
-import { fetchUsers } from "@/lib/api/users";
+import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 
 export type LeadsFilterState = {
   search: string;
@@ -35,7 +35,7 @@ export function LeadsFilters({
   const [owners, setOwners] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
-    fetchUsers({ role: "sales_representative" })
+    fetchCrmAssignableUsers({ role: "sales_representative" })
       .then((res) =>
         setOwners(res.data.map((u) => ({ id: u.id, name: u.name }))),
       )

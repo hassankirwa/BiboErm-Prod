@@ -126,3 +126,77 @@ export function downloadLeadImportTemplate() {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+export function parseLeadImportCsv(text: string): import("@/lib/api/crm/leads").ImportLeadRow[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+  const rows: import("@/lib/api/crm/leads").ImportLeadRow[] = [];
+
+  for (const line of lines.slice(1)) {
+    const values = parseCsvLine(line);
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] ?? "";
+    });
+
+    const name = row["lead name"] || row.name;
+    const phone = row.phone;
+    if (!name?.trim() || !phone?.trim()) {
+      continue;
+    }
+
+    const estimatedRaw =
+      row["estimated value (kes)"] || row["estimated value"] || "";
+    const estimated = estimatedRaw
+      ? Number(estimatedRaw.replace(/[^\d.]/g, ""))
+      : undefined;
+
+    rows.push({
+      name: name.trim(),
+      contact_person_name: name.trim(),
+      phone: phone.trim(),
+      email: row.email?.trim() || null,
+      account_name: row.company?.trim() || null,
+      site_address: row.location?.trim() || null,
+      source: row["lead source"]?.trim() || row.source?.trim() || null,
+      estimated_value:
+        estimated != null && !Number.isNaN(estimated) ? estimated : null,
+    });
+  }
+
+  return rows;
+}

@@ -58,7 +58,8 @@ export function LeadCreateForm() {
         account_name: form.company.trim() || null,
         site_address: form.location.trim() || null,
         requirement_description: form.notes.trim() || form.title.trim(),
-        product_interests: [],
+        need_site_visit: false,
+        product_interests: form.source ? [form.source] : ["custom"],
         estimated_value: form.estimatedValue || undefined,
       });
       router.push(`/crm/leads/${lead.id}`);

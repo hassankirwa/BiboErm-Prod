@@ -16,7 +16,7 @@ class MarkDealWonController extends Controller
 
     public function __invoke(Request $request, Deal $deal): DealResource
     {
-        $this->authorize('update', $deal);
+        $this->authorize('markWon', $deal);
 
         $override = $request->boolean('override_deposit')
             && $request->user()->hasRole('super_admin');

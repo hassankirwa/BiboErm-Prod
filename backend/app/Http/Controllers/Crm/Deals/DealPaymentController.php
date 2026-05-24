@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Crm\Deals;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\DealResource;
 use App\Models\Deal;
+use App\Models\DealPayment;
 use App\Services\Crm\Payments\DealPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class DealPaymentController extends Controller
 
     public function store(Request $request, Deal $deal): JsonResponse
     {
-        $this->authorize('update', $deal);
+        $this->authorize('create', [DealPayment::class, $deal]);
 
         $validated = $request->validate([
             'payment_reference' => ['required', 'string', 'max:100'],

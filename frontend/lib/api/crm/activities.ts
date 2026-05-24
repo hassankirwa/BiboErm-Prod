@@ -56,3 +56,12 @@ export async function createActivity(
     json: payload,
   });
 }
+
+export async function completeActivity(
+  activityId: number,
+): Promise<{ data: ApiActivity }> {
+  return apiFetch<{ data: ApiActivity }>(
+    `/api/v1/crm/activities/${activityId}/complete`,
+    { method: "PATCH" },
+  );
+}

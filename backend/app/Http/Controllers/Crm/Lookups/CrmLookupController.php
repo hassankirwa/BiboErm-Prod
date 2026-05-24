@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Crm\Lookups;
 
 use App\Http\Controllers\Controller;
-use App\Models\County;
+use App\Models\CrmCounty;
+use App\Models\CrmLossReason;
 use App\Models\LeadSource;
 use App\Models\LeadType;
-use App\Models\LossReason;
 use App\Models\ProductInterest;
+use App\Models\User;
 use App\Models\VisitPurpose;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,10 +29,27 @@ class CrmLookupController extends Controller
                 'lead_sources' => $query(LeadSource::class),
                 'lead_types' => $query(LeadType::class),
                 'product_interests' => $query(ProductInterest::class),
-                'counties' => $query(County::class),
-                'loss_reasons' => $query(LossReason::class),
+                'counties' => $query(CrmCounty::class),
+                'loss_reasons' => $query(CrmLossReason::class),
                 'visit_purposes' => $query(VisitPurpose::class),
             ],
         ]);
+    }
+
+    public function users(Request $request): JsonResponse
+    {
+        $role = $request->string('role')->toString();
+        $spatieRole = match ($role) {
+            'sales_rep' => 'sales_representative',
+            default => $role,
+        };
+
+        $users = User::query()
+            ->where('status', User::STATUS_ACTIVE)
+            ->when($spatieRole !== '', fn ($q) => $q->role($spatieRole))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return response()->json(['data' => $users]);
     }
 }

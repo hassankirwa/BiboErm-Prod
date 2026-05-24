@@ -119,6 +119,7 @@ class LeadController extends Controller
                 'convertedDeal',
                 'siteVisits',
                 'activities',
+                'attachments',
             ])
         );
     }

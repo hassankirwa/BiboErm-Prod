@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -10,32 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  crmOpenTasks,
-  crmUpcomingMeetings,
-  crmTodaysLeads,
-  crmLeadsThisMonth,
-} from "@/lib/crm-home-data";
 import { cn } from "@/lib/utils";
-
-const priorityStyles = {
-  High: "bg-red-100 text-red-700 hover:bg-red-100",
-  Medium: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-  Low: "bg-slate-100 text-slate-600 hover:bg-slate-100",
-} as const;
-
-const leadStatusStyles = {
-  New: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  Contacted: "bg-orange-100 text-orange-700 hover:bg-orange-100",
-  Qualified: "bg-green-100 text-green-700 hover:bg-green-100",
-} as const;
-
-const stageStyles = {
-  New: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  Qualified: "bg-green-100 text-green-700 hover:bg-green-100",
-  Proposal: "bg-violet-100 text-violet-700 hover:bg-violet-100",
-  Negotiation: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-} as const;
+import { fetchActivities } from "@/lib/api/crm/activities";
+import { fetchLeads } from "@/lib/api/crm/leads";
+import { fetchSiteVisits } from "@/lib/api/crm/site-visits";
+import { apiLeadToListRow } from "@/lib/crm-lead-mapper";
+import type { ApiActivity } from "@/lib/api/crm/types";
 
 function TableCard({
   title,
@@ -63,7 +45,49 @@ function TableCard({
   );
 }
 
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return iso.slice(0, 10);
+}
+
+function EmptyRow({ cols }: { cols: number }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={cols} className="py-8 text-center text-sm text-muted-foreground">
+        No records yet
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function CrmHomeTables() {
+  const [tasks, setTasks] = useState<ApiActivity[]>([]);
+  const [visits, setVisits] = useState<
+    Awaited<ReturnType<typeof fetchSiteVisits>>["data"]
+  >([]);
+  const [recentLeads, setRecentLeads] = useState<
+    ReturnType<typeof apiLeadToListRow>[]
+  >([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetchActivities({ status: "open", per_page: 5 }),
+      fetchSiteVisits({ per_page: 5 }),
+      fetchLeads({ per_page: 10 }),
+    ])
+      .then(([activitiesRes, visitsRes, leadsRes]) => {
+        setTasks(activitiesRes.data ?? []);
+        setVisits(visitsRes.data ?? []);
+        setRecentLeads((leadsRes.data ?? []).map(apiLeadToListRow));
+      })
+      .catch(() => {});
+  }, []);
+
+  const todaysLeads = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return recentLeads.filter((l) => l.statusKey === "new").slice(0, 5);
+  }, [recentLeads]);
+
   return (
     <div className="grid w-full min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
       <TableCard title="My Open Tasks" href="/crm/activities" linkLabel="View all">
@@ -76,49 +100,56 @@ export function CrmHomeTables() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {crmOpenTasks.map((task) => (
-              <TableRow key={task.subject}>
-                <TableCell className="max-w-[140px] truncate pl-4 font-medium sm:max-w-none">
-                  {task.subject}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {task.dueDate}
-                </TableCell>
-                <TableCell className="pr-4">
-                  <Badge
-                    variant="secondary"
-                    className={cn("font-medium", priorityStyles[task.priority])}
-                  >
-                    {task.priority}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {tasks.length === 0 ? (
+              <EmptyRow cols={3} />
+            ) : (
+              tasks.map((task) => (
+                <TableRow key={task.id}>
+                  <TableCell className="max-w-[140px] truncate pl-4 font-medium sm:max-w-none">
+                    {task.subject}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {formatDate(task.due_at)}
+                  </TableCell>
+                  <TableCell className="pr-4">
+                    <Badge variant="secondary" className="font-medium">
+                      {task.priority ?? "Medium"}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableCard>
 
-      <TableCard title="Upcoming Meetings" href="/crm/field-day" linkLabel="View all">
+      <TableCard title="Upcoming Site Visits" href="/crm/site-visits" linkLabel="View all">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4">Title / Client</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead className="pr-4">Assigned To</TableHead>
+              <TableHead className="pl-4">Title</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="pr-4">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {crmUpcomingMeetings.map((meeting) => (
-              <TableRow key={meeting.title}>
-                <TableCell className="max-w-[140px] truncate pl-4 font-medium sm:max-w-none">
-                  {meeting.title}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {meeting.time}
-                </TableCell>
-                <TableCell className="pr-4 text-muted-foreground">{meeting.assignedTo}</TableCell>
-              </TableRow>
-            ))}
+            {visits.length === 0 ? (
+              <EmptyRow cols={3} />
+            ) : (
+              visits.map((visit) => (
+                <TableRow key={visit.id}>
+                  <TableCell className="max-w-[140px] truncate pl-4 font-medium sm:max-w-none">
+                    {visit.title ?? visit.visit_number ?? `Visit #${visit.id}`}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {formatDate(visit.visit_date)}
+                  </TableCell>
+                  <TableCell className="pr-4 capitalize text-muted-foreground">
+                    {(visit.status ?? "scheduled").replace(/_/g, " ")}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableCard>
@@ -129,66 +160,74 @@ export function CrmHomeTables() {
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">Lead Name</TableHead>
               <TableHead className="hidden sm:table-cell">Source</TableHead>
-              <TableHead className="hidden md:table-cell">Assigned To</TableHead>
-              <TableHead className="pr-4">Status</TableHead>
+              <TableHead className="hidden md:table-cell">Owner</TableHead>
+              <TableHead className="pr-4">Stage</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {crmTodaysLeads.map((lead) => (
-              <TableRow key={lead.name}>
-                <TableCell className="pl-4 font-medium">{lead.name}</TableCell>
-                <TableCell className="hidden text-muted-foreground sm:table-cell">
-                  {lead.source}
-                </TableCell>
-                <TableCell className="hidden text-muted-foreground md:table-cell">
-                  {lead.assignedTo}
-                </TableCell>
-                <TableCell className="pr-4">
-                  <Badge
-                    variant="secondary"
-                    className={cn("font-medium", leadStatusStyles[lead.status])}
-                  >
-                    {lead.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {todaysLeads.length === 0 ? (
+              <EmptyRow cols={4} />
+            ) : (
+              todaysLeads.map((lead) => (
+                <TableRow key={lead.id}>
+                  <TableCell className="pl-4 font-medium">
+                    <Link href={`/crm/leads/${lead.id}`} className="text-primary hover:underline">
+                      {lead.leadName}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                    {lead.source}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground md:table-cell">
+                    {lead.owner}
+                  </TableCell>
+                  <TableCell className="pr-4">
+                    <Badge variant="secondary" className={cn("font-medium", lead.stageClassName)}>
+                      {lead.stage}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableCard>
 
-      <TableCard title="Leads This Month" href="/crm/leads" linkLabel="View all">
+      <TableCard title="Recent Leads" href="/crm/leads" linkLabel="View all">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-4">Lead / Company</TableHead>
               <TableHead className="hidden sm:table-cell">Source</TableHead>
               <TableHead>Stage</TableHead>
-              <TableHead className="hidden md:table-cell pr-4">Created</TableHead>
+              <TableHead className="hidden md:table-cell pr-4">Owner</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {crmLeadsThisMonth.map((lead) => (
-              <TableRow key={lead.name}>
-                <TableCell className="max-w-[120px] truncate pl-4 font-medium sm:max-w-none">
-                  {lead.name}
-                </TableCell>
-                <TableCell className="hidden text-muted-foreground sm:table-cell">
-                  {lead.source}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant="secondary"
-                    className={cn("font-medium", stageStyles[lead.stage])}
-                  >
-                    {lead.stage}
-                  </Badge>
-                </TableCell>
-                <TableCell className="hidden whitespace-nowrap pr-4 text-muted-foreground md:table-cell">
-                  {lead.created}
-                </TableCell>
-              </TableRow>
-            ))}
+            {recentLeads.length === 0 ? (
+              <EmptyRow cols={4} />
+            ) : (
+              recentLeads.slice(0, 5).map((lead) => (
+                <TableRow key={lead.id}>
+                  <TableCell className="max-w-[120px] truncate pl-4 font-medium sm:max-w-none">
+                    <Link href={`/crm/leads/${lead.id}`} className="text-primary hover:underline">
+                      {lead.leadName}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                    {lead.source}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className={cn("font-medium", lead.stageClassName)}>
+                      {lead.stage}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden whitespace-nowrap pr-4 text-muted-foreground md:table-cell">
+                    {lead.owner}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableCard>

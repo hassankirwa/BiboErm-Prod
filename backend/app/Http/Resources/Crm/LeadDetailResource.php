@@ -51,6 +51,7 @@ class LeadDetailResource extends LeadResource
             'converted_account' => new AccountResource($this->whenLoaded('convertedAccount')),
             'converted_deal' => new DealResource($this->whenLoaded('convertedDeal')),
             'site_visits' => SiteVisitResource::collection($this->whenLoaded('siteVisits')),
+            'attachments' => $this->whenLoaded('attachments'),
             'activities' => $this->whenLoaded('activities'),
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,

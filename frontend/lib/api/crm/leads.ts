@@ -178,6 +178,33 @@ export async function convertLead(
   });
 }
 
+export type ImportLeadRow = {
+  name: string;
+  contact_person_name?: string;
+  phone: string;
+  email?: string | null;
+  account_name?: string | null;
+  site_address?: string | null;
+  source?: string | null;
+  estimated_value?: number | null;
+};
+
+export type ImportLeadsResult = {
+  data: {
+    imported: number;
+    leads: Array<{ id: number; lead_number: string; name: string }>;
+  };
+};
+
+export async function importLeads(
+  leads: ImportLeadRow[],
+): Promise<ImportLeadsResult> {
+  return apiFetch<ImportLeadsResult>("/api/v1/crm/leads/import", {
+    method: "POST",
+    json: { leads },
+  });
+}
+
 /** Upload attachment when backend exposes POST /api/v1/crm/leads/{id}/attachments */
 export async function uploadLeadAttachment(
   leadId: number,

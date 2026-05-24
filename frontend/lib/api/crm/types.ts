@@ -211,6 +211,9 @@ export type ApiLead = {
   need_site_visit: boolean | null;
   site_address: string | null;
   county_id: number | null;
+  area_estate: string | null;
+  latitude: number | null;
+  longitude: number | null;
   next_follow_up_at: string | null;
   lead_owner_id: number | null;
   assigned_sales_user_id: number | null;
@@ -267,6 +270,13 @@ export type ApiLeadDetail = ApiLead & {
   converted_deal?: ApiDeal | null;
   site_visits?: ApiSiteVisit[];
   activities?: ApiActivity[];
+  attachments?: Array<{
+    id: number;
+    file_name?: string | null;
+    original_name?: string | null;
+    mime_type?: string | null;
+    size?: number | null;
+  }>;
   created_by: number | null;
   updated_by: number | null;
   creator?: ApiUser | null;

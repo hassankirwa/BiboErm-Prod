@@ -10,7 +10,11 @@ import { LeadsCalendarView } from "@/components/crm/leads-calendar-view";
 import { LeadsMapView } from "@/components/crm/leads-map-view";
 import type { LeadViewMode } from "@/lib/leads-list-data";
 import { leadScopeFilters } from "@/lib/leads-list-data";
-import { fetchLeads } from "@/lib/api/crm/leads";
+import { fetchLeads, createLead, updateLeadStatus } from "@/lib/api/crm/leads";
+import { createActivity } from "@/lib/api/crm/activities";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import type { LeadKanbanStageId } from "@/lib/leads-kanban-data";
+import type { LeadFormValues } from "@/lib/lead-form-config";
 import {
   apiLeadToKanbanCard,
   apiLeadToListRow,
@@ -63,6 +67,59 @@ export function LeadsPageClient() {
     }
   }, [search]);
 
+  const handleStageChange = useCallback(
+    async (leadId: string, stageId: LeadKanbanStageId) => {
+      await ensureCsrfCookie();
+      await updateLeadStatus(Number(leadId), stageId);
+      await loadLeads();
+    },
+    [loadLeads],
+  );
+
+  const handleAddLead = useCallback(
+    async (values: LeadFormValues) => {
+      await ensureCsrfCookie();
+      await createLead({
+        name: values.title.trim(),
+        contact_person_name: values.title.trim(),
+        phone: values.phone.trim() || "0000000000",
+        email: values.email.trim() || null,
+        account_name: values.company.trim() || null,
+        site_address: values.location.trim() || null,
+        status: values.stageId,
+        requirement_description: values.notes.trim() || values.title.trim(),
+        need_site_visit: false,
+        product_interests: values.source ? [values.source] : ["custom"],
+        estimated_value: values.estimatedValue || undefined,
+      });
+      await loadLeads();
+    },
+    [loadLeads],
+  );
+
+  const handleActivitySave = useCallback(
+    async (
+      leadId: string,
+      payload: {
+        subject: string;
+        description?: string;
+        due_at?: string;
+        activity_type?: string;
+      },
+    ) => {
+      await ensureCsrfCookie();
+      await createActivity({
+        lead_id: Number(leadId),
+        subject: payload.subject,
+        description: payload.description,
+        due_at: payload.due_at,
+        activity_type: payload.activity_type,
+        type: payload.activity_type,
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     loadLeads();
   }, [loadLeads]);
@@ -110,11 +167,23 @@ export function LeadsPageClient() {
             />
           )}
           {view === "kanban" && (
-            <LeadsKanbanView returnView={view} apiCards={kanbanCards} />
+            <LeadsKanbanView
+              returnView={view}
+              apiCards={kanbanCards}
+              onStageChange={handleStageChange}
+              onAddLead={handleAddLead}
+              onActivitySave={handleActivitySave}
+            />
           )}
-          {view === "calendar" && <LeadsCalendarView returnView={view} />}
+          {view === "calendar" && (
+            <LeadsCalendarView returnView={view} cards={kanbanCards} />
+          )}
           {view === "map" && (
-            <LeadsMapView className="min-h-0 flex-1" returnView={view} />
+            <LeadsMapView
+              className="min-h-0 flex-1"
+              returnView={view}
+              cards={kanbanCards}
+            />
           )}
         </>
       )}
