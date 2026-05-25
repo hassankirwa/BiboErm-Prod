@@ -7,6 +7,7 @@ import { ExternalLink, MapPin } from "lucide-react";
 import type { LeadViewMode } from "@/lib/leads-list-data";
 import { cn } from "@/lib/utils";
 import { getLeadsMapMarkers } from "@/lib/leads-map-data";
+import { apiCardsToMapMarkers } from "@/lib/crm-lead-mapper";
 
 const LeadsMap = dynamic(
   () => import("@/components/crm/leads-map").then((m) => m.LeadsMap),
@@ -23,11 +24,15 @@ const LeadsMap = dynamic(
 export function LeadsMapView({
   className,
   returnView = "map",
+  cards,
 }: {
   className?: string;
   returnView?: LeadViewMode;
+  cards?: import("@/lib/leads-kanban-data").LeadKanbanCard[];
 }) {
-  const markers = getLeadsMapMarkers();
+  const markers = cards
+    ? apiCardsToMapMarkers(cards)
+    : getLeadsMapMarkers();
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
 
   return (

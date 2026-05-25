@@ -1,32 +1,11 @@
 import type { ApiErrorBody } from "@/lib/auth/types";
 import { getDeviceId } from "@/lib/device-id";
-import { getApiBaseUrl } from "./config";
-import { ensureCsrfCookie, getXsrfToken } from "./csrf";
+import { API_URL, getApiBaseUrl } from "./config";
+import { ensureCsrfCookie, getCsrfTokenFromCookie, getXsrfToken } from "./csrf";
+import { getDeviceUuid } from "./device";
+import { ApiError } from "./errors";
 
-export class ApiError extends Error {
-  status: number;
-  body: ApiErrorBody;
-
-  constructor(status: number, body: ApiErrorBody) {
-    super(body.message ?? `Request failed with status ${status}`);
-    this.name = "ApiError";
-    this.status = status;
-    this.body = body;
-  }
-
-  fieldErrors(): Record<string, string[]> {
-    return this.body.errors ?? {};
-  }
-
-  firstError(): string | undefined {
-    const errors = this.body.errors;
-    if (!errors) {
-      return this.body.message;
-    }
-    const first = Object.values(errors)[0];
-    return first?.[0] ?? this.body.message;
-  }
-}
+export { ApiError, ensureCsrfCookie };
 
 export type ApiRequestOptions = {
   method?: string;
@@ -36,6 +15,13 @@ export type ApiRequestOptions = {
   skipRefresh?: boolean;
   headers?: Record<string, string>;
 };
+
+type ApiFetchOptions = RequestInit & {
+  json?: unknown;
+  skipAuthHeaders?: boolean;
+};
+
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -48,7 +34,7 @@ async function tryRefreshSession(): Promise<boolean> {
     try {
       await ensureCsrfCookie();
       const xsrf = getXsrfToken();
-      const res = await fetch(`${getApiBaseUrl()}/api/auth/refresh`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -72,7 +58,7 @@ async function tryRefreshSession(): Promise<boolean> {
 
 export async function apiRequest<T>(
   path: string,
-  options: ApiRequestOptions = {}
+  options: ApiRequestOptions = {},
 ): Promise<T> {
   const {
     method = "GET",
@@ -105,7 +91,8 @@ export async function apiRequest<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  const url = `${getApiBaseUrl()}/api${path.startsWith("/") ? path : `/${path}`}`;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${getApiBaseUrl()}/api/v1${normalizedPath}`;
 
   const doFetch = () =>
     fetch(url, {
@@ -140,8 +127,65 @@ export async function apiRequest<T>(
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    throw new ApiError(response.status, (data as ApiErrorBody) ?? {});
+    const errorBody = (data as ApiErrorBody) ?? {};
+    throw new ApiError(
+      response.status,
+      errorBody.message ?? `Request failed with status ${response.status}`,
+      errorBody as Record<string, unknown>,
+    );
   }
 
   return data as T;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<T> {
+  const { json, skipAuthHeaders, headers: initHeaders, ...rest } = options;
+  const method = (rest.method ?? "GET").toUpperCase();
+  const headers = new Headers(initHeaders);
+
+  headers.set("Accept", "application/json");
+  headers.set("X-Requested-With", "XMLHttpRequest");
+
+  if (!skipAuthHeaders) {
+    const deviceUuid = getDeviceUuid();
+    headers.set("X-Device-UUID", deviceUuid);
+    headers.set("X-Device-Id", deviceUuid);
+  }
+
+  if (json !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (MUTATING_METHODS.has(method)) {
+    const csrf = getCsrfTokenFromCookie();
+    if (csrf) {
+      headers.set("X-XSRF-TOKEN", csrf);
+    }
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...rest,
+    method,
+    credentials: "include",
+    headers,
+    body: json !== undefined ? JSON.stringify(json) : rest.body,
+  });
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const message =
+      (typeof body.message === "string" && body.message) ||
+      "Request failed. Please try again.";
+    throw new ApiError(res.status, message, body);
+  }
+
+  return body as T;
 }

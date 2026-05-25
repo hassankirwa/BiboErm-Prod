@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Models\UserDepartmentRole;
+use App\Services\Crm\CrmAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->booting(function (): void {
             config(['filesystems.disks.bibo.root' => BiboStorage::rootPath()]);
         });
+
+        $this->app->singleton(CrmAuditLogger::class);
     }
 
     /**

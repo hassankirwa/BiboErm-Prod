@@ -18,7 +18,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { downloadLeadImportTemplate } from "@/lib/lead-form-config";
+import { downloadLeadImportTemplate, parseLeadImportCsv } from "@/lib/lead-form-config";
+import { importLeads } from "@/lib/api/crm/leads";
+import { ensureCsrfCookie } from "@/lib/api/client";
 
 const ACCEPTED_TYPES = [
   "text/csv",
@@ -40,6 +42,8 @@ export function LeadsImportWizard() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [imported, setImported] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importCount, setImportCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const handleFile = (next: File | null) => {
@@ -57,9 +61,28 @@ export function LeadsImportWizard() {
     setFile(next);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!file) return;
-    setImported(true);
+    setImporting(true);
+    setError(null);
+    try {
+      const text = await file.text();
+      const rows = parseLeadImportCsv(text);
+      if (rows.length === 0) {
+        setError(
+          "No valid rows found. Ensure the file has headers and at least one row with Lead Name and Phone.",
+        );
+        return;
+      }
+      await ensureCsrfCookie();
+      const result = await importLeads(rows);
+      setImportCount(result.data.imported);
+      setImported(true);
+    } catch {
+      setError("Import failed. Check the file format and try again.");
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -171,11 +194,14 @@ export function LeadsImportWizard() {
             <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
-                <p className="text-sm font-medium">File ready for import</p>
+                <p className="text-sm font-medium">Import complete</p>
                 <p className="mt-0.5 text-xs text-green-700/90">
-                  {file.name} has been received. Lead rows will be processed when
-                  the import API is connected.
+                  {importCount} lead{importCount !== 1 ? "s" : ""} imported from{" "}
+                  {file.name}.
                 </p>
+                <Button variant="link" className="h-auto p-0 text-xs" asChild>
+                  <Link href="/crm/leads?view=list">View leads</Link>
+                </Button>
               </div>
             </div>
           )}
@@ -183,11 +209,11 @@ export function LeadsImportWizard() {
           <Button
             type="button"
             className="w-full gap-2 sm:w-auto"
-            disabled={!file || imported}
+            disabled={!file || imported || importing}
             onClick={handleImport}
           >
             <Upload className="h-4 w-4" />
-            Import file
+            {importing ? "Importing…" : "Import file"}
           </Button>
 
           <div className="border-t border-border pt-4">

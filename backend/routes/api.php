@@ -27,6 +27,7 @@ use App\Http\Controllers\StoredFileController;
 use App\Http\Controllers\TwoFactorSettingsController;
 use Illuminate\Support\Facades\Route;
 
+Route::prefix('v1')->group(function () {
 Route::middleware('throttle:bibo-login')->post('auth/login', [LoginController::class, 'store']);
 
 Route::middleware('throttle:bibo-2fa-verify')->post('auth/two-factor/verify', [TwoFactorLoginController::class, 'verify']);
@@ -126,3 +127,17 @@ Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
             Route::post('profile-change-requests/{profileChangeRequest}/reject', [HrProfileChangeRequestController::class, 'reject']);
         });
     });
+
+Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () {
+    require __DIR__.'/api/crm/leads.php';
+    require __DIR__.'/api/crm/contacts.php';
+    require __DIR__.'/api/crm/accounts.php';
+    require __DIR__.'/api/crm/deals.php';
+    require __DIR__.'/api/crm/site-visits.php';
+    require __DIR__.'/api/crm/quotations.php';
+    require __DIR__.'/api/crm/activities.php';
+    require __DIR__.'/api/crm/field-day.php';
+    require __DIR__.'/api/crm/lookups.php';
+    require __DIR__.'/api/crm/reports.php';
+});
+}); // v1

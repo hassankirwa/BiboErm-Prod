@@ -25,6 +25,8 @@ export type LeadKanbanCard = {
   email?: string;
   source?: string;
   notes?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export const leadActivityTypes: {

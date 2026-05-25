@@ -1,68 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { fetchLead } from "@/lib/api/crm/leads";
+import type { ApiLeadDetail } from "@/lib/api/crm/types";
+import { Spinner } from "@/components/ui/spinner";
 
 type RelatedSection = {
   id: string;
   label: string;
   count?: number;
-  items?: { id: string; title: string; meta?: string }[];
+  items?: { id: string; title: string; meta?: string; href?: string }[];
   emptyLabel?: string;
 };
 
-const defaultSections: RelatedSection[] = [
-  {
-    id: "notes",
-    label: "Notes",
-    count: 0,
-    emptyLabel: "No notes yet",
-  },
-  {
-    id: "connected",
-    label: "Connected Records",
-    count: 0,
-    emptyLabel: "No connected records",
-  },
-  {
-    id: "attachments",
-    label: "Attachments",
-    count: 0,
-    emptyLabel: "No attachments",
-  },
-  {
-    id: "open-activities",
-    label: "Open Activities",
-    count: 2,
-    items: [
-      { id: "a1", title: "Follow-up call", meta: "Due May 20" },
-      { id: "a2", title: "Send quotation", meta: "Due May 22" },
-    ],
-  },
-  {
-    id: "closed-activities",
-    label: "Closed Activities",
-    count: 1,
-    items: [{ id: "c1", title: "Intro email sent", meta: "May 15" }],
-  },
-  {
-    id: "deals",
-    label: "Deals",
-    count: 0,
-    emptyLabel: "No deals linked",
-  },
-  {
-    id: "contacts",
-    label: "Contacts",
-    count: 1,
-    items: [{ id: "p1", title: "Primary contact", meta: "Not set" }],
-  },
-];
-
 function RelatedSectionBlock({ section }: { section: RelatedSection }) {
   const [open, setOpen] = useState(
-    section.id === "open-activities" || section.id === "notes"
+    section.id === "open-activities" || section.id === "notes",
   );
   const hasItems = (section.items?.length ?? 0) > 0;
 
@@ -91,15 +46,24 @@ function RelatedSectionBlock({ section }: { section: RelatedSection }) {
             <ul className="space-y-2">
               {section.items!.map((item) => (
                 <li key={item.id}>
-                  <button
-                    type="button"
-                    className="w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[#ebf2ff]/50"
-                  >
-                    <p className="font-medium text-[#1e3a5f]">{item.title}</p>
-                    {item.meta && (
-                      <p className="text-muted-foreground">{item.meta}</p>
-                    )}
-                  </button>
+                  {item.href ? (
+                    <Link
+                      href={item.href}
+                      className="block rounded-md px-2 py-1.5 text-left text-xs hover:bg-[#ebf2ff]/50"
+                    >
+                      <p className="font-medium text-[#1e3a5f]">{item.title}</p>
+                      {item.meta && (
+                        <p className="text-muted-foreground">{item.meta}</p>
+                      )}
+                    </Link>
+                  ) : (
+                    <div className="rounded-md px-2 py-1.5 text-left text-xs">
+                      <p className="font-medium text-[#1e3a5f]">{item.title}</p>
+                      {item.meta && (
+                        <p className="text-muted-foreground">{item.meta}</p>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -114,7 +78,147 @@ function RelatedSectionBlock({ section }: { section: RelatedSection }) {
   );
 }
 
-export function LeadRelatedLists() {
+function buildSections(lead: ApiLeadDetail): RelatedSection[] {
+  const activities = (lead.activities ?? []) as Array<{
+    id: number;
+    subject: string;
+    status: string;
+    due_at?: string | null;
+  }>;
+  const openActivities = activities.filter((a) => a.status !== "completed");
+  const closedActivities = activities.filter((a) => a.status === "completed");
+  const attachments = (lead.attachments ?? []) as Array<{
+    id: number;
+    file_name?: string;
+    original_name?: string;
+  }>;
+
+  const connected: RelatedSection["items"] = [];
+  if (lead.converted_contact) {
+    connected.push({
+      id: `contact-${lead.converted_contact.id}`,
+      title: lead.converted_contact.name ?? "Contact",
+      meta: "Contact",
+      href: `/crm/contacts/${lead.converted_contact.id}`,
+    });
+  }
+  if (lead.converted_account) {
+    connected.push({
+      id: `account-${lead.converted_account.id}`,
+      title: lead.converted_account.name ?? "Account",
+      meta: "Account",
+      href: `/crm/accounts/${lead.converted_account.id}`,
+    });
+  }
+
+  return [
+    {
+      id: "notes",
+      label: "Notes",
+      count: lead.notes || lead.internal_notes ? 1 : 0,
+      items: lead.notes || lead.internal_notes
+        ? [{ id: "note-1", title: lead.notes ?? lead.internal_notes ?? "" }]
+        : [],
+      emptyLabel: "No notes yet",
+    },
+    {
+      id: "connected",
+      label: "Connected Records",
+      count: connected.length,
+      items: connected,
+      emptyLabel: "No connected records",
+    },
+    {
+      id: "attachments",
+      label: "Attachments",
+      count: attachments.length,
+      items: attachments.map((a) => ({
+        id: String(a.id),
+        title: a.original_name ?? a.file_name ?? `Attachment ${a.id}`,
+      })),
+      emptyLabel: "No attachments",
+    },
+    {
+      id: "open-activities",
+      label: "Open Activities",
+      count: openActivities.length,
+      items: openActivities.map((a) => ({
+        id: String(a.id),
+        title: a.subject,
+        meta: a.due_at ? `Due ${a.due_at.slice(0, 10)}` : undefined,
+      })),
+      emptyLabel: "No open activities",
+    },
+    {
+      id: "closed-activities",
+      label: "Closed Activities",
+      count: closedActivities.length,
+      items: closedActivities.map((a) => ({
+        id: String(a.id),
+        title: a.subject,
+      })),
+      emptyLabel: "No completed activities",
+    },
+    {
+      id: "deals",
+      label: "Deals",
+      count: lead.converted_deal ? 1 : 0,
+      items: lead.converted_deal
+        ? [
+            {
+              id: String(lead.converted_deal.id),
+              title: lead.converted_deal.title ?? lead.converted_deal.name ?? "Deal",
+              href: `/crm/deals/${lead.converted_deal.id}`,
+            },
+          ]
+        : [],
+      emptyLabel: "No deals linked",
+    },
+    {
+      id: "site-visits",
+      label: "Site Visits",
+      count: (lead.site_visits ?? []).length,
+      items: (lead.site_visits ?? []).map((v) => ({
+        id: String(v.id),
+        title: v.title ?? v.visit_number ?? `Visit ${v.id}`,
+        meta: v.visit_date?.slice?.(0, 10) ?? v.visit_date,
+        href: `/crm/site-visits`,
+      })),
+      emptyLabel: "No site visits",
+    },
+  ];
+}
+
+export function LeadRelatedLists({ leadId }: { leadId?: number }) {
+  const [lead, setLead] = useState<ApiLeadDetail | null>(null);
+  const [loading, setLoading] = useState(!!leadId);
+
+  useEffect(() => {
+    if (!leadId) return;
+    setLoading(true);
+    fetchLead(leadId)
+      .then(setLead)
+      .catch(() => setLead(null))
+      .finally(() => setLoading(false));
+  }, [leadId]);
+
+  const sections = useMemo(
+    () => (lead ? buildSections(lead) : []),
+    [lead],
+  );
+
+  if (!leadId) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner className="h-6 w-6 text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div className="border-b border-border bg-[#ebf2ff]/30 px-3 py-2.5">
@@ -123,7 +227,7 @@ export function LeadRelatedLists() {
         </h2>
       </div>
       <nav>
-        {defaultSections.map((section) => (
+        {sections.map((section) => (
           <RelatedSectionBlock key={section.id} section={section} />
         ))}
       </nav>

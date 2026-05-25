@@ -37,6 +37,8 @@ import {
   leadCalendarEvents,
   type LeadCalendarEvent,
 } from "@/lib/leads-calendar-data";
+import { apiCardsToCalendarEvents } from "@/lib/crm-lead-mapper";
+import type { LeadKanbanCard } from "@/lib/leads-kanban-data";
 
 const weekOpts = { weekStartsOn: 1 as const };
 
@@ -98,11 +100,18 @@ function CalendarEventChip({
 
 export function LeadsCalendarView({
   returnView = "calendar",
+  cards,
 }: {
   returnView?: LeadViewMode;
+  cards?: LeadKanbanCard[];
 }) {
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 4, 20));
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  const events = useMemo(
+    () => (cards ? apiCardsToCalendarEvents(cards) : leadCalendarEvents),
+    [cards],
+  );
 
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
@@ -140,7 +149,7 @@ export function LeadsCalendarView({
   }, [currentDate]);
 
   const dayEvents = useMemo(
-    () => eventsOnDay(leadCalendarEvents, currentDate),
+    () => eventsOnDay(events, currentDate),
     [currentDate]
   );
 
@@ -219,7 +228,7 @@ export function LeadsCalendarView({
             </div>
             <div className="grid grid-cols-7">
               {monthDays.map((day) => {
-                const dayEv = eventsOnDay(leadCalendarEvents, day);
+                const dayEv = eventsOnDay(events, day);
                 const inMonth = isSameMonth(day, currentDate);
                 const today = isToday(day);
 
@@ -309,7 +318,7 @@ export function LeadsCalendarView({
             </div>
             <div className="grid grid-cols-7 min-h-[320px]">
               {weekDays.map((day) => {
-                const dayEv = eventsOnDay(leadCalendarEvents, day);
+                const dayEv = eventsOnDay(events, day);
                 const today = isToday(day);
                 return (
                   <div

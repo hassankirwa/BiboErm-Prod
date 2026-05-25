@@ -18,6 +18,10 @@ export function getXsrfToken(): string | null {
   return decodeURIComponent(match.split("=")[1] ?? "");
 }
 
+export function getCsrfTokenFromCookie(): string | null {
+  return getXsrfToken();
+}
+
 export async function ensureCsrfCookie(): Promise<void> {
   if (csrfPromise) {
     return csrfPromise;
