@@ -175,10 +175,16 @@ function scalePct(value: number) {
   return `${(value / REVENUE_MAX_SCALE) * 100}%`;
 }
 
-export function RevenueTargetChart() {
-  const achievedPct = Math.round((REVENUE_ACHIEVED / REVENUE_TARGET) * 100);
-  const achievedWidth = scalePct(REVENUE_ACHIEVED);
-  const targetLineLeft = scalePct(REVENUE_TARGET);
+export function RevenueTargetChart({
+  achieved = REVENUE_ACHIEVED,
+  target = REVENUE_TARGET,
+}: {
+  achieved?: number;
+  target?: number;
+}) {
+  const achievedPct = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  const achievedWidth = scalePct(achieved);
+  const targetLineLeft = scalePct(target);
 
   return (
     <ChartCardShell title="Revenue Target — This Year">
@@ -199,7 +205,7 @@ export function RevenueTargetChart() {
                 style={{ left: targetLineLeft }}
               >
                 <span className="text-[10px] font-medium text-foreground sm:text-xs">
-                  Target: KES {REVENUE_TARGET.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Target: KES {target.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
@@ -213,7 +219,7 @@ export function RevenueTargetChart() {
                 >
                   <span className="absolute inset-0 flex items-center justify-center px-0.5 text-center text-[8px] font-semibold leading-tight text-white sm:text-[10px]">
                     KES{" "}
-                    {REVENUE_ACHIEVED.toLocaleString("en-KE", {
+                    {achieved.toLocaleString("en-KE", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
@@ -258,7 +264,7 @@ export function RevenueTargetChart() {
                   Target
                 </span>
                 <span className="text-[10px] text-neutral-600 sm:text-xs">
-                  KES {REVENUE_TARGET.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  KES {target.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

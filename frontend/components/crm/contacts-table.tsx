@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -29,25 +30,80 @@ import {
   MapPin,
   FolderPlus,
 } from "lucide-react";
-import { mockContacts, mockAccounts } from "@/lib/mock-data";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  contactDisplayName,
+  fetchContacts,
+  type ApiContact,
+} from "@/lib/api/crm/contacts";
+import { getUserInitials } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/errors";
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
+type ContactsTableProps = {
+  search?: string;
+};
 
-function getAccountName(companyName?: string) {
-  if (!companyName) return null;
-  return mockAccounts.find((a) => a.companyName === companyName);
-}
+export function ContactsTable({ search }: ContactsTableProps) {
+  const [contacts, setContacts] = useState<ApiContact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export function ContactsTable() {
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    const timer = setTimeout(() => {
+      fetchContacts({ search: search || undefined })
+        .then((response) => {
+          if (!cancelled) setContacts(response.data);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setError(
+              err instanceof ApiError
+                ? err.message
+                : "Failed to load contacts.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+    }, search ? 300 : 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center rounded-md border border-border bg-card py-16">
+        <Spinner className="h-8 w-8 text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-8 text-center text-sm text-destructive">
+        {error}
+      </div>
+    );
+  }
+
+  if (contacts.length === 0) {
+    return (
+      <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
+        No contacts found.
+      </div>
+    );
+  }
+
   return (
-    <div className="min-w-0 overflow-x-auto rounded-md border border-border bg-card">
+    <div className="rounded-md border border-border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -64,7 +120,10 @@ export function ContactsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mockContacts.map((contact) => {
+          {contacts.map((contact) => {
+            const name = contactDisplayName(contact);
+            const accountName = contact.account?.name;
+
             return (
               <TableRow key={contact.id} className="group">
                 <TableCell>
@@ -74,42 +133,54 @@ export function ContactsTable() {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {getInitials(contact.name)}
+                        {getUserInitials(name)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium text-foreground">{contact.name}</p>
-                      <p className="text-xs text-muted-foreground">{contact.id}</p>
+                      <p className="font-medium text-foreground">{name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {contact.contact_number ?? `#${contact.id}`}
+                      </p>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {contact.company ? (
+                  {accountName ? (
                     <div className="flex items-center gap-1.5">
                       <Building className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-sm">{contact.company}</span>
+                      <span className="text-sm">{accountName}</span>
                     </div>
                   ) : (
                     <span className="text-sm text-muted-foreground">-</span>
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1.5 text-sm">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    {contact.email}
-                  </div>
+                  {contact.email ? (
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      {contact.email}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1.5 text-sm">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    {contact.phone}
-                  </div>
+                  {contact.phone ? (
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                      {contact.phone}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
-                  {contact.location ? (
+                  {contact.account?.physical_address ||
+                  contact.account?.billing_address ? (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5" />
-                      {contact.location}
+                      {contact.account?.physical_address ??
+                        contact.account?.billing_address}
                     </div>
                   ) : (
                     <span className="text-sm text-muted-foreground">-</span>
@@ -117,7 +188,9 @@ export function ContactsTable() {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-muted-foreground">
-                    {new Date(contact.createdAt).toLocaleDateString()}
+                    {contact.created_at
+                      ? new Date(contact.created_at).toLocaleDateString()
+                      : "-"}
                   </span>
                 </TableCell>
                 <TableCell>

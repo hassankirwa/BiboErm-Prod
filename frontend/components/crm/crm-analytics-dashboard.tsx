@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Briefcase,
@@ -39,12 +40,9 @@ import {
   LeadGenerationTargetChart,
   RevenueTargetChart,
 } from "@/components/crm/crm-analytics-target-charts";
-import {
-  crmAnalyticsKpis,
-  crmLeadsBySource,
-  crmPerformanceRows,
-  crmTopSalesReps,
-} from "@/lib/crm-analytics-data";
+import { fetchLeads } from "@/lib/api/crm/leads";
+import { fetchDeals } from "@/lib/api/crm/deals";
+import { fetchAccounts } from "@/lib/api/crm/accounts";
 
 const kpiIcons = {
   users: Users,
@@ -53,7 +51,106 @@ const kpiIcons = {
   building: Building2,
 } as const;
 
+const SOURCE_COLORS = ["#2563eb", "#ec2024", "#16a34a", "#f59e0b", "#8b5cf6", "#64748b"];
+
 export function CrmAnalyticsDashboard() {
+  const [leadCount, setLeadCount] = useState(0);
+  const [dealCount, setDealCount] = useState(0);
+  const [accountCount, setAccountCount] = useState(0);
+  const [pipelineValue, setPipelineValue] = useState(0);
+  const [wonRevenue, setWonRevenue] = useState(0);
+  const [leadsBySource, setLeadsBySource] = useState<
+    { name: string; value: number; fill: string }[]
+  >([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetchLeads({ per_page: 200 }),
+      fetchDeals({ per_page: 200 }),
+      fetchAccounts({ per_page: 200 }),
+    ]).then(([leadsRes, dealsRes, accountsRes]) => {
+      const leads = leadsRes.data ?? [];
+      const deals = dealsRes.data ?? [];
+      setLeadCount(leadsRes.meta?.total ?? leads.length);
+      setDealCount(dealsRes.meta?.total ?? deals.length);
+      setAccountCount(accountsRes.meta?.total ?? (accountsRes.data ?? []).length);
+      setPipelineValue(
+        deals.reduce((s, d) => s + Number(d.estimated_value ?? d.amount ?? 0), 0),
+      );
+      setWonRevenue(
+        deals
+          .filter((d) => (d.stage ?? d.status) === "closed_won")
+          .reduce((s, d) => s + Number(d.estimated_value ?? d.amount ?? 0), 0),
+      );
+
+      const bySource = new Map<string, number>();
+      for (const lead of leads) {
+        const src = lead.source ?? lead.lead_source?.label ?? "Other";
+        bySource.set(src, (bySource.get(src) ?? 0) + 1);
+      }
+      setLeadsBySource(
+        [...bySource.entries()].map(([name, value], i) => ({
+          name,
+          value,
+          fill: SOURCE_COLORS[i % SOURCE_COLORS.length],
+        })),
+      );
+    }).catch(() => {});
+  }, []);
+
+  const kpis = useMemo(
+    () => [
+      {
+        label: "Total Leads",
+        value: String(leadCount),
+        change: "Live",
+        previous: "—",
+        icon: "users" as const,
+      },
+      {
+        label: "Pipeline Value",
+        value: `KES ${(pipelineValue / 1_000_000).toFixed(2)}M`,
+        change: "Live",
+        previous: "—",
+        icon: "coin" as const,
+      },
+      {
+        label: "Open Deals",
+        value: String(dealCount),
+        change: "Live",
+        previous: "—",
+        icon: "briefcase" as const,
+      },
+      {
+        label: "Accounts",
+        value: String(accountCount),
+        change: "Live",
+        previous: "—",
+        icon: "building" as const,
+      },
+    ],
+    [leadCount, pipelineValue, dealCount, accountCount],
+  );
+
+  const performanceRows = useMemo(
+    () => [
+      { metric: "Leads", mar: "—", apr: "—", may: String(leadCount), highlightMay: true },
+      { metric: "Deals", mar: "—", apr: "—", may: String(dealCount), highlightMay: false },
+      {
+        metric: "Won Revenue (KES)",
+        mar: "—",
+        apr: "—",
+        may: wonRevenue.toLocaleString(),
+        highlightMay: true,
+      },
+    ],
+    [leadCount, dealCount, wonRevenue],
+  );
+
+  const topReps = useMemo(() => {
+    return [{ rank: 1, name: "Team total", revenue: wonRevenue.toLocaleString() }];
+  }, [wonRevenue]);
+
   return (
     <CrmPageContent>
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -103,7 +200,7 @@ export function CrmAnalyticsDashboard() {
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-3 min-[480px]:grid-cols-2 xl:grid-cols-4">
-        {crmAnalyticsKpis.map((kpi) => {
+        {kpis.map((kpi) => {
           const Icon = kpiIcons[kpi.icon];
           return (
             <Card
@@ -136,8 +233,8 @@ export function CrmAnalyticsDashboard() {
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
-        <LeadGenerationTargetChart />
-        <RevenueTargetChart />
+        <LeadGenerationTargetChart current={leadCount} target={Math.max(leadCount, 100)} />
+        <RevenueTargetChart achieved={wonRevenue} target={Math.max(pipelineValue, 1_000_000)} />
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-12">
@@ -158,7 +255,7 @@ export function CrmAnalyticsDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {crmPerformanceRows.map((row) => (
+                {performanceRows.map((row) => (
                   <TableRow key={row.metric}>
                     <TableCell className="pl-4 font-medium">{row.metric}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{row.mar}</TableCell>
@@ -187,7 +284,7 @@ export function CrmAnalyticsDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={crmLeadsBySource}
+                    data={leadsBySource.length ? leadsBySource : [{ name: "No data", value: 1, fill: "#e5e7eb" }]}
                     cx="50%"
                     cy="50%"
                     innerRadius={58}
@@ -196,7 +293,7 @@ export function CrmAnalyticsDashboard() {
                     dataKey="value"
                     nameKey="name"
                   >
-                    {crmLeadsBySource.map((entry) => (
+                    {leadsBySource.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -213,7 +310,8 @@ export function CrmAnalyticsDashboard() {
               </ResponsiveContainer>
             </div>
             <p className="text-center text-sm font-semibold text-foreground">
-              26 <span className="font-normal text-muted-foreground">Total Leads</span>
+              {leadCount}{" "}
+              <span className="font-normal text-muted-foreground">Total Leads</span>
             </p>
           </CardContent>
         </Card>
@@ -232,7 +330,7 @@ export function CrmAnalyticsDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {crmTopSalesReps.map((rep) => (
+                {topReps.map((rep) => (
                   <TableRow key={rep.name}>
                     <TableCell className="pl-4 text-muted-foreground">{rep.rank}</TableCell>
                     <TableCell className="font-medium">{rep.name}</TableCell>
