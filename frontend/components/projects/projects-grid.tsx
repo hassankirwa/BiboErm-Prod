@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,11 +20,9 @@ import {
   Edit,
   FileText,
   Trash2,
-  Users,
   DollarSign,
 } from "lucide-react";
 import { mockProjects } from "@/lib/data/projects";
-import { mockContacts, mockUsers } from "@/lib/data/crm";
 
 const stageColors: Record<string, string> = {
   awaiting_deposit: "bg-muted text-muted-foreground",
@@ -61,29 +58,18 @@ function formatStage(stage: string): string {
     .join(" ");
 }
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function getClient(clientId: string) {
-  return mockContacts.find((c) => c.id === clientId);
-}
-
-function getProjectManager(pmId: string) {
-  return mockUsers.find((u) => u.id === pmId);
-}
-
 export function ProjectsGrid() {
+  if (mockProjects.length === 0) {
+    return (
+      <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
+        No projects to display.
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {mockProjects.map((project) => {
-        const client = getClient(project.clientId);
-        const pm = getProjectManager(project.projectManagerId);
         const isDelayed =
           new Date(project.projectedCompletionDate) < new Date() &&
           project.stage !== "complete";
@@ -175,7 +161,7 @@ export function ProjectsGrid() {
                 <Progress value={project.percentComplete} className="h-1.5" />
               </div>
 
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <DollarSign className="h-3.5 w-3.5" />
                   KES {(project.totalValue / 1000).toFixed(0)}K
@@ -183,29 +169,6 @@ export function ProjectsGrid() {
                 <div className="text-muted-foreground">
                   Deposit: {Math.round((project.depositAmount / project.totalValue) * 100)}%
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                {client && (
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
-                        {getInitials(client.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs text-muted-foreground truncate max-w-[100px]">
-                      {client.name}
-                    </span>
-                  </div>
-                )}
-                {pm && (
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-                      {pm.fullName.split(" ")[0]}
-                    </span>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

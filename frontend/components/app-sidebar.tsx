@@ -39,6 +39,7 @@ import { canAccessWorkspaceHub, isWorkspaceHubPath } from "@/lib/auth/redirect";
 import {
   getActiveDepartment,
   getPrimaryDepartmentNav,
+  filterDepartmentNav,
   isWorkspaceNavActive,
   isWorkspaceSettingsPath,
   workspaceNavItems,
@@ -249,7 +250,7 @@ function DepartmentContent({
           {nav.groups.map((group) => {
             const GroupIcon = group.icon;
             const isGroupActive = group.items.some(
-              (item) => pathname === item.path
+              (item) => pathname === item.path,
             );
 
             return (
@@ -285,7 +286,7 @@ function DepartmentContent({
                                 isActive={pathname === item.path}
                                 className={cn(
                                   "text-neutral-600 hover:text-neutral-900",
-                                  pathname === item.path && "sidebar-sub-active"
+                                  pathname === item.path && "sidebar-sub-active",
                                 )}
                               >
                                 <Link href={item.path}>
@@ -335,11 +336,15 @@ function DepartmentContent({
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { roles, departments } = useAuth();
+  const { roles, departments, permissions } = useAuth();
   const canWorkspace = canAccessWorkspaceHub(roles);
   const isSuperAdmin = roles.includes("super_admin");
   const activeDepartment = getActiveDepartment(pathname);
   const primaryDepartment = getPrimaryDepartmentNav(departments);
+
+  const filterDepartment = (
+    department: NonNullable<ReturnType<typeof getActiveDepartment>>,
+  ) => filterDepartmentNav(department, permissions, roles);
 
   const showWorkspaceSidebar =
     (isWorkspaceHubPath(pathname) && canWorkspace) ||
@@ -349,8 +354,11 @@ export function AppSidebar() {
     activeDepartment !== null ||
     (isWorkspaceSettingsPath(pathname) && !canWorkspace && primaryDepartment !== null);
 
-  const sidebarDepartment =
+  const sidebarDepartmentRaw =
     activeDepartment ?? (showDepartmentSidebar ? primaryDepartment : null);
+  const sidebarDepartment = sidebarDepartmentRaw
+    ? filterDepartment(sidebarDepartmentRaw)
+    : null;
 
   return (
     <Sidebar
@@ -367,7 +375,7 @@ export function AppSidebar() {
         />
       ) : primaryDepartment ? (
         <DepartmentContent
-          department={primaryDepartment}
+          department={filterDepartment(primaryDepartment)}
           pathname={pathname}
         />
       ) : canWorkspace ? (

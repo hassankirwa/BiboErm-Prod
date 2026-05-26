@@ -13,8 +13,8 @@ export type CreateLeadPayload = {
   lead_owner_id?: number | null;
   assigned_sales_user_id?: number | null;
   assigned_field_officer_id?: number | null;
-  contact_person_name: string;
-  phone: string;
+  contact_person_name?: string | null;
+  phone?: string | null;
   whatsapp?: string | null;
   email?: string | null;
   job_title?: string | null;
@@ -28,8 +28,8 @@ export type CreateLeadPayload = {
   website?: string | null;
   kra_pin?: string | null;
   billing_address?: string | null;
-  product_interests: string[];
-  requirement_description: string;
+  product_interests?: string[];
+  requirement_description?: string;
   property_site_type?: string | null;
   estimated_scope?: string | null;
   estimated_budget?: number | null;
@@ -39,6 +39,8 @@ export type CreateLeadPayload = {
   site_name?: string | null;
   site_address?: string | null;
   county_id?: number | null;
+  subcounty?: string | null;
+  ward?: string | null;
   area_estate?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -48,7 +50,7 @@ export type CreateLeadPayload = {
   has_budget?: string | null;
   decision_maker_identified?: string | null;
   has_existing_supplier?: string | null;
-  need_site_visit: boolean;
+  need_site_visit?: boolean;
   expected_decision_date?: string | null;
   lead_quality_score?: string | null;
   qualification_notes?: string | null;
@@ -57,6 +59,7 @@ export type CreateLeadPayload = {
   internal_notes?: string | null;
   notes?: string | null;
   source?: string | null;
+  field_day_pin_id?: number | null;
   first_name?: string | null;
   last_name?: string | null;
   company?: string | null;
@@ -111,15 +114,47 @@ export async function fetchLeads(params?: {
   status?: string;
   search?: string;
   owner_id?: number;
+  unassigned?: boolean;
+  hot?: boolean;
   date_from?: string;
   date_to?: string;
   page?: number;
   per_page?: number;
 }): Promise<PaginatedResponse<ApiLead>> {
-  const res = await apiFetch<PaginatedResponse<ApiLead>>(
-    `/api/v1/crm/leads${buildQuery(params)}`,
-  );
-  return { ...res, data: res.data.map(normalizeLead) };
+  const queryParams: Record<string, string | number | undefined> = {
+    status: params?.status,
+    search: params?.search,
+    owner_id: params?.owner_id,
+    date_from: params?.date_from,
+    date_to: params?.date_to,
+    page: params?.page,
+    per_page: params?.per_page,
+  };
+  if (params?.unassigned) {
+    queryParams.unassigned = 1;
+  }
+  if (params?.hot) {
+    queryParams.hot = 1;
+  }
+  const res = await apiFetch<
+    PaginatedResponse<ApiLead> & {
+      current_page?: number;
+      last_page?: number;
+      total?: number;
+      per_page?: number;
+    }
+  >(`/api/v1/crm/leads${buildQuery(queryParams)}`);
+  const data = (res.data ?? []).map(normalizeLead);
+  return {
+    data,
+    meta: res.meta ?? {
+      current_page: res.current_page ?? 1,
+      last_page: res.last_page ?? 1,
+      per_page: res.per_page ?? params?.per_page,
+      total: res.total ?? data.length,
+    },
+    links: res.links,
+  };
 }
 
 export async function fetchLead(id: number): Promise<ApiLeadDetail> {
@@ -178,10 +213,14 @@ export async function convertLead(
   });
 }
 
+export async function deleteLead(id: number): Promise<void> {
+  await apiFetch(`/api/v1/crm/leads/${id}`, { method: "DELETE" });
+}
+
 export type ImportLeadRow = {
   name: string;
   contact_person_name?: string;
-  phone: string;
+  phone?: string;
   email?: string | null;
   account_name?: string | null;
   site_address?: string | null;

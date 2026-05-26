@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
@@ -21,6 +21,15 @@ import {
 } from "@/lib/lead-form-config";
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
 import { createLead } from "@/lib/api/crm/leads";
+import { fetchFieldDayPin } from "@/lib/api/crm/field-day";
+import { leadFormToCreatePayload } from "@/lib/crm-lead-payload";
+import {
+  isAdminOnlyLocationLabel,
+  resolveKenyaAdminFromCoordinates,
+  resolveSubcountyForCounty,
+} from "@/lib/kenya-locations";
+import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
+import { useAuth } from "@/contexts/auth-context";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -28,40 +37,161 @@ import { toast } from "sonner";
 export function LeadCreateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnView = searchParams.get("view");
+  const { user } = useAuth();
+  const { lookups } = useCrmFormLookups({
+    assignableRole: "sales_representative",
+  });
+  const returnView = searchParams.get("return");
+  const fromPinId = searchParams.get("from_pin");
+  const fieldDayPinId = fromPinId ? Number(fromPinId) : null;
   const leadsHref =
     returnView && ["list", "kanban", "calendar", "map"].includes(returnView)
       ? `/crm/leads?view=${returnView}`
       : "/crm/leads?view=list";
 
-  const [form, setForm] = useState<LeadFormValues>(() => emptyLeadForm());
+  const [form, setForm] = useState<LeadFormValues>(() =>
+    emptyLeadForm("new", {
+      ownerId: user?.id ?? null,
+      leadSourceId: lookups?.lead_sources[0]?.id ?? null,
+    }),
+  );
   const [submitting, setSubmitting] = useState(false);
+  const [pinPrefillLoaded, setPinPrefillLoaded] = useState(!fieldDayPinId);
+
+  useEffect(() => {
+    if (!lookups) return;
+    setForm((current) => ({
+      ...current,
+      ownerId: current.ownerId ?? user?.id ?? null,
+      leadSourceId:
+        current.leadSourceId ??
+        lookups.lead_sources.find((source) => source.slug === "field_visit")
+          ?.id ??
+        lookups.lead_sources[0]?.id ??
+        null,
+      leadTypeId:
+        current.leadTypeId ?? lookups.lead_types[0]?.id ?? null,
+    }));
+  }, [lookups, user?.id]);
+
+  useEffect(() => {
+    if (!fieldDayPinId || Number.isNaN(fieldDayPinId) || !lookups) return;
+
+    fetchFieldDayPin(fieldDayPinId)
+      .then(async (pin) => {
+        const countySlug =
+          lookups.counties.find((county) => county.id === pin.county_id)
+            ?.slug ?? "";
+
+        let subcounty =
+          (countySlug
+            ? resolveSubcountyForCounty(countySlug, pin.subcounty)
+            : pin.subcounty) ||
+          pin.subcounty ||
+          "";
+
+        let ward = pin.ward || "";
+
+        if (
+          countySlug &&
+          !subcounty &&
+          pin.latitude != null &&
+          pin.longitude != null
+        ) {
+          const admin = await resolveKenyaAdminFromCoordinates(
+            pin.latitude,
+            pin.longitude,
+          );
+          if (admin?.subcounty) {
+            subcounty =
+              resolveSubcountyForCounty(countySlug, admin.subcounty) ??
+              admin.subcounty;
+          }
+          if (!ward && admin?.ward) {
+            ward = admin.ward;
+          }
+        }
+
+        if (
+          countySlug &&
+          subcounty &&
+          ward &&
+          resolveSubcountyForCounty(countySlug, ward) === subcounty
+        ) {
+          ward = "";
+        }
+
+        const pinAdmin = {
+          countyLabel: pin.county?.label ?? null,
+          subcounty: subcounty || null,
+          ward: ward || null,
+        };
+        const streetFromPin =
+          pin.location_address &&
+          !isAdminOnlyLocationLabel(pin.location_address, pinAdmin)
+            ? pin.location_address
+            : "";
+
+        setForm((current) => ({
+          ...current,
+          title:
+            pin.site_label ||
+            pin.notes?.slice(0, 80) ||
+            current.title ||
+            "Field visit lead",
+          siteName: pin.site_label || current.siteName,
+          siteAddress:
+            streetFromPin ||
+            current.siteAddress,
+          requirementDescription: pin.findings || current.requirementDescription,
+          latitude: pin.latitude ?? current.latitude,
+          longitude: pin.longitude ?? current.longitude,
+          countySlug: countySlug || current.countySlug,
+          subcounty: subcounty || current.subcounty,
+          ward: ward || current.ward,
+          assignedFieldOfficerId:
+            pin.fieldDay?.field_officer_id ?? current.assignedFieldOfficerId,
+          leadSourceId:
+            lookups.lead_sources.find((source) => source.slug === "field_visit")
+              ?.id ??
+            current.leadSourceId,
+        }));
+        setPinPrefillLoaded(true);
+      })
+      .catch((err) => {
+        toast.error(
+          err instanceof ApiError
+            ? err.message
+            : "Could not load field day pin.",
+        );
+        setPinPrefillLoaded(true);
+      });
+  }, [fieldDayPinId, lookups]);
 
   const stage = leadKanbanStages.find((s) => s.id === form.stageId);
 
   const update = <K extends keyof LeadFormValues>(
     key: K,
-    value: LeadFormValues[K]
+    value: LeadFormValues[K],
   ) => setForm((f) => ({ ...f, [key]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !form.phone.trim()) return;
+    if (!form.title.trim()) return;
+    if (form.needSiteVisit && !form.assignedFieldOfficerId) {
+      toast.error("Assign a field officer when a site visit is required.");
+      return;
+    }
     setSubmitting(true);
     try {
       await ensureCsrfCookie();
-      const lead = await createLead({
-        name: form.title.trim(),
-        contact_person_name: form.title.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || null,
-        account_name: form.company.trim() || null,
-        site_address: form.location.trim() || null,
-        requirement_description: form.notes.trim() || form.title.trim(),
-        need_site_visit: false,
-        product_interests: form.source ? [form.source] : ["custom"],
-        estimated_value: form.estimatedValue || undefined,
-      });
+      const lead = await createLead(
+        leadFormToCreatePayload(form, {
+          counties: lookups?.counties,
+          product_interests: lookups?.product_interests,
+          fieldDayPinId,
+        }),
+      );
       router.push(`/crm/leads/${lead.id}`);
     } catch (err) {
       toast.error(
@@ -70,6 +200,10 @@ export function LeadCreateForm() {
       setSubmitting(false);
     }
   };
+
+  if (!pinPrefillLoaded) {
+    return null;
+  }
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-8">
@@ -80,9 +214,9 @@ export function LeadCreateForm() {
           asChild
           className="h-8 gap-1.5 text-muted-foreground hover:text-foreground"
         >
-          <Link href={leadsHref}>
+          <Link href={fieldDayPinId ? "/crm/field-day" : leadsHref}>
             <ArrowLeft className="h-4 w-4" />
-            Leads
+            {fieldDayPinId ? "Field day" : "Leads"}
           </Link>
         </Button>
         <span className="text-muted-foreground/60">/</span>
@@ -103,13 +237,17 @@ export function LeadCreateForm() {
                   {form.tag}
                 </Badge>
               )}
+              {fieldDayPinId ? (
+                <Badge variant="secondary">From field day pin</Badge>
+              ) : null}
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-[#1e3a5f] sm:text-2xl">
               New lead
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground">
-              Fill in the details below to add a lead to your pipeline. Required
-              fields are marked with an asterisk.
+              {fieldDayPinId
+                ? "Review the prefilled site details from your field visit, then create the lead."
+                : "Capture the site or opportunity first. Contact details are optional until someone is identified."}
             </p>
           </div>
         </div>
@@ -151,7 +289,9 @@ export function LeadCreateForm() {
             </p>
             <div className="flex gap-2">
               <Button type="button" variant="outline" asChild>
-                <Link href={leadsHref}>Cancel</Link>
+                <Link href={fieldDayPinId ? "/crm/field-day" : leadsHref}>
+                  Cancel
+                </Link>
               </Button>
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Creating…" : "Create lead"}

@@ -1,5 +1,3 @@
-import { leadKanbanCards } from "@/lib/leads-kanban-data";
-
 export type CalendarViewMode = "day" | "week" | "month";
 
 export type LeadCalendarEventType =
@@ -22,63 +20,8 @@ export type LeadCalendarEvent = {
   location?: string;
 };
 
-const eventTypeFromTag = (tag: string): LeadCalendarEventType => {
-  if (tag.toLowerCase().includes("site visit")) return "site_visit";
-  if (tag.toLowerCase().includes("negotiation")) return "meeting";
-  if (tag.toLowerCase().includes("quotation")) return "task";
-  return "follow_up";
-};
-
-const defaultTimes = ["09:00", "10:30", "11:00", "14:00", "15:30", "16:00"];
-
-/** Lead activities & next actions shown on the calendar */
-export const leadCalendarEvents: LeadCalendarEvent[] = [
-  ...leadKanbanCards.map((card, index) => ({
-    id: `cal_${card.id}`,
-    leadId: card.id,
-    title: card.title,
-    subtitle: card.tag,
-    date: card.nextActionDate,
-    startTime: defaultTimes[index % defaultTimes.length],
-    endTime: undefined,
-    type: eventTypeFromTag(card.tag),
-    owner: card.owner,
-    location: card.location,
-  })),
-  {
-    id: "cal_extra_1",
-    leadId: "kb_7",
-    title: "Follow-up call — Karen Villa",
-    subtitle: "Call",
-    date: "2026-05-20",
-    startTime: "08:30",
-    type: "call",
-    owner: "Sarah Wanjiku",
-    location: "Karen, Nairobi",
-  },
-  {
-    id: "cal_extra_2",
-    leadId: "kb_8",
-    title: "Site visit — Muthaiga Luxury Home",
-    subtitle: "Site Visit",
-    date: "2026-05-20",
-    startTime: "13:00",
-    type: "site_visit",
-    owner: "Brian Otieno",
-    location: "Muthaiga, Nairobi",
-  },
-  {
-    id: "cal_extra_3",
-    leadId: "kb_4",
-    title: "Proposal review — Westlands Office",
-    subtitle: "Meeting",
-    date: "2026-05-21",
-    startTime: "10:00",
-    type: "meeting",
-    owner: "Brian Otieno",
-    location: "Westlands, Nairobi",
-  },
-];
+/** Demo events removed — calendar uses API lead cards when provided. */
+export const leadCalendarEvents: LeadCalendarEvent[] = [];
 
 export const eventTypeStyles: Record<
   LeadCalendarEventType,

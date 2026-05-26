@@ -3,6 +3,8 @@
 namespace App\Services\Crm\Deals;
 
 use App\Enums\Crm\DealStage;
+use App\Enums\Crm\QuotationStatus;
+use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Deal;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
@@ -23,6 +25,8 @@ class DealStageService
                 'stage' => ['Lost deals cannot change stage.'],
             ]);
         }
+
+        $this->assertCanTransitionTo($deal, $stage);
 
         $oldValues = ['stage' => $current];
 
@@ -84,5 +88,87 @@ class DealStageService
         ]);
 
         return $deal->fresh()->load(['contact', 'account', 'owner']);
+    }
+
+    protected function assertCanTransitionTo(Deal $deal, string $targetStage): void
+    {
+        $target = DealStage::tryFrom($targetStage);
+
+        if ($target === null) {
+            throw ValidationException::withMessages([
+                'stage' => ['Invalid deal stage.'],
+            ]);
+        }
+
+        match ($target) {
+            DealStage::MeasurementsCompleted => $this->assertApprovedSiteVisit($deal),
+            DealStage::QuotationSent => $this->assertQuotationWithStatuses(
+                $deal,
+                [QuotationStatus::Sent, QuotationStatus::Accepted],
+                'A sent quotation is required before moving to quotation sent.',
+            ),
+            DealStage::Accepted => $this->assertQuotationWithStatuses(
+                $deal,
+                [QuotationStatus::Accepted],
+                'An accepted quotation is required before moving to accepted.',
+            ),
+            DealStage::DepositRecorded => $this->assertDepositMet($deal),
+            DealStage::Won => throw ValidationException::withMessages([
+                'stage' => ['Use the mark-won endpoint to set deal stage to won.'],
+            ]),
+            DealStage::ProjectCreated => throw ValidationException::withMessages([
+                'stage' => ['Use the create-project endpoint to set deal stage to project created.'],
+            ]),
+            default => null,
+        };
+    }
+
+    protected function assertApprovedSiteVisit(Deal $deal): void
+    {
+        $hasApproved = $deal->siteVisits()
+            ->where('status', SiteVisitStatus::Approved->value)
+            ->exists();
+
+        if (! $hasApproved) {
+            throw ValidationException::withMessages([
+                'stage' => ['An approved site visit is required before measurements completed.'],
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<QuotationStatus>  $statuses
+     */
+    protected function assertQuotationWithStatuses(Deal $deal, array $statuses, string $message): void
+    {
+        $values = array_map(fn (QuotationStatus $s) => $s->value, $statuses);
+
+        $hasQuotation = $deal->quotations()
+            ->whereIn('status', $values)
+            ->exists();
+
+        if (! $hasQuotation) {
+            throw ValidationException::withMessages([
+                'stage' => [$message],
+            ]);
+        }
+    }
+
+    protected function assertDepositMet(Deal $deal): void
+    {
+        $required = (float) ($deal->deposit_required_amount ?? $deal->deposit_amount ?? 0);
+        $paid = (float) ($deal->deposit_paid_amount ?? 0);
+
+        if ($required > 0 && $paid < $required) {
+            throw ValidationException::withMessages([
+                'stage' => ['Recorded payments must meet the deposit requirement.'],
+            ]);
+        }
+
+        if ($required <= 0 && $paid <= 0) {
+            throw ValidationException::withMessages([
+                'stage' => ['At least one payment must be recorded.'],
+            ]);
+        }
     }
 }

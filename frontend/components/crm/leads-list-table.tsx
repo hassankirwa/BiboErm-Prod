@@ -6,13 +6,35 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Edit,
+  Eye,
+  Mail,
+  MoreHorizontal,
   Phone,
-  Plus,
   Star,
+  Trash2,
+  UserPlus,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -27,6 +49,16 @@ import {
   type LeadActivity,
   type LeadListRow,
 } from "@/lib/leads-list-data";
+import { deleteLead } from "@/lib/api/crm/leads";
+import { createActivity } from "@/lib/api/crm/activities";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
+import { statusToKanbanStage } from "@/lib/crm-lead-status";
+import type { LeadKanbanCard } from "@/lib/leads-kanban-data";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { LeadsActivityModal } from "@/components/crm/leads-activity-modal";
+import { LeadComposeEmailDialog } from "@/components/crm/lead-compose-email-dialog";
+import { toast } from "sonner";
 
 /** Uniform pill size for activity & stage columns in list view */
 const listTagBase =
@@ -95,33 +127,196 @@ function StageTag({ stage, className }: { stage: string; className: string }) {
   );
 }
 
-function LeadRowActions() {
+function listRowToKanbanCard(row: LeadListRow): LeadKanbanCard {
+  return {
+    id: row.id,
+    stageId: statusToKanbanStage(row.statusKey),
+    statusKey: row.statusKey,
+    title: row.leadName,
+    location: "—",
+    owner: row.owner,
+    nextActionDate: new Date().toISOString().slice(0, 10),
+    estimatedValue: 0,
+    tag: row.stage,
+    company: row.company,
+    phone: row.phone,
+    email: row.email,
+    source: row.source,
+  };
+}
+
+function LeadListRowMenu({
+  row,
+  returnView,
+  onDeleted,
+}: {
+  row: LeadListRow;
+  returnView: string;
+  onDeleted?: () => void;
+}) {
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleLogCallSave(payload: {
+    subject: string;
+    description?: string;
+    due_at?: string;
+    activity_type?: string;
+    assigned_to?: number;
+  }) {
+    try {
+      await ensureCsrfCookie();
+      await createActivity({
+        lead_id: Number(row.id),
+        subject: payload.subject,
+        description: payload.description,
+        due_at: payload.due_at,
+        activity_type: payload.activity_type ?? "schedule_call",
+        type: payload.activity_type ?? "schedule_call",
+        assigned_to: payload.assigned_to,
+      });
+      toast.success("Call logged.");
+      setActivityOpen(false);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to log call.",
+      );
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    setDeleting(true);
+    try {
+      await ensureCsrfCookie();
+      await deleteLead(Number(row.id));
+      toast.success("Lead deleted.");
+      setDeleteOpen(false);
+      onDeleted?.();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to delete lead.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-7 w-7 rounded-[4px] border-border"
-      >
-        <Plus className="h-3.5 w-3.5" />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-7 w-7 rounded-[4px] border-border"
-      >
-        <Phone className="h-3.5 w-3.5" />
-      </Button>
-    </div>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 rounded-[4px] border-border"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/crm/leads/${row.id}?view=${returnView}`}>
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </Link>
+          </DropdownMenuItem>
+          <PermissionGate permission="leads.update">
+            <DropdownMenuItem asChild>
+              <Link href={`/crm/leads/${row.id}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Lead
+              </Link>
+            </DropdownMenuItem>
+          </PermissionGate>
+          <PermissionGate permission="leads.update">
+            <DropdownMenuItem onSelect={() => setActivityOpen(true)}>
+              <Phone className="mr-2 h-4 w-4" />
+              Log Call
+            </DropdownMenuItem>
+          </PermissionGate>
+          <PermissionGate permission="leads.update">
+            <DropdownMenuItem onSelect={() => setEmailOpen(true)}>
+              <Mail className="mr-2 h-4 w-4" />
+              Send Email
+            </DropdownMenuItem>
+          </PermissionGate>
+          <PermissionGate permission="leads.convert">
+            <DropdownMenuItem asChild>
+              <Link href={`/crm/leads/${row.id}/convert`}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Convert to Contact
+              </Link>
+            </DropdownMenuItem>
+          </PermissionGate>
+          <DropdownMenuSeparator />
+          <PermissionGate permission="leads.delete">
+            <DropdownMenuItem
+              className="text-destructive"
+              onSelect={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </PermissionGate>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <LeadsActivityModal
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+        activityType="schedule_call"
+        leadTitle={row.leadName}
+        onSave={handleLogCallSave}
+      />
+
+      {emailOpen && (
+        <LeadComposeEmailDialog
+          open
+          onOpenChange={setEmailOpen}
+          lead={listRowToKanbanCard(row)}
+          leadId={row.id}
+          returnView={returnView}
+        />
+      )}
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete lead?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {row.leadName}. This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDeleteConfirm();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
 function LeadMobileCard({
   row,
   returnView,
+  onDeleted,
 }: {
   row: LeadListRow;
   returnView: string;
+  onDeleted?: () => void;
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -158,34 +353,54 @@ function LeadMobileCard({
             {row.owner}
           </span>
         </div>
-        <LeadRowActions />
+        <LeadListRowMenu
+          row={row}
+          returnView={returnView}
+          onDeleted={onDeleted}
+        />
       </div>
     </div>
   );
 }
+
+export type LeadsListPagination = {
+  currentPage: number;
+  lastPage: number;
+  perPage: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPerPageChange: (perPage: number) => void;
+};
 
 export function LeadsListTable({
   search,
   returnView = "list",
   apiRows,
   totalCount,
+  pagination,
+  onLeadDeleted,
 }: {
   search: string;
   returnView?: string;
   apiRows?: LeadListRow[];
   totalCount?: number;
+  pagination?: LeadsListPagination;
+  onLeadDeleted?: () => void;
 }) {
-  const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState("25");
+  const [localPage, setLocalPage] = useState(1);
+  const [localRowsPerPage, setLocalRowsPerPage] = useState("25");
   const [starred, setStarred] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const sourceRows = apiRows ?? leadsListRows;
-  const recordTotal = totalCount ?? (apiRows ? apiRows.length : LEADS_TOTAL_COUNT);
+  const recordTotal =
+    pagination?.total ??
+    totalCount ??
+    (apiRows ? apiRows.length : LEADS_TOTAL_COUNT);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return sourceRows;
+    if (!q || pagination) return sourceRows;
     return sourceRows.filter(
       (r) =>
         r.leadName.toLowerCase().includes(q) ||
@@ -193,16 +408,46 @@ export function LeadsListTable({
         r.email.toLowerCase().includes(q) ||
         r.owner.toLowerCase().includes(q)
     );
-  }, [search, sourceRows]);
+  }, [search, sourceRows, pagination]);
 
-  const perPage = Number(rowsPerPage);
-  const totalPages = Math.max(1, Math.ceil(recordTotal / perPage));
-  const start = (page - 1) * perPage + 1;
-  const end = Math.min(page * perPage, recordTotal, start + filtered.length - 1);
-  const displayEnd = Math.min(end, start + filtered.length - 1);
+  const perPage = pagination?.perPage ?? Number(localRowsPerPage);
+  const page = pagination?.currentPage ?? localPage;
+  const totalPages = pagination?.lastPage ?? Math.max(1, Math.ceil(recordTotal / perPage));
+  const pageNumbers = useMemo(
+    () => Array.from({ length: totalPages }, (_, index) => index + 1),
+    [totalPages],
+  );
+
+  const start =
+    recordTotal === 0 ? 0 : (page - 1) * perPage + 1;
+  const end = Math.min(page * perPage, recordTotal);
+  const displayRows = pagination
+    ? filtered
+    : filtered.slice((page - 1) * perPage, page * perPage);
+  const displayEnd = pagination
+    ? end
+    : Math.min(page * perPage, recordTotal, start + displayRows.length - 1);
 
   const allSelected =
-    filtered.length > 0 && filtered.every((r) => selected[r.id]);
+    displayRows.length > 0 && displayRows.every((r) => selected[r.id]);
+
+  function handlePageChange(nextPage: number) {
+    if (pagination) {
+      pagination.onPageChange(nextPage);
+    } else {
+      setLocalPage(nextPage);
+    }
+  }
+
+  function handleRowsPerPageChange(value: string) {
+    const nextPerPage = Number(value);
+    if (pagination) {
+      pagination.onPerPageChange(nextPerPage);
+    } else {
+      setLocalRowsPerPage(value);
+      setLocalPage(1);
+    }
+  }
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -217,7 +462,7 @@ export function LeadsListTable({
                   onCheckedChange={(checked) => {
                     const next: Record<string, boolean> = {};
                     if (checked) {
-                      filtered.forEach((r) => {
+                      displayRows.forEach((r) => {
                         next[r.id] = true;
                       });
                     }
@@ -238,7 +483,7 @@ export function LeadsListTable({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => (
+            {displayRows.map((row) => (
               <tr
                 key={row.id}
                 className="border-b border-border/80 transition-colors hover:bg-muted/20"
@@ -298,7 +543,11 @@ export function LeadsListTable({
                   </div>
                 </td>
                 <td className="px-3 py-2.5">
-                  <LeadRowActions />
+                  <LeadListRowMenu
+                    row={row}
+                    returnView={returnView}
+                    onDeleted={onLeadDeleted}
+                  />
                 </td>
               </tr>
             ))}
@@ -308,20 +557,30 @@ export function LeadsListTable({
 
       {/* Mobile cards */}
       <div className="flex flex-col gap-3 md:hidden">
-        {filtered.map((row) => (
-          <LeadMobileCard key={row.id} row={row} returnView={returnView} />
+        {displayRows.map((row) => (
+          <LeadMobileCard
+            key={row.id}
+            row={row}
+            returnView={returnView}
+            onDeleted={onLeadDeleted}
+          />
         ))}
       </div>
 
       {/* Pagination */}
       <div className="mt-4 flex min-w-0 flex-col gap-3 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p className="text-center sm:text-left">
-          Showing {start} to {displayEnd} of {recordTotal} leads
+          {recordTotal === 0
+            ? "Showing 0 leads"
+            : `Showing ${start} to ${displayEnd} of ${recordTotal} leads`}
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <div className="flex items-center gap-2">
             <span className="text-xs sm:text-sm">Rows per page</span>
-            <Select value={rowsPerPage} onValueChange={setRowsPerPage}>
+            <Select
+              value={String(perPage)}
+              onValueChange={handleRowsPerPageChange}
+            >
               <SelectTrigger className="h-8 w-[70px] rounded-[5px] text-sm">
                 <SelectValue />
               </SelectTrigger>
@@ -340,11 +599,11 @@ export function LeadsListTable({
               size="icon"
               className="h-8 w-8"
               disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(Math.max(1, page - 1))}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            {[1, 2, 3].map((n) => (
+            {pageNumbers.map((n) => (
               <Button
                 key={n}
                 variant={page === n ? "default" : "outline"}
@@ -353,7 +612,7 @@ export function LeadsListTable({
                   "h-8 w-8 text-sm",
                   page === n && "bg-primary text-primary-foreground"
                 )}
-                onClick={() => setPage(n)}
+                onClick={() => handlePageChange(n)}
               >
                 {n}
               </Button>
@@ -363,7 +622,7 @@ export function LeadsListTable({
               size="icon"
               className="h-8 w-8"
               disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

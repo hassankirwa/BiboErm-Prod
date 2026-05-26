@@ -152,6 +152,9 @@ export default function SiteVisitsPage() {
             <Button size="sm" variant="outline" asChild>
               <Link href="/crm/site-visits/today">Field Today</Link>
             </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/crm/field-day">Field Day</Link>
+            </Button>
             <Button
               size="sm"
               className="h-8 gap-1.5"
@@ -197,7 +200,12 @@ export default function SiteVisitsPage() {
                   {visits.map((visit) => (
                     <TableRow key={visit.id}>
                       <TableCell>
-                        <p className="font-medium">{visit.title}</p>
+                        <Link
+                          href={`/crm/site-visits/${visit.id}`}
+                          className="hover:underline"
+                        >
+                          <p className="font-medium">{visit.title}</p>
+                        </Link>
                         <p className="text-xs text-muted-foreground">
                           {visit.visit_number ?? `#${visit.id}`}
                         </p>

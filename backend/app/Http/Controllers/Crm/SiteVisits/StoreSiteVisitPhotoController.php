@@ -27,7 +27,7 @@ class StoreSiteVisitPhotoController extends Controller
             'file' => ['required', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp'],
         ]);
 
-        $stored = $this->storage->store($validated['file'], 'site-visits/'.$siteVisit->id);
+        $stored = $this->storage->store($validated['file'], 'site-visit-'.$siteVisit->id);
 
         $photo = SiteVisitPhoto::query()->create([
             'site_visit_id' => $siteVisit->id,

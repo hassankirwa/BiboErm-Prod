@@ -8,15 +8,20 @@ use App\Http\Requests\Crm\Leads\UpdateLeadRequest;
 use App\Http\Resources\Crm\LeadDetailResource;
 use App\Http\Resources\Crm\LeadResource;
 use App\Models\CrmActivity;
+use App\Models\FieldDayPin;
 use App\Models\Lead;
+use App\Models\LeadSource;
+use App\Services\Crm\Leads\LeadContactService;
 use App\Services\Crm\Leads\LeadNumberGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class LeadController extends Controller
 {
     public function __construct(
         protected LeadNumberGenerator $leadNumberGenerator,
+        protected LeadContactService $leadContactService,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -25,7 +30,7 @@ class LeadController extends Controller
 
         $query = Lead::query()
             ->visibleTo($request->user())
-            ->with(['leadOwner', 'assignedSalesUser', 'assignedFieldOfficer', 'assignee'])
+            ->with(['leadOwner', 'assignedSalesUser', 'assignedFieldOfficer', 'assignee', 'leadSource'])
             ->latest();
 
         if ($status = $request->query('status')) {
@@ -59,16 +64,28 @@ class LeadController extends Controller
             $query->whereDate('created_at', '<=', $dateTo);
         }
 
+        if ($request->boolean('unassigned')) {
+            $query->whereNull('lead_owner_id')
+                ->whereNull('assigned_sales_user_id')
+                ->whereNull('assigned_to');
+        }
+
+        if ($request->boolean('hot')) {
+            $query->whereIn('priority', ['high', 'urgent']);
+        }
+
         return LeadResource::collection(
             $query->paginate($request->integer('per_page', 25))
         );
     }
 
-    public function store(StoreLeadRequest $request): LeadDetailResource
+    public function store(StoreLeadRequest $request): JsonResponse
     {
         $this->authorize('create', Lead::class);
 
         $validated = $request->validated();
+        $fieldDayPinId = $validated['field_day_pin_id'] ?? null;
+        unset($validated['field_day_pin_id']);
 
         $user = $request->user();
         $leadNumber = $this->leadNumberGenerator->generate();
@@ -76,6 +93,9 @@ class LeadController extends Controller
         $lead = Lead::query()->create([
             ...$validated,
             ...$this->legacyNameFields($validated),
+            'source' => $this->resolveSource($validated),
+            'product_interests' => $validated['product_interests'] ?? ['custom'],
+            'need_site_visit' => $validated['need_site_visit'] ?? false,
             'reference' => $leadNumber,
             'lead_number' => $leadNumber,
             'status' => $validated['status'] ?? 'new',
@@ -100,9 +120,24 @@ class LeadController extends Controller
             ]);
         }
 
-        return new LeadDetailResource(
-            $lead->load(['leadOwner', 'assignedSalesUser', 'assignedFieldOfficer'])
-        );
+        $this->leadContactService->createFromLead($lead, $user);
+
+        if ($fieldDayPinId) {
+            FieldDayPin::query()
+                ->whereKey($fieldDayPinId)
+                ->whereNull('lead_id')
+                ->update(['lead_id' => $lead->id]);
+        }
+
+        return (new LeadDetailResource(
+            $lead->fresh()->load([
+                'leadOwner',
+                'assignedSalesUser',
+                'assignedFieldOfficer',
+                'leadSource',
+                'sourceContact',
+            ])
+        ))->response()->setStatusCode(201);
     }
 
     public function show(Lead $lead): LeadDetailResource
@@ -114,6 +149,8 @@ class LeadController extends Controller
                 'leadOwner',
                 'assignedSalesUser',
                 'assignedFieldOfficer',
+                'leadSource',
+                'sourceContact',
                 'convertedContact',
                 'convertedAccount',
                 'convertedDeal',
@@ -130,26 +167,104 @@ class LeadController extends Controller
 
         $validated = $request->validated();
 
-        $lead->update([
+        $updateData = [
             ...$validated,
             'updated_by' => $request->user()->id,
-        ]);
+        ];
+
+        if ($this->hasLegacyNameInput($validated)) {
+            $updateData = [
+                ...$updateData,
+                ...$this->legacyNameFields([
+                    ...$lead->only(['name', 'contact_person_name', 'first_name', 'last_name', 'account_name', 'company']),
+                    ...$validated,
+                ]),
+            ];
+        }
+
+        if (array_key_exists('source', $validated) || array_key_exists('lead_source_id', $validated)) {
+            $updateData['source'] = $this->resolveSource([
+                ...$lead->only(['lead_source_id', 'source']),
+                ...$validated,
+            ], $lead);
+        }
+
+        $lead->update($updateData);
 
         return new LeadDetailResource(
-            $lead->fresh()->load(['leadOwner', 'assignedSalesUser', 'assignedFieldOfficer'])
+            $lead->fresh()->load([
+                'leadOwner',
+                'assignedSalesUser',
+                'assignedFieldOfficer',
+                'leadSource',
+                'sourceContact',
+            ])
         );
+    }
+
+    public function destroy(Lead $lead): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('delete', $lead);
+
+        $lead->delete();
+
+        return response()->json(null, 204);
     }
 
     /** @return array{first_name: string, last_name: ?string, company: ?string} */
     protected function legacyNameFields(array $validated): array
     {
-        $fullName = $validated['contact_person_name'] ?? $validated['name'] ?? '';
-        $parts = preg_split('/\s+/', trim($fullName), 2) ?: [];
+        $company = $validated['company'] ?? ($validated['account_name'] ?? null);
+
+        if (! empty($validated['first_name'])) {
+            return [
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'] ?? null,
+                'company' => $company,
+            ];
+        }
+
+        $contactName = trim($validated['contact_person_name'] ?? '');
+        if ($contactName !== '') {
+            $parts = preg_split('/\s+/', $contactName, 2) ?: [];
+
+            return [
+                'first_name' => $parts[0] ?? 'Contact',
+                'last_name' => $parts[1] ?? null,
+                'company' => $company,
+            ];
+        }
 
         return [
-            'first_name' => $validated['first_name'] ?? ($parts[0] ?? 'Lead'),
-            'last_name' => $validated['last_name'] ?? ($parts[1] ?? null),
-            'company' => $validated['company'] ?? ($validated['account_name'] ?? null),
+            'first_name' => trim($validated['name'] ?? '') ?: 'Lead',
+            'last_name' => null,
+            'company' => $company,
         ];
+    }
+
+    protected function resolveSource(array $validated, ?Lead $existing = null): ?string
+    {
+        if (array_key_exists('source', $validated) && $validated['source'] !== null) {
+            return $validated['source'];
+        }
+
+        $leadSourceId = $validated['lead_source_id'] ?? $existing?->lead_source_id;
+
+        if (! $leadSourceId) {
+            return $existing?->source;
+        }
+
+        return LeadSource::query()->whereKey($leadSourceId)->value('slug') ?? $existing?->source;
+    }
+
+    protected function hasLegacyNameInput(array $validated): bool
+    {
+        foreach (['name', 'contact_person_name', 'first_name', 'last_name', 'account_name', 'company'] as $key) {
+            if (array_key_exists($key, $validated)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

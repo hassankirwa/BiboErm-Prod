@@ -1,13 +1,16 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -17,9 +20,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  AlertTriangle,
   ChevronLeft,
   Download,
   Loader2,
+  Pencil,
   Send,
   FileText,
 } from "lucide-react";
@@ -29,11 +34,17 @@ import {
   quotationAmount,
   quotationPdfUrl,
   sendQuotation,
+  updateQuotation,
   type ApiQuotation,
+  type QuotationLinePayload,
 } from "@/lib/api/crm/quotations";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
+
+/** Spec: discounts above this % of subtotal need `deals.approve_discount`. */
+const DISCOUNT_THRESHOLD_PERCENT = 10;
 
 function formatCurrency(value: string | number | null | undefined): string {
   if (value == null) return "-";
@@ -49,10 +60,20 @@ export default function QuotationDetailPage({
 }) {
   const { id } = use(params);
   const quotationId = Number(id);
+  const { hasPermission } = useAuth();
+  const canApproveDiscount = hasPermission("deals.approve_discount");
+
   const [quotation, setQuotation] = useState<ApiQuotation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    valid_until: "",
+    terms_conditions: "",
+    discount_amount: "",
+    lines: [] as QuotationLinePayload[],
+  });
 
   const loadQuotation = useCallback(async () => {
     setIsLoading(true);
@@ -60,6 +81,16 @@ export default function QuotationDetailPage({
     try {
       const data = await fetchQuotation(quotationId);
       setQuotation(data);
+      setEditForm({
+        valid_until: data.valid_until?.slice(0, 10) ?? "",
+        terms_conditions: data.terms_conditions ?? "",
+        discount_amount: String(data.discount_amount ?? ""),
+        lines: (data.lines ?? []).map((line) => ({
+          description: line.description,
+          quantity: Number(line.quantity),
+          unit_price: Number(line.unit_price),
+        })),
+      });
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Failed to load quotation.",
@@ -72,6 +103,50 @@ export default function QuotationDetailPage({
   useEffect(() => {
     loadQuotation();
   }, [loadQuotation]);
+
+  const editSubtotal = useMemo(
+    () =>
+      editForm.lines.reduce(
+        (sum, line) => sum + line.quantity * line.unit_price,
+        0,
+      ),
+    [editForm.lines],
+  );
+
+  const editDiscount = parseFloat(editForm.discount_amount) || 0;
+  const discountThreshold = editSubtotal * (DISCOUNT_THRESHOLD_PERCENT / 100);
+  const discountExceedsThreshold =
+    editSubtotal > 0 && editDiscount > discountThreshold;
+  const discountBlocked = discountExceedsThreshold && !canApproveDiscount;
+
+  async function handleSaveDraft() {
+    if (discountBlocked) {
+      toast.error(
+        `Discount exceeds ${DISCOUNT_THRESHOLD_PERCENT}% of subtotal. Manager approval required.`,
+      );
+      return;
+    }
+
+    setActionLoading("save");
+    try {
+      await ensureCsrfCookie();
+      const updated = await updateQuotation(quotationId, {
+        valid_until: editForm.valid_until || null,
+        terms_conditions: editForm.terms_conditions || null,
+        discount_amount: editDiscount,
+        lines: editForm.lines,
+      });
+      setQuotation(updated);
+      setEditing(false);
+      toast.success("Quotation updated.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to update quotation.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   async function handleSend() {
     setActionLoading("send");
@@ -139,6 +214,8 @@ export default function QuotationDetailPage({
     quotation.status === "internal_review" ||
     quotation.status === "revised";
 
+  const isDraft = quotation.status === "draft";
+
   return (
     <div className="flex h-full flex-col">
       <AppHeader
@@ -153,6 +230,17 @@ export default function QuotationDetailPage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{quotation.status ?? "draft"}</Badge>
+            {isDraft && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!!actionLoading}
+                onClick={() => setEditing((v) => !v)}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                {editing ? "Cancel edit" : "Edit draft"}
+              </Button>
+            )}
             {canSend && (
               <Button
                 size="sm"
@@ -204,6 +292,163 @@ export default function QuotationDetailPage({
       />
 
       <div className="flex-1 space-y-6 overflow-auto p-6">
+        {editing && isDraft && (
+          <Card className="border-border border-primary/30">
+            <CardHeader>
+              <CardTitle className="text-base">Edit draft quotation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {editForm.lines.map((line, index) => (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-4"
+                >
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={line.description}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          lines: f.lines.map((l, i) =>
+                            i === index
+                              ? { ...l, description: e.target.value }
+                              : l,
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Qty</Label>
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={line.quantity}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          lines: f.lines.map((l, i) =>
+                            i === index
+                              ? {
+                                  ...l,
+                                  quantity: parseFloat(e.target.value) || 0,
+                                }
+                              : l,
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Unit price</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={line.unit_price}
+                      onChange={(e) =>
+                        setEditForm((f) => ({
+                          ...f,
+                          lines: f.lines.map((l, i) =>
+                            i === index
+                              ? {
+                                  ...l,
+                                  unit_price: parseFloat(e.target.value) || 0,
+                                }
+                              : l,
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-discount">Discount (KES)</Label>
+                  <Input
+                    id="edit-discount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.discount_amount}
+                    onChange={(e) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        discount_amount: e.target.value,
+                      }))
+                    }
+                  />
+                  {discountExceedsThreshold && (
+                    <div
+                      className={`flex items-start gap-2 rounded-md border p-2 text-xs ${
+                        discountBlocked
+                          ? "border-destructive/40 bg-destructive/5 text-destructive"
+                          : "border-warning/40 bg-warning/5 text-warning"
+                      }`}
+                    >
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        Discount exceeds {DISCOUNT_THRESHOLD_PERCENT}% threshold (
+                        {formatCurrency(discountThreshold)}).
+                        {discountBlocked
+                          ? " You need deals.approve_discount to save."
+                          : " Manager approval permission detected — you may save."}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-valid">Valid until</Label>
+                  <Input
+                    id="edit-valid"
+                    type="date"
+                    value={editForm.valid_until}
+                    onChange={(e) =>
+                      setEditForm((f) => ({
+                        ...f,
+                        valid_until: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-terms">Terms & conditions</Label>
+                <Textarea
+                  id="edit-terms"
+                  value={editForm.terms_conditions}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      terms_conditions: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveDraft}
+                  disabled={!!actionLoading || discountBlocked}
+                >
+                  {actionLoading === "save" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Save draft
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-base">Summary</CardTitle>

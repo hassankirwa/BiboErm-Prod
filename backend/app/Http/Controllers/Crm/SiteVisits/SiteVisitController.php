@@ -67,7 +67,7 @@ class SiteVisitController extends Controller
         $this->authorize('view', $siteVisit);
 
         return new SiteVisitResource(
-            $siteVisit->load(['lead', 'deal', 'assignedFieldOfficer', 'measurementLines'])
+            $siteVisit->load(['lead', 'deal', 'assignedFieldOfficer', 'measurementLines', 'photos'])
         );
     }
 }

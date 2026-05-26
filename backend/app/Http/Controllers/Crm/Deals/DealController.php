@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Crm\Deals;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\DealResource;
+use App\Models\Contact;
 use App\Models\Deal;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
 
@@ -61,6 +63,27 @@ class DealController extends Controller
         $reference = 'DL-'.strtoupper(Str::random(8));
         $name = $validated['name'] ?? $validated['title'];
 
+        $contactId = $validated['primary_contact_id'] ?? $validated['contact_id'] ?? null;
+        if ($contactId && empty($validated['primary_contact_id'])) {
+            $validated['primary_contact_id'] = $contactId;
+        }
+        if ($contactId && empty($validated['contact_id'])) {
+            $validated['contact_id'] = $contactId;
+        }
+
+        if (empty($validated['account_id']) && $contactId) {
+            $contact = Contact::query()->find($contactId);
+            if ($contact?->account_id) {
+                $validated['account_id'] = $contact->account_id;
+            }
+        }
+
+        if (empty($validated['account_id'])) {
+            throw ValidationException::withMessages([
+                'account_id' => ['An account is required for every deal.'],
+            ]);
+        }
+
         $deal = Deal::query()->create([
             ...$validated,
             'reference' => $reference,
@@ -93,6 +116,9 @@ class DealController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'title' => ['sometimes', 'string', 'max:255'],
+            'account_id' => ['sometimes', 'exists:accounts,id'],
+            'contact_id' => ['nullable', 'exists:contacts,id'],
+            'primary_contact_id' => ['nullable', 'exists:contacts,id'],
             'stage' => ['nullable', 'string', 'max:64'],
             'status' => ['nullable', 'string', 'in:open,won,lost'],
             'amount' => ['nullable', 'numeric', 'min:0'],

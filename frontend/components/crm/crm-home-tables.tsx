@@ -13,11 +13,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { fetchActivities } from "@/lib/api/crm/activities";
+import { fetchFieldDays } from "@/lib/api/crm/field-day";
 import { fetchLeads } from "@/lib/api/crm/leads";
 import { fetchSiteVisits } from "@/lib/api/crm/site-visits";
 import { apiLeadToListRow } from "@/lib/crm-lead-mapper";
-import type { ApiActivity } from "@/lib/api/crm/types";
+import type { ApiActivity, ApiFieldDay } from "@/lib/api/crm/types";
 
 function TableCard({
   title,
@@ -68,17 +70,23 @@ export function CrmHomeTables() {
   const [recentLeads, setRecentLeads] = useState<
     ReturnType<typeof apiLeadToListRow>[]
   >([]);
+  const [fieldDaysToday, setFieldDaysToday] = useState<ApiFieldDay[]>([]);
 
   useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
     Promise.all([
       fetchActivities({ status: "open", per_page: 5 }),
       fetchSiteVisits({ per_page: 5 }),
       fetchLeads({ per_page: 10 }),
+      fetchFieldDays({ field_date: today, per_page: 10 }).catch(() => ({
+        data: [] as ApiFieldDay[],
+      })),
     ])
-      .then(([activitiesRes, visitsRes, leadsRes]) => {
+      .then(([activitiesRes, visitsRes, leadsRes, fieldDaysRes]) => {
         setTasks(activitiesRes.data ?? []);
         setVisits(visitsRes.data ?? []);
         setRecentLeads((leadsRes.data ?? []).map(apiLeadToListRow));
+        setFieldDaysToday(fieldDaysRes.data ?? []);
       })
       .catch(() => {});
   }, []);
@@ -153,6 +161,48 @@ export function CrmHomeTables() {
           </TableBody>
         </Table>
       </TableCard>
+
+      <PermissionGate permission="field_day.view">
+        <TableCard
+          title="Field Officers Today"
+          href="/crm/field-day"
+          linkLabel="Open field day"
+        >
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4">Officer</TableHead>
+                <TableHead>Pins</TableHead>
+                <TableHead className="pr-4">Leads</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {fieldDaysToday.length === 0 ? (
+                <EmptyRow cols={3} />
+              ) : (
+                fieldDaysToday.map((fieldDay) => {
+                  const pins = fieldDay.pins ?? [];
+                  const leadsFromPins = pins.filter((pin) => pin.lead_id).length;
+                  return (
+                    <TableRow key={fieldDay.id}>
+                      <TableCell className="max-w-[140px] truncate pl-4 font-medium sm:max-w-none">
+                        {fieldDay.field_officer?.name ??
+                          `Officer #${fieldDay.field_officer_id}`}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {pins.length}
+                      </TableCell>
+                      <TableCell className="pr-4 text-muted-foreground">
+                        {leadsFromPins}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableCard>
+      </PermissionGate>
 
       <TableCard title="Today's Leads" href="/crm/leads" linkLabel="View all">
         <Table>

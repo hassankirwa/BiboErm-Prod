@@ -7,7 +7,6 @@ import {
   Settings,
   Headphones,
   Users,
-  Calendar,
   FolderKanban,
   Calculator,
   Warehouse,
@@ -58,6 +57,8 @@ import {
 export type SubModule = {
   name: string;
   path: string;
+  /** Spatie permission required to show this nav item */
+  permission?: string;
 };
 
 export type NavGroup = {
@@ -92,8 +93,8 @@ export const departments: Department[] = [
       { name: "Accounts", path: "/crm/accounts" },
       { name: "Deals", path: "/crm/deals" },
       { name: "Site Visits", path: "/crm/site-visits" },
+      { name: "Field Day", path: "/crm/field-day", permission: "field_day.view" },
       { name: "Activities", path: "/crm/activities" },
-      { name: "Field Day", path: "/crm/field-day" },
     ],
     nav: {
       topItems: [
@@ -112,7 +113,11 @@ export const departments: Department[] = [
             { name: "Deals", path: "/crm/deals" },
             { name: "Site Visits", path: "/crm/site-visits" },
             { name: "Today", path: "/crm/site-visits/today" },
-            { name: "Campaigns", path: "/crm/field-day" },
+            {
+              name: "Field Day",
+              path: "/crm/field-day",
+              permission: "field_day.view",
+            },
           ],
         },
         {
@@ -120,7 +125,7 @@ export const departments: Department[] = [
           icon: ListTodo,
           items: [
             { name: "Tasks", path: "/crm/activities" },
-            { name: "Meetings", path: "/crm/field-day" },
+            { name: "Meetings", path: "/crm/activities" },
             { name: "Calls", path: "/crm/activities" },
           ],
         },
@@ -406,15 +411,15 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/crm",
     icon: Users,
     iconClassName: "bg-blue-100 text-blue-600",
-    badge: { label: "12 New Leads", className: "text-blue-600" },
     permission: "leads.view",
   },
   {
     id: "field-day",
     name: "Field Day",
     href: "/crm/field-day",
-    icon: Calendar,
+    icon: MapPin,
     iconClassName: "bg-green-100 text-green-600",
+    permission: "field_day.view",
   },
   {
     id: "project-management",
@@ -468,7 +473,6 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/crm/deals",
     icon: FileText,
     iconClassName: "bg-pink-100 text-pink-600",
-    badge: { label: "5 Pending", className: "text-primary" },
   },
   {
     id: "offcuts",
@@ -561,18 +565,63 @@ export const workspaceApps: WorkspaceApp[] = [
   },
 ];
 
+function hasNavPermission(
+  permission: string | undefined,
+  permissions: string[],
+  roles: string[] = [],
+): boolean {
+  if (!permission) return true;
+  if (roles.includes("super_admin")) return true;
+  if (permissions.includes("*")) return true;
+  return permissions.includes(permission);
+}
+
+export function filterSubModulesByPermissions(
+  items: SubModule[],
+  permissions: string[],
+  roles: string[] = [],
+): SubModule[] {
+  return items.filter((item) =>
+    hasNavPermission(item.permission, permissions, roles),
+  );
+}
+
+export function filterDepartmentNav(
+  department: Department,
+  permissions: string[],
+  roles: string[] = [],
+): Department {
+  const subModules = filterSubModulesByPermissions(
+    department.subModules,
+    permissions,
+    roles,
+  );
+
+  if (!department.nav) {
+    return { ...department, subModules };
+  }
+
+  return {
+    ...department,
+    subModules,
+    nav: {
+      ...department.nav,
+      groups: department.nav.groups.map((group) => ({
+        ...group,
+        items: filterSubModulesByPermissions(group.items, permissions, roles),
+      })),
+    },
+  };
+}
+
 export function filterAppsByPermissions(
   apps: WorkspaceApp[],
   permissions: string[],
   roles: string[] = []
 ): WorkspaceApp[] {
-  const isSuperAdmin = roles.includes("super_admin");
-
-  return apps.filter((app) => {
-    if (!app.permission) return true;
-    if (isSuperAdmin) return true;
-    return permissions.includes(app.permission);
-  });
+  return apps.filter((app) =>
+    hasNavPermission(app.permission, permissions, roles),
+  );
 }
 
 export const workspaceNavItems = [

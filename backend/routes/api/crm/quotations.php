@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('permission:quotations.create')->post('deals/{deal}/quotations', [QuotationController::class, 'store']);
 Route::middleware('permission:quotations.view')->get('quotations/{quotation}', [QuotationController::class, 'show']);
+Route::middleware('permission:quotations.create')->patch('quotations/{quotation}', [QuotationController::class, 'update']);
 Route::middleware('permission:quotations.view')->get('quotations/{quotation}/pdf', DownloadQuotationPdfController::class);
 Route::middleware('permission:quotations.send')->post('quotations/{quotation}/send', SendQuotationController::class);
 Route::middleware('permission:quotations.create')->post('quotations/{quotation}/revise', ReviseQuotationController::class);

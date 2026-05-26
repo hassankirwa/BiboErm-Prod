@@ -101,6 +101,13 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
       meta: "Contact",
       href: `/crm/contacts/${lead.converted_contact.id}`,
     });
+  } else if (lead.source_contact) {
+    connected.push({
+      id: `contact-${lead.source_contact.id}`,
+      title: lead.source_contact.name ?? "Contact",
+      meta: "Linked contact",
+      href: `/crm/contacts/${lead.source_contact.id}`,
+    });
   }
   if (lead.converted_account) {
     connected.push({

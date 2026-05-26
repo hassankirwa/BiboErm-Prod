@@ -16,4 +16,5 @@ Route::middleware('permission:deals.update')->patch('deals/{deal}/stage', Update
 Route::middleware('permission:deals.mark_won')->post('deals/{deal}/mark-won', MarkDealWonController::class);
 Route::middleware('permission:deals.mark_lost')->post('deals/{deal}/mark-lost', MarkDealLostController::class);
 Route::middleware('permission:deals.create_project')->post('deals/{deal}/create-project', CreateProjectFromDealController::class);
+Route::middleware('permission:deal_payments.view')->get('deals/{deal}/payments', [DealPaymentController::class, 'index']);
 Route::middleware('permission:deal_payments.record')->post('deals/{deal}/payments', [DealPaymentController::class, 'store']);

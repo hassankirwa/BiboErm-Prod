@@ -1,19 +1,4 @@
-import {
-  leadKanbanAssignees,
-  type LeadKanbanCard,
-  type LeadKanbanStageId,
-} from "@/lib/leads-kanban-data";
-
-export const leadSourceOptions = [
-  "Website",
-  "Referral",
-  "LinkedIn",
-  "Facebook",
-  "Cold Call",
-  "Walk-in",
-  "Existing Client",
-  "Phone",
-] as const;
+import type { LeadKanbanCard, LeadKanbanStageId } from "@/lib/leads-kanban-data";
 
 export const tagOptions = [
   "New Inquiry",
@@ -23,55 +8,159 @@ export const tagOptions = [
   "Site Visit",
 ] as const;
 
+export const priorityOptions = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+] as const;
+
+export const urgencyOptions = [
+  { value: "flexible", label: "Flexible" },
+  { value: "within_month", label: "Within a month" },
+  { value: "within_week", label: "Within a week" },
+  { value: "immediate", label: "Immediate" },
+] as const;
+
+export const propertySiteTypeOptions = [
+  { value: "residential", label: "Residential" },
+  { value: "commercial", label: "Commercial" },
+  { value: "industrial", label: "Industrial" },
+  { value: "institutional", label: "Institutional" },
+  { value: "mixed_use", label: "Mixed use" },
+  { value: "other", label: "Other" },
+] as const;
+
+export const preferredContactMethodOptions = [
+  { value: "phone", label: "Phone" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "email", label: "Email" },
+  { value: "sms", label: "SMS" },
+] as const;
+
 export type LeadFormValues = {
   title: string;
-  company: string;
-  location: string;
+  leadTypeId: number | null;
+  leadSourceId: number | null;
+  stageId: LeadKanbanStageId;
+  ownerId: number | null;
+  priority: string;
+  tag: string;
+  contactPersonName: string;
   phone: string;
   email: string;
-  source: string;
-  stageId: LeadKanbanStageId;
-  owner: string;
+  whatsapp: string;
+  jobTitle: string;
+  preferredContactMethod: string;
+  preferredContactTime: string;
+  company: string;
+  siteName: string;
+  siteAddress: string;
+  location: string;
+  countySlug: string;
+  subcounty: string;
+  ward: string;
+  areaEstate: string;
+  landmark: string;
+  latitude: number | null;
+  longitude: number | null;
+  needSiteVisit: boolean;
+  assignedFieldOfficerId: number | null;
+  productInterests: string[];
+  requirementDescription: string;
+  propertySiteType: string;
   estimatedValue: number;
+  estimatedBudget: number;
+  urgency: string;
+  expectedTimeline: string;
   nextActionDate: string;
-  tag: string;
+  nextAction: string;
   notes: string;
 };
 
 export function emptyLeadForm(
-  stageId: LeadKanbanStageId = "new"
+  stageId: LeadKanbanStageId = "new",
+  defaults?: {
+    ownerId?: number | null;
+    leadSourceId?: number | null;
+    leadTypeId?: number | null;
+  },
 ): LeadFormValues {
   return {
     title: "",
-    company: "",
-    location: "",
+    leadTypeId: defaults?.leadTypeId ?? null,
+    leadSourceId: defaults?.leadSourceId ?? null,
+    stageId,
+    ownerId: defaults?.ownerId ?? null,
+    priority: "medium",
+    tag: tagOptions[0],
+    contactPersonName: "",
     phone: "",
     email: "",
-    source: leadSourceOptions[0],
-    stageId,
-    owner: leadKanbanAssignees[0],
+    whatsapp: "",
+    jobTitle: "",
+    preferredContactMethod: "",
+    preferredContactTime: "",
+    company: "",
+    siteName: "",
+    siteAddress: "",
+    location: "",
+    countySlug: "",
+    subcounty: "",
+    ward: "",
+    areaEstate: "",
+    landmark: "",
+    latitude: null,
+    longitude: null,
+    needSiteVisit: false,
+    assignedFieldOfficerId: null,
+    productInterests: [],
+    requirementDescription: "",
+    propertySiteType: "",
     estimatedValue: 0,
+    estimatedBudget: 0,
+    urgency: "",
+    expectedTimeline: "",
     nextActionDate: new Date().toISOString().slice(0, 10),
-    tag: tagOptions[0],
+    nextAction: "",
     notes: "",
   };
 }
 
+export function hasContactInfo(values: LeadFormValues): boolean {
+  return (
+    values.contactPersonName.trim() !== "" ||
+    values.phone.trim() !== "" ||
+    values.email.trim() !== ""
+  );
+}
+
 export function leadFormValuesToKanbanCard(values: LeadFormValues): LeadKanbanCard {
+  const location =
+    values.siteAddress.trim() ||
+    values.location.trim() ||
+    [values.areaEstate, values.subcounty, values.countySlug]
+      .filter(Boolean)
+      .join(", ");
+
   return {
     id: `kb_${Date.now()}`,
     stageId: values.stageId,
+    statusKey: values.stageId,
     title: values.title.trim(),
-    location: values.location.trim(),
-    owner: values.owner,
+    location: location.trim(),
+    owner: values.ownerId ? String(values.ownerId) : "Unassigned",
+    ownerId: values.ownerId,
+    leadSourceId: values.leadSourceId,
     nextActionDate: values.nextActionDate,
     estimatedValue: values.estimatedValue,
     tag: values.tag,
     company: values.company.trim() || undefined,
     phone: values.phone.trim() || undefined,
     email: values.email.trim() || undefined,
-    source: values.source,
     notes: values.notes.trim() || undefined,
+    latitude: values.latitude,
+    longitude: values.longitude,
   };
 }
 
@@ -174,11 +263,11 @@ export function parseLeadImportCsv(text: string): import("@/lib/api/crm/leads").
     });
 
     const name = row["lead name"] || row.name;
-    const phone = row.phone;
-    if (!name?.trim() || !phone?.trim()) {
+    if (!name?.trim()) {
       continue;
     }
 
+    const phone = row.phone?.trim();
     const estimatedRaw =
       row["estimated value (kes)"] || row["estimated value"] || "";
     const estimated = estimatedRaw
@@ -187,8 +276,8 @@ export function parseLeadImportCsv(text: string): import("@/lib/api/crm/leads").
 
     rows.push({
       name: name.trim(),
-      contact_person_name: name.trim(),
-      phone: phone.trim(),
+      contact_person_name: row["contact person"]?.trim() || name.trim(),
+      phone: phone || undefined,
       email: row.email?.trim() || null,
       account_name: row.company?.trim() || null,
       site_address: row.location?.trim() || null,

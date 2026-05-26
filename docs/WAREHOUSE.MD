@@ -2,8 +2,8 @@
 
 **Module:** Warehouse · Inventory · Offcuts · Tools · Stock Reservations (FIFO)  
 **Stack:** PHP 8.2+ · Laravel 11 · PostgreSQL/MySQL · Next.js SPA  
-**References:** [README.md](../../README.md) §8.3 (Warehouse), §8.2 (Project BOM), §10 (Integrations), [USER_ONBOARDING.MD](./USER_ONBOARDING.MD), [SALES_CRM.MD](./SALES_CRM.MD) §3 (folder structure)  
-**Version:** 1.0 · 2026
+**References:** [README.md](../README.md) §8.3 (Warehouse), §8.2 (Project BOM), §10 (Integrations), [Raw_Plam.txt](./Raw_Plam.txt) §6, [USER_ONBOARDING.MD](./USER_ONBOARDING.MD), [SALES_CRM.MD](./SALES_CRM.MD) §3 (folder structure), [WAREHOUSE_MIGRATION_SPEC.MD](./WAREHOUSE_MIGRATION_SPEC.MD) (column-level migration target)  
+**Version:** 1.1 · 2026
 
 ---
 
@@ -15,19 +15,22 @@
 4. [Repository & Folder Structure](#4-repository--folder-structure)
 5. [Master Data](#5-master-data)
 6. [Database Schema](#6-database-schema)
-7. [Stock Management](#7-stock-management)
-8. [FIFO Reservations & Project Integration](#8-fifo-reservations--project-integration)
-9. [Offcuts Warehouse](#9-offcuts-warehouse)
-10. [Rubbers & Gaskets](#10-rubbers--gaskets)
-11. [Tools Management](#11-tools-management)
-12. [Stock Movements & Stock-Take](#12-stock-movements--stock-take)
-13. [API Endpoints](#13-api-endpoints)
-14. [Permissions & Role Scoping](#14-permissions--role-scoping)
-15. [Seed Data](#15-seed-data)
-16. [Frontend Routes](#16-frontend-routes)
-17. [Cross-Module Integration](#17-cross-module-integration)
-18. [Audit Logging](#18-audit-logging)
-19. [Implementation Phases](#19-implementation-phases)
+7. [Migration Refactor Notes](#7-migration-refactor-notes)
+8. [Stock Management](#8-stock-management)
+9. [FIFO Reservations & Project Integration](#9-fifo-reservations--project-integration)
+10. [GRN Receive Flow](#10-grn-receive-flow)
+11. [Domain Events](#11-domain-events)
+12. [Offcuts Warehouse](#12-offcuts-warehouse)
+13. [Rubbers & Gaskets](#13-rubbers--gaskets)
+14. [Tools Management](#14-tools-management)
+15. [Stock Movements & Stock-Take](#15-stock-movements--stock-take)
+16. [API Endpoints](#16-api-endpoints)
+17. [Permissions & Role Scoping](#17-permissions--role-scoping)
+18. [Seed Data](#18-seed-data)
+19. [Frontend Routes](#19-frontend-routes)
+20. [Cross-Module Integration](#20-cross-module-integration)
+21. [Audit Logging](#21-audit-logging)
+22. [Implementation Phases](#22-implementation-phases)
 
 ---
 
@@ -37,7 +40,7 @@
 
 - Track **Accessories** and **Aluminium Profiles** with **separate manager roles**.
 - **Glass is NOT stored** in warehouse — sourced per project at procurement.
-- **Hierarchy:** find any item physically → Deck → Section → Bin → Item.
+- **Hierarchy:** find any item physically → **Warehouse → Deck → Section → Bin → Item** (README §8.3 uses the shorthand “Section → Bin”; the **Deck** layer models the two manager zones — accessories/rubbers vs aluminium/offcuts).
 - **FIFO** material reservation when project BOM is confirmed.
 - **Offcuts** logged after cutting; check offcuts before new procurement.
 - **Tools** issued per project with return/damage tracking.
@@ -404,7 +407,7 @@ CREATE TABLE warehouse_decks (
 CREATE TABLE warehouse_sections (
     id              BIGSERIAL PRIMARY KEY,
     deck_id         BIGINT NOT NULL REFERENCES warehouse_decks(id),
-    door_type_id    BIGINT NULL,           -- for accessories sections
+    door_type_id    BIGINT NULL REFERENCES door_types(id),
     code            VARCHAR(30) NOT NULL,  -- SEC-SLD, SEC-BTH
     name            VARCHAR(255) NOT NULL,
     section_type    VARCHAR(50) NOT NULL,
@@ -428,13 +431,23 @@ CREATE TABLE warehouse_bins (
 ### 6.2 Items & extensions
 
 ```sql
+CREATE TABLE door_types (
+    id              BIGSERIAL PRIMARY KEY,
+    code            VARCHAR(20) NOT NULL UNIQUE,
+    name            VARCHAR(255) NOT NULL,
+    section_code    VARCHAR(30) NOT NULL,
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP NOT NULL
+);
+
 CREATE TABLE warehouse_items (
     id              BIGSERIAL PRIMARY KEY,
     sku             VARCHAR(50) NOT NULL UNIQUE,
     name            VARCHAR(255) NOT NULL,
     category        VARCHAR(30) NOT NULL,  -- aluminium_profile, accessory, rubber
     unit_of_measure VARCHAR(20) NOT NULL,
-    door_type_id    BIGINT NULL,
+    door_type_id    BIGINT NULL REFERENCES door_types(id),
     min_stock_qty   DECIMAL(15,3) DEFAULT 0,
     is_active       BOOLEAN DEFAULT TRUE,
     created_at      TIMESTAMP NOT NULL,
@@ -453,7 +466,7 @@ CREATE TABLE aluminium_profiles (
 
 CREATE TABLE accessories (
     item_id             BIGINT PRIMARY KEY REFERENCES warehouse_items(id),
-    door_type_id        BIGINT NOT NULL,
+    door_type_id        BIGINT NOT NULL REFERENCES door_types(id),
     default_bin_id      BIGINT NULL REFERENCES warehouse_bins(id)
 );
 
@@ -463,14 +476,6 @@ CREATE TABLE rubbers (
     default_section_id      BIGINT NULL REFERENCES warehouse_sections(id)
 );
 
-CREATE TABLE door_types (
-    id              BIGSERIAL PRIMARY KEY,
-    code            VARCHAR(20) NOT NULL UNIQUE,
-    name            VARCHAR(255) NOT NULL,
-    section_code    VARCHAR(30) NOT NULL,
-    is_active       BOOLEAN DEFAULT TRUE
-);
-
 CREATE TABLE door_type_accessories (
     door_type_id    BIGINT NOT NULL REFERENCES door_types(id),
     item_id         BIGINT NOT NULL REFERENCES warehouse_items(id),
@@ -478,6 +483,8 @@ CREATE TABLE door_type_accessories (
     PRIMARY KEY (door_type_id, item_id)
 );
 ```
+
+> **FK order:** In the actual migration, create `door_types` before `warehouse_sections` (see [WAREHOUSE_MIGRATION_SPEC.MD §3](./WAREHOUSE_MIGRATION_SPEC.MD#3-fk-creation-order)). Column-level detail and indexes: [WAREHOUSE_MIGRATION_SPEC.MD](./WAREHOUSE_MIGRATION_SPEC.MD).
 
 ### 6.3 Stock levels (per bin)
 
@@ -526,7 +533,7 @@ CREATE TABLE stock_movement_lines (
 CREATE TABLE stock_reservations (
     id              BIGSERIAL PRIMARY KEY,
     reservation_number VARCHAR(30) NOT NULL UNIQUE,
-    project_id      BIGINT NOT NULL,  -- FK when Projects module exists
+    project_id      BIGINT NOT NULL REFERENCES projects(id),
     status          VARCHAR(30) NOT NULL DEFAULT 'pending',
     reserved_at     TIMESTAMP NOT NULL,
     reserved_by     BIGINT NOT NULL REFERENCES users(id),
@@ -601,7 +608,30 @@ CREATE TABLE tool_issuances (
 
 ---
 
-## 7. Stock Management
+## 7. Migration Refactor Notes
+
+**Current stub:** `backend/database/migrations/2025_05_19_400000_create_warehouse_tables.php` (7 tables).  
+**Target:** 18 tables per [WAREHOUSE_MIGRATION_SPEC.MD](./WAREHOUSE_MIGRATION_SPEC.MD).
+
+| Current artifact | Fix |
+|------------------|-----|
+| `warehouses.category` | Remove; categories are **deck slugs** on `warehouse_decks` |
+| Missing `warehouse_decks` | Add four decks under `WH-MAIN` |
+| `warehouse_sections.warehouse_id` | Change to `deck_id` + `section_type` + optional `door_type_id` |
+| `inventory_items` + qty on row | Split → `warehouse_items` (master) + `stock_levels` (per bin) |
+| Flat `stock_movements` | Header/lines: `stock_movements` + `stock_movement_lines` |
+| Flat `stock_reservations` | Header/lines: `stock_reservations` + `stock_reservation_lines` + `fifo_sequence` on header |
+| `offcuts` table | Replace with `offcut_pieces` (`item_id`, `bin_id`, `offcut_number`) |
+| No master data | Add `door_types`, profile/accessory/rubber extensions, `door_type_accessories` |
+| No tools | Add `warehouse_tools`, `tool_issuances` |
+
+**Prerequisite:** `2025_05_19_300000_create_projects_tables.php` must run first (`projects`, `users` FKs).
+
+**Glass rule:** No `glass` row in `warehouse_items.category` — enforced at application layer and documented in BOM (`is_procurement_only` / `is_glass` on project side).
+
+---
+
+## 8. Stock Management
 
 ### Core formulas
 
@@ -626,7 +656,7 @@ When `available_qty < min_stock_qty` on any item:
 
 ---
 
-## 8. FIFO Reservations & Project Integration
+## 9. FIFO Reservations & Project Integration
 
 From README §8.2 project stages 6–8:
 
@@ -634,7 +664,7 @@ From README §8.2 project stages 6–8:
 BOM Finalized → Material Check → Materials Reserved (FIFO) → Awaiting Procurement (if shortage)
 ```
 
-### 8.1 `BomStockCheckService`
+### 9.1 `BomStockCheckService`
 
 **Input:** project_id + BOM lines (item_id, qty required)
 
@@ -645,14 +675,22 @@ BOM Finalized → Material Check → Materials Reserved (FIFO) → Awaiting Proc
 
 **Offcut check:** Before flagging procurement for profiles, `OffcutAllocationService` searches `offcut_pieces` where `length_mm >= required_cut`.
 
-### 8.2 `FifoReservationService`
+### 9.2 `FifoReservationService`
+
+**All-or-nothing reservation** ([INTEGRATION_CONTRACT.MD](./INTEGRATION_CONTRACT.MD) §11 Q5): the project advances to `materials_reserved` only when **every** stockable BOM line can be **fully** reserved. If any line has a shortage, emit `ProjectMaterialShortageDetected` and move to `awaiting_procurement` — **no partial reservation**.
 
 1. Assign `fifo_sequence` from project queue (earlier project = lower number).
-2. For each BOM line, lock stock in bins (prefer default bin → then same section).
-3. Update `stock_levels.quantity_reserved`.
-4. Shortage lines → `awaiting_procurement` on project + notify procurement.
+2. For each BOM line, attempt full lock in bins (prefer default bin → then same section).
+3. If **all** lines succeed: update `stock_levels.quantity_reserved`; emit `ProjectMaterialsReady` (or advance via `materials_reserved` then `materials_ready` per PM listener).
+4. If **any** line fails: release any tentative locks; emit `ProjectMaterialShortageDetected`; do **not** set `materials_reserved`.
 
-### 8.3 Stage-based release
+### 9.2.1 FIFO sequence override (operations manager)
+
+Per contract §11 Q14: **production schedule reorder** does not change `fifo_sequence`. Only **`operations_manager`** may override reservation queue order via `FifoReservationOverrideService`, with mandatory Owen audit log (`fifo_sequence_override`).
+
+Production Manager and PROD module **must not** call override APIs.
+
+### 9.3 Stage-based release
 
 Production stage start triggers partial release (README §8.2):
 
@@ -661,9 +699,99 @@ Production stage start triggers partial release (README §8.2):
 
 `ReleaseReservedStockController` — `permission:warehouse.reservations.release`
 
+### 9.4 Event-driven FIFO flow
+
+Triggered when Project Management emits **`ProjectBomFinalized`** (README §8.2 stages 6–8, Raw_Plam §6.3):
+
+```mermaid
+sequenceDiagram
+    participant PM as Project Management
+    participant WH as Warehouse
+    participant PROC as Procurement
+
+    PM->>WH: ProjectBomFinalized
+    WH->>WH: BomStockCheckService
+    alt any line cannot be fully reserved
+        WH->>PM: ProjectMaterialShortageDetected
+        WH->>PROC: ProjectMaterialShortageDetected
+    else all stockable lines fully reserved
+        WH->>PM: ProjectMaterialsReady
+    end
+```
+
+| Step | Service | Action |
+|------|---------|--------|
+| 1 | `BomStockCheckService` | Compare BOM lines vs `stock_levels` + usable `offcut_pieces` |
+| 2 | `FifoReservationService` | Assign `fifo_sequence`; lock bins; update `quantity_reserved` |
+| 3a | — | Shortage → emit **`ProjectMaterialShortageDetected`** |
+| 3b | — | Full reserve → emit **`ProjectMaterialsReady`** |
+
+PM owns stage transitions (`awaiting_procurement` / `materials_ready`) via listeners — warehouse never writes `projects.stage` directly.
+
 ---
 
-## 9. Offcuts Warehouse
+## 10. GRN Receive Flow
+
+When Procurement verifies a goods receipt and emits **`GoodsReceiptVerified`**:
+
+```mermaid
+sequenceDiagram
+    participant PROC as Procurement
+    participant WH as Warehouse
+    participant PM as Project Management
+
+    PROC->>WH: GoodsReceiptVerified (goods_receipt_id)
+    WH->>WH: Create stock_movements (inbound)
+    Note over WH: reference_type = goods_receipt
+    WH->>WH: stock_movement_lines with to_bin_id (putaway)
+    WH->>WH: Update stock_levels.quantity_on_hand
+    alt linked project reservation
+        WH->>WH: Reduce shortage on reservation lines
+        WH->>PM: Notify materials progress
+    end
+```
+
+| Step | Detail |
+|------|--------|
+| 1 | Create **`stock_movements`** row: `movement_type = inbound`, `reference_type = goods_receipt`, `reference_id = {grn_id}` |
+| 2 | For each accepted GRN line, create **`stock_movement_lines`** with `to_bin_id` = putaway bin (warehouse operator selects or uses `accessories.default_bin_id`) |
+| 3 | Increment **`stock_levels.quantity_on_hand`** for `(item_id, bin_id)` |
+| 4 | Receipt / invoice images remain on procurement **`goods_receipt_attachments`** (`path`, optional `firebase_url`); movement links via `reference_id`. Optional copy paths into movement `notes` for audit |
+| 5 | If GRN fulfills an open project shortage, reduce pending qty on **`stock_reservation_lines`**; re-run check → may emit **`ProjectMaterialsReady`** |
+
+**Storage pattern (BiboStorage):** Same as CRM attachments — `private/procurement/{grn_id}/{filename}` or category `warehouse` for warehouse-captured photos; resolve URL via `BiboStorage::resolvePrivateApiUrl`.
+
+**Frontend entry:** `/warehouse/receive?grn={id}` — deep-link from procurement GRN detail.
+
+**API:** `POST /api/warehouse/movements/receive` with `goods_receipt_id`, line putaway bins, optional notes.
+
+---
+
+## 11. Domain Events
+
+Warehouse module event wiring (pending `docs/INTEGRATION_CONTRACT.MD`; names match integration plan):
+
+### Publish (emit)
+
+| Event | When | Payload (min) |
+|-------|------|----------------|
+| **`ProjectMaterialShortageDetected`** | BOM check / FIFO reserve finds shortage | `project_id`, shortage lines `[{item_id, qty_short}]` |
+| **`ProjectMaterialsReady`** | All BOM stock + offcuts reserved | `project_id`, `reservation_id` |
+| **`OffcutLogged`** | Offcut piece created after cutting | `offcut_piece_id`, `project_id`, `item_id`, `length_mm` |
+
+### Listen (handle)
+
+| Event | Publisher | Handler |
+|-------|-----------|---------|
+| **`ProjectBomFinalized`** | PM | Queue `BomStockCheckService` → `FifoReservationService` |
+| **`GoodsReceiptVerified`** | Procurement | Inbound movement + putaway + reservation shortage reduction |
+| **`ProductionStageCompleted`** | Production | Partial **`stock_reservation_lines.quantity_released`** when stage requires material release (e.g. cutting → profiles, fabrication → accessories) |
+
+Register listeners in `AppServiceProvider` under warehouse-specific methods; PM remains sole writer of `projects.stage`.
+
+---
+
+## 12. Offcuts Warehouse
 
 ### Deck: `offcuts`
 
@@ -693,7 +821,7 @@ Bins within section can be by length range (optional) or single bin per profile.
 
 ---
 
-## 10. Rubbers & Gaskets
+## 13. Rubbers & Gaskets
 
 ### Deck: `rubbers`
 
@@ -708,7 +836,7 @@ When project BOM includes rubber line → system suggests correct rubber SKU fro
 
 ---
 
-## 11. Tools Management
+## 14. Tools Management
 
 Separate from consumable stock (README §8.3):
 
@@ -719,7 +847,7 @@ Separate from consumable stock (README §8.3):
 
 ---
 
-## 12. Stock Movements & Stock-Take
+## 15. Stock Movements & Stock-Take
 
 ### Movement document flow
 
@@ -738,7 +866,7 @@ Adjustment (stock-take) → adjustment with reason
 
 ---
 
-## 13. API Endpoints
+## 16. API Endpoints
 
 Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 
@@ -808,7 +936,7 @@ Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 
 ---
 
-## 14. Permissions & Role Scoping
+## 17. Permissions & Role Scoping
 
 | Role | Decks | Key permissions |
 |------|-------|-----------------|
@@ -837,7 +965,11 @@ public function manage(User $user, Deck $deck): bool
 
 ---
 
-## 15. Seed Data
+## 18. Seed Data
+
+### `WarehouseMasterDataSeeder`
+
+Seeds **`door_types`** (SLD, FLD, CSM, BTH, AWN, GEN), sample **`warehouse_items`** + extensions, and **`door_type_accessories`** standard qty rows. Idempotent via unique codes / SKUs.
 
 Add to `php artisan db:seed` after `CrmLookupSeeder`:
 
@@ -895,7 +1027,7 @@ All seeders use `updateOrCreate` by unique codes (idempotent).
 
 ---
 
-## 16. Frontend Routes
+## 19. Frontend Routes
 
 Existing (`frontend/lib/navigation.ts`):
 
@@ -906,6 +1038,7 @@ Existing (`frontend/lib/navigation.ts`):
 | `/warehouse/offcuts` | Offcuts deck UI |
 | `/warehouse/tools` | Tools register |
 | `/warehouse/master-data` | Items, door types, profiles |
+| `/warehouse/receive?grn={id}` | GRN putaway — deep-link from procurement |
 
 ### Planned UI views
 
@@ -921,7 +1054,7 @@ Existing (`frontend/lib/navigation.ts`):
 
 ---
 
-## 17. Cross-Module Integration
+## 20. Cross-Module Integration
 
 ```mermaid
 flowchart LR
@@ -936,16 +1069,16 @@ flowchart LR
 
 | From | To | Event |
 |------|-----|-------|
-| Project | Warehouse | BOM finalized → stock check |
-| Warehouse | Project | Reservation complete / shortage flagged |
-| Warehouse | Procurement | Low stock / shortage alert |
-| Procurement | Warehouse | GRN → inbound movement |
-| Production | Warehouse | Cutting complete → offcut log + outbound profiles |
+| Project | Warehouse | **`ProjectBomFinalized`** → stock check |
+| Warehouse | Project | **`ProjectMaterialsReady`** / **`ProjectMaterialShortageDetected`** |
+| Warehouse | Procurement | Low stock / **`ProjectMaterialShortageDetected`** |
+| Procurement | Warehouse | **`GoodsReceiptVerified`** → inbound movement |
+| Production | Warehouse | **`ProductionStageCompleted`** → release; cutting → **`OffcutLogged`** |
 | Warehouse | Production | Stage start → release reserved materials |
 
 ---
 
-## 18. Audit Logging
+## 21. Audit Logging
 
 | Action | Module | Entity |
 |--------|--------|--------|
@@ -961,7 +1094,7 @@ flowchart LR
 
 ---
 
-## 19. Implementation Phases
+## 22. Implementation Phases
 
 ### Phase 1 — Location structure (Week 1)
 
@@ -1044,4 +1177,4 @@ WH-MAIN (BIBO Main Warehouse)
 
 ---
 
-*End of Warehouse Implementation Plan v1.0*
+*End of Warehouse Implementation Plan v1.1*

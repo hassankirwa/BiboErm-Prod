@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, DollarSign, Target, CheckCircle } from "lucide-react";
-import { fetchDeals } from "@/lib/api/crm/deals";
+import { dealValue, fetchDeals } from "@/lib/api/crm/deals";
 import type { ApiDeal } from "@/lib/api/crm/types";
 
-function dealValue(deal: ApiDeal): number {
-  return Number(deal.estimated_value ?? deal.amount ?? 0);
+function isDealWon(deal: ApiDeal): boolean {
+  const stage = deal.stage ?? deal.status ?? "";
+  return stage === "won" || stage === "project_created" || deal.status === "won";
 }
 
 export function DealsPipeline() {
@@ -21,7 +22,7 @@ export function DealsPipeline() {
 
   const stats = useMemo(() => {
     const totalValue = deals.reduce((acc, d) => acc + dealValue(d), 0);
-    const wonDeals = deals.filter((d) => (d.stage ?? d.status) === "closed_won");
+    const wonDeals = deals.filter(isDealWon);
     const wonValue = wonDeals.reduce((acc, d) => acc + dealValue(d), 0);
     const avgDealSize = deals.length ? totalValue / deals.length : 0;
     const weightedValue = deals.reduce(

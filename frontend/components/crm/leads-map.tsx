@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -10,6 +10,12 @@ import {
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { MapSearchBox } from "@/components/crm/map-search-box";
+import {
+  DEFAULT_MAP_CENTER,
+  FlyToPosition,
+} from "@/components/crm/map-pin-picker";
+import type { GeocodeResult } from "@/lib/geocoding";
 import {
   getLeadsMapMarkers,
   getMapBounds,
@@ -31,7 +37,7 @@ function FitBounds({
   useEffect(() => {
     if (focusedLeadId) return;
     if (markers.length === 0) {
-      map.setView([-1.2864, 36.8172], 6);
+      map.setView(DEFAULT_MAP_CENTER, 6);
       return;
     }
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
@@ -51,7 +57,7 @@ function FocusLead({
 
   useEffect(() => {
     if (!focusedLeadId) return;
-    const marker = markers.find((m) => m.id === focusedLeadId);
+    const marker = markers.find((item) => item.id === focusedLeadId);
     if (!marker) return;
 
     map.flyTo([marker.lat, marker.lng], FOCUS_ZOOM, {
@@ -74,8 +80,8 @@ function LeadMarker({
 
   useEffect(() => {
     if (isFocused && markerRef.current) {
-      const t = window.setTimeout(() => markerRef.current?.openPopup(), 400);
-      return () => window.clearTimeout(t);
+      const timer = window.setTimeout(() => markerRef.current?.openPopup(), 400);
+      return () => window.clearTimeout(timer);
     }
     markerRef.current?.closePopup();
   }, [isFocused]);
@@ -129,17 +135,19 @@ function stagePinColor(stageClassName: string): string {
   return "#ec2024";
 }
 
-export function LeadsMap({
-  focusedLeadId = null,
+function LeadsMapCanvas({
+  markers,
+  focusedLeadId,
+  searchTarget,
 }: {
-  focusedLeadId?: string | null;
+  markers: LeadMapMarker[];
+  focusedLeadId: string | null;
+  searchTarget: { lat: number; lng: number } | null;
 }) {
-  const markers = useMemo(() => getLeadsMapMarkers(), []);
-
   return (
     <MapContainer
       className="z-0 h-full w-full"
-      center={[-1.2864, 36.8172]}
+      center={DEFAULT_MAP_CENTER}
       zoom={7}
       scrollWheelZoom
     >
@@ -149,6 +157,11 @@ export function LeadsMap({
       />
       <FitBounds markers={markers} focusedLeadId={focusedLeadId} />
       <FocusLead focusedLeadId={focusedLeadId} markers={markers} />
+      <FlyToPosition
+        latitude={searchTarget?.lat ?? null}
+        longitude={searchTarget?.lng ?? null}
+        zoom={14}
+      />
       {markers.map((marker) => (
         <LeadMarker
           key={marker.id}
@@ -157,5 +170,45 @@ export function LeadsMap({
         />
       ))}
     </MapContainer>
+  );
+}
+
+export function LeadsMap({
+  focusedLeadId = null,
+  markers: markersProp,
+  onSearchSelect,
+}: {
+  focusedLeadId?: string | null;
+  markers?: LeadMapMarker[];
+  onSearchSelect?: (result: GeocodeResult) => void;
+}) {
+  const markers = useMemo(
+    () => markersProp ?? getLeadsMapMarkers(),
+    [markersProp],
+  );
+  const [searchTarget, setSearchTarget] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+
+  function handleSearchSelect(result: GeocodeResult) {
+    setSearchTarget({ lat: result.lat, lng: result.lng });
+    onSearchSelect?.(result);
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div className="absolute left-3 right-3 top-3 z-[1000] sm:right-auto sm:max-w-sm">
+        <MapSearchBox
+          onSelect={handleSearchSelect}
+          placeholder="Search area or navigate map"
+        />
+      </div>
+      <LeadsMapCanvas
+        markers={markers}
+        focusedLeadId={focusedLeadId}
+        searchTarget={searchTarget}
+      />
+    </div>
   );
 }

@@ -78,7 +78,7 @@ class SiteVisit extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->can('site_visits.view_all') || $user->can('crm.manage')) {
+        if ($user->can('site_visits.view_all')) {
             return $query;
         }
 

@@ -25,7 +25,7 @@ trait ChecksCrmPermissions
 
     protected function canViewAll(User $user, string $viewAllPermission): bool
     {
-        return $user->can($viewAllPermission) || $this->hasLegacyCrmAccess($user);
+        return $user->can($viewAllPermission);
     }
 
     protected function ownsRecord(User $user, Model $model, array $ownerColumns): bool

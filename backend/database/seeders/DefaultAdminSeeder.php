@@ -7,6 +7,7 @@ use App\Models\EmployeeProfile;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\UserProfile;
+use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -32,7 +33,7 @@ class DefaultAdminSeeder extends Seeder
         $user = User::query()->firstWhere('email', $email);
 
         if ($user) {
-            $this->command?->warn('Default admin user already exists — ensuring profile records only.');
+            $this->command?->warn('Default admin user already exists — ensuring role and profile records.');
         } else {
             $user = User::query()->create([
                 'name' => config('bibo.admin.name'),
@@ -44,16 +45,22 @@ class DefaultAdminSeeder extends Seeder
                 'must_change_password' => false,
             ]);
 
-            UserDepartmentRole::query()->create([
+            $this->command?->info("Default admin seeded: {$email}");
+        }
+
+        UserDepartmentRole::query()->firstOrCreate(
+            [
                 'user_id' => $user->id,
                 'department_id' => $operationsDept->id,
                 'role_id' => $superAdminRole->id,
+            ],
+            [
                 'is_primary' => true,
                 'assigned_at' => now(),
-            ]);
+            ],
+        );
 
-            $this->command?->info("Default admin seeded: {$email}");
-        }
+        app(SyncDepartmentRolesToSpatie::class)->sync($user);
 
         UserProfile::query()->firstOrCreate(['user_id' => $user->id]);
 

@@ -29,7 +29,7 @@ import {
   leadActivityIcons,
   leadActivityLabels,
 } from "@/lib/lead-activity-icons";
-import { leadKanbanAssignees } from "@/lib/leads-kanban-data";
+import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
 import type { LeadActivityType } from "@/lib/leads-kanban-data";
 
 export function LeadsActivityModal({
@@ -49,24 +49,30 @@ export function LeadsActivityModal({
     description?: string;
     due_at?: string;
     activity_type?: string;
+    assigned_to?: number;
   }) => void | Promise<void>;
   onMarkDone?: () => void;
 }) {
+  const { assignableUsers } = useCrmFormLookups({
+    assignableRole: "sales_representative",
+  });
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
-  const [assignee, setAssignee] = useState(leadKanbanAssignees[0]);
+  const [assigneeId, setAssigneeId] = useState<string>("");
   const [dueDate, setDueDate] = useState(
-    () => new Date().toISOString().slice(0, 10)
+    () => new Date().toISOString().slice(0, 10),
   );
 
   useEffect(() => {
     if (open && activityType) {
       setTitle(`${leadActivityLabels[activityType]} — ${leadTitle}`);
       setNote("");
-      setAssignee(leadKanbanAssignees[0]);
+      setAssigneeId(
+        assignableUsers[0] ? String(assignableUsers[0].id) : "",
+      );
       setDueDate(new Date().toISOString().slice(0, 10));
     }
-  }, [open, activityType, leadTitle]);
+  }, [open, activityType, leadTitle, assignableUsers]);
 
   const dueTone = useMemo(() => {
     if (!dueDate) return "green" as const;
@@ -126,14 +132,14 @@ export function LeadsActivityModal({
 
           <div className="grid gap-2">
             <Label>Assign to</Label>
-            <Select value={assignee} onValueChange={setAssignee}>
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue placeholder="Select assignee" />
               </SelectTrigger>
               <SelectContent>
-                {leadKanbanAssignees.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    {name}
+                {assignableUsers.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -199,6 +205,7 @@ export function LeadsActivityModal({
                   description: note || undefined,
                   due_at: dueDate ? `${dueDate}T12:00:00` : undefined,
                   activity_type: activityType ?? undefined,
+                  assigned_to: assigneeId ? Number(assigneeId) : undefined,
                 });
                 onOpenChange(false);
               }}

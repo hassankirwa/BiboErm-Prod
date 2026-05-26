@@ -19,4 +19,9 @@ class DealPaymentPolicy
     {
         return $this->canAny($user, ['deal_payments.view', 'crm.view']);
     }
+
+    public function view(User $user, DealPayment $payment): bool
+    {
+        return $this->viewAny($user);
+    }
 }

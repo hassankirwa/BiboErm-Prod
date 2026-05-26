@@ -185,8 +185,18 @@ export type ApiSiteVisit = {
   lead?: ApiLead | null;
   deal?: ApiDeal | null;
   assigned_field_officer?: ApiUser | null;
+  photos?: ApiSiteVisitPhoto[];
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type ApiSiteVisitPhoto = {
+  id: number;
+  file_path: string | null;
+  firebase_url: string | null;
+  url: string | null;
+  uploaded_by: number | null;
+  created_at: string | null;
 };
 
 export type ApiLead = {
@@ -211,6 +221,8 @@ export type ApiLead = {
   need_site_visit: boolean | null;
   site_address: string | null;
   county_id: number | null;
+  subcounty: string | null;
+  ward: string | null;
   area_estate: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -225,6 +237,7 @@ export type ApiLead = {
   assignee?: ApiUser | null;
   source: string | null;
   notes: string | null;
+  lead_source?: CrmLookupItem | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -266,6 +279,7 @@ export type ApiLeadDetail = ApiLead & {
   converted_account_id: number | null;
   converted_deal_id: number | null;
   converted_contact?: ApiContact | null;
+  source_contact?: ApiContact | null;
   converted_account?: ApiAccount | null;
   converted_deal?: ApiDeal | null;
   site_visits?: ApiSiteVisit[];
@@ -341,7 +355,26 @@ export type ApiFieldDayPin = {
   contact_id: number | null;
   latitude: number | null;
   longitude: number | null;
+  accuracy_m: number | null;
+  captured_at: string | null;
   notes: string | null;
+  findings: string | null;
+  site_label: string | null;
+  county_id: number | null;
+  subcounty: string | null;
+  ward: string | null;
+  location_address: string | null;
+  county?: CrmLookupItem | null;
+  lead?: { id: number; name?: string; lead_number?: string } | null;
+  contact?: { id: number; name?: string } | null;
+  fieldDay?: {
+    id: number;
+    field_officer_id: number;
+    field_date: string;
+    field_officer?: ApiUser | null;
+  } | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type ApiFieldDay = {

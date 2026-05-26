@@ -29,4 +29,14 @@ class FieldDayPolicy
     {
         return $this->canAny($user, ['field_day.create', 'crm.manage']);
     }
+
+    public function update(User $user, FieldDay $fieldDay): bool
+    {
+        if (! $this->create($user)) {
+            return false;
+        }
+
+        return $user->can('field_day.manage')
+            || $this->ownsRecord($user, $fieldDay, ['field_officer_id', 'created_by']);
+    }
 }

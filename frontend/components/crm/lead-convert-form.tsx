@@ -16,6 +16,7 @@ import { ApiError } from "@/lib/api/errors";
 import { Field, FormSection } from "@/components/crm/lead-form-ui";
 import { CrmRecordDetailShell } from "@/components/crm/crm-record-detail-shell";
 import { Spinner } from "@/components/ui/spinner";
+import { usePermissions } from "@/hooks/use-permissions";
 import { toast } from "sonner";
 
 function leadsBackHref(view: string | null, leadId: string) {
@@ -37,6 +38,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
+  const { can } = usePermissions();
   const { card: lead, loading, error } = useCrmLead(leadId);
   const [form, setForm] = useState<ConvertForm | null>(null);
   const [converting, setConverting] = useState(false);
@@ -67,6 +69,19 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
     return (
       <div className="py-12 text-center text-sm text-muted-foreground">
         {error ?? "Lead not found."}
+      </div>
+    );
+  }
+
+  if (!can("leads.convert")) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        You do not have permission to convert leads.
+        <div className="mt-4">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={leadsBackHref(view, leadId)}>Back to lead</Link>
+          </Button>
+        </div>
       </div>
     );
   }

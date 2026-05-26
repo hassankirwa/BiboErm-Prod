@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Enums\Crm\LeadStatus;
+use App\Support\Crm\LeadAccountEligibility;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Lead extends Model
@@ -23,7 +25,7 @@ class Lead extends Model
         'website', 'kra_pin', 'billing_address',
         'product_interests', 'requirement_description', 'property_site_type',
         'estimated_scope', 'estimated_budget', 'estimated_value', 'expected_timeline', 'urgency',
-        'site_name', 'site_address', 'county_id', 'area_estate', 'latitude', 'longitude',
+        'site_name', 'site_address', 'county_id', 'subcounty', 'ward', 'area_estate', 'latitude', 'longitude',
         'landmark', 'site_contact_name', 'site_contact_phone',
         'has_budget', 'decision_maker_identified', 'has_existing_supplier',
         'need_site_visit', 'expected_decision_date', 'lead_quality_score', 'qualification_notes',
@@ -71,6 +73,16 @@ class Lead extends Model
         return $this->belongsTo(User::class, 'assigned_field_officer_id');
     }
 
+    public function leadSource(): BelongsTo
+    {
+        return $this->belongsTo(LeadSource::class, 'lead_source_id');
+    }
+
+    public function sourceContact(): HasOne
+    {
+        return $this->hasOne(Contact::class, 'source_lead_id');
+    }
+
     public function convertedContact(): BelongsTo
     {
         return $this->belongsTo(Contact::class, 'converted_contact_id');
@@ -101,9 +113,14 @@ class Lead extends Model
         return $this->hasMany(LeadAttachment::class);
     }
 
+    public function isQualifiedForAccount(): bool
+    {
+        return LeadAccountEligibility::isQualifiedForAccount($this);
+    }
+
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->can('leads.view_all') || $user->can('crm.manage')) {
+        if ($user->can('leads.view_all')) {
             return $query;
         }
 

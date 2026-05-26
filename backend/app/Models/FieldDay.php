@@ -19,6 +19,31 @@ class FieldDay extends Model
         ];
     }
 
+    public static function findOrCreateForOfficer(string $date, int $officerId, int $createdBy, ?string $notes = null): array
+    {
+        $fieldDay = static::query()
+            ->whereDate('field_date', $date)
+            ->where('field_officer_id', $officerId)
+            ->first();
+
+        if ($fieldDay) {
+            if ($notes !== null && $fieldDay->notes !== $notes) {
+                $fieldDay->update(['notes' => $notes]);
+            }
+
+            return [$fieldDay, false];
+        }
+
+        $fieldDay = static::query()->create([
+            'field_date' => $date,
+            'field_officer_id' => $officerId,
+            'created_by' => $createdBy,
+            'notes' => $notes,
+        ]);
+
+        return [$fieldDay, true];
+    }
+
     public function fieldOfficer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'field_officer_id');

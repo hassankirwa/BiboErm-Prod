@@ -21,9 +21,9 @@ function ChartCardMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem>Export</DropdownMenuItem>
-        <DropdownMenuItem>Refresh</DropdownMenuItem>
-        <DropdownMenuItem>Configure</DropdownMenuItem>
+        <DropdownMenuItem disabled>Export (coming soon)</DropdownMenuItem>
+        <DropdownMenuItem disabled>Refresh (use dashboard refresh)</DropdownMenuItem>
+        <DropdownMenuItem disabled>Configure (coming soon)</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -57,14 +57,17 @@ function ChartCardShell({
 }
 
 export function LeadGenerationTargetChart({
-  current = 350,
-  target = 1000,
+  title = "Leads This Period",
+  current = 0,
+  target = 1,
 }: {
+  title?: string;
   current?: number;
   target?: number;
 }) {
-  const pct = Math.round((current / target) * 100);
-  const remaining = target - current;
+  const safeTarget = Math.max(target, 1);
+  const pct = Math.min(100, Math.round((current / safeTarget) * 100));
+  const remaining = Math.max(0, target - current);
   const radius = 90;
   const stroke = 16;
   const cx = 110;
@@ -73,7 +76,7 @@ export function LeadGenerationTargetChart({
   const dash = (pct / 100) * arcLen;
 
   return (
-    <ChartCardShell title="Lead Generation Target — This Year">
+    <ChartCardShell title={title}>
       <div className="flex flex-col items-center px-4 pb-5 pt-1">
         <svg
           viewBox="0 0 220 130"
@@ -157,9 +160,7 @@ export function LeadGenerationTargetChart({
   );
 }
 
-const REVENUE_ACHIEVED = 420_000;
-const REVENUE_TARGET = 1_000_000;
-const REVENUE_MAX_SCALE = 1_200_000;
+const DEFAULT_REVENUE_MAX_SCALE = 1_200_000;
 
 const xAxisTicks = [
   { label: "0", value: 0 },
@@ -171,29 +172,37 @@ const xAxisTicks = [
   { label: "1.2M", value: 1_200_000 },
 ];
 
-function scalePct(value: number) {
-  return `${(value / REVENUE_MAX_SCALE) * 100}%`;
+function scalePct(value: number, maxScale: number) {
+  return `${(value / maxScale) * 100}%`;
 }
 
 export function RevenueTargetChart({
-  achieved = REVENUE_ACHIEVED,
-  target = REVENUE_TARGET,
+  title = "Won Revenue This Period",
+  achieved = 0,
+  target = 0,
 }: {
+  title?: string;
   achieved?: number;
   target?: number;
 }) {
+  const maxScale = Math.max(
+    DEFAULT_REVENUE_MAX_SCALE,
+    achieved,
+    target,
+    Math.ceil(Math.max(achieved, target, 1) / 200_000) * 200_000,
+  );
   const achievedPct = target > 0 ? Math.round((achieved / target) * 100) : 0;
-  const achievedWidth = scalePct(achieved);
-  const targetLineLeft = scalePct(target);
+  const achievedWidth = scalePct(achieved, maxScale);
+  const targetLineLeft = scalePct(target, maxScale);
 
   return (
-    <ChartCardShell title="Revenue Target — This Year">
+    <ChartCardShell title={title}>
       <div className="px-3 pb-4 pt-1 sm:px-4">
         <div className="flex gap-2 sm:gap-3">
           {/* Y-axis */}
           <div className="flex w-14 shrink-0 items-center justify-end pr-1 sm:w-16">
             <span className="text-[10px] font-medium text-neutral-600 sm:text-xs">
-              Entire Org
+              Won vs pipeline
             </span>
           </div>
 
@@ -242,7 +251,7 @@ export function RevenueTargetChart({
                 <span
                   key={tick.label}
                   className="absolute top-1 -translate-x-1/2 text-[9px] text-neutral-500 sm:text-[10px]"
-                  style={{ left: scalePct(tick.value) }}
+                  style={{ left: scalePct(tick.value, maxScale) }}
                 >
                   {tick.label}
                 </span>

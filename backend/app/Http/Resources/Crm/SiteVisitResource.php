@@ -42,6 +42,7 @@ class SiteVisitResource extends JsonResource
             'deal' => new DealResource($this->whenLoaded('deal')),
             'assigned_field_officer' => new UserResource($this->whenLoaded('assignedFieldOfficer')),
             'measurement_lines' => $this->whenLoaded('measurementLines'),
+            'photos' => SiteVisitPhotoResource::collection($this->whenLoaded('photos')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

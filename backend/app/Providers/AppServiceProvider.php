@@ -9,6 +9,7 @@ use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -31,6 +32,22 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(function (?User $user, string $ability): ?bool {
+            if (! $user instanceof User) {
+                return null;
+            }
+
+            if ($user->hasRole('super_admin')) {
+                return true;
+            }
+
+            $hasDepartmentSuperAdmin = $user->departmentRoles()
+                ->whereHas('role', fn ($query) => $query->where('name', 'super_admin'))
+                ->exists();
+
+            return $hasDepartmentSuperAdmin ? true : null;
+        });
+
         BiboStorage::ensureCategoryDirectoriesExist();
 
         RateLimiter::for('bibo-login', function (Request $request): Limit {

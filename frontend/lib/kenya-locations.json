@@ -1,0 +1,284 @@
+[
+  {
+    "slug": "mombasa",
+    "label": "Mombasa",
+    "center": { "lat": -4.0435, "lng": 39.6682 },
+    "subCounties": ["Changamwe", "Jomvu", "Kisauni", "Likoni", "Mvita", "Nyali"]
+  },
+  {
+    "slug": "kwale",
+    "label": "Kwale",
+    "center": { "lat": -4.1743, "lng": 39.4526 },
+    "subCounties": ["Kinango", "Lunga Lunga", "Matuga", "Msambweni"]
+  },
+  {
+    "slug": "kilifi",
+    "label": "Kilifi",
+    "center": { "lat": -3.5107, "lng": 39.9093 },
+    "subCounties": ["Ganze", "Kaloleni", "Kilifi North", "Kilifi South", "Magarini", "Malindi", "Rabai"]
+  },
+  {
+    "slug": "tana-river",
+    "label": "Tana River",
+    "center": { "lat": -1.4994, "lng": 40.0169 },
+    "subCounties": ["Bura", "Galole", "Garsen"]
+  },
+  {
+    "slug": "lamu",
+    "label": "Lamu",
+    "center": { "lat": -2.2719, "lng": 40.9020 },
+    "subCounties": ["Lamu East", "Lamu West"]
+  },
+  {
+    "slug": "taita-taveta",
+    "label": "Taita Taveta",
+    "center": { "lat": -3.3955, "lng": 38.3644 },
+    "subCounties": ["Mwatate", "Taveta", "Voi", "Wundanyi"]
+  },
+  {
+    "slug": "garissa",
+    "label": "Garissa",
+    "center": { "lat": -0.4532, "lng": 39.6461 },
+    "subCounties": ["Balambala", "Dadaab", "Fafi", "Garissa Township", "Hulugho", "Ijara", "Lagdera"]
+  },
+  {
+    "slug": "wajir",
+    "label": "Wajir",
+    "center": { "lat": 1.7471, "lng": 40.0573 },
+    "subCounties": ["Eldas", "Tarbaj", "Wajir East", "Wajir North", "Wajir South", "Wajir West"]
+  },
+  {
+    "slug": "mandera",
+    "label": "Mandera",
+    "center": { "lat": 3.9373, "lng": 41.8569 },
+    "subCounties": ["Banissa", "Lafey", "Mandera East", "Mandera North", "Mandera South", "Mandera West"]
+  },
+  {
+    "slug": "marsabit",
+    "label": "Marsabit",
+    "center": { "lat": 2.3344, "lng": 37.9909 },
+    "subCounties": ["Laisamis", "Moyale", "North Horr", "Saku"]
+  },
+  {
+    "slug": "isiolo",
+    "label": "Isiolo",
+    "center": { "lat": 0.3545, "lng": 37.5822 },
+    "subCounties": ["Garbatulla", "Isiolo", "Merti"]
+  },
+  {
+    "slug": "meru",
+    "label": "Meru",
+    "center": { "lat": 0.0469, "lng": 37.6559 },
+    "subCounties": ["Buuri", "Igembe Central", "Igembe North", "Igembe South", "Imenti Central", "Imenti North", "Imenti South", "Tigania East", "Tigania West"]
+  },
+  {
+    "slug": "tharaka-nithi",
+    "label": "Tharaka Nithi",
+    "center": { "lat": -0.3000, "lng": 37.6500 },
+    "subCounties": ["Chuka", "Igambang'ombe", "Maara", "Tharaka North", "Tharaka South"]
+  },
+  {
+    "slug": "embu",
+    "label": "Embu",
+    "center": { "lat": -0.5397, "lng": 37.4574 },
+    "subCounties": ["Manyatta", "Mbeere North", "Mbeere South", "Runyenjes"]
+  },
+  {
+    "slug": "kitui",
+    "label": "Kitui",
+    "center": { "lat": -1.3751, "lng": 38.0106 },
+    "subCounties": ["Ikutha", "Katulani", "Kisasi", "Kitui Central", "Kitui Rural", "Kitui West", "Lower Yatta", "Matinyani", "Mumoni", "Mutito", "Mutomo", "Mutonguni", "Mwingi Central", "Mwingi North", "Mwingi West", "Nzambani"]
+  },
+  {
+    "slug": "machakos",
+    "label": "Machakos",
+    "center": { "lat": -1.5177, "lng": 37.2634 },
+    "subCounties": ["Athi River", "Kalama", "Kangundo", "Kathiani", "Machakos Town", "Masinga", "Matungulu", "Mavoko", "Mwala", "Yatta"]
+  },
+  {
+    "slug": "makueni",
+    "label": "Makueni",
+    "center": { "lat": -1.8067, "lng": 37.6219 },
+    "subCounties": ["Kaiti", "Kibwezi East", "Kibwezi West", "Kilome", "Makueni", "Mbooni"]
+  },
+  {
+    "slug": "nyandarua",
+    "label": "Nyandarua",
+    "center": { "lat": -0.1800, "lng": 36.4500 },
+    "subCounties": ["Kinangop", "Kipipiri", "Ndaragwa", "Ol Jorok", "Ol Kalou"]
+  },
+  {
+    "slug": "nyeri",
+    "label": "Nyeri",
+    "center": { "lat": -0.4197, "lng": 36.9476 },
+    "subCounties": ["Kieni East", "Kieni West", "Mathira East", "Mathira West", "Mukurweini", "Nyeri Central", "Tetu"]
+  },
+  {
+    "slug": "kirinyaga",
+    "label": "Kirinyaga",
+    "center": { "lat": -0.6590, "lng": 37.1600 },
+    "subCounties": ["Gichugu", "Kirinyaga Central", "Kirinyaga East", "Kirinyaga West", "Mwea East", "Mwea West"]
+  },
+  {
+    "slug": "muranga",
+    "label": "Murang'a",
+    "center": { "lat": -0.7839, "lng": 37.0400 },
+    "subCounties": ["Gatanga", "Kahuro", "Kandara", "Kangema", "Kigumo", "Kiharu", "Mathioya", "Murang'a South"]
+  },
+  {
+    "slug": "kiambu",
+    "label": "Kiambu",
+    "center": { "lat": -1.1715, "lng": 36.8356 },
+    "subCounties": ["Gatundu North", "Gatundu South", "Githunguri", "Juja", "Kabete", "Kiambaa", "Kiambu Town", "Kikuyu", "Lari", "Limuru", "Ruiru", "Thika Town", "Westlands"]
+  },
+  {
+    "slug": "turkana",
+    "label": "Turkana",
+    "center": { "lat": 3.1190, "lng": 35.5970 },
+    "subCounties": ["Kibish", "Loima", "Turkana Central", "Turkana East", "Turkana North", "Turkana South", "Turkana West"]
+  },
+  {
+    "slug": "west-pokot",
+    "label": "West Pokot",
+    "center": { "lat": 1.6219, "lng": 35.1050 },
+    "subCounties": ["Central Pokot", "North Pokot", "Pokot South", "West Pokot"]
+  },
+  {
+    "slug": "samburu",
+    "label": "Samburu",
+    "center": { "lat": 1.2155, "lng": 36.7800 },
+    "subCounties": ["Samburu East", "Samburu North", "Samburu West"]
+  },
+  {
+    "slug": "trans-nzoia",
+    "label": "Trans Nzoia",
+    "center": { "lat": 1.0567, "lng": 34.9500 },
+    "subCounties": ["Cherangany", "Endebess", "Kiminini", "Kwanza", "Saboti"]
+  },
+  {
+    "slug": "uasin-gishu",
+    "label": "Uasin Gishu",
+    "center": { "lat": 0.5143, "lng": 35.2698 },
+    "subCounties": ["Ainabkoi", "Kapseret", "Kesses", "Moiben", "Soy", "Turbo"]
+  },
+  {
+    "slug": "elgeyo-marakwet",
+    "label": "Elgeyo Marakwet",
+    "center": { "lat": 0.5200, "lng": 35.7200 },
+    "subCounties": ["Keiyo North", "Keiyo South", "Marakwet East", "Marakwet West"]
+  },
+  {
+    "slug": "nandi",
+    "label": "Nandi",
+    "center": { "lat": 0.1833, "lng": 35.1333 },
+    "subCounties": ["Aldai", "Chesumei", "Emgwen", "Mosop", "Nandi Hills", "Tinderet"]
+  },
+  {
+    "slug": "baringo",
+    "label": "Baringo",
+    "center": { "lat": 0.4667, "lng": 35.9667 },
+    "subCounties": ["Baringo Central", "Baringo North", "Baringo South", "Eldama Ravine", "Mogotio", "Tiaty"]
+  },
+  {
+    "slug": "laikipia",
+    "label": "Laikipia",
+    "center": { "lat": 0.2036, "lng": 36.7800 },
+    "subCounties": ["Laikipia Central", "Laikipia East", "Laikipia North", "Laikipia West", "Nyahururu"]
+  },
+  {
+    "slug": "nakuru",
+    "label": "Nakuru",
+    "center": { "lat": -0.3031, "lng": 36.0800 },
+    "subCounties": ["Bahati", "Gilgil", "Kuresoi North", "Kuresoi South", "Molo", "Naivasha", "Nakuru East", "Nakuru West", "Njoro", "Rongai", "Subukia"]
+  },
+  {
+    "slug": "narok",
+    "label": "Narok",
+    "center": { "lat": -1.0833, "lng": 35.8667 },
+    "subCounties": ["Emurua Dikirr", "Kilgoris", "Narok East", "Narok North", "Narok South", "Narok West", "Transmara East", "Transmara West"]
+  },
+  {
+    "slug": "kajiado",
+    "label": "Kajiado",
+    "center": { "lat": -1.8524, "lng": 36.7769 },
+    "subCounties": ["Isinya", "Kajiado Central", "Kajiado East", "Kajiado North", "Kajiado South", "Loitokitok", "Mashuuru"]
+  },
+  {
+    "slug": "kericho",
+    "label": "Kericho",
+    "center": { "lat": -0.3677, "lng": 35.2831 },
+    "subCounties": ["Ainamoi", "Belgut", "Bureti", "Kipkelion East", "Kipkelion West", "Soin Sigowet"]
+  },
+  {
+    "slug": "bomet",
+    "label": "Bomet",
+    "center": { "lat": -0.7800, "lng": 35.3400 },
+    "subCounties": ["Bomet Central", "Bomet East", "Chepalungu", "Konoin", "Sotik"]
+  },
+  {
+    "slug": "kakamega",
+    "label": "Kakamega",
+    "center": { "lat": 0.2827, "lng": 34.7519 },
+    "subCounties": ["Butere", "Ikolomani", "Khwisero", "Lugari", "Lurambi", "Malava", "Matungu", "Mumias East", "Mumias West", "Navakholo", "Shinyalu"]
+  },
+  {
+    "slug": "vihiga",
+    "label": "Vihiga",
+    "center": { "lat": 0.0769, "lng": 34.7222 },
+    "subCounties": ["Emuhaya", "Hamisi", "Luanda", "Sabatia", "Vihiga"]
+  },
+  {
+    "slug": "bungoma",
+    "label": "Bungoma",
+    "center": { "lat": 0.5695, "lng": 34.5584 },
+    "subCounties": ["Bumula", "Kabuchai", "Kanduyi", "Kimilili", "Mt Elgon", "Sirisia", "Tongaren", "Webuye East", "Webuye West"]
+  },
+  {
+    "slug": "busia",
+    "label": "Busia",
+    "center": { "lat": 0.4600, "lng": 34.1100 },
+    "subCounties": ["Budalangi", "Butula", "Funyula", "Matayos", "Nambale", "Teso North", "Teso South"]
+  },
+  {
+    "slug": "siaya",
+    "label": "Siaya",
+    "center": { "lat": 0.0607, "lng": 34.2881 },
+    "subCounties": ["Alego Usonga", "Bondo", "Gem", "Rarieda", "Ugenya", "Ugunja"]
+  },
+  {
+    "slug": "kisumu",
+    "label": "Kisumu",
+    "center": { "lat": -0.0917, "lng": 34.7680 },
+    "subCounties": ["Kisumu Central", "Kisumu East", "Kisumu West", "Muhoroni", "Nyakach", "Nyando", "Seme"]
+  },
+  {
+    "slug": "homa-bay",
+    "label": "Homa Bay",
+    "center": { "lat": -0.5273, "lng": 34.4571 },
+    "subCounties": ["Homa Bay Town", "Kabondo Kasipul", "Karachuonyo", "Kasipul", "Mbita", "Ndhiwa", "Rangwe", "Suba North", "Suba South"]
+  },
+  {
+    "slug": "migori",
+    "label": "Migori",
+    "center": { "lat": -1.0634, "lng": 34.4731 },
+    "subCounties": ["Awendo", "Kuria East", "Kuria West", "Migori", "Nyatike", "Rongo", "Suna East", "Suna West", "Uriri"]
+  },
+  {
+    "slug": "kisii",
+    "label": "Kisii",
+    "center": { "lat": -0.6773, "lng": 34.7796 },
+    "subCounties": ["Bobasi", "Bonchari", "Bomachoge Borabu", "Bomachoge Chache", "Kitutu Chache North", "Kitutu Chache South", "Nyaribari Chache", "Nyaribari Masaba", "South Mugirango"]
+  },
+  {
+    "slug": "nyamira",
+    "label": "Nyamira",
+    "center": { "lat": -0.5633, "lng": 34.9358 },
+    "subCounties": ["Borabu", "Kitutu Masaba", "North Mugirango", "West Mugirango"]
+  },
+  {
+    "slug": "nairobi",
+    "label": "Nairobi",
+    "center": { "lat": -1.2864, "lng": 36.8172 },
+    "subCounties": ["Dagoretti North", "Dagoretti South", "Embakasi Central", "Embakasi East", "Embakasi North", "Embakasi South", "Embakasi West", "Kamukunji", "Kasarani", "Kibra", "Lang'ata", "Makadara", "Mathare", "Roysambu", "Ruaraka", "Starehe", "Westlands"]
+  }
+]

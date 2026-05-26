@@ -24,6 +24,14 @@ export type CreateQuotationPayload = {
   lines: QuotationLinePayload[];
 };
 
+export type UpdateQuotationPayload = {
+  valid_until?: string | null;
+  terms_conditions?: string | null;
+  discount_amount?: number;
+  tax_amount?: number;
+  lines?: QuotationLinePayload[];
+};
+
 function normalizeQuotation(res: ApiQuotation | { data: ApiQuotation }): ApiQuotation {
   return unwrapResource(res);
 }
@@ -45,6 +53,20 @@ export async function createQuotation(
 export async function fetchQuotation(id: number): Promise<ApiQuotation> {
   const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
     `/api/v1/crm/quotations/${id}`,
+  );
+  return normalizeQuotation(res);
+}
+
+export async function updateQuotation(
+  id: number,
+  payload: UpdateQuotationPayload,
+): Promise<ApiQuotation> {
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}`,
+    {
+      method: "PATCH",
+      json: payload,
+    },
   );
   return normalizeQuotation(res);
 }

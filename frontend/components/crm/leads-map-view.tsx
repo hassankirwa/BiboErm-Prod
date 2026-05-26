@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ExternalLink, MapPin } from "lucide-react";
+import { ExternalLink, MapPin, Search } from "lucide-react";
 import type { LeadViewMode } from "@/lib/leads-list-data";
 import { cn } from "@/lib/utils";
 import { getLeadsMapMarkers } from "@/lib/leads-map-data";
 import { apiCardsToMapMarkers } from "@/lib/crm-lead-mapper";
+import { Input } from "@/components/ui/input";
 
 const LeadsMap = dynamic(
   () => import("@/components/crm/leads-map").then((m) => m.LeadsMap),
@@ -30,10 +31,45 @@ export function LeadsMapView({
   returnView?: LeadViewMode;
   cards?: import("@/lib/leads-kanban-data").LeadKanbanCard[];
 }) {
-  const markers = cards
-    ? apiCardsToMapMarkers(cards)
-    : getLeadsMapMarkers();
+  const markers = cards ? apiCardsToMapMarkers(cards) : getLeadsMapMarkers();
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
+  const [leadFilter, setLeadFilter] = useState("");
+
+  const filteredMarkers = useMemo(() => {
+    const query = leadFilter.trim().toLowerCase();
+    if (!query) return markers;
+
+    return markers.filter((marker) => {
+      const haystack = [
+        marker.title,
+        marker.company,
+        marker.location,
+        marker.stage,
+        marker.owner,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [leadFilter, markers]);
+
+  if (markers.length === 0) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-[480px] flex-1 flex-col items-center justify-center rounded-lg border border-border bg-card px-6 py-16 text-center",
+          className,
+        )}
+      >
+        <MapPin className="mb-3 h-10 w-10 text-muted-foreground/40" />
+        <p className="text-sm font-medium text-foreground">No leads on the map</p>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Leads with location or coordinates from the API will appear here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -44,14 +80,14 @@ export function LeadsMapView({
     >
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div className="relative min-h-[min(70dvh,560px)] flex-1 lg:min-h-[calc(100dvh-11.5rem)]">
-          <LeadsMap focusedLeadId={focusedLeadId} />
+          <LeadsMap focusedLeadId={focusedLeadId} markers={markers} />
         </div>
         <aside className="flex w-full shrink-0 flex-col border-t border-border bg-card lg:w-80 lg:border-t-0 lg:border-l">
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold text-foreground">
-                {markers.length} leads on map
+                {filteredMarkers.length} of {markers.length} leads
               </h2>
             </div>
             {focusedLeadId && (
@@ -64,8 +100,24 @@ export function LeadsMapView({
               </button>
             )}
           </div>
+          <div className="border-b border-border px-3 py-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={leadFilter}
+                onChange={(event) => setLeadFilter(event.target.value)}
+                placeholder="Filter leads by name, company, location…"
+                className="h-9 pl-8"
+              />
+            </div>
+          </div>
           <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 lg:max-h-none">
-            {markers.map((marker) => {
+            {filteredMarkers.length === 0 ? (
+              <li className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                No leads match your filter.
+              </li>
+            ) : null}
+            {filteredMarkers.map((marker) => {
               const isActive = focusedLeadId === marker.id;
               return (
                 <li key={marker.id}>
@@ -120,7 +172,8 @@ export function LeadsMapView({
             })}
           </ul>
           <p className="shrink-0 border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
-            Click a lead to zoom in · Map data © OpenStreetMap
+            Search map to navigate · Filter sidebar to find leads · Map data ©
+            OpenStreetMap
           </p>
         </aside>
       </div>

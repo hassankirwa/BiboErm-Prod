@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { AccountsTable } from "@/components/crm/accounts-table";
+import { CreateAccountDialog } from "@/components/crm/create-account-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,10 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
+import { PermissionGate } from "@/components/auth/permission-gate";
 
 export default function AccountsPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
     <div className="flex h-full flex-col">
@@ -24,10 +30,16 @@ export default function AccountsPage() {
         title="Accounts"
         subtitle="Manage customer and partner accounts"
         actions={
-          <Button size="sm" className="h-8 gap-1.5">
-            <Plus className="h-4 w-4" />
-            Add Account
-          </Button>
+          <PermissionGate permission="accounts.create">
+            <Button
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Account
+            </Button>
+          </PermissionGate>
         }
       />
       <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -56,8 +68,17 @@ export default function AccountsPage() {
             </SelectContent>
           </Select>
         </div>
-        <AccountsTable search={search} status={status} />
+        <AccountsTable search={search} status={status} refreshKey={refreshKey} />
       </div>
+
+      <CreateAccountDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={(account) => {
+          setRefreshKey((k) => k + 1);
+          router.push(`/crm/accounts/${account.id}`);
+        }}
+      />
     </div>
   );
 }

@@ -11,9 +11,80 @@ export type CrmReport = {
   record_count?: number;
 };
 
+export type CrmReportDashboardKpis = {
+  total_leads: number;
+  open_leads: number;
+  converted_leads: number;
+  lead_conversion_rate: number;
+  open_deals: number;
+  deals_created: number;
+  pipeline_value: number;
+  won_deals: number;
+  lost_deals: number;
+  won_revenue: number;
+  win_rate: number;
+  avg_deal_size: number;
+  quotations_sent: number;
+  quotations_accepted: number;
+  activities_total: number;
+  activities_completed: number;
+  site_visits: number;
+  payments_received: number;
+};
+
+export type CrmReportDashboard = {
+  period: { from: string; to: string };
+  filters: { owner_id: number | null };
+  kpis: CrmReportDashboardKpis;
+  pipeline_by_stage: {
+    stage: string;
+    label: string;
+    count: number;
+    value: number;
+  }[];
+  leads_by_status: { status: string; label: string; count: number }[];
+  leads_by_source: { source: string; label: string; count: number }[];
+  activities_by_type: { type: string; label: string; count: number }[];
+  quotations_by_status: {
+    status: string;
+    label: string;
+    count: number;
+    value: number;
+  }[];
+  top_performers: {
+    owner_id: number | null;
+    name: string;
+    won_deals: number;
+    revenue: number;
+  }[];
+};
+
+export type CrmReportDashboardParams = {
+  from?: string;
+  to?: string;
+  owner_id?: string;
+};
+
 export async function fetchCrmReports(): Promise<CrmReport[]> {
   const res = await apiFetch<{ data: CrmReport[] }>("/api/v1/crm/reports");
   return res.data ?? [];
+}
+
+export async function fetchCrmReportsDashboard(
+  params: CrmReportDashboardParams = {},
+): Promise<CrmReportDashboard> {
+  const search = new URLSearchParams();
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  if (params.owner_id) search.set("owner_id", params.owner_id);
+
+  const query = search.toString();
+  const path = query
+    ? `/api/v1/crm/reports/dashboard?${query}`
+    : "/api/v1/crm/reports/dashboard";
+
+  const res = await apiFetch<{ data: CrmReportDashboard }>(path);
+  return res.data;
 }
 
 export async function downloadCrmReportExport(reportId: string): Promise<void> {

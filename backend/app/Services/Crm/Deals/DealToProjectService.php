@@ -35,6 +35,12 @@ class DealToProjectService
             ]);
         }
 
+        if (! $deal->account_id) {
+            throw ValidationException::withMessages([
+                'account_id' => ['Deal must be linked to an account before creating a project.'],
+            ]);
+        }
+
         return DB::transaction(function () use ($deal, $user) {
             $project = Project::query()->create([
                 'reference' => 'PR-'.strtoupper(Str::random(8)),

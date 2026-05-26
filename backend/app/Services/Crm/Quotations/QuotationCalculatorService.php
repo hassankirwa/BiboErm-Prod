@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class QuotationCalculatorService
 {
@@ -124,5 +125,67 @@ class QuotationCalculatorService
         ]);
 
         return $quotation->fresh()->load(['lines', 'deal']);
+    }
+
+    public function updateDraft(Quotation $quotation, array $data): Quotation
+    {
+        $status = $quotation->status instanceof QuotationStatus
+            ? $quotation->status
+            : QuotationStatus::tryFrom((string) $quotation->status);
+
+        if ($status !== QuotationStatus::Draft) {
+            throw ValidationException::withMessages([
+                'status' => ['Only draft quotations can be updated.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($quotation, $data) {
+            if (array_key_exists('lines', $data)) {
+                $quotation->lines()->delete();
+                $subtotal = 0;
+
+                foreach ($data['lines'] as $index => $line) {
+                    $lineTotal = ($line['quantity'] ?? 1) * ($line['unit_price'] ?? 0);
+                    $subtotal += $lineTotal;
+
+                    QuotationLine::query()->create([
+                        'quotation_id' => $quotation->id,
+                        'description' => $line['description'],
+                        'quantity' => $line['quantity'],
+                        'unit_price' => $line['unit_price'],
+                        'line_total' => $lineTotal,
+                        'measurement_line_id' => $line['measurement_line_id'] ?? null,
+                        'sort_order' => $line['sort_order'] ?? $index,
+                    ]);
+                }
+
+                $discount = (float) ($data['discount_amount'] ?? $quotation->discount_amount ?? 0);
+                $tax = (float) ($data['tax_amount'] ?? $quotation->tax_amount ?? 0);
+                $total = $subtotal - $discount + $tax;
+
+                $quotation->update([
+                    'subtotal' => $subtotal,
+                    'discount_amount' => $discount,
+                    'tax_amount' => $tax,
+                    'total_amount' => $total,
+                ]);
+
+                $quotation->deal?->update(['quotation_amount' => $total]);
+            }
+
+            $headerUpdates = [];
+
+            foreach (['valid_until', 'terms_conditions', 'discount_amount', 'tax_amount'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $headerUpdates[$field] = $data[$field];
+                }
+            }
+
+            if ($headerUpdates !== []) {
+                $quotation->update($headerUpdates);
+            }
+
+            return $quotation->fresh()->load(['lines', 'deal', 'account', 'contact']);
+        });
     }
 }

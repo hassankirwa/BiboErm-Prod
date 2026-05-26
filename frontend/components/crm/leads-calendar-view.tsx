@@ -34,7 +34,6 @@ import {
   HOUR_SLOTS,
   WEEKDAY_LABELS,
   eventTypeStyles,
-  leadCalendarEvents,
   type LeadCalendarEvent,
 } from "@/lib/leads-calendar-data";
 import { apiCardsToCalendarEvents } from "@/lib/crm-lead-mapper";
@@ -109,9 +108,10 @@ export function LeadsCalendarView({
   const [currentDate, setCurrentDate] = useState(() => new Date());
 
   const events = useMemo(
-    () => (cards ? apiCardsToCalendarEvents(cards) : leadCalendarEvents),
+    () => (cards ? apiCardsToCalendarEvents(cards) : []),
     [cards],
   );
+  const showEmptyHint = events.length === 0;
 
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
@@ -155,6 +155,11 @@ export function LeadsCalendarView({
 
   return (
     <div className="flex min-w-0 flex-col rounded-lg border border-border bg-card">
+      {showEmptyHint && (
+        <div className="border-b border-border bg-muted/30 px-4 py-3 text-center text-sm text-muted-foreground">
+          No lead activities to show. Load leads from the API or switch to another view.
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b border-border p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div className="flex items-center gap-2">

@@ -39,6 +39,17 @@ return [
                 'image_only' => false,
                 'permissions' => ['leads.view', 'leads.create'],
             ],
+            'crm-attachments' => [
+                'public' => false,
+                'max_kb' => (int) env('BIBO_CRM_ATTACHMENT_MAX_KB', 10240),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp', 'pdf'],
+                'image_only' => false,
+                'permissions' => [
+                    'leads.view', 'leads.create', 'leads.update',
+                    'site_visits.view', 'site_visits.execute',
+                    'deal_payments.record',
+                ],
+            ],
         ],
     ],
 

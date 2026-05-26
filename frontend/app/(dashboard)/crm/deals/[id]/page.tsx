@@ -46,15 +46,18 @@ import {
   Send,
   ExternalLink,
   MapPin,
+  Pencil,
 } from "lucide-react";
 import {
   BIBO_DEAL_STAGES,
   createProjectFromDeal,
   dealValue,
   fetchDeal,
+  fetchDealPayments,
   markDealLost,
   markDealWon,
   recordPayment,
+  updateDeal,
   updateDealStage,
   type ApiDeal,
 } from "@/lib/api/crm/deals";
@@ -71,6 +74,10 @@ import type { ApiDealPayment } from "@/lib/api/crm/types";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { AccountPicker } from "@/components/crm/account-picker";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -117,6 +124,8 @@ export default function DealDetailPage({
   const { id } = use(params);
   const dealId = Number(id);
   const router = useRouter();
+  const { roles } = useAuth();
+  const canOverrideDeposit = roles.includes("super_admin");
 
   const [deal, setDeal] = useState<ApiDeal | null>(null);
   const [quotations, setQuotations] = useState<ApiQuotation[]>([]);
@@ -129,6 +138,8 @@ export default function DealDetailPage({
   const [quotationDialogOpen, setQuotationDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
+  const [wonDialogOpen, setWonDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const [fieldOfficers, setFieldOfficers] = useState<
     { id: number; name: string }[]
@@ -158,8 +169,20 @@ export default function DealDetailPage({
     payment_method: "bank_transfer",
     notes: "",
   });
+  const [proofFile, setProofFile] = useState<File | null>(null);
 
   const [lossNotes, setLossNotes] = useState("");
+  const [overrideDeposit, setOverrideDeposit] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: "",
+    estimated_value: "",
+    expected_close_date: "",
+    site_address: "",
+    requirement_summary: "",
+    account_id: "",
+  });
+  const [editAccountLabel, setEditAccountLabel] = useState<string | null>(null);
 
   const latestQuotation = useMemo(
     () => (quotations.length > 0 ? quotations[quotations.length - 1] : null),
@@ -174,12 +197,30 @@ export default function DealDetailPage({
       setDeal(data);
       setQuotations(data.quotations ?? []);
       setPayments(data.payments ?? []);
+      setEditForm({
+        name: data.name ?? data.title ?? "",
+        estimated_value: String(dealValue(data) || ""),
+        expected_close_date: data.expected_close_date?.slice(0, 10) ?? "",
+        site_address: data.site_address ?? "",
+        requirement_summary: data.requirement_summary ?? "",
+        account_id: data.account_id ? String(data.account_id) : "",
+      });
+      setEditAccountLabel(data.account?.name ?? null);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Failed to load deal.",
       );
     } finally {
       setIsLoading(false);
+    }
+  }, [dealId]);
+
+  const refreshPayments = useCallback(async () => {
+    try {
+      const list = await fetchDealPayments(dealId);
+      setPayments(list);
+    } catch {
+      /* keep embedded payments from fetchDeal */
     }
   }, [dealId]);
 
@@ -293,24 +334,47 @@ export default function DealDetailPage({
         payment_status: "confirmed",
         quotation_id: latestQuotation?.id,
         notes: paymentForm.notes || undefined,
+        proof_file: proofFile ?? undefined,
       });
       setDeal(result.data.deal);
-      if (result.data.payment && typeof result.data.payment === "object") {
-        setPayments((prev) => [
-          ...prev,
-          result.data.payment as ApiDealPayment,
-        ]);
-      }
+      await refreshPayments();
       setPaymentDialogOpen(false);
+      setProofFile(null);
       toast.success("Payment recorded.");
     });
   }
 
   async function handleMarkWon() {
     await runAction("mark-won", async () => {
-      const updated = await markDealWon(dealId);
+      const updated = await markDealWon(dealId, {
+        override_deposit: overrideDeposit || undefined,
+      });
       setDeal(updated);
+      setWonDialogOpen(false);
+      setOverrideDeposit(false);
       toast.success("Deal marked as won.");
+    });
+  }
+
+  async function handleUpdateDeal() {
+    if (!editForm.account_id) {
+      toast.error("Please select an account for this deal.");
+      return;
+    }
+    await runAction("update-deal", async () => {
+      const updated = await updateDeal(dealId, {
+        name: editForm.name.trim() || undefined,
+        account_id: Number(editForm.account_id),
+        estimated_value: editForm.estimated_value
+          ? Number(editForm.estimated_value)
+          : undefined,
+        expected_close_date: editForm.expected_close_date || undefined,
+        site_address: editForm.site_address.trim() || undefined,
+        requirement_summary: editForm.requirement_summary.trim() || undefined,
+      });
+      setDeal(updated);
+      setEditDialogOpen(false);
+      toast.success("Deal updated.");
     });
   }
 
@@ -341,22 +405,31 @@ export default function DealDetailPage({
       onClick: () => void,
       variant: "default" | "outline" | "secondary" | "destructive" = "default",
       icon?: React.ReactNode,
-    ) => (
-      <Button
-        key={key}
-        size="sm"
-        variant={variant}
-        disabled={!!actionLoading}
-        onClick={onClick}
-      >
-        {actionLoading === key ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          icon
-        )}
-        {label}
-      </Button>
-    );
+      permission?: string,
+    ) => {
+      const button = (
+        <Button
+          key={key}
+          size="sm"
+          variant={variant}
+          disabled={!!actionLoading}
+          onClick={onClick}
+        >
+          {actionLoading === key ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            icon
+          )}
+          {label}
+        </Button>
+      );
+      if (!permission) return button;
+      return (
+        <PermissionGate key={key} permission={permission}>
+          {button}
+        </PermissionGate>
+      );
+    };
 
     switch (stage) {
       case "new_deal":
@@ -415,6 +488,7 @@ export default function DealDetailPage({
               () => setLostDialogOpen(true),
               "destructive",
               <XCircle className="mr-2 h-4 w-4" />,
+              "deals.mark_lost",
             )}
           </>
         );
@@ -440,14 +514,16 @@ export default function DealDetailPage({
           () => setPaymentDialogOpen(true),
           "default",
           <Banknote className="mr-2 h-4 w-4" />,
+          "deal_payments.record",
         );
       case "deposit_recorded":
         return btn(
           "won",
           "Mark Won",
-          handleMarkWon,
+          () => setWonDialogOpen(true),
           "default",
           <Trophy className="mr-2 h-4 w-4" />,
+          "deals.mark_won",
         );
       case "won":
         return deal.project_id ? (
@@ -464,6 +540,7 @@ export default function DealDetailPage({
             handleCreateProject,
             "default",
             <FolderKanban className="mr-2 h-4 w-4" />,
+            "deals.create_project",
           )
         );
       case "project_created":
@@ -482,6 +559,7 @@ export default function DealDetailPage({
           () => setLostDialogOpen(true),
           "outline",
           <XCircle className="mr-2 h-4 w-4" />,
+          "deals.mark_lost",
         );
     }
   }
@@ -536,6 +614,16 @@ export default function DealDetailPage({
                 Back
               </Link>
             </Button>
+            <PermissionGate permission="deals.update">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditDialogOpen(true)}
+              >
+                <Pencil className="mr-1 h-4 w-4" />
+                Edit
+              </Button>
+            </PermissionGate>
           </div>
         }
       />
@@ -578,7 +666,15 @@ export default function DealDetailPage({
               {deal.account && (
                 <>
                   <Separator />
-                  <p className="font-medium">{deal.account.name}</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account</p>
+                    <Link
+                      href={`/crm/accounts?search=${encodeURIComponent(deal.account.name)}`}
+                      className="font-medium hover:underline"
+                    >
+                      {deal.account.name}
+                    </Link>
+                  </div>
                 </>
               )}
               {deal.site_address && (
@@ -962,6 +1058,30 @@ export default function DealDetailPage({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="pay-proof">Payment proof (optional)</Label>
+              <Input
+                id="pay-proof"
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                onChange={(e) =>
+                  setProofFile(e.target.files?.[0] ?? null)
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                JPG, PNG, WebP, or PDF up to 10 MB
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pay-notes">Notes</Label>
+              <Textarea
+                id="pay-notes"
+                value={paymentForm.notes}
+                onChange={(e) =>
+                  setPaymentForm((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -993,6 +1113,148 @@ export default function DealDetailPage({
           <DialogFooter>
             <Button variant="destructive" onClick={handleMarkLost}>
               Mark Lost
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={wonDialogOpen} onOpenChange={setWonDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Deal Won</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirm this deal is won. Deposit recorded:{" "}
+            {formatCurrency(deal.deposit_paid_amount)}
+            {deal.deposit_required_amount
+              ? ` of ${formatCurrency(deal.deposit_required_amount)} required`
+              : ""}
+            .
+          </p>
+          {canOverrideDeposit && (
+            <div className="flex items-start gap-2 rounded-md border border-border p-3">
+              <Checkbox
+                id="override-deposit"
+                checked={overrideDeposit}
+                onCheckedChange={(c) => setOverrideDeposit(!!c)}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="override-deposit" className="font-medium">
+                  Override deposit requirement
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Super admin only — mark won even if deposit threshold is not met.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWonDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMarkWon} disabled={!!actionLoading}>
+              Mark Won
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Deal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Account *</Label>
+              <AccountPicker
+                required
+                value={editForm.account_id ? Number(editForm.account_id) : null}
+                displayLabel={editAccountLabel}
+                onSelect={(account) => {
+                  setEditForm((f) => ({ ...f, account_id: String(account.id) }));
+                  setEditAccountLabel(account.name);
+                }}
+                onClear={() => {
+                  setEditForm((f) => ({ ...f, account_id: "" }));
+                  setEditAccountLabel(null);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Deal name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-value">Estimated value (KES)</Label>
+                <Input
+                  id="edit-value"
+                  type="number"
+                  min={0}
+                  value={editForm.estimated_value}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      estimated_value: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-close">Expected close</Label>
+                <Input
+                  id="edit-close"
+                  type="date"
+                  value={editForm.expected_close_date}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      expected_close_date: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-site">Site address</Label>
+              <Input
+                id="edit-site"
+                value={editForm.site_address}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, site_address: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-req">Requirement summary</Label>
+              <Textarea
+                id="edit-req"
+                value={editForm.requirement_summary}
+                onChange={(e) =>
+                  setEditForm((f) => ({
+                    ...f,
+                    requirement_summary: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateDeal}
+              disabled={!!actionLoading || !editForm.account_id}
+            >
+              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>

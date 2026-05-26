@@ -26,6 +26,22 @@ export type SubmitSiteVisitPayload = {
   field_officer_notes?: string;
 };
 
+export type SiteVisitMeasurementLine = {
+  room_area_name: string;
+  width?: number;
+  height?: number;
+  quantity?: number;
+  material_preference?: string;
+  installation_notes?: string;
+  obstacles_notes?: string;
+  client_comments?: string;
+  sort_order?: number;
+};
+
+export type SubmitSiteVisitMeasurementsPayload = {
+  lines: SiteVisitMeasurementLine[];
+};
+
 function buildQuery(params?: Record<string, string | number | undefined>): string {
   const qs = new URLSearchParams();
   Object.entries(params ?? {}).forEach(([key, value]) => {
@@ -52,6 +68,16 @@ export async function fetchTodaySiteVisits(): Promise<{ data: ApiSiteVisit[] }> 
   return apiFetch<{ data: ApiSiteVisit[] }>("/api/v1/crm/site-visits/today");
 }
 
+export async function fetchSiteVisit(id: number): Promise<ApiSiteVisit> {
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}`,
+  );
+  if (res && typeof res === "object" && "data" in res && res.data) {
+    return res.data;
+  }
+  return res as ApiSiteVisit;
+}
+
 export async function scheduleSiteVisit(
   payload: ScheduleSiteVisitPayload,
 ): Promise<ApiSiteVisit> {
@@ -68,6 +94,16 @@ export async function startSiteVisit(
   return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/start`, {
     method: "POST",
     json: payload ?? {},
+  });
+}
+
+export async function submitSiteVisitMeasurements(
+  id: number,
+  payload: SubmitSiteVisitMeasurementsPayload,
+): Promise<ApiSiteVisit> {
+  return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/measurements`, {
+    method: "POST",
+    json: payload,
   });
 }
 
@@ -94,7 +130,7 @@ export async function uploadSiteVisitPhoto(
   caption?: string,
 ): Promise<unknown> {
   const form = new FormData();
-  form.append("photo", file);
+  form.append("file", file);
   if (caption) form.append("caption", caption);
 
   return apiFetch(`/api/v1/crm/site-visits/${visitId}/photos`, {

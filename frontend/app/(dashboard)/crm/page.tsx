@@ -1,6 +1,7 @@
 import { CrmPageBackground } from "@/components/crm/crm-page-background";
 import { CrmHomeStats } from "@/components/crm/crm-home-stats";
 import { CrmHomeTables } from "@/components/crm/crm-home-tables";
+import { CrmHomeQuickActions } from "@/components/crm/crm-home-quick-actions";
 
 export default function CrmHomePage() {
   return (
@@ -10,13 +11,16 @@ export default function CrmHomePage() {
 
         <div className="relative z-10 w-full min-w-0">
           <div className="w-full min-w-0 space-y-4 px-3 py-4 pb-6 sm:space-y-5 sm:px-4 sm:py-5 md:px-6 lg:px-8 lg:py-6">
-            <div className="space-y-1">
-              <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-                Welcome, Sales Team 👋
-              </h1>
-              <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-                Here&apos;s a quick overview of your CRM activity today.
-              </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  Welcome, Sales Team 👋
+                </h1>
+                <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+                  Here&apos;s a quick overview of your CRM activity today.
+                </p>
+              </div>
+              <CrmHomeQuickActions />
             </div>
 
             <CrmHomeStats />

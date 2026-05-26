@@ -23,7 +23,7 @@ class StoreLeadAttachmentController extends Controller
             'file' => ['required', 'file', 'max:10240'],
         ]);
 
-        $stored = $this->storage->store($validated['file'], 'leads/'.$lead->id);
+        $stored = $this->storage->store($validated['file'], 'lead-'.$lead->id);
 
         $attachment = LeadAttachment::query()->create([
             'lead_id' => $lead->id,

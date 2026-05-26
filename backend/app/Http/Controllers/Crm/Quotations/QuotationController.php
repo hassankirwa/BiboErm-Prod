@@ -46,4 +46,26 @@ class QuotationController extends Controller
             $quotation->load(['lines', 'deal', 'account', 'contact', 'preparedBy'])
         );
     }
+
+    public function update(Request $request, Quotation $quotation): QuotationResource
+    {
+        $this->authorize('create', Quotation::class);
+
+        $validated = $request->validate([
+            'valid_until' => ['sometimes', 'nullable', 'date'],
+            'terms_conditions' => ['sometimes', 'nullable', 'string'],
+            'discount_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'tax_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'lines' => ['sometimes', 'array', 'min:1'],
+            'lines.*.description' => ['required_with:lines', 'string', 'max:255'],
+            'lines.*.quantity' => ['required_with:lines', 'numeric', 'min:0.01'],
+            'lines.*.unit_price' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.measurement_line_id' => ['nullable', 'exists:measurement_lines,id'],
+            'lines.*.sort_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $updated = $this->quotationService->updateDraft($quotation, $validated);
+
+        return new QuotationResource($updated);
+    }
 }

@@ -7,12 +7,37 @@ use App\Models\Account;
 use App\Models\CrmActivity;
 use App\Models\Deal;
 use App\Models\Lead;
+use App\Services\Crm\Reports\CrmSalesReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrmReportController extends Controller
 {
+    public function __construct(
+        private readonly CrmSalesReportService $salesReportService,
+    ) {}
+
+    public function dashboard(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Lead::class);
+
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        return response()->json([
+            'data' => $this->salesReportService->dashboard(
+                $request->user(),
+                $validated['from'] ?? null,
+                $validated['to'] ?? null,
+                isset($validated['owner_id']) ? (int) $validated['owner_id'] : null,
+            ),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Lead::class);

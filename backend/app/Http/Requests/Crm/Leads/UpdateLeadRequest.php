@@ -55,6 +55,8 @@ class UpdateLeadRequest extends FormRequest
             'site_name' => ['nullable', 'string', 'max:255'],
             'site_address' => ['nullable', 'string'],
             'county_id' => ['nullable', 'exists:crm_counties,id'],
+            'subcounty' => ['nullable', 'string', 'max:100'],
+            'ward' => ['nullable', 'string', 'max:100'],
             'area_estate' => ['nullable', 'string', 'max:100'],
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],

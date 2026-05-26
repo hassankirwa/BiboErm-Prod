@@ -27,7 +27,7 @@ class CrmSeeder extends Seeder
         $leads = [
             [
                 'reference' => 'LD-DEMO001',
-                'lead_number' => 'LD-2026-0001',
+                'lead_number' => 'LD-DEMO001',
                 'name' => 'James Kariuki',
                 'first_name' => 'James',
                 'last_name' => 'Kariuki',
@@ -52,7 +52,7 @@ class CrmSeeder extends Seeder
             ],
             [
                 'reference' => 'LD-DEMO002',
-                'lead_number' => 'LD-2026-0002',
+                'lead_number' => 'LD-DEMO002',
                 'name' => 'Mary Wanjiku',
                 'first_name' => 'Mary',
                 'last_name' => 'Wanjiku',
@@ -91,7 +91,7 @@ class CrmSeeder extends Seeder
 
         if ($qualifiedLead && $salesRep) {
             $account = Account::query()->updateOrCreate(
-                ['account_number' => 'AC-2026-0001'],
+                ['account_number' => 'AC-DEMO001'],
                 [
                     'name' => 'Westlands Apartments Ltd',
                     'industry' => 'Real Estate',
@@ -106,7 +106,7 @@ class CrmSeeder extends Seeder
             );
 
             $contact = Contact::query()->updateOrCreate(
-                ['contact_number' => 'CT-2026-0001'],
+                ['contact_number' => 'CT-DEMO001'],
                 [
                     'name' => 'James Kariuki',
                     'first_name' => 'James',
@@ -127,7 +127,7 @@ class CrmSeeder extends Seeder
             Deal::query()->updateOrCreate(
                 ['reference' => 'DL-DEMO001'],
                 [
-                    'deal_number' => 'DL-2026-0001',
+                    'deal_number' => 'DL-DEMO001',
                     'title' => 'Westlands Apartments Roller Blinds',
                     'name' => 'Westlands Apartments Roller Blinds',
                     'account_id' => $account->id,

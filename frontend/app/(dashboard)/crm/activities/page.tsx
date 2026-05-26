@@ -39,7 +39,18 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Spinner } from "@/components/ui/spinner";
-import { fetchActivities, type ApiActivity } from "@/lib/api/crm/activities";
+import { fetchActivities, createActivity, completeActivity, type ApiActivity } from "@/lib/api/crm/activities";
+import { ensureCsrfCookie } from "@/lib/api/client";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { contactDisplayName } from "@/lib/api/crm/contacts";
 import { getUserInitials } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/errors";
@@ -88,6 +99,73 @@ export default function ActivitiesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [logOpen, setLogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [logForm, setLogForm] = useState({
+    subject: "",
+    description: "",
+    activity_type: "task",
+    due_at: new Date().toISOString().slice(0, 10),
+  });
+
+  const reloadActivities = () => {
+    setIsLoading(true);
+    setError(null);
+    fetchActivities({ per_page: 200 })
+      .then((response) => setActivities(response.data))
+      .catch((err) => {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to load activities.",
+        );
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  async function handleLogActivity(e: React.FormEvent) {
+    e.preventDefault();
+    if (!logForm.subject.trim()) return;
+    setSaving(true);
+    try {
+      await ensureCsrfCookie();
+      await createActivity({
+        subject: logForm.subject.trim(),
+        description: logForm.description.trim() || undefined,
+        activity_type: logForm.activity_type,
+        type: logForm.activity_type,
+        due_at: logForm.due_at ? `${logForm.due_at}T12:00:00` : undefined,
+      });
+      toast.success("Activity logged.");
+      setLogOpen(false);
+      setLogForm({
+        subject: "",
+        description: "",
+        activity_type: "task",
+        due_at: new Date().toISOString().slice(0, 10),
+      });
+      reloadActivities();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to log activity.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleComplete(activityId: number) {
+    try {
+      await ensureCsrfCookie();
+      await completeActivity(activityId);
+      toast.success("Activity marked complete.");
+      reloadActivities();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to complete activity.",
+      );
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -156,7 +234,7 @@ export default function ActivitiesPage() {
             Track calls, meetings, emails and tasks
           </p>
         </div>
-        <Button className="rounded-[5px]">
+        <Button className="rounded-[5px]" onClick={() => setLogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Log Activity
         </Button>
@@ -346,7 +424,12 @@ export default function ActivitiesPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>View Details</DropdownMenuItem>
                             <DropdownMenuItem>Edit Activity</DropdownMenuItem>
-                            <DropdownMenuItem>Mark Complete</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleComplete(activity.id)}
+                              disabled={activity.status === "completed"}
+                            >
+                              Mark Complete
+                            </DropdownMenuItem>
                             <DropdownMenuItem>Reschedule</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -359,6 +442,76 @@ export default function ActivitiesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={logOpen} onOpenChange={setLogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log Activity</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleLogActivity} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="activity-subject">Subject *</Label>
+              <Input
+                id="activity-subject"
+                value={logForm.subject}
+                onChange={(e) =>
+                  setLogForm((f) => ({ ...f, subject: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="activity-type">Type</Label>
+              <Select
+                value={logForm.activity_type}
+                onValueChange={(v) =>
+                  setLogForm((f) => ({ ...f, activity_type: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Call</SelectItem>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="task">Task</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="activity-due">Due date</Label>
+              <Input
+                id="activity-due"
+                type="date"
+                value={logForm.due_at}
+                onChange={(e) =>
+                  setLogForm((f) => ({ ...f, due_at: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="activity-description">Description</Label>
+              <Textarea
+                id="activity-description"
+                value={logForm.description}
+                onChange={(e) =>
+                  setLogForm((f) => ({ ...f, description: e.target.value }))
+                }
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setLogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Log activity"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

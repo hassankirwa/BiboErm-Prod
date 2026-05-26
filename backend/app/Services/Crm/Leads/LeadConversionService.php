@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Lead;
+use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -61,22 +62,32 @@ class LeadConversionService
             }
 
             if ($data['create_contact'] ?? true) {
-                $contact = Contact::query()->create([
-                    'contact_number' => 'CT-'.strtoupper(Str::random(8)),
-                    'name' => $lead->contact_person_name ?? $lead->name,
-                    'first_name' => $lead->first_name ?? explode(' ', $lead->name ?? '')[0] ?? 'Contact',
-                    'last_name' => $lead->last_name,
-                    'phone' => $lead->phone,
-                    'whatsapp' => $lead->whatsapp,
-                    'email' => $lead->email,
-                    'job_title' => $lead->job_title,
-                    'preferred_contact_method' => $lead->preferred_contact_method,
-                    'status' => 'new_contact',
-                    'account_id' => $account?->id,
-                    'contact_owner_id' => $lead->lead_owner_id ?? $user->id,
-                    'source_lead_id' => $lead->id,
-                    'created_by' => $user->id,
-                ]);
+                $contact = Contact::query()
+                    ->where('source_lead_id', $lead->id)
+                    ->first();
+
+                if ($contact) {
+                    if ($account && ! $contact->account_id) {
+                        $contact->update(['account_id' => $account->id]);
+                    }
+                } else {
+                    $contact = Contact::query()->create([
+                        'contact_number' => 'CT-'.strtoupper(Str::random(8)),
+                        'name' => $lead->contact_person_name ?? $lead->name,
+                        'first_name' => $lead->first_name ?? explode(' ', $lead->name ?? '')[0] ?? 'Contact',
+                        'last_name' => $lead->last_name,
+                        'phone' => $lead->phone,
+                        'whatsapp' => $lead->whatsapp,
+                        'email' => $lead->email,
+                        'job_title' => $lead->job_title,
+                        'preferred_contact_method' => $lead->preferred_contact_method,
+                        'status' => 'new_contact',
+                        'account_id' => $account?->id,
+                        'contact_owner_id' => $lead->lead_owner_id ?? $user->id,
+                        'source_lead_id' => $lead->id,
+                        'created_by' => $user->id,
+                    ]);
+                }
 
                 if ($account) {
                     $account->update(['primary_contact_id' => $contact->id]);
@@ -123,6 +134,17 @@ class LeadConversionService
                 'converted_deal_id' => $deal?->id,
                 'updated_by' => $user->id,
             ]);
+
+            if ($deal) {
+                SiteVisit::query()
+                    ->where('lead_id', $lead->id)
+                    ->whereNull('deal_id')
+                    ->update([
+                        'deal_id' => $deal->id,
+                        'account_id' => $account?->id ?? $deal->account_id,
+                        'contact_id' => $contact?->id ?? $deal->primary_contact_id,
+                    ]);
+            }
 
             $lead = $lead->fresh();
 

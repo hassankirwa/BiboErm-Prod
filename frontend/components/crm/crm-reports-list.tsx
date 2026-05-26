@@ -23,12 +23,18 @@ import {
 import { cn } from "@/lib/utils";
 import { CrmPageContent } from "@/components/crm/crm-page-shell";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   downloadCrmReportExport,
   fetchCrmReports,
   type CrmReport,
 } from "@/lib/api/crm/reports";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const PAGE_SIZE = 11;
 
@@ -112,6 +118,7 @@ function ReportCard({
 export function CrmReportsList() {
   const [reports, setReports] = useState<CrmReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [folder, setFolder] = useState("All Reports");
   const [search, setSearch] = useState("");
@@ -121,9 +128,13 @@ export function CrmReportsList() {
 
   useEffect(() => {
     setLoading(true);
+    setLoadError(null);
     fetchCrmReports()
       .then(setReports)
-      .catch(() => setReports([]))
+      .catch(() => {
+        setReports([]);
+        setLoadError("Could not load export reports.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -266,13 +277,21 @@ export function CrmReportsList() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className="h-9 flex-1 gap-1.5 rounded-[5px] px-4 text-sm font-medium sm:flex-none"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span className="truncate">Create Report</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex flex-1 sm:flex-none">
+                  <Button
+                    size="sm"
+                    className="h-9 w-full gap-1.5 rounded-[5px] px-4 text-sm font-medium sm:w-auto"
+                    disabled
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Create Report</span>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Coming in Phase 2</TooltipContent>
+            </Tooltip>
             <Button
               variant="ghost"
               size="icon"
@@ -288,6 +307,11 @@ export function CrmReportsList() {
         <div className="flex justify-center py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
+      ) : loadError ? (
+        <Alert variant="destructive">
+          <AlertTitle>Export reports unavailable</AlertTitle>
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
       ) : (
         <>
       {/* Mobile / tablet: card list */}

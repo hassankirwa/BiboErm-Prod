@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { leadKanbanStages } from "@/lib/leads-kanban-data";
-import { cardToFormValues, type LeadFormValues } from "@/lib/lead-form-utils";
+import { apiLeadToFormValues, cardToFormValues } from "@/lib/lead-form-utils";
+import type { LeadFormValues } from "@/lib/lead-form-config";
 import { useCrmLead } from "@/lib/use-crm-lead";
-import { updateLead } from "@/lib/api/crm/leads";
+import { fetchLead, updateLead } from "@/lib/api/crm/leads";
+import { leadFormToUpdatePayload } from "@/lib/crm-lead-payload";
+import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
@@ -29,16 +32,21 @@ export function LeadEditForm({ leadId }: { leadId: string }) {
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
   const { card: lead, loading, error } = useCrmLead(leadId);
+  const { lookups } = useCrmFormLookups({
+    assignableRole: "sales_representative",
+  });
   const [form, setForm] = useState<LeadFormValues | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!lead) {
-      setForm(null);
-      return;
-    }
-    setForm(cardToFormValues(lead));
-  }, [lead]);
+    const id = Number(leadId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    fetchLead(id)
+      .then((detail) => setForm(apiLeadToFormValues(detail)))
+      .catch(() => {
+        if (lead) setForm(cardToFormValues(lead));
+      });
+  }, [leadId, lead]);
 
   const stage = leadKanbanStages.find((s) => s.id === form?.stageId);
 
@@ -70,20 +78,8 @@ export function LeadEditForm({ leadId }: { leadId: string }) {
     try {
       await ensureCsrfCookie();
       await updateLead(Number(leadId), {
-        name: form.title.trim(),
-        contact_person_name: form.title.trim(),
-        status: form.stageId,
-        site_address: form.location.trim() || null,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || null,
-        account_name: form.company.trim() || null,
-        estimated_value: form.estimatedValue || undefined,
-        next_follow_up_at: form.nextActionDate || undefined,
-        notes: form.notes.trim() || null,
-        source: form.source || null,
-        need_site_visit: false,
-        product_interests: ["custom"],
-        requirement_description: form.notes.trim() || form.title.trim(),
+        ...leadFormToUpdatePayload(form, { counties: lookups?.counties }),
+        need_site_visit: form.needSiteVisit,
       });
       toast.success("Lead updated.");
       router.push(leadsBackHref(view, leadId));

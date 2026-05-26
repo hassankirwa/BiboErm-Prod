@@ -1,5 +1,10 @@
 import { apiFetch } from "../client";
-import type { ApiDeal, BiboDealStage, PaginatedResponse } from "./types";
+import type {
+  ApiDeal,
+  ApiDealPayment,
+  BiboDealStage,
+  PaginatedResponse,
+} from "./types";
 import { unwrapResource } from "./types";
 
 export type { ApiDeal, BiboDealStage } from "./types";
@@ -26,9 +31,36 @@ export type RecordPaymentPayload = {
   payment_method: string;
   payment_status?: string;
   quotation_id?: number;
+  proof_file?: File;
   proof_file_path?: string;
   proof_firebase_url?: string;
   notes?: string;
+};
+
+export type UpdateDealPayload = {
+  name?: string;
+  title?: string;
+  account_id?: number;
+  contact_id?: number;
+  primary_contact_id?: number;
+  stage?: string;
+  status?: string;
+  amount?: number;
+  estimated_value?: number;
+  deposit_amount?: number;
+  deposit_required_amount?: number;
+  expected_close_date?: string;
+  expected_installation_date?: string;
+  product_interests?: string[];
+  requirement_summary?: string;
+  site_address?: string;
+  probability?: number;
+  discount_requested?: number;
+  final_agreed_amount?: number;
+  lost_reason?: string;
+  loss_notes?: string;
+  loss_reason_id?: number;
+  assigned_field_officer_id?: number;
 };
 
 function buildQuery(params?: Record<string, string | number | undefined>): string {
@@ -52,6 +84,31 @@ export function dealValue(deal: ApiDeal): number {
   return typeof raw === "string" ? parseFloat(raw) || 0 : raw ?? 0;
 }
 
+export type CreateDealPayload = {
+  name?: string;
+  title?: string;
+  contact_id?: number;
+  primary_contact_id?: number;
+  account_id?: number;
+  lead_id?: number;
+  source_lead_id?: number;
+  stage?: string;
+  amount?: number;
+  estimated_value?: number;
+  expected_close_date?: string;
+  site_address?: string;
+  requirement_summary?: string;
+  product_interests?: string[];
+};
+
+export async function createDeal(payload: CreateDealPayload): Promise<ApiDeal> {
+  const res = await apiFetch<ApiDeal | { data: ApiDeal }>("/api/v1/crm/deals", {
+    method: "POST",
+    json: payload,
+  });
+  return unwrapResource(res);
+}
+
 export async function fetchDeals(params?: {
   stage?: string;
   status?: string;
@@ -66,6 +123,25 @@ export async function fetchDeals(params?: {
 export async function fetchDeal(id: number): Promise<ApiDeal> {
   const res = await apiFetch<ApiDeal | { data: ApiDeal }>(`/api/v1/crm/deals/${id}`);
   return unwrapResource(res);
+}
+
+export async function updateDeal(
+  id: number,
+  payload: UpdateDealPayload,
+): Promise<ApiDeal> {
+  const res = await apiFetch<ApiDeal | { data: ApiDeal }>(`/api/v1/crm/deals/${id}`, {
+    method: "PUT",
+    json: payload,
+  });
+  return unwrapResource(res);
+}
+
+export async function fetchDealPayments(dealId: number): Promise<ApiDealPayment[]> {
+  const res = await apiFetch<
+    ApiDealPayment[] | { data: ApiDealPayment[] }
+  >(`/api/v1/crm/deals/${dealId}/payments`);
+  if (Array.isArray(res)) return res;
+  return res.data ?? [];
 }
 
 export async function updateDealStage(
@@ -106,9 +182,31 @@ export async function recordPayment(
   dealId: number,
   payload: RecordPaymentPayload,
 ): Promise<{ data: { payment: unknown; deal: ApiDeal } }> {
+  if (payload.proof_file) {
+    const form = new FormData();
+    form.append("payment_reference", payload.payment_reference);
+    form.append("payment_date", payload.payment_date);
+    form.append("amount_paid", String(payload.amount_paid));
+    form.append("payment_method", payload.payment_method);
+    if (payload.payment_status) {
+      form.append("payment_status", payload.payment_status);
+    }
+    if (payload.quotation_id != null) {
+      form.append("quotation_id", String(payload.quotation_id));
+    }
+    if (payload.notes) form.append("notes", payload.notes);
+    form.append("proof_file", payload.proof_file);
+
+    return apiFetch(`/api/v1/crm/deals/${dealId}/payments`, {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  const { proof_file: _proof, ...jsonPayload } = payload;
   return apiFetch(`/api/v1/crm/deals/${dealId}/payments`, {
     method: "POST",
-    json: payload,
+    json: jsonPayload,
   });
 }
 

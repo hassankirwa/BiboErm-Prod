@@ -156,7 +156,7 @@ class Deal extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->can('deals.view_all') || $user->can('crm.manage')) {
+        if ($user->can('deals.view_all')) {
             return $query;
         }
 

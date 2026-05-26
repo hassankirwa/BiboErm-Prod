@@ -1,0 +1,557 @@
+
+
+
+
+BIBO GLASS & WINDOWS
+Enterprise Resource Management System
+SYSTEM DESIGN PLAN
+Document Version 1.0  |  2025
+
+
+Document Information
+Project Name	Bibo Glass & Windows ERM System
+Prepared For	Bibo Glass & Windows Management
+Document Type	System Design Plan
+Scope	Full ERP covering CRM, Projects, Warehouse, Procurement, Production, QC, HR, Finance
+Backend Language	PHP
+Database	PostgreSQL / MySQL (Relational)
+Logging	Owen (PHP logging library)
+Authentication	Session-based with optional 2FA
+Version	1.0 — Initial Design
+
+
+1. Executive Summary
+Bibo Glass & Windows requires a comprehensive, integrated enterprise resource management (ERM) system to streamline operations from lead capture through project delivery. This document outlines the full system design covering all modules, their interactions, data flows, user roles, and technical architecture.
+The system is project-centric — a project acts as the backbone that binds every module together, from the initial sales lead through procurement, production, quality control, and final installation. Every activity in the system is traceable back to a project, an employee, a device, and a timestamp.
+
+1.1 Core Business Flow
+1	Lead Capture (Field Officers / Reception / Marketing)
+2	Lead Qualification (Calls, SMS, Site Visits, Meetings)
+3	Convert Lead → Contact + Account
+4	Create Deal → Site Visit & Measurements
+5	Quotation & Negotiation
+6	Deal Won → Deposit Paid → Project Created
+7	BOM Upload & Final Design Approval
+8	Material Check & Stock Reservation (FIFO)
+9	Procurement (if shortage) → Warehouse Receives Stock
+10	Production Schedule → Cutting → Fabrication → Assembly
+11	QC Inspection (Pre-Installation)
+12	Installation (Nairobi = Fabrication only; Outside = Full Project)
+13	Site QC Inspection & Handover
+14	Client Sign-off → Payment Completion
+15	Analytics, Reporting & Offcut Tracking
+
+1.2 System Principles
+•Project-Centric: Every action ties to a project
+•Role-Driven Access: Department sets default view; Role determines actual permissions
+•Device-Locked: Users can only log in from registered devices
+•Full Audit Trail: All actions logged via Owen (who, what, where, when)
+•FIFO Material Reservation: First project in line has stock reserved first
+•Connected Modules: CRM → Project → Warehouse → Procurement → Production → QC → Finance
+•Real-Time Client Visibility: Client dashboard tracks project progress
+
+
+2. Technical Architecture
+2.1 Technology Stack
+Layer	Technology	Purpose
+Backend	PHP (Latest Stable)	Core application logic, API endpoints
+Database	PostgreSQL or MySQL	Relational data storage
+Logging	Owen (PHP)	Structured audit logging — who, what, when, where
+Authentication	PHP Sessions + bcrypt	Session-based auth with optional 2FA
+Email Integration	Gmail API (OAuth2)	Send/receive emails per user Gmail account
+File Storage	Local / Firebase	BOM uploads, images, drawings, documents
+Frontend	React / Next Js	Web-based responsive UI
+Device Fingerprinting	Browser fingerprint + Device UUID	Restrict login to registered devices
+2FA	TOTP (Google Authenticator / Email OTP)	Optional two-factor authentication
+PDF Generation	DomPDF / mPDF (PHP)	Quotations, reports, BOMs
+Queue/Jobs	Database-backed queue or Redis	Email dispatch, notification jobs
+
+2.2 Authentication & Security
+Session Management
+•Short-lived sessions with configurable inactivity timeout (e.g., 30 minutes)
+•Session regeneration on login to prevent fixation attacks
+•Secure, HttpOnly, SameSite cookies
+•Sessions stored server-side (database or Redis)
+•Concurrent session detection — flag or terminate older sessions
+
+Device Registration (IT Module)
+•Each device is registered by IT with a unique Device UUID and fingerprint
+•On login, system checks: (1) valid credentials, (2) device registered and active, (3) device assigned to user
+•Unrecognized device triggers access denial with alert to IT admin
+•Device table stores: device name, type, OS, MAC address, UUID, assigned user, registration date, status
+
+Password Management
+•Forgot password via email OTP with short-lived token (15 minutes)
+•Password strength enforcement (minimum length, complexity)
+•bcrypt hashing for all passwords
+•Forced password reset on first login or when admin triggers reset
+
+Two-Factor Authentication (Optional)
+•TOTP-based (Google Authenticator, Authy) OR Email OTP
+•Users can enable/disable via profile settings (admin can enforce for specific roles)
+•Backup codes generated on 2FA setup
+
+2.3 Audit Logging (Owen)
+All system actions are logged using Owen (PHP logging library). Every log entry captures:
+Field	Description
+user_id	Who performed the action
+device_id	Which registered device was used
+module	Which module (CRM, Warehouse, Production, etc.)
+action	What action was performed (create, update, delete, view, login, export)
+entity_type	What was acted on (lead, project, stock_movement, etc.)
+entity_id	The specific record ID
+old_values	JSON snapshot of data before change
+new_values	JSON snapshot of data after change
+ip_address	Client IP address
+user_agent	Browser/device user agent
+timestamp	Exact date and time (UTC)
+
+
+3. User Onboarding & Management Module
+This module controls who can access the system, what they can do, and from which device. It is the foundation all other modules depend on.
+3.1 Department & Role Architecture
+The system separates Department (where someone belongs) from Role (what they can do). A user's department determines their default module landing page. Their role determines their actual system permissions — and a role can grant access beyond their department.
+
+Department	Default Module	Notes
+Sales / Marketing	CRM	Field officers also use Field Day module
+Production	Production	Includes cutting, fabrication, assembly teams
+Warehouse / Inventory	Warehouse	Two sub-roles: Accessories Manager, Aluminium Manager
+Procurement	Procurement	Also has visibility into stock levels
+Quality Control	QC Module	Can view production and project status
+HR	HR Module	Manages employee info, payroll, leave
+Finance	Finance Module	Invoices, payments, expenses, payroll
+IT	IT / Device Management	Device registration, user management
+Project Management	Projects	PM team including engineers
+Operations / Admin	Dashboard (All Modules)	Full system visibility
+Reception	CRM / Lead Entry	Lead capture and basic contact management
+
+3.2 Roles
+Roles are not department-restricted. A user in Production can have a role that also grants QC access. Roles are assigned by IT/Admin and are cumulative — a user can have multiple roles.
+Role	Key Permissions
+Super Admin	Full system access, user management, system configuration
+Operations Manager	Full visibility across all modules, reports, approval authority
+Sales Representative	CRM full access, lead to project pipeline, field day
+Field Officer	Lead capture, field day, location pins, limited CRM
+Project Manager	Project creation/management, team assignment, client updates
+Production Manager	Full production pipeline, scheduling, material prep
+Warehouse Manager (Accessories)	Accessories stock, bin management, stock movements
+Warehouse Manager (Aluminium)	Aluminium profile stock, sections, bin management
+Procurement Officer	Purchase orders, supplier management, glass orders
+QC Inspector	QC checklists, inspections, defect logging
+HR Manager	Employee info, payroll, leave, emergency contacts
+Finance Officer	Invoices, payments, expenses, payroll processing
+IT Admin	Device registration, user creation, audit log access
+Reception	Lead entry, contact lookup, basic scheduling
+Client (External)	Read-only client dashboard for their projects only
+
+3.3 User Master Table Fields
+Field	Type	Notes
+Full Name	VARCHAR	Legal name
+Email Address	VARCHAR UNIQUE	Also used for login and system communications
+Phone Number	VARCHAR	Primary contact number
+Department	FK → departments	User's primary department
+Job Title	VARCHAR	Formal title
+Profile Photo	VARCHAR (path)	Optional
+Status	ENUM	Active, Inactive, Suspended
+Date Joined	DATE	Employment start date
+Created By	FK → users	IT admin who created the account
+Last Login	TIMESTAMP	Track last access
+
+3.4 Employee Info (HR Extension)
+The employee_info table extends the master users table for HR-specific data:
+•Emergency contact name, relationship, phone number
+•Contact valid from / valid to dates
+•Area of residence / physical address
+•Salary information (monthly salary, currency, payment date)
+•Bank account details (encrypted)
+•National ID / KRA PIN / NHIF / NSSF numbers
+•Contract type (permanent, contract, casual)
+•Contract start and end date
+•Employee number (internal HR ID)
+•Notes / HR observations
+
+
+4. CRM Module
+The CRM module manages the full sales pipeline from initial lead capture through to project creation. It is the entry point for all revenue-generating activities. Everything is interconnected — a lead can become a contact, a deal, and eventually a project.
+4.1 Lead Management
+Lead Capture Sources
+•Field Officers logging leads from field visits (with GPS pin)
+•Reception / walk-in entries
+•Inbound calls or SMS
+•Social media / marketing campaigns
+•Website enquiries
+
+Lead Statuses
+Status	Description
+New	Just captured, not yet contacted
+Contacted	Initial outreach made
+Qualified	Confirmed interest and budget capacity
+Site Visit Scheduled	Visit booked to take measurements
+Quotation Sent	Formal quote delivered to lead
+Negotiation	Terms being discussed
+Won	Deal closed — convert to Contact + Project
+Lost	Lead did not convert — record reason
+Dormant	No response; follow up later
+
+4.2 Sales Pipeline Flow
+1	Lead Capture — Name, phone, email, source, location, notes
+2	Lead Qualification — Log calls, SMS, meetings; attach notes
+3	Convert Lead → Create Contact + Account (company if applicable)
+4	Create Deal — Attach to contact; set estimated value and close date
+5	Site Visit Activity — Log visit, capture measurements, GPS location
+6	Quotation Creation — Itemised quote generated from measurements
+7	Quotation Sent — Email via Gmail API; logged in system
+8	Negotiation — Revise quote; log discussion notes
+9	Deal Won — Mark deal as won; record deposit amount
+10	Project Created — Execution phase begins; CRM links to project
+
+4.3 Activities & Communication
+Call Logging
+•'Call Client' button opens the device dialer with pre-filled number
+•After call: log duration, outcome, discussion notes, next action
+•Legacy call log: manually enter call details (for calls made outside system)
+•All call logs tied to Lead/Contact/Deal
+
+Email Integration (Gmail API)
+•Sales reps connect their Gmail account via OAuth2
+•Compose and send emails directly from CRM
+•System captures sent emails: to, subject, body, timestamp
+•Email categories: Follow-up, Meeting Confirmation, Quotation, General
+•Received replies can be linked to the CRM record manually or via threading
+
+Task Management
+•Create tasks tied to a lead/contact/deal: 'Call client', 'Visit site', 'Send quote', 'Follow up'
+•Set due date, priority (High/Medium/Low), and assigned user
+•Dashboard shows today's tasks and overdue tasks
+•Mark tasks complete with outcome notes
+
+4.4 Field Day Module
+Field Officers are frequently out visiting potential clients. The Field Day module allows them to log their entire day's activity in a structured way.
+•Start a Field Day — records date and field officer
+•Log Location Pins — GPS coordinates captured automatically + manual notes
+•Each pin can be linked to: a new lead, an existing contact, a site visit, or a follow-up
+•End of day summary: number of visits, leads created, notes
+•Operations Manager can review field day reports per officer
+•Field day locations visible on map view for management oversight
+
+4.5 Contacts & Accounts
+•Contact = an individual (the person you deal with)
+•Account = a company or organisation (optional — some clients are individuals)
+•A contact can be linked to multiple deals and projects
+•Contacts converted from won leads retain full lead history
+•Contact list = database of all paying and active clients
+
+
+5. Project Management Module
+The project is the central entity that binds every operational module together. Once a deal is won and a deposit is paid, a project is created in this module. From here, all subsequent operations — BOM, procurement, production, QC, and installation — are tracked under the project.
+5.1 Project Creation
+Project Core Information
+Client	Linked Contact from CRM (name, email, phone, location)
+Project Name	Descriptive name / reference
+Project Type	Supply Only, Fabrication Only, Full Supply & Install
+Location	Nairobi (fabrication only) or Outside Nairobi (full installation)
+Estimated Start Date	Date work is planned to begin
+Projected Completion Date	Expected finish date given to client
+Overage Buffer	Additional buffer days added to client-facing deadline
+Sales Rep	CRM user who converted the lead — mapped to project
+Project Manager	PM assigned to oversee execution
+Engineers Assigned	Production/installation engineers
+Deal Reference	Link back to CRM deal for full history
+Priority	Standard / Urgent / Apartment Block
+Apartment / Floor Tracking	For apartment projects: track by floor/section
+
+5.2 Project Stages
+1	Awaiting Deposit — Lead won, project created, deposit not yet received
+2	Deposit Received — Project active; BOM and design work begins
+3	Site Assessment — Engineers visit site; checklist completed (openings, timeline per section)
+4	Final Design & Approval — Drawing prepared, client approves; any additions noted
+5	BOM Finalized — Excel BOM uploaded; materials identified (profiles, accessories, rubbers, glass)
+6	Material Check — Warehouse verifies stock against BOM; shortages flagged
+7	Materials Reserved — FIFO stock reservation; first-in project gets stock set aside
+8	Awaiting Procurement — Shortage logged; PO raised; delay recorded if applicable
+9	Materials Ready — All materials confirmed; production scheduled
+10	Cutting Stage — Aluminium profiles cut to specification (approx. 3 days)
+11	Fabrication Stage — Frame assembly; sash fabrication
+12	Glass Assembly — Glass sourced and fitted (externally sourced, project-specific)
+13	QC Inspection (Pre-Installation) — Inspector signs off on finished units
+14	In Transit — Materials transported to site
+15	Installation — On-site assembly and fitting
+16	Site QC — Inspector reviews installation against checklist
+17	Snagging — Any defects or incomplete items addressed
+18	Project Complete — Client sign-off; final images captured; project closed
+
+5.3 Timeline Tracking
+•Projected timeline set at project creation (agreed with client)
+•Actual timeline tracked as stages are updated
+•Delay logging: each delay is recorded with reason, stage affected, and days lost
+•Delay reasons: Procurement delay, Production capacity, Client decision, Site not ready, Material damage
+•Percentage completion calculated from stages completed vs total stages
+•Automatic alerts when projected deadline is within 3 days of actual progress
+
+5.4 BOM & Design Documents
+•Upload Excel BOM file — system parses line items (profile type, quantity, dimensions)
+•BOM items linked to warehouse items for stock checking
+•Final design drawings uploaded and stored (PDF / DWG)
+•Works plan stored per project
+•QC checklist generated from BOM (openings count, sections)
+•All document versions retained with upload date and uploader name
+
+5.5 Material Tracking Per Project
+•Each BOM item is matched to a warehouse item
+•Stock reservation: confirmed availability locks stock for this project (FIFO)
+•If stock is insufficient: procurement is notified; delay is logged
+•Material release by warehouse: as each stage begins, warehouse releases the required materials
+•Next stage material readiness tracked: 'Has material for next stage been held?'
+•Offcut tracking: after cutting, leftover profile pieces go to offcut warehouse
+
+5.6 Client Dashboard
+A read-only client-facing portal where clients can track their project. Access granted via unique login credentials created at project start.
+•Current project stage and percentage complete
+•Projected and actual completion dates
+•Key milestone dates (design approval, production start, installation date)
+•Images: fabrication progress photos and final installation images
+•Latest update notes from project manager
+•Delay notifications with reason (where appropriate to share)
+
+
+6. Warehouse Module
+The warehouse manages two categories of physical stock: Accessories and Aluminium Profiles. Each is managed by a dedicated warehouse manager role, though a user can hold both roles. Glass is NOT stored in the warehouse — it is sourced per project at the point of need.
+6.1 Warehouse Structure
+The warehouse is organised hierarchically for easy physical location of items:
+1	Warehouse — Top-level physical building (e.g., Main Warehouse)
+2	Section — Named area within the warehouse (e.g., SEC5FG = Sliding Door Profile Section)
+3	Bin — Specific storage unit within a section (e.g., BIN2, BIN5, BIN6)
+4	Item — What is stored in the bin (e.g., BIN2 = Hinges, BIN5 = Joints)
+
+Example: To find hinges for a sliding door → Go to SEC5FG → BIN2
+Sections are organised by door/window type (Sliding Door, Folding Door, Bathroom Accessories, etc.). Each door type has a code name and its accessories are grouped in dedicated sections and bins.
+
+6.2 Master Data — Items
+A master data entry point captures all stockable items before they can be used in the system:
+•Aluminium Profiles — profile type, code, dimensions, finish (powder coat colour), weight per metre
+•Accessories — accessory name, code, applicable door types, unit of measure
+•Rubbers / Gaskets — rubber type, code, profile compatibility, unit of measure
+•Door Types — door type name, code, list of required accessories with standard quantities
+
+6.3 Stock Management
+•Stock levels tracked per item per bin
+•Stock movements logged: Inbound (from procurement), Outbound (to production/project), Transfer (between bins), Adjustment (stock take)
+•Stock reservations: when a project BOM is confirmed, stock is reserved (locked) using FIFO
+•Available stock = Total stock − Reserved stock
+•Minimum stock thresholds configured per item — triggers low-stock alert to procurement
+•Monthly stock-take reconciliation — variance report generated
+
+6.4 Offcut Warehouse
+•After cutting aluminium profiles, offcut pieces are logged by length and profile type
+•Offcuts stored in a separate offcut section with bin location
+•Before procurement orders new profiles, system checks offcut availability
+•Offcuts can be allocated to a project if length is sufficient
+•Monthly offcut analytics: total wastage, reuse rate, material efficiency per project
+
+6.5 Tools Management
+•Tools registered in the system with a unique tool code, type, condition, and purchase date
+•Tools are assigned per project by the Inventory / IT team
+•Issuance log: tool, assigned to (employee), project, issue date, return date, condition on return
+•Damage reports logged on tool return
+•Missing tools flagged for follow-up or replacement requisition
+
+
+7. Procurement Module
+Procurement is responsible for sourcing Aluminium Profiles, Accessories, Rubbers, and Glass. Except for glass (project-specific), all items are received into the warehouse. Procurement is triggered either by stock shortages or by project-specific glass requirements.
+7.1 Procurement Triggers
+•Automatic low-stock alert — item falls below minimum threshold
+•Project BOM check — shortage identified during material check stage
+•Glass order — initiated when a project reaches the Glass Assembly stage
+•Manual requisition — procurement officer raises a PO independently
+
+7.2 Purchase Order Flow
+1	Requisition Raised — stock shortage or project need identified
+2	Supplier Selected — from registered supplier list; compare prices
+3	PO Created — items, quantities, agreed unit prices, delivery date
+4	PO Approved — Operations Manager / Finance approves PO
+5	PO Sent to Supplier — PDF generated and emailed
+6	Delivery Expected — transport order created; delivery date tracked
+7	Goods Received — warehouse team confirms receipt; any damages logged
+8	Stock Updated — warehouse stock levels automatically updated
+9	Invoice Matched — supplier invoice matched to PO for finance
+10	Payment Processed — finance records payment against invoice
+
+7.3 Supplier Management
+•Supplier profile: name, contact, address, specialisation (profiles, accessories, rubbers, glass)
+•Price history per item per supplier — track price changes over time
+•Preferred supplier flag per item category
+•Supplier performance: on-time delivery rate, quality issue log
+•Local glass company directory — for project-specific glass sourcing
+
+7.4 Delay Tracking
+•Every procurement delay is logged against the triggering project
+•Delay record: reason, expected date, actual delivery date, days delayed
+•Delays impact project timeline and are reflected in the project's delay log
+•Procurement delay analytics: frequency by supplier, by item category, by month
+•Price change alerts: if a supplier increases unit price, alert procurement manager
+
+7.5 Transport Orders
+•Separate transport order created for delivery coordination
+•Transport type: supplier delivery, own collection, third-party logistics
+•Vehicle details, driver, expected arrival time
+•Goods received note (GRN) logged on arrival
+
+
+8. Production Module
+Production covers the full manufacturing pipeline from material preparation through to assembly. The Production Manager oversees the schedule, assigns teams to projects, and tracks progress against the project timeline.
+8.1 Production Pipeline
+1	Production Order Created — triggered when project reaches 'Materials Ready' stage
+2	Client Placed in Production Schedule — FIFO scheduling; client notified
+3	Material Preparation — cutting team prepares profile list from BOM
+4	QC Pre-Check — materials checked before cutting begins
+5	Cutting Stage (~3 days) — profiles cut to dimension; offcuts logged
+6	Fabrication Stage — frame assembly; corner joints, welds
+7	Sash Fabrication — inner frame (sash) assembled
+8	Glass Assembly — glass received from supplier and fitted into frame
+9	Final Assembly & Finishing — hardware fitted; rubber seals installed
+10	QC Post-Fabrication — inspector checks finished unit before dispatch
+
+8.2 Production Scheduling
+•Visual production calendar — shows all active projects on schedule
+•Projects assigned to production slots with estimated duration per stage
+•Team assignment per stage: cutting team, fabrication team, assembly team
+•Stage completion logged with date, team member, and notes
+•Automatic next-stage notification when a stage is marked complete
+•Production Manager can reorder schedule (except overriding FIFO reservations)
+
+8.3 Material Preparation & Offcuts
+•Cutting sheet generated from BOM: profile type, length per cut, number of pieces
+•Offcuts recorded immediately after cutting: profile type, offcut length, bin location
+•Material released from warehouse stock at each stage (not all at once)
+•Monthly material usage analytics: by project, by profile type, by month
+
+8.4 Installation
+•Installation checklist generated per project (number of doors/windows, section timeline)
+•Installation team assigned per project
+•Tools issued to installation team against project
+•On-site updates logged by PM or field engineer: sections completed, issues encountered
+•Damage on delivery logged with photos
+•For Nairobi projects: only fabrication done; installation may be client-managed
+•For outside Nairobi: full project including installation managed by Bibo team
+
+
+9. Quality Control Module
+QC is involved at three critical stages: before cutting (material check), after fabrication (finished product inspection), and after installation (site inspection). QC inspectors maintain their own checklists and log all findings.
+9.1 QC Stages
+Stage	Trigger	Who	Output
+Pre-Production Material Check	Materials prepared for cutting	QC Inspector / Cutting Team	Material approval or rejection with defect log
+Post-Fabrication Inspection	Production stage 'Final Assembly' complete	QC Inspector	Pass / Fail with checklist; photos uploaded
+Pre-Installation Check	Product ready to leave warehouse	QC Inspector	Damage check; dispatch approval
+Site Installation QC	Installation stage complete	QC Inspector (on-site)	Site checklist: what done correctly, what needs fixing
+Snagging Sign-off	All snagging items resolved	QC Inspector + Client	Final handover; client sign-off logged
+
+9.2 QC Checklists
+•Checklist templates created per product type (sliding door, folding door, bathroom window, etc.)
+•Template items: dimension accuracy, corner joints, seal integrity, hardware function, glass clarity, finish quality
+•Inspector selects template, fills in pass/fail per item, adds notes and photos
+•Defects logged: defect type, severity (Critical / Major / Minor), photo attached, resolution status
+•Site checklist: openings correctly done, seals fitted, hardware operable, aesthetics acceptable
+•All checklists timestamped and attributed to the inspector
+
+9.3 QC Analytics
+•Defect rate per product type per month
+•Common defect types — guides training and process improvement
+•Inspector performance summary
+•Projects with site QC issues — track resolution time
+
+
+10. HR Module
+The HR module manages employee information, payroll, and HR documentation. Attendance is handled outside the system. The module extends the master user table with HR-specific data.
+10.1 HR Data Scope
+•Employee personal information (from master user table)
+•Emergency contacts — name, relationship, phone, valid from/to dates
+•Area of residence and physical address
+•Salary information — monthly gross, net, deductions (NHIF, NSSF, PAYE), payment date
+•Bank account for salary disbursement (stored encrypted)
+•Government IDs — National ID, KRA PIN, NHIF number, NSSF number
+•Contract details — type, start date, end date, notice period
+•Salary history — track every salary change with effective date and reason
+•HR notes / performance observations
+
+10.2 Payroll Management
+•Monthly payroll run — HR Manager initiates for the period
+•System calculates: gross salary, statutory deductions (NHIF, NSSF, PAYE), net pay
+•Payslip generated per employee (PDF)
+•Payroll approval by Finance Manager before processing
+•Payroll history retained per employee
+•Finance module receives approved payroll for payment processing
+
+
+11. Finance Module
+Finance tracks all monetary movements: client payments, procurement costs, payroll disbursements, and expense management. It interfaces with CRM (deals), Projects (payments), and HR (payroll).
+11.1 Finance Scope
+•Client invoices — generated from project milestones (deposit, progress payment, final payment)
+•Payment tracking — record partial and full payments; outstanding balance per project
+•Expense management — operational expenses, procurement costs, transport
+•Payroll processing — approved payroll from HR → payment records
+•Profit tracking per project — revenue minus procurement + production costs
+•Supplier invoice matching — match supplier invoice to PO for payment
+•Financial reporting — monthly P&L, outstanding receivables, payment ageing
+
+
+12. IT / Device Management Module
+The IT module controls system access at the device level. Users can only log in from devices registered and approved by the IT Admin. This provides a hardware-layer security control in addition to credentials.
+12.1 Device Registration
+•IT Admin registers a device: device name, type (desktop/laptop/mobile/tablet), OS, MAC address, serial number
+•System generates a unique Device UUID assigned to the device
+•Device assigned to one or more users
+•Device status: Active, Suspended, Decommissioned
+•On every login attempt, system validates: credentials + device UUID match + device status is Active
+•Failed device checks are logged and trigger an alert to IT Admin
+
+12.2 User Management by IT
+•Create new user accounts (department, role, initial password)
+•Assign and revoke roles
+•Enable or disable 2FA enforcement per role
+•View full audit log — filter by user, module, action, date range
+•Force password reset for any user
+•Suspend or deactivate user accounts
+
+
+13. Analytics & Reporting
+13.1 Management Dashboard
+•Active projects: count, stage distribution, on-time vs delayed
+•Sales pipeline: leads by stage, conversion rate, average deal value
+•Revenue summary: month-to-date, year-to-date, vs target
+•Production schedule: projects in each production stage
+•Stock alerts: low-stock items requiring procurement
+•Outstanding payments: overdue invoices by project
+
+13.2 Module-Specific Reports
+Module	Key Reports
+CRM	Lead conversion rate, Sales rep performance, Pipeline value, Field day coverage map
+Projects	On-time delivery rate, Delay frequency by reason, Project profitability, Stage duration analysis
+Warehouse	Stock levels by item, Monthly stock movements, Offcut reuse rate, Material wastage by project
+Procurement	Spend by supplier, Price trends, Delivery performance, Delay frequency
+Production	Units produced per month, Stage duration averages, Cutting yield, Team productivity
+QC	Defect rates by product type, Common defect types, Site issue resolution time
+HR	Headcount by department, Payroll summary, Staff tenure analysis
+Finance	Monthly P&L, Revenue vs Costs, Outstanding receivables, Payroll costs
+
+
+14. Cross-Module Integration Map
+Every module in the system connects to at least one other. The Project is the central binding entity.
+From Module	To Module	Integration Point
+CRM (Lead)	CRM (Contact + Deal)	Lead converted → Contact created + Deal opened
+CRM (Deal Won)	Project Management	Deal won → Project automatically created with client info
+Project	Warehouse	BOM uploaded → Stock check requested; reservations made
+Project / Warehouse	Procurement	Shortage detected → Purchase order triggered
+Procurement	Warehouse	PO delivered → Stock levels updated; project reservation fulfilled
+Project	Production	Materials ready → Production order created; schedule assigned
+Production	Warehouse	Stage begins → Materials released from reserved stock; offcuts logged
+Production	QC	Stage complete → QC inspection triggered
+QC	Project	Inspection result → Project stage updated; defects logged
+Project (Installation)	QC	Installation complete → Site QC checklist assigned
+Project (Complete)	Finance	Project closed → Final invoice generated
+HR (Payroll)	Finance	Approved payroll → Payment record created
+Procurement (Invoice)	Finance	Supplier invoice → Payment matched to PO
+All Modules	Audit Log	Every action → Owen log entry (user, device, action, timestamp)
+IT (Devices)	All Modules	Login validation → Device check on every session
+
+
+— End of System Design Plan —
