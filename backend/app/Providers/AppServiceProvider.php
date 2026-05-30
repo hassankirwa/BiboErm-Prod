@@ -4,6 +4,15 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Models\UserDepartmentRole;
+use App\Models\Warehouse\Bin;
+use App\Models\Warehouse\Deck;
+use App\Models\Warehouse\OffcutPiece;
+use App\Models\Warehouse\Section;
+use App\Models\Warehouse\StockReservation;
+use App\Models\Warehouse\Tool;
+use App\Models\Warehouse\ToolIssuance;
+use App\Policies\Warehouse\OffcutPolicy;
+use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
@@ -11,6 +20,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -32,6 +42,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Route::bind('deck', fn ($id) => Deck::query()->findOrFail($id));
+        Route::bind('section', fn ($id) => Section::query()->findOrFail($id));
+        Route::bind('offcut', fn ($id) => OffcutPiece::query()->findOrFail($id));
+        Route::bind('reservation', fn ($id) => StockReservation::query()->findOrFail($id));
+        Route::bind('tool', fn ($id) => Tool::query()->findOrFail($id));
+        Route::bind('issuance', fn ($id) => ToolIssuance::query()->findOrFail($id));
+
+        Gate::policy(Bin::class, StockMovementPolicy::class);
+        Gate::policy(OffcutPiece::class, OffcutPolicy::class);
+
+        Gate::define('logOffcut', fn (User $user, Bin $bin) => app(OffcutPolicy::class)->log($user, $bin));
+
         Gate::before(function (?User $user, string $ability): ?bool {
             if (! $user instanceof User) {
                 return null;
