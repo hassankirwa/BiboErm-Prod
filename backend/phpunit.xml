@@ -33,5 +33,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="ADMIN_EMAIL" value="admin@bibo.local"/>
+        <env name="ADMIN_PASSWORD" value="password"/>
+        <env name="ADMIN_NAME" value="System Administrator"/>
     </php>
 </phpunit>

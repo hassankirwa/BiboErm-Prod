@@ -1,11 +1,37 @@
-export { mockPurchaseOrders, mockSuppliers } from "@/lib/mock-data";
+import {
+  listPurchaseOrders,
+  listRequisitions,
+  listSuppliers,
+} from "@/lib/api/procurement";
+
+export {
+  listSuppliers,
+  listPurchaseOrders,
+  listRequisitions,
+  getProcurementDashboard,
+  createRequisition,
+  submitRequisition,
+  approveRequisition,
+} from "@/lib/api/procurement";
+
+export type {
+  Supplier,
+  PurchaseOrder,
+  PurchaseRequisition,
+  ProcurementDashboard,
+} from "@/lib/api/procurement";
 
 export async function getPurchaseOrders() {
-  const { mockPurchaseOrders } = await import("@/lib/mock-data");
-  return mockPurchaseOrders;
+  const res = await listPurchaseOrders({ per_page: 50 });
+  return res.data;
 }
 
 export async function getSuppliers() {
-  const { mockSuppliers } = await import("@/lib/mock-data");
-  return mockSuppliers;
+  const res = await listSuppliers({ per_page: 50 });
+  return res.data;
+}
+
+export async function getRequisitions() {
+  const res = await listRequisitions({ per_page: 50 });
+  return res.data;
 }

@@ -140,4 +140,8 @@ Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () 
     require __DIR__.'/api/crm/lookups.php';
     require __DIR__.'/api/crm/reports.php';
 });
+
+Route::middleware(['auth:sanctum', 'active'])->prefix('procurement')->group(function () {
+    require __DIR__.'/api/procurement.php';
+});
 }); // v1

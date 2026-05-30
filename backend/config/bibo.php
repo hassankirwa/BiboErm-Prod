@@ -50,6 +50,16 @@ return [
                     'deal_payments.record',
                 ],
             ],
+            'procurement-attachments' => [
+                'public' => false,
+                'max_kb' => (int) env('BIBO_PROCUREMENT_ATTACHMENT_MAX_KB', 10240),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp', 'pdf'],
+                'image_only' => false,
+                'permissions' => [
+                    'procurement.view', 'procurement.manage',
+                    'procurement.grn.verify', 'procurement.grn.create',
+                ],
+            ],
         ],
     ],
 

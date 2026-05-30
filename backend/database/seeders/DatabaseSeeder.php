@@ -19,8 +19,10 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             DefaultAdminSeeder::class,
             CrmDemoUsersSeeder::class,
+            ProcurementDemoUsersSeeder::class,
             CrmLookupSeeder::class,
             CrmSeeder::class,
+            ProcurementSeeder::class,
         ]);
 
         app()->make(PermissionRegistrar::class)->forgetCachedPermissions();
