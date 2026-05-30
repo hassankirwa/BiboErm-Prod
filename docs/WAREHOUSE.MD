@@ -1,7 +1,7 @@
 # Warehouse & Inventory — Implementation Plan
 
 **Module:** Warehouse · Inventory · Offcuts · Tools · Stock Reservations (FIFO)  
-**Stack:** PHP 8.2+ · Laravel 11 · PostgreSQL/MySQL · Next.js SPA  
+**Stack:** PHP 8.2+ · Laravel 12 · PostgreSQL/MySQL · Next.js SPA  
 **References:** [README.md](../README.md) §8.3 (Warehouse), §8.2 (Project BOM), §10 (Integrations), [Raw_Plam.txt](./Raw_Plam.txt) §6, [USER_ONBOARDING.MD](./USER_ONBOARDING.MD), [SALES_CRM.MD](./SALES_CRM.MD) §3 (folder structure), [WAREHOUSE_MIGRATION_SPEC.MD](./WAREHOUSE_MIGRATION_SPEC.MD) (column-level migration target)  
 **Version:** 1.1 · 2026
 
@@ -757,13 +757,13 @@ sequenceDiagram
 | 2 | For each accepted GRN line, create **`stock_movement_lines`** with `to_bin_id` = putaway bin (warehouse operator selects or uses `accessories.default_bin_id`) |
 | 3 | Increment **`stock_levels.quantity_on_hand`** for `(item_id, bin_id)` |
 | 4 | Receipt / invoice images remain on procurement **`goods_receipt_attachments`** (`path`, optional `firebase_url`); movement links via `reference_id`. Optional copy paths into movement `notes` for audit |
-| 5 | If GRN fulfills an open project shortage, reduce pending qty on **`stock_reservation_lines`**; re-run check → may emit **`ProjectMaterialsReady`** |
+| 5 | If GRN fulfills an open project shortage, `GrnReservationFulfillmentService` re-runs BOM stock check and creates/resumes FIFO reservation when stock is sufficient; may emit **`ProjectMaterialsReady`** |
 
 **Storage pattern (BiboStorage):** Same as CRM attachments — `private/procurement/{grn_id}/{filename}` or category `warehouse` for warehouse-captured photos; resolve URL via `BiboStorage::resolvePrivateApiUrl`.
 
 **Frontend entry:** `/warehouse/receive?grn={id}` — deep-link from procurement GRN detail.
 
-**API:** `POST /api/warehouse/movements/receive` with `goods_receipt_id`, line putaway bins, optional notes.
+**API:** `POST /api/v1/warehouse/movements/receive` with `goods_receipt_id`, line putaway bins, optional notes.
 
 ---
 
@@ -805,10 +805,11 @@ Separate from full-length aluminium deck. After cutting (Production module):
 
 | Action | Endpoint | Notes |
 |--------|----------|-------|
-| Log offcut | `POST /api/warehouse/offcuts` | From production/cutting |
-| Search usable offcuts | `GET /api/warehouse/offcuts?profile=&min_length=` | Before procurement |
-| Allocate to project | `POST /api/warehouse/offcuts/{id}/allocate` | Sets `allocated_project_id` |
-| Mark consumed | `PATCH` status → `consumed` | When cut used |
+| Log offcut | `POST /api/v1/warehouse/offcuts` | From production/cutting |
+| Search usable offcuts | `GET /api/v1/warehouse/offcuts?profile=&min_length=` | Before procurement |
+| Allocate to project | `POST /api/v1/warehouse/offcuts/{id}/allocate` | Sets `allocated_project_id` |
+| Mark consumed | `PATCH /api/v1/warehouse/offcuts/{id}` body `{ "status": "consumed" }` | When cut used |
+| Reuse analytics | `GET /api/v1/warehouse/offcuts/analytics` | Monthly reuse rate, by-project summary |
 
 ### Section layout
 
@@ -868,12 +869,15 @@ Adjustment (stock-take) → adjustment with reason
 
 ## 16. API Endpoints
 
-Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
+Base: `/api/v1/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
+
+Mutating endpoints use Form Request validation under `app/Http/Requests/Warehouse/`.
 
 ### Locations
 
 | Method | Path | Permission |
 |--------|------|------------|
+| GET | `/locations/tree` | `warehouse.locations.view` |
 | GET | `/warehouses` | `warehouse.locations.view` |
 | GET | `/decks` | `warehouse.locations.view` |
 | GET | `/decks/{deck}/sections` | `warehouse.locations.view` |
@@ -887,18 +891,20 @@ Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 |--------|------|------------|
 | GET | `/inventory` | `warehouse.stock.view` |
 | GET | `/inventory/search?q=` | `warehouse.stock.view` |
+| GET | `/inventory/search/locations?q=` | `warehouse.stock.view` |
 | GET | `/inventory/by-location` | `warehouse.stock.view` |
+| GET | `/inventory/low-stock` | `warehouse.stock.view` |
 | GET | `/items/{item}/stock` | `warehouse.stock.view` |
 
 ### Movements
 
-| Method | Path | Permission |
-|--------|------|------------|
-| GET | `/movements` | `warehouse.stock.view` |
-| POST | `/movements/receive` | `warehouse.stock.receive` |
-| POST | `/movements/transfer` | `warehouse.stock.transfer` |
-| POST | `/movements/adjust` | `warehouse.stock.adjust` |
-| POST | `/movements/issue` | `warehouse.stock.issue` |
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| GET | `/movements` | `warehouse.stock.view` | |
+| POST | `/movements/receive` | `warehouse.stock.receive` | GRN putaway; triggers `GrnReservationFulfillmentService` |
+| POST | `/movements/transfer` | `warehouse.stock.transfer` | |
+| POST | `/movements/adjust` | `warehouse.stock.adjust` | |
+| POST | `/movements/issue` | `warehouse.stock.issue` | Optional `project_id`: releases matching reservation lines then issues remainder |
 
 ### Reservations
 
@@ -908,14 +914,17 @@ Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 | POST | `/projects/{project}/stock-check` | `warehouse.reservations.view` |
 | POST | `/projects/{project}/reserve` | `warehouse.reservations.create` |
 | POST | `/reservations/{id}/release` | `warehouse.reservations.release` |
+| POST | `/reservations/reorder` | `warehouse.reservations.create` + `operations_manager\|super_admin` |
 
 ### Offcuts
 
 | Method | Path | Permission |
 |--------|------|------------|
 | GET | `/offcuts` | `warehouse.offcuts.manage` |
+| GET | `/offcuts/analytics` | `warehouse.offcuts.manage` |
 | POST | `/offcuts` | `warehouse.offcuts.log` |
 | POST | `/offcuts/{id}/allocate` | `warehouse.offcuts.allocate` |
+| PATCH | `/offcuts/{id}` | `warehouse.offcuts.manage` | Body: `{ "status": "consumed" }` |
 
 ### Master data
 
@@ -925,6 +934,7 @@ Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 | GET/POST | `/master-data/aluminium-profiles` | `warehouse.master_data.manage` |
 | GET/POST | `/master-data/accessories` | `warehouse.master_data.manage` |
 | GET/POST | `/master-data/rubbers` | `warehouse.master_data.manage` |
+| GET | `/master-data/rubbers/suggest?warehouse_item_id=` | `warehouse.master_data.view` |
 
 ### Tools
 
@@ -933,6 +943,14 @@ Base: `/api/warehouse` · Auth: `auth:sanctum`, `active`, `device.trusted`
 | GET/POST | `/tools` | `warehouse.tools.manage` |
 | POST | `/tools/{id}/issue` | `warehouse.tools.issue` |
 | POST | `/tools/issuances/{id}/return` | `warehouse.tools.issue` |
+
+### Stock take
+
+| Method | Path | Permission |
+|--------|------|------------|
+| GET | `/stock-take/snapshot` | `warehouse.stocktake.view` |
+| POST | `/stock-take/variance` | `warehouse.stocktake.view` |
+| POST | `/stock-take/apply` | `warehouse.stocktake.run` |
 
 ---
 
