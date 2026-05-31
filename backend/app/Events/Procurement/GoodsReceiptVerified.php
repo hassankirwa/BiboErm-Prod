@@ -10,6 +10,7 @@ class GoodsReceiptVerified
     use Dispatchable, SerializesModels;
 
     /**
+     * @param  array<int, array{purchase_order_line_id: int, warehouse_item_id: ?int, qty_accepted: float, to_bin_id?: ?int}>  $acceptedLines
      * @param  array<int, array{purchase_order_line_id?: int|null, warehouse_item_id: int, qty_accepted: string|float, to_bin_id?: int|null}>  $acceptedLines
      * @param  array<int, array{warehouse_item_id: int, qty_required: string|float, required_length_mm?: int|null, bom_line_ref?: string|null, project_bom_line_id?: int|null}>  $bomLineSummary
      */

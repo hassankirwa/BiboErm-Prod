@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Events\Production\ProductionStageCompleted;
+use App\Events\Projects\ProjectAddonRequested;
+use App\Events\Warehouse\ProjectMaterialShortageDetected;
+use App\Listeners\Procurement\CreateAddonRequisition;
+use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
+use App\Listeners\Procurement\NotifyGlassProcurement;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\Warehouse\Bin;
@@ -14,10 +20,12 @@ use App\Models\Warehouse\ToolIssuance;
 use App\Policies\Warehouse\OffcutPolicy;
 use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Procurement\ProcurementAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(CrmAuditLogger::class);
+        $this->app->singleton(ProcurementAuditLogger::class);
     }
 
     /**
@@ -157,5 +166,14 @@ class AppServiceProvider extends ServiceProvider
                 app(SyncDepartmentRolesToSpatie::class)->sync($user);
             }
         });
+
+        $this->registerProcurementListeners();
+    }
+
+    protected function registerProcurementListeners(): void
+    {
+        Event::listen(ProjectMaterialShortageDetected::class, DraftPurchaseRequisitionFromShortage::class);
+        Event::listen(ProjectAddonRequested::class, CreateAddonRequisition::class);
+        Event::listen(ProductionStageCompleted::class, NotifyGlassProcurement::class);
     }
 }

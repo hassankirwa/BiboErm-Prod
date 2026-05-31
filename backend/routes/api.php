@@ -141,6 +141,8 @@ Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () 
     require __DIR__.'/api/crm/reports.php';
 });
 
+Route::middleware(['auth:sanctum', 'active'])->prefix('procurement')->group(function () {
+    require __DIR__.'/api/procurement.php';
 Route::middleware(['auth:sanctum', 'active', 'device.trusted'])->prefix('warehouse')->group(function () {
     require __DIR__.'/api/warehouse/locations.php';
     require __DIR__.'/api/warehouse/inventory.php';
