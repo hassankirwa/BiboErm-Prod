@@ -143,5 +143,14 @@ Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () 
 
 Route::middleware(['auth:sanctum', 'active'])->prefix('procurement')->group(function () {
     require __DIR__.'/api/procurement.php';
+Route::middleware(['auth:sanctum', 'active', 'device.trusted'])->prefix('warehouse')->group(function () {
+    require __DIR__.'/api/warehouse/locations.php';
+    require __DIR__.'/api/warehouse/inventory.php';
+    require __DIR__.'/api/warehouse/movements.php';
+    require __DIR__.'/api/warehouse/reservations.php';
+    require __DIR__.'/api/warehouse/offcuts.php';
+    require __DIR__.'/api/warehouse/master-data.php';
+    require __DIR__.'/api/warehouse/tools.php';
+    require __DIR__.'/api/warehouse/stock-take.php';
 });
 }); // v1
