@@ -258,7 +258,7 @@ export interface PurchaseOrder {
   updatedAt: string;
 }
 
-// Production Types
+// Production Types (legacy mock shapes — live UI uses @/lib/api/production)
 export type ProductionStage =
   | "scheduled"
   | "material_prep"

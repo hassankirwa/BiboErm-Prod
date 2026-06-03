@@ -597,7 +597,10 @@ export async function verifyGoodsReceipt(id: number) {
   });
 }
 
-export async function listGlassOrders(params?: { per_page?: number }) {
+export async function listGlassOrders(params?: {
+  per_page?: number;
+  project_id?: number;
+}) {
   return apiRequest<Paginated<GlassOrder>>(`/procurement/glass-orders${buildQuery(params)}`);
 }
 

@@ -1,34 +1,63 @@
-import { AppHeader } from "@/components/app-header";
-import { ProductionSchedule } from "@/components/production/production-schedule";
-import { ProductionStats } from "@/components/production/production-stats";
-import { Button } from "@/components/ui/button";
-import { Plus, Calendar } from "lucide-react";
-
-export default function ProductionSchedulePage() {
-  return (
-    <div className="flex min-w-0 w-full flex-col">
-      <AppHeader
-        title="Production Schedule"
-        subtitle="Manage production pipeline"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5">
-              <Calendar className="h-4 w-4" />
-              Calendar View
-            </Button>
-            <Button size="sm" className="h-8 gap-1.5">
-              <Plus className="h-4 w-4" />
-              New Order
-            </Button>
-          </div>
-        }
-      />
-      <div className="min-w-0 w-full">
-        <div className="space-y-6 p-6">
-          <ProductionStats />
-          <ProductionSchedule />
-        </div>
-      </div>
-    </div>
-  );
-}
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { AppHeader } from "@/components/app-header";
+import { ProductionSchedule } from "@/components/production/production-schedule";
+import { ProductionStats } from "@/components/production/production-stats";
+import { usePermissions } from "@/hooks/use-permissions";
+import {
+  listProductionOrders,
+  listProductionSchedule,
+  type ProductionOrder,
+  type ScheduleOrder,
+} from "@/lib/api/production";
+import { toast } from "sonner";
+
+export default function ProductionSchedulePage() {
+  const { can } = usePermissions();
+  const [schedule, setSchedule] = useState<ScheduleOrder[]>([]);
+  const [orders, setOrders] = useState<ProductionOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const canReorder = can("production.schedule.manage");
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      listProductionSchedule(),
+      listProductionOrders({ per_page: 100 }),
+    ])
+      .then(([schedRes, ordersRes]) => {
+        setSchedule(schedRes.data);
+        setOrders(ordersRes.data);
+      })
+      .catch((e: Error) => toast.error(e.message || "Failed to load production schedule"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="flex min-w-0 w-full flex-col">
+      <AppHeader
+        title="Production Schedule"
+        subtitle="FIFO queue — orders are created when warehouse materials are ready"
+      />
+      <div className="min-w-0 w-full space-y-6 p-6">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading schedule…</p>
+        ) : (
+          <>
+            <ProductionStats orders={orders} />
+            <ProductionSchedule
+              orders={schedule}
+              canReorder={canReorder}
+              onScheduleUpdated={load}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
