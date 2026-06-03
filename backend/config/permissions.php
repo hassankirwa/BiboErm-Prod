@@ -39,6 +39,8 @@ return [
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view', 'procurement.manage', 'procurement.approve',
             'production.view', 'production.manage',
+            'field_installation.view', 'field_installation.manage', 'field_installation.log',
+            'field_installation.deliver', 'field_installation.tools',
             'qc.view', 'qc.manage',
             'finance.view', 'finance.manage',
             'hr.view',
@@ -79,8 +81,23 @@ return [
             'warehouse.view',
             'procurement.view',
             'production.view',
+            'field_installation.view',
             'qc.view',
             'finance.view',
+        ],
+
+        'installation_lead' => [
+            'field_installation.view', 'field_installation.manage', 'field_installation.log',
+            'field_installation.deliver', 'field_installation.tools',
+            'warehouse.tools.view', 'warehouse.tools.issue',
+            'projects.view',
+        ],
+
+        'field_installation_engineer' => [
+            'field_installation.view', 'field_installation.log',
+            'field_installation.deliver', 'field_installation.tools',
+            'warehouse.tools.view', 'warehouse.tools.issue',
+            'projects.view',
         ],
 
         'production_manager' => [
@@ -212,6 +229,11 @@ return [
         'role' => ['view' => 'users.view', 'manage' => 'users.manage'],
         'department' => ['view' => 'users.view', 'manage' => 'users.manage'],
         'audit_log' => ['view' => 'audit.view'],
+        'field_installation_job' => [
+            'view' => 'field_installation.view',
+            'create' => 'field_installation.manage',
+            'manage' => 'field_installation.manage',
+        ],
     ],
 
 ];

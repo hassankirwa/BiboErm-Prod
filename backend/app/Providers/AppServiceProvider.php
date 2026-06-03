@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Events\FieldInstallation\FieldInstallationCompleted;
+use App\Events\FieldInstallation\FieldNonConformityReported;
 use App\Events\Procurement\GoodsReceiptVerified;
 use App\Events\Procurement\PurchaseRequisitionApproved;
 use App\Events\Production\ProductionStageCompleted;
@@ -12,7 +14,9 @@ use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Events\Warehouse\ProjectMaterialsReady;
 use App\Events\Warehouse\ProjectMaterialsReserved;
 use App\Events\Warehouse\WarehouseLowStockDetected;
+use App\Listeners\FieldInstallation\NotifyPmOnFieldNonConformity;
 use App\Listeners\Projects\OnDealProjectCreated;
+use App\Listeners\Projects\OnFieldInstallationCompleted;
 use App\Listeners\Projects\OnProductionStageCompleted;
 use App\Listeners\Projects\OnProjectBomFinalized;
 use App\Listeners\Projects\OnProjectMaterialShortageDetected;
@@ -22,6 +26,10 @@ use App\Listeners\Procurement\CreateAddonRequisition;
 use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
 use App\Listeners\Procurement\NotifyGlassProcurement;
 use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
+use App\Models\FieldInstallation\FieldInstallationJob;
+use App\Models\FieldInstallation\FieldInstallationUnit;
+use App\Models\FieldInstallation\FieldNonConformity;
+use App\Models\FieldInstallation\FieldToolAssignment;
 use App\Models\Project;
 use App\Listeners\Warehouse\HandleProjectBomFinalized;
 use App\Listeners\Warehouse\NotifyProcurementOfficersOfLowStock;
@@ -36,10 +44,12 @@ use App\Models\Warehouse\Section;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\Tool;
 use App\Models\Warehouse\ToolIssuance;
+use App\Policies\FieldInstallation\FieldInstallationJobPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\Warehouse\OffcutPolicy;
 use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\FieldInstallation\FieldInstallationAuditLogger;
 use App\Services\Procurement\ProcurementAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
@@ -64,6 +74,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(CrmAuditLogger::class);
         $this->app->singleton(ProcurementAuditLogger::class);
+        $this->app->singleton(FieldInstallationAuditLogger::class);
     }
 
     /**
@@ -77,8 +88,13 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('reservation', fn ($id) => StockReservation::query()->findOrFail($id));
         Route::bind('tool', fn ($id) => Tool::query()->findOrFail($id));
         Route::bind('issuance', fn ($id) => ToolIssuance::query()->findOrFail($id));
+        Route::bind('fieldJob', fn ($id) => FieldInstallationJob::query()->findOrFail($id));
+        Route::bind('nonConformity', fn ($id) => FieldNonConformity::query()->findOrFail($id));
+        Route::bind('toolAssignment', fn ($id) => FieldToolAssignment::query()->findOrFail($id));
+        Route::bind('unit', fn ($id) => FieldInstallationUnit::query()->findOrFail($id));
 
         Gate::policy(Bin::class, StockMovementPolicy::class);
+        Gate::policy(FieldInstallationJob::class, FieldInstallationJobPolicy::class);
         Gate::policy(OffcutPiece::class, OffcutPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
 
@@ -191,6 +207,13 @@ class AppServiceProvider extends ServiceProvider
         $this->registerProjectListeners();
         $this->registerProcurementListeners();
         $this->registerWarehouseListeners();
+        $this->registerFieldInstallationListeners();
+    }
+
+    protected function registerFieldInstallationListeners(): void
+    {
+        Event::listen(FieldNonConformityReported::class, NotifyPmOnFieldNonConformity::class);
+        Event::listen(FieldInstallationCompleted::class, OnFieldInstallationCompleted::class);
     }
 
     protected function registerProjectListeners(): void

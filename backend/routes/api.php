@@ -159,4 +159,10 @@ Route::middleware(['auth:sanctum', 'active', 'device.trusted'])->prefix('warehou
     require __DIR__.'/api/warehouse/tools.php';
     require __DIR__.'/api/warehouse/stock-take.php';
 });
+
+Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
+    ->prefix('field-installation')
+    ->group(function () {
+        require __DIR__.'/api/field-installation.php';
+    });
 }); // v1

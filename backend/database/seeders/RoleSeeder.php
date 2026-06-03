@@ -26,6 +26,8 @@ class RoleSeeder extends Seeder
         'it_admin',
         'reception',
         'client',
+        'installation_lead',
+        'field_installation_engineer',
     ];
 
     public function run(): void

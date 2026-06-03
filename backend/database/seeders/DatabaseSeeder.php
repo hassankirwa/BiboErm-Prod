@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             DefaultAdminSeeder::class,
             ModuleDemoUsersSeeder::class,
+            FieldInstallationDemoUsersSeeder::class,
             CrmLookupSeeder::class,
             CrmSeeder::class,
             ProcurementSeeder::class,

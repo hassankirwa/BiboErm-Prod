@@ -261,7 +261,6 @@ export const departments: Department[] = [
       { name: "Orders", path: "/production/orders" },
       { name: "Cutting", path: "/production/cutting" },
       { name: "Assembly", path: "/production/assembly" },
-      { name: "Installation", path: "/production/installation" },
     ],
     nav: {
       topItems: [
@@ -278,7 +277,30 @@ export const departments: Department[] = [
             { name: "Orders", path: "/production/orders" },
             { name: "Cutting", path: "/production/cutting" },
             { name: "Assembly", path: "/production/assembly" },
-            { name: "Installation", path: "/production/installation" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: "field_installation",
+    name: "Field Installation",
+    icon: Wrench,
+    path: "/field-installation",
+    subModules: [
+      { name: "Jobs", path: "/field-installation/jobs", permission: "field_installation.view" },
+    ],
+    nav: {
+      topItems: [
+        { name: "Home", path: "/field-installation/jobs" },
+        { name: "Reports", path: "/analytics" },
+      ],
+      groups: [
+        {
+          label: "Field Installation",
+          icon: Wrench,
+          items: [
+            { name: "Jobs", path: "/field-installation/jobs", permission: "field_installation.view" },
           ],
         },
       ],
@@ -542,11 +564,11 @@ export const workspaceApps: WorkspaceApp[] = [
   },
   {
     id: "installation",
-    name: "Installation",
-    href: "/production/installation",
+    name: "Field Installation",
+    href: "/field-installation/jobs",
     icon: Wrench,
     iconClassName: "bg-blue-100 text-blue-700",
-    badge: { label: "5 Scheduled", className: "text-blue-600" },
+    permission: "field_installation.view",
   },
   {
     id: "finance",
@@ -682,6 +704,7 @@ function isProjectsModulePath(pathname: string): boolean {
 const SLUG_TO_DEPARTMENT_ID: Record<string, string> = {
   sales_marketing: "crm",
   production: "production",
+  field_installation: "field_installation",
   warehouse: "warehouse",
   procurement: "procurement",
   quality_control: "qc",
