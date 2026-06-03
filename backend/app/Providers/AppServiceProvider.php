@@ -2,31 +2,35 @@
 
 namespace App\Providers;
 
+use App\Events\Crm\DealProjectCreated;
 use App\Events\Procurement\GoodsReceiptVerified;
 use App\Events\Procurement\PurchaseRequisitionApproved;
 use App\Events\Production\ProductionStageCompleted;
-use App\Events\Crm\DealProjectCreated;
-use App\Events\Projects\ProjectBomFinalized;
 use App\Events\Projects\ProjectAddonRequested;
+use App\Events\Projects\ProjectBomFinalized;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Events\Warehouse\ProjectMaterialsReady;
 use App\Events\Warehouse\ProjectMaterialsReserved;
 use App\Events\Warehouse\WarehouseLowStockDetected;
+use App\Listeners\Procurement\CreateAddonRequisition;
+use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
+use App\Listeners\Procurement\NotifyGlassProcurement;
+use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
+use App\Listeners\Production\CreateProductionOrder;
+use App\Listeners\Production\NotifyProductionManagersOfNewOrder;
 use App\Listeners\Projects\OnDealProjectCreated;
 use App\Listeners\Projects\OnProductionStageCompleted;
 use App\Listeners\Projects\OnProjectBomFinalized;
 use App\Listeners\Projects\OnProjectMaterialShortageDetected;
 use App\Listeners\Projects\OnProjectMaterialsReady;
 use App\Listeners\Projects\OnProjectMaterialsReserved;
-use App\Listeners\Procurement\CreateAddonRequisition;
-use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
-use App\Listeners\Procurement\NotifyGlassProcurement;
-use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
-use App\Models\Project;
 use App\Listeners\Warehouse\HandleProjectBomFinalized;
 use App\Listeners\Warehouse\NotifyProcurementOfficersOfLowStock;
 use App\Listeners\Warehouse\ReceiveGoodsIntoWarehouse;
 use App\Listeners\Warehouse\ReleaseMaterialsOnProductionStageCompleted;
+use App\Models\Production\CuttingSheet;
+use App\Models\Production\ProductionOrder;
+use App\Models\Project;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\Warehouse\Bin;
@@ -36,11 +40,14 @@ use App\Models\Warehouse\Section;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\Tool;
 use App\Models\Warehouse\ToolIssuance;
+use App\Policies\Production\ProductionOrderPolicy;
+use App\Policies\Production\ProductionSchedulePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\Warehouse\OffcutPolicy;
 use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Procurement\ProcurementAuditLogger;
+use App\Services\Production\ProductionAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -64,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(CrmAuditLogger::class);
         $this->app->singleton(ProcurementAuditLogger::class);
+        $this->app->singleton(ProductionAuditLogger::class);
     }
 
     /**
@@ -77,7 +85,11 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('reservation', fn ($id) => StockReservation::query()->findOrFail($id));
         Route::bind('tool', fn ($id) => Tool::query()->findOrFail($id));
         Route::bind('issuance', fn ($id) => ToolIssuance::query()->findOrFail($id));
+        Route::bind('order', fn ($id) => ProductionOrder::query()->findOrFail($id));
+        Route::bind('line', fn ($id) => CuttingSheet::query()->findOrFail($id));
 
+        Gate::policy(ProductionOrder::class, ProductionOrderPolicy::class);
+        Gate::define('production.schedule.viewAny', fn (User $user) => app(ProductionSchedulePolicy::class)->viewAny($user));
         Gate::policy(Bin::class, StockMovementPolicy::class);
         Gate::policy(OffcutPiece::class, OffcutPolicy::class);
         Gate::policy(Project::class, ProjectPolicy::class);
@@ -191,6 +203,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerProjectListeners();
         $this->registerProcurementListeners();
         $this->registerWarehouseListeners();
+        $this->registerProductionListeners();
     }
 
     protected function registerProjectListeners(): void
@@ -217,5 +230,11 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(GoodsReceiptVerified::class, ReceiveGoodsIntoWarehouse::class);
         Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class);
         Event::listen(WarehouseLowStockDetected::class, NotifyProcurementOfficersOfLowStock::class);
+    }
+
+    protected function registerProductionListeners(): void
+    {
+        Event::listen(ProjectMaterialsReady::class, CreateProductionOrder::class);
+        Event::listen(ProjectMaterialsReady::class, NotifyProductionManagersOfNewOrder::class);
     }
 }

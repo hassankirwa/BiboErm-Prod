@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse\Offcuts;
 
+use App\Enums\Warehouse\OffcutStorageArea;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Warehouse\Offcuts\LogOffcutRequest;
 use App\Http\Resources\Warehouse\OffcutResource;
@@ -18,17 +19,18 @@ class LogOffcutController extends Controller
     {
         $data = $request->validated();
 
-        $bin = Bin::query()->findOrFail($data['bin_id']);
-        $this->authorize('logOffcut', $bin);
+        if (
+            ($data['storage_area'] ?? OffcutStorageArea::WarehouseDeck->value) !== OffcutStorageArea::ProductionWorkspace->value
+            && isset($data['bin_id'])
+        ) {
+            $bin = Bin::query()->findOrFail($data['bin_id']);
+            $this->authorize('logOffcut', $bin);
+        }
 
-        $offcut = $this->offcutLogging->log(
+        $offcut = $this->offcutLogging->logFromArray(
             user: $request->user(),
-            itemId: $data['item_id'],
-            binId: $data['bin_id'],
-            lengthMm: $data['length_mm'],
-            quantityPieces: $data['quantity_pieces'] ?? 1,
+            data: $data,
             sourceProjectId: $data['source_project_id'] ?? null,
-            notes: $data['notes'] ?? null,
         );
 
         return new OffcutResource($offcut);

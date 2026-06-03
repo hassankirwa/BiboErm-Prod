@@ -38,7 +38,7 @@ return [
             'warehouse.tools.view', 'warehouse.tools.manage', 'warehouse.tools.issue',
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view', 'procurement.manage', 'procurement.approve',
-            'production.view', 'production.manage',
+            'production.view', 'production.manage', 'production.schedule.manage',
             'qc.view', 'qc.manage',
             'finance.view', 'finance.manage',
             'hr.view',
@@ -90,7 +90,7 @@ return [
             'warehouse.stock.view',
             'warehouse.reservations.view',
             'warehouse.reservations.release',
-            'production.view', 'production.manage',
+            'production.view', 'production.manage', 'production.schedule.manage',
             'qc.view',
         ],
 
