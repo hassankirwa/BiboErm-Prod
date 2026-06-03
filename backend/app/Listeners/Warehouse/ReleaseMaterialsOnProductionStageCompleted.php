@@ -2,6 +2,7 @@
 
 namespace App\Listeners\Warehouse;
 
+use App\Enums\Production\ProductionStage;
 use App\Events\Production\ProductionStageCompleted;
 use App\Services\Warehouse\Reservations\StageMaterialReleaseService;
 
@@ -13,6 +14,12 @@ class ReleaseMaterialsOnProductionStageCompleted
 
     public function handle(ProductionStageCompleted $event): void
     {
-        $this->stageRelease->releaseForStage($event->projectId, $event->stage);
+        $stage = ProductionStage::tryFrom($event->productionStage);
+
+        if (! $stage) {
+            return;
+        }
+
+        $this->stageRelease->releaseForStage($event->projectId, $stage);
     }
 }

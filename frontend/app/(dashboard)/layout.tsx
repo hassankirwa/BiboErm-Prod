@@ -21,7 +21,7 @@ export default function DashboardLayout({
           } as React.CSSProperties
         }
       >
-        <div className="flex h-dvh w-full max-w-full flex-col overflow-hidden">
+        <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-hidden">
           <AppTopbar />
           <div className="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
             <AppSidebar />

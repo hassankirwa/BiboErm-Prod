@@ -24,8 +24,18 @@ class UpdateGoodsReceiptLinesController extends Controller
             'lines.*.qty_rejected' => ['nullable', 'numeric', 'min:0'],
             'lines.*.rejection_reason' => ['nullable', 'string'],
             'lines.*.to_bin_id' => ['nullable', 'integer', 'exists:warehouse_bins,id'],
+            'lines.*.notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'quality_inspection_notes' => ['nullable', 'string'],
         ]);
 
-        return new GoodsReceiptResource($this->service->updateLines($goodsReceipt, $validated['lines']));
+        return new GoodsReceiptResource($this->service->updateLines(
+            $goodsReceipt,
+            $validated['lines'],
+            [
+                'notes' => $validated['notes'] ?? null,
+                'quality_inspection_notes' => $validated['quality_inspection_notes'] ?? null,
+            ],
+        ));
     }
 }

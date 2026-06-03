@@ -92,6 +92,7 @@ export const departments: Department[] = [
       { name: "Contacts", path: "/crm/contacts" },
       { name: "Accounts", path: "/crm/accounts" },
       { name: "Deals", path: "/crm/deals" },
+      { name: "Projects", path: "/crm/projects", permission: "projects.view" },
       { name: "Site Visits", path: "/crm/site-visits" },
       { name: "Field Day", path: "/crm/field-day", permission: "field_day.view" },
       { name: "Activities", path: "/crm/activities" },
@@ -111,6 +112,7 @@ export const departments: Department[] = [
             { name: "Contacts", path: "/crm/contacts" },
             { name: "Accounts", path: "/crm/accounts" },
             { name: "Deals", path: "/crm/deals" },
+            { name: "Projects", path: "/crm/projects", permission: "projects.view" },
             { name: "Site Visits", path: "/crm/site-visits" },
             { name: "Today", path: "/crm/site-visits/today" },
             {
@@ -169,15 +171,20 @@ export const departments: Department[] = [
     icon: Warehouse,
     path: "/warehouse",
     subModules: [
-      { name: "Inventory", path: "/warehouse/inventory" },
-      { name: "Stock Movements", path: "/warehouse/movements" },
-      { name: "Offcuts", path: "/warehouse/offcuts" },
-      { name: "Tools", path: "/warehouse/tools" },
-      { name: "Master Data", path: "/warehouse/master-data" },
+      { name: "Inventory", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
+      { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
+      { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
+      { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
+      { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
+      { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
+      { name: "Project Pipeline", path: "/warehouse/projects", permission: "projects.view" },
+      { name: "Master Data", path: "/warehouse/master-data", permission: "warehouse.master_data.view" },
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/warehouse/inventory" },
+        { name: "Home", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
+        { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
+      { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
         { name: "Reports", path: "/analytics" },
         { name: "Analytics", path: "/analytics" },
       ],
@@ -186,11 +193,14 @@ export const departments: Department[] = [
           label: "Inventory",
           icon: Package,
           items: [
-            { name: "Inventory", path: "/warehouse/inventory" },
-            { name: "Stock Movements", path: "/warehouse/movements" },
-            { name: "Offcuts", path: "/warehouse/offcuts" },
-            { name: "Tools", path: "/warehouse/tools" },
-            { name: "Master Data", path: "/warehouse/master-data" },
+            { name: "Inventory", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
+            { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
+      { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
+            { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
+            { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
+            { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
+            { name: "Project Pipeline", path: "/warehouse/projects", permission: "projects.view" },
+            { name: "Master Data", path: "/warehouse/master-data", permission: "warehouse.master_data.view" },
           ],
         },
       ],
@@ -202,26 +212,40 @@ export const departments: Department[] = [
     icon: ShoppingCart,
     path: "/procurement",
     subModules: [
-      { name: "Purchase Orders", path: "/procurement/orders" },
-      { name: "Suppliers", path: "/procurement/suppliers" },
-      { name: "Requisitions", path: "/procurement/requisitions" },
-      { name: "Transport", path: "/procurement/transport" },
+      { name: "Dashboard", path: "/procurement/dashboard", permission: "procurement.view" },
+      { name: "Stock Management", path: "/procurement/stock", permission: "procurement.view" },
+      { name: "Stock Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
+      { name: "Purchase Orders", path: "/procurement/orders", permission: "procurement.view" },
+      { name: "Receiving Logs", path: "/procurement/goods-receipts", permission: "procurement.view" },
+      { name: "Suppliers", path: "/procurement/suppliers", permission: "procurement.view" },
+      { name: "Drivers", path: "/procurement/drivers", permission: "procurement.view" },
+      { name: "Requisitions", path: "/procurement/requisitions", permission: "procurement.view" },
+      { name: "Create Requisition", path: "/procurement/requisitions/create", permission: "procurement.manage" },
+      { name: "Project Materials", path: "/procurement/project-materials", permission: "procurement.view" },
+      { name: "Transport", path: "/procurement/transport", permission: "procurement.manage" },
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/procurement/orders" },
+        { name: "Home", path: "/procurement/dashboard", permission: "procurement.view" },
         { name: "Reports", path: "/analytics" },
-        { name: "Analytics", path: "/analytics" },
+        { name: "Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
       ],
       groups: [
         {
           label: "Procurement",
           icon: ShoppingCart,
           items: [
-            { name: "Purchase Orders", path: "/procurement/orders" },
-            { name: "Suppliers", path: "/procurement/suppliers" },
-            { name: "Requisitions", path: "/procurement/requisitions" },
-            { name: "Transport", path: "/procurement/transport" },
+            { name: "Dashboard", path: "/procurement/dashboard", permission: "procurement.view" },
+            { name: "Stock Management", path: "/procurement/stock", permission: "procurement.view" },
+            { name: "Stock Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
+            { name: "Purchase Orders", path: "/procurement/orders", permission: "procurement.view" },
+      { name: "Receiving Logs", path: "/procurement/goods-receipts", permission: "procurement.view" },
+            { name: "Suppliers", path: "/procurement/suppliers", permission: "procurement.view" },
+            { name: "Drivers", path: "/procurement/drivers", permission: "procurement.view" },
+            { name: "Requisitions", path: "/procurement/requisitions", permission: "procurement.view" },
+            { name: "Create Requisition", path: "/procurement/requisitions/create", permission: "procurement.manage" },
+            { name: "Project Materials", path: "/procurement/project-materials", permission: "procurement.view" },
+            { name: "Transport", path: "/procurement/transport", permission: "procurement.manage" },
           ],
         },
       ],
@@ -480,6 +504,7 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/warehouse/offcuts",
     icon: Scissors,
     iconClassName: "bg-red-100 text-red-600",
+    permission: "warehouse.offcuts.manage",
   },
   {
     id: "procurement",
@@ -488,7 +513,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Receipt,
     iconClassName: "bg-emerald-100 text-emerald-600",
     badge: { label: "4 Pending", className: "text-teal-600" },
-    permission: "procurement.po.create",
+    permission: "procurement.view",
   },
   {
     id: "production",
@@ -606,6 +631,11 @@ export function filterDepartmentNav(
     subModules,
     nav: {
       ...department.nav,
+      topItems: filterSubModulesByPermissions(
+        department.nav.topItems,
+        permissions,
+        roles,
+      ),
       groups: department.nav.groups.map((group) => ({
         ...group,
         items: filterSubModulesByPermissions(group.items, permissions, roles),
@@ -643,11 +673,11 @@ export function isWorkspaceNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-const workspaceShellPrefixes = [
-  "/analytics",
-  "/projects",
-  "/notifications",
-];
+const workspaceShellPrefixes = ["/analytics", "/notifications"];
+
+function isProjectsModulePath(pathname: string): boolean {
+  return pathname === "/projects" || pathname.startsWith("/projects/");
+}
 
 const SLUG_TO_DEPARTMENT_ID: Record<string, string> = {
   sales_marketing: "crm",
@@ -690,6 +720,10 @@ export function isWorkspaceSettingsPath(pathname: string): boolean {
 }
 
 export function getActiveDepartment(pathname: string): Department | null {
+  if (isProjectsModulePath(pathname)) {
+    return departments.find((department) => department.id === "projects") ?? null;
+  }
+
   if (
     workspaceShellPrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -717,4 +751,18 @@ export function getActiveDepartment(pathname: string): Department | null {
 
 export function isWorkspaceRoute(pathname: string): boolean {
   return getActiveDepartment(pathname) === null;
+}
+
+/** Match list routes and single-segment detail pages (e.g. /projects/12). */
+export function isDepartmentNavItemActive(pathname: string, path: string): boolean {
+  if (pathname === path) {
+    return true;
+  }
+
+  if (!pathname.startsWith(`${path}/`)) {
+    return false;
+  }
+
+  const remainder = pathname.slice(path.length + 1);
+  return remainder.length > 0 && !remainder.includes("/");
 }

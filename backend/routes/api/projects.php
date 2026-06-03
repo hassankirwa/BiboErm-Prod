@@ -1,0 +1,46 @@
+<?php
+
+use App\Http\Controllers\Projects\ProjectBomController;
+use App\Http\Controllers\Projects\ProjectController;
+use App\Http\Controllers\Projects\ProjectDocumentController;
+use App\Http\Controllers\Projects\ProjectOperationsController;
+use App\Http\Controllers\Projects\ProjectSiteAssessmentController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('dashboard', [ProjectController::class, 'dashboard']);
+Route::get('pipeline', [ProjectController::class, 'pipeline']);
+Route::get('material-shortages', [ProjectOperationsController::class, 'materialShortages']);
+Route::get('/', [ProjectController::class, 'index']);
+Route::post('/', [ProjectController::class, 'store']);
+
+Route::prefix('{project}')->group(function () {
+    Route::get('/', [ProjectController::class, 'show']);
+    Route::patch('/', [ProjectController::class, 'update']);
+    Route::post('assign-pm', [ProjectController::class, 'assignProjectManager']);
+    Route::post('advance-stage', [ProjectController::class, 'advanceStage']);
+    Route::patch('site-assessment-notes', [ProjectController::class, 'updateSiteAssessmentNotes']);
+    Route::post('site-assessment/images', [ProjectSiteAssessmentController::class, 'storeImage']);
+    Route::delete('site-assessment/images', [ProjectSiteAssessmentController::class, 'destroyImage']);
+    Route::get('timeline', [ProjectController::class, 'timeline']);
+
+    Route::get('bom', [ProjectBomController::class, 'show']);
+    Route::post('bom/extract', [ProjectBomController::class, 'extract']);
+    Route::post('bom/import', [ProjectBomController::class, 'import']);
+    Route::post('bom', [ProjectBomController::class, 'store']);
+    Route::patch('bom/lines/{line}', [ProjectBomController::class, 'updateLine']);
+    Route::post('finalize-bom', [ProjectBomController::class, 'finalize']);
+
+    Route::get('documents', [ProjectDocumentController::class, 'index']);
+    Route::post('documents', [ProjectDocumentController::class, 'store']);
+    Route::get('documents/{document}/download', [ProjectDocumentController::class, 'download']);
+
+    Route::get('material-status', [ProjectOperationsController::class, 'materialStatus']);
+    Route::post('reserve-materials', [ProjectOperationsController::class, 'reserveMaterials']);
+    Route::post('delays', [ProjectOperationsController::class, 'storeDelay']);
+    Route::get('floors', [ProjectOperationsController::class, 'floors']);
+    Route::post('floors', [ProjectOperationsController::class, 'storeFloor']);
+    Route::get('engineers', [ProjectOperationsController::class, 'engineers']);
+    Route::post('engineers', [ProjectOperationsController::class, 'storeEngineer']);
+    Route::delete('engineers/{engineer}', [ProjectOperationsController::class, 'destroyEngineer']);
+    Route::post('addons', [ProjectOperationsController::class, 'addAddon']);
+});

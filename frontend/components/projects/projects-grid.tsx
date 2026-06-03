@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -17,36 +18,34 @@ import {
   AlertCircle,
   MoreVertical,
   Eye,
-  Edit,
   FileText,
-  Trash2,
   DollarSign,
 } from "lucide-react";
-import { mockProjects } from "@/lib/data/projects";
+import type { ProjectSummary } from "@/lib/api/projects";
 
 const stageColors: Record<string, string> = {
   awaiting_deposit: "bg-muted text-muted-foreground",
   deposit_received: "bg-info/10 text-info",
   site_assessment: "bg-info/10 text-info",
-  design_approval: "bg-info/10 text-info",
+  final_design_approval: "bg-info/10 text-info",
   bom_finalized: "bg-info/10 text-info",
   material_check: "bg-warning/10 text-warning",
   materials_reserved: "bg-warning/10 text-warning",
   awaiting_procurement: "bg-warning/10 text-warning",
   materials_ready: "bg-success/10 text-success",
-  cutting: "bg-primary/10 text-primary",
-  fabrication: "bg-primary/10 text-primary",
+  cutting_stage: "bg-primary/10 text-primary",
+  fabrication_stage: "bg-primary/10 text-primary",
   glass_assembly: "bg-primary/10 text-primary",
   qc_pre_installation: "bg-chart-4/10 text-chart-4",
   in_transit: "bg-chart-5/10 text-chart-5",
   installation: "bg-chart-5/10 text-chart-5",
   site_qc: "bg-chart-4/10 text-chart-4",
   snagging: "bg-warning/10 text-warning",
-  complete: "bg-success/10 text-success",
+  project_complete: "bg-success/10 text-success",
 };
 
 const priorityColors: Record<string, string> = {
-  standard: "bg-secondary text-secondary-foreground",
+  normal: "bg-secondary text-secondary-foreground",
   urgent: "bg-destructive/10 text-destructive",
   apartment_block: "bg-primary/10 text-primary",
 };
@@ -58,8 +57,21 @@ function formatStage(stage: string): string {
     .join(" ");
 }
 
-export function ProjectsGrid() {
-  if (mockProjects.length === 0) {
+type ProjectsGridProps = {
+  projects: ProjectSummary[];
+  loading?: boolean;
+};
+
+export function ProjectsGrid({ projects, loading = false }: ProjectsGridProps) {
+  if (loading) {
+    return (
+      <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
+        Loading projects...
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
     return (
       <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
         No projects to display.
@@ -69,14 +81,20 @@ export function ProjectsGrid() {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {mockProjects.map((project) => {
+      {projects.map((project) => {
+        const projectedEnd = project.projected_end ? new Date(project.projected_end) : null;
         const isDelayed =
-          new Date(project.projectedCompletionDate) < new Date() &&
-          project.stage !== "complete";
-        const daysRemaining = Math.ceil(
-          (new Date(project.projectedCompletionDate).getTime() - new Date().getTime()) /
-            (1000 * 60 * 60 * 24)
-        );
+          projectedEnd !== null &&
+          projectedEnd < new Date() &&
+          project.stage !== "project_complete";
+        const daysRemaining =
+          projectedEnd !== null
+            ? Math.ceil(
+                (projectedEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+              )
+            : null;
+        const quotedAmount = Number(project.quoted_amount ?? 0);
+        const depositReceived = Number(project.deposit_received ?? 0);
 
         return (
           <Card key={project.id} className="border-border hover:shadow-md transition-shadow">
@@ -91,7 +109,7 @@ export function ProjectsGrid() {
                       <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{project.id}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{project.reference}</p>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -100,33 +118,35 @@ export function ProjectsGrid() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Details
+                    <DropdownMenuItem asChild>
+                      <Link href={`/projects/${project.id}`}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Project
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <FileText className="mr-2 h-4 w-4" />
-                      View BOM
+                    <DropdownMenuItem asChild>
+                      <Link href={`/projects/${project.id}?tab=bom`}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        View BOM
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={priorityColors[project.priority]} variant="secondary">
+                <Badge
+                  className={priorityColors[project.priority] ?? priorityColors.normal}
+                  variant="secondary"
+                >
                   {project.priority.replace("_", " ")}
                 </Badge>
-                <Badge className={stageColors[project.stage]} variant="secondary">
+                <Badge
+                  className={stageColors[project.stage] ?? "bg-muted text-muted-foreground"}
+                  variant="secondary"
+                >
                   {formatStage(project.stage)}
                 </Badge>
               </div>
@@ -134,8 +154,12 @@ export function ProjectsGrid() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5" />
-                  {project.location}
-                  {!project.isNairobi && (
+                  {project.site_address || "Site not set"}
+                  {project.location_type === "nairobi" ? (
+                    <Badge variant="outline" className="text-[10px] h-4">
+                      Nairobi (fab → install)
+                    </Badge>
+                  ) : (
                     <Badge variant="outline" className="text-[10px] h-4">
                       Outside Nairobi
                     </Badge>
@@ -143,11 +167,11 @@ export function ProjectsGrid() {
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Calendar className="h-3.5 w-3.5" />
-                  Due: {new Date(project.projectedCompletionDate).toLocaleDateString()}
-                  {daysRemaining > 0 && (
+                  Due: {project.projected_end ? new Date(project.projected_end).toLocaleDateString() : "TBD"}
+                  {daysRemaining !== null && daysRemaining > 0 && (
                     <span className="text-success">({daysRemaining} days left)</span>
                   )}
-                  {daysRemaining < 0 && (
+                  {daysRemaining !== null && daysRemaining < 0 && (
                     <span className="text-destructive">({Math.abs(daysRemaining)} days overdue)</span>
                   )}
                 </div>
@@ -156,18 +180,18 @@ export function ProjectsGrid() {
               <div>
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">Progress</span>
-                  <span className="font-medium">{project.percentComplete}%</span>
+                  <span className="font-medium">{project.completion_percent}%</span>
                 </div>
-                <Progress value={project.percentComplete} className="h-1.5" />
+                <Progress value={project.completion_percent} className="h-1.5" />
               </div>
 
               <div className="flex items-center justify-between text-xs pt-2 border-t border-border">
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <DollarSign className="h-3.5 w-3.5" />
-                  KES {(project.totalValue / 1000).toFixed(0)}K
+                  KES {(quotedAmount / 1000).toFixed(0)}K
                 </div>
                 <div className="text-muted-foreground">
-                  Deposit: {Math.round((project.depositAmount / project.totalValue) * 100)}%
+                  Deposit: {quotedAmount > 0 ? Math.round((depositReceived / quotedAmount) * 100) : 0}%
                 </div>
               </div>
             </CardContent>

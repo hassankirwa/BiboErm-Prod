@@ -40,6 +40,7 @@ import {
   getActiveDepartment,
   getPrimaryDepartmentNav,
   filterDepartmentNav,
+  isDepartmentNavItemActive,
   isWorkspaceNavActive,
   isWorkspaceSettingsPath,
   workspaceNavItems,
@@ -205,7 +206,7 @@ function DepartmentContent({
                       href={sub.path}
                       name={sub.name}
                       icon={department.icon}
-                      isActive={pathname === sub.path}
+                      isActive={isDepartmentNavItemActive(pathname, sub.path)}
                     />
                   ))}
                 </SidebarMenu>
@@ -229,7 +230,7 @@ function DepartmentContent({
               {workspaceLink}
               {nav.topItems.map((item) => {
                 const Icon = topItemIcons[item.name] ?? Home;
-                const isActive = pathname === item.path;
+                const isActive = isDepartmentNavItemActive(pathname, item.path);
                 return (
                   <NavItem
                     key={item.name}
@@ -249,8 +250,8 @@ function DepartmentContent({
         <div className="sidebar-scroll-area min-h-0 flex-1">
           {nav.groups.map((group) => {
             const GroupIcon = group.icon;
-            const isGroupActive = group.items.some(
-              (item) => pathname === item.path,
+            const isGroupActive = group.items.some((item) =>
+              isDepartmentNavItemActive(pathname, item.path),
             );
 
             return (
@@ -283,10 +284,11 @@ function DepartmentContent({
                             <SidebarMenuSubItem key={item.path + item.name}>
                               <SidebarMenuSubButton
                                 asChild
-                                isActive={pathname === item.path}
+                                isActive={isDepartmentNavItemActive(pathname, item.path)}
                                 className={cn(
                                   "text-neutral-600 hover:text-neutral-900",
-                                  pathname === item.path && "sidebar-sub-active",
+                                  isDepartmentNavItemActive(pathname, item.path) &&
+                                    "sidebar-sub-active",
                                 )}
                               >
                                 <Link href={item.path}>
@@ -350,14 +352,15 @@ export function AppSidebar() {
     (isWorkspaceHubPath(pathname) && canWorkspace) ||
     (isWorkspaceSettingsPath(pathname) && canWorkspace);
 
-  const showDepartmentSidebar =
-    activeDepartment !== null ||
-    (isWorkspaceSettingsPath(pathname) && !canWorkspace && primaryDepartment !== null);
+  const sidebarDepartmentSource =
+    activeDepartment ??
+    (isWorkspaceSettingsPath(pathname) && !canWorkspace
+      ? primaryDepartment
+      : null) ??
+    primaryDepartment;
 
-  const sidebarDepartmentRaw =
-    activeDepartment ?? (showDepartmentSidebar ? primaryDepartment : null);
-  const sidebarDepartment = sidebarDepartmentRaw
-    ? filterDepartment(sidebarDepartmentRaw)
+  const sidebarDepartment = sidebarDepartmentSource
+    ? filterDepartment(sidebarDepartmentSource)
     : null;
 
   return (
@@ -372,11 +375,6 @@ export function AppSidebar() {
           department={sidebarDepartment}
           pathname={pathname}
           showWorkspaceLink={isSuperAdmin && !isWorkspaceHubPath(pathname)}
-        />
-      ) : primaryDepartment ? (
-        <DepartmentContent
-          department={filterDepartment(primaryDepartment)}
-          pathname={pathname}
         />
       ) : canWorkspace ? (
         <WorkspaceContent pathname={pathname} />

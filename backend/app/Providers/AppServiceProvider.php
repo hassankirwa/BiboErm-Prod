@@ -2,12 +2,31 @@
 
 namespace App\Providers;
 
+use App\Events\Procurement\GoodsReceiptVerified;
+use App\Events\Procurement\PurchaseRequisitionApproved;
 use App\Events\Production\ProductionStageCompleted;
+use App\Events\Crm\DealProjectCreated;
+use App\Events\Projects\ProjectBomFinalized;
 use App\Events\Projects\ProjectAddonRequested;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
+use App\Events\Warehouse\ProjectMaterialsReady;
+use App\Events\Warehouse\ProjectMaterialsReserved;
+use App\Events\Warehouse\WarehouseLowStockDetected;
+use App\Listeners\Projects\OnDealProjectCreated;
+use App\Listeners\Projects\OnProductionStageCompleted;
+use App\Listeners\Projects\OnProjectBomFinalized;
+use App\Listeners\Projects\OnProjectMaterialShortageDetected;
+use App\Listeners\Projects\OnProjectMaterialsReady;
+use App\Listeners\Projects\OnProjectMaterialsReserved;
 use App\Listeners\Procurement\CreateAddonRequisition;
 use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
 use App\Listeners\Procurement\NotifyGlassProcurement;
+use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
+use App\Models\Project;
+use App\Listeners\Warehouse\HandleProjectBomFinalized;
+use App\Listeners\Warehouse\NotifyProcurementOfficersOfLowStock;
+use App\Listeners\Warehouse\ReceiveGoodsIntoWarehouse;
+use App\Listeners\Warehouse\ReleaseMaterialsOnProductionStageCompleted;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\Warehouse\Bin;
@@ -17,6 +36,7 @@ use App\Models\Warehouse\Section;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\Tool;
 use App\Models\Warehouse\ToolIssuance;
+use App\Policies\ProjectPolicy;
 use App\Policies\Warehouse\OffcutPolicy;
 use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
@@ -60,6 +80,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Bin::class, StockMovementPolicy::class);
         Gate::policy(OffcutPiece::class, OffcutPolicy::class);
+        Gate::policy(Project::class, ProjectPolicy::class);
 
         Gate::define('logOffcut', fn (User $user, Bin $bin) => app(OffcutPolicy::class)->log($user, $bin));
 
@@ -167,13 +188,34 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        $this->registerProjectListeners();
         $this->registerProcurementListeners();
+        $this->registerWarehouseListeners();
+    }
+
+    protected function registerProjectListeners(): void
+    {
+        Event::listen(DealProjectCreated::class, OnDealProjectCreated::class);
+        Event::listen(ProjectBomFinalized::class, OnProjectBomFinalized::class);
+        Event::listen(ProjectMaterialShortageDetected::class, OnProjectMaterialShortageDetected::class);
+        Event::listen(ProjectMaterialsReserved::class, OnProjectMaterialsReserved::class);
+        Event::listen(ProjectMaterialsReady::class, OnProjectMaterialsReady::class);
+        Event::listen(ProductionStageCompleted::class, OnProductionStageCompleted::class);
     }
 
     protected function registerProcurementListeners(): void
     {
         Event::listen(ProjectMaterialShortageDetected::class, DraftPurchaseRequisitionFromShortage::class);
         Event::listen(ProjectAddonRequested::class, CreateAddonRequisition::class);
+        Event::listen(PurchaseRequisitionApproved::class, UnlockPurchaseOrderCreation::class);
         Event::listen(ProductionStageCompleted::class, NotifyGlassProcurement::class);
+    }
+
+    protected function registerWarehouseListeners(): void
+    {
+        Event::listen(ProjectBomFinalized::class, HandleProjectBomFinalized::class);
+        Event::listen(GoodsReceiptVerified::class, ReceiveGoodsIntoWarehouse::class);
+        Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class);
+        Event::listen(WarehouseLowStockDetected::class, NotifyProcurementOfficersOfLowStock::class);
     }
 }

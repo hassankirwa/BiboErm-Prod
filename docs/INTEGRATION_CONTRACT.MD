@@ -1,10 +1,10 @@
 # Cross-Module Integration Contract
 
-**Purpose:** Single source of truth for Agents 1–4 (Project Management, Warehouse, Procurement, Production) building in parallel.  
+**Purpose:** Single source of truth for Agents 1–5 (Project Management, Warehouse, Procurement, Production, Field Installation) building in parallel.  
 **Foundation (not parallel agent tracks):** [USER_ONBOARDING.MD](./USER_ONBOARDING.MD), [SALES_CRM.MD](./SALES_CRM.MD)  
 **Master plan:** [four_module_integration_plan_a3882cfc.plan.md](../../.cursor/plans/four_module_integration_plan_a3882cfc.plan.md)  
 **References:** [README.md](../README.md) §2, §8.2–8.5, §10 · [Raw_Plam.txt](./Raw_Plam.txt) §5–8 · [WAREHOUSE.MD](./WAREHOUSE.MD) §8, §17 · [SALES_CRM.MD](./SALES_CRM.MD) §14  
-**Version:** 1.1 · 2026 (integration questions resolved)
+**Version:** 1.2 · 2026 (Field Installation module added)
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## 1. Purpose & Principles
 
-This document defines **stable contracts** — event names, enum values, foreign-key column names, API response shapes, and ownership boundaries — so four agents can implement PM, Warehouse, Procurement, and Production without merge conflicts or divergent integration logic.
+This document defines **stable contracts** — event names, enum values, foreign-key column names, API response shapes, and ownership boundaries — so five module developers can implement PM, Warehouse, Procurement, Production, and Field Installation without merge conflicts or divergent integration logic.
 
 ### 1.1 Project-centric design
 
@@ -164,8 +164,11 @@ All events are Laravel classes under `backend/app/Events/{Module}/`. Listeners r
 | `PurchaseRequisitionApproved` | PROC | PROC (internal) | — |
 | `GoodsReceiptVerified` | PROC | WH | May reduce shortage |
 | `ProjectMaterialsReady` | WH | PM, PROD | → `materials_ready` |
-| `ProductionStageCompleted` | PROD | PM, PROC | Maps to stages 10–13 |
-| `OffcutLogged` | PROD / WH | WH | — |
+| `ProductionStageCompleted` | PROD | PM, PROC, WH | Maps to stages 10–13 |
+| `OffcutLogged` | WH | WH | — |
+| `FieldInstallationCompleted` | FIELD | PM | → `site_qc` (PM listener) |
+| `FieldNonConformityReported` | FIELD | PM | Notify on critical NC |
+| `FieldDeliveryRecorded` | FIELD | PM, PROC | Delivery handoff |
 | `ProjectAddonRequested` | PM | PROC | — |
 
 ### 3.2 Event specifications
@@ -455,7 +458,8 @@ These endpoints support UI deep links and dashboards. **Write operations stay in
 | **Agent 1** | Project Management | Implement warehouse stock mutations; create POs/GRNs; log production stages; rename `DealProjectCreated`; write `stock_levels` or `production_stage_logs` directly |
 | **Agent 2** | Warehouse | Finalize BOM; approve requisitions or verify GRNs; create production orders; write `projects.stage` except via listening + calling `ProjectStageService`; store glass in `warehouse_items` |
 | **Agent 3** | Procurement | Run FIFO reservation or BOM stock checks; receive stock into bins (inbound movements); complete production stages; write `projects.stage` directly |
-| **Agent 4** | Production | Create projects; approve PRs; verify GRNs; write `projects.stage` except via `ProductionStageCompleted` listener chain through PM service; override WH `fifo_sequence` (only `operations_manager` via WH API — see §11 Q14) |
+| **Agent 4** | Production | Create projects; approve PRs; verify GRNs; write `projects.stage` except via `ProductionStageCompleted` listener chain through PM service; override WH `fifo_sequence`; implement on-site field install (Dev 5 scope) |
+| **Agent 5** | Field Installation | Create projects; mutate `production_orders`; write `projects.stage` directly; create POs/GRNs; mutate `warehouse_tools` / `tool_issuances` directly (use WH API); duplicate production stage pipeline |
 
 ### 7.3 Shared files — coordination rules
 
@@ -504,6 +508,11 @@ From master plan — **conflict-free parallel development.**
 | `backend/app/Events/Production/` | Agent 4 |
 | `backend/app/Listeners/Production/` | Agent 4 |
 | `backend/app/Enums/Production/` | Agent 4 |
+| `backend/app/Services/FieldInstallation/` | Agent 5 |
+| `backend/app/Http/Controllers/FieldInstallation/` | Agent 5 |
+| `backend/app/Events/FieldInstallation/` | Agent 5 |
+| `backend/app/Listeners/FieldInstallation/` | Agent 5 |
+| `backend/app/Enums/FieldInstallation/` | Agent 5 |
 | `frontend/lib/api/projects.ts` | Agent 1 |
 | `frontend/lib/api/warehouse.ts` | Agent 2 |
 | `frontend/lib/api/procurement.ts` | Agent 3 |
@@ -676,12 +685,13 @@ Independent backend developers (not AI agents) should read this contract **befor
 | Dev 2 | [WAREHOUSE.MD](./WAREHOUSE.MD), [WAREHOUSE_MIGRATION_SPEC.MD](./WAREHOUSE_MIGRATION_SPEC.MD) | `400000` (refactor) | `Services/Warehouse/`, `Http/Controllers/Warehouse/` |
 | Dev 3 | [PROCUREMENT.MD](./PROCUREMENT.MD) | `500000`, `500001` | `Services/Procurement/`, `Http/Controllers/Procurement/` |
 | Dev 4 | [PRODUCTION.MD](./PRODUCTION.MD) | `600000`, `600001` | `Services/Production/`, `Http/Controllers/Production/` |
+| Dev 5 | [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD) | `650000`, `650001` | `Services/FieldInstallation/`, `Http/Controllers/FieldInstallation/` |
 
 **Also read:** [USER_ONBOARDING.MD](./USER_ONBOARDING.MD) (auth/permissions), [SALES_CRM.MD](./SALES_CRM.MD) §14 (handoff).
 
 **Tests:** `cd backend; php artisan test --filter=YourModuleTest` · **No frontend changes.**
 
-**Migration order:** CRM → Projects → Warehouse → Procurement → Production → Auth/HR.
+**Migration order:** CRM → Projects → Warehouse → Procurement → Production → **Field Installation** → QC → Finance.
 
 ---
 
@@ -693,6 +703,7 @@ Independent backend developers (not AI agents) should read this contract **befor
 | [docs/WAREHOUSE.MD](./WAREHOUSE.MD) | 2 | Exists |
 | [docs/PROCUREMENT.MD](./PROCUREMENT.MD) | 3 | Exists |
 | [docs/PRODUCTION.MD](./PRODUCTION.MD) | 4 | Exists |
+| [docs/FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD) | 5 | Exists |
 | [docs/SALES_CRM.MD](./SALES_CRM.MD) | Foundation | Exists |
 | [docs/USER_ONBOARDING.MD](./USER_ONBOARDING.MD) | Foundation | Exists |
 
@@ -713,4 +724,4 @@ backend/app/Enums/
 
 ---
 
-*End of Cross-Module Integration Contract v1.1*
+*End of Cross-Module Integration Contract v1.2*

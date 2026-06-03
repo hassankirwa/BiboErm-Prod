@@ -1,53 +1,56 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { mockWarehouseItems } from "@/lib/data/warehouse";
+import type { StockLevel } from "@/lib/api/warehouse";
 import { Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 
-const totalItems = mockWarehouseItems.length;
-const lowStockItems = mockWarehouseItems.filter(
-  (item) => item.currentStock - item.reservedStock < item.minStock
-);
-const totalReserved = mockWarehouseItems.reduce((acc, item) => acc + item.reservedStock, 0);
-const totalAvailable = mockWarehouseItems.reduce(
-  (acc, item) => acc + (item.currentStock - item.reservedStock),
-  0
-);
+export function InventoryStats({ items }: { items: StockLevel[] }) {
+  const totalItems = items.length;
+  const lowStockItems = items.filter(
+    (item) => Number(item.quantity_available) < Number(item.item?.min_stock_qty ?? 0),
+  );
+  const totalReserved = items.reduce(
+    (acc, item) => acc + Number(item.quantity_reserved),
+    0,
+  );
+  const totalAvailable = items.reduce(
+    (acc, item) => acc + Number(item.quantity_available),
+    0,
+  );
 
-const stats = [
-  {
-    label: "Total Items",
-    value: totalItems,
-    subtext: "In catalog",
-    icon: Package,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-  },
-  {
-    label: "Low Stock",
-    value: lowStockItems.length,
-    subtext: "Need restock",
-    icon: AlertTriangle,
-    color: "text-destructive",
-    bgColor: "bg-destructive/10",
-  },
-  {
-    label: "Reserved",
-    value: totalReserved,
-    subtext: "For projects",
-    icon: ArrowDownToLine,
-    color: "text-warning",
-    bgColor: "bg-warning/10",
-  },
-  {
-    label: "Available",
-    value: totalAvailable,
-    subtext: "Ready to use",
-    icon: ArrowUpFromLine,
-    color: "text-success",
-    bgColor: "bg-success/10",
-  },
-];
+  const stats = [
+    {
+      label: "Total Items",
+      value: totalItems,
+      subtext: "Active stock rows",
+      icon: Package,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+    },
+    {
+      label: "Low Stock",
+      value: lowStockItems.length,
+      subtext: "Need restock",
+      icon: AlertTriangle,
+      color: "text-destructive",
+      bgColor: "bg-destructive/10",
+    },
+    {
+      label: "Reserved",
+      value: totalReserved.toFixed(3),
+      subtext: "For projects",
+      icon: ArrowDownToLine,
+      color: "text-warning",
+      bgColor: "bg-warning/10",
+    },
+    {
+      label: "Available",
+      value: totalAvailable.toFixed(3),
+      subtext: "Ready to use",
+      icon: ArrowUpFromLine,
+      color: "text-success",
+      bgColor: "bg-success/10",
+    },
+  ];
 
-export function InventoryStats() {
   return (
     <div className="grid gap-4 md:grid-cols-4">
       {stats.map((stat) => {

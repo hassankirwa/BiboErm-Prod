@@ -27,7 +27,7 @@ class SupplierItemPriceController extends Controller
         $this->authorize('update', $supplier);
 
         $validated = $request->validate([
-            'warehouse_item_id' => ['required', 'integer', 'exists:inventory_items,id'],
+            'warehouse_item_id' => ['required', 'integer', 'exists:warehouse_items,id'],
             'unit_price' => ['required', 'numeric', 'min:0'],
             'currency' => ['nullable', 'string', 'size:3'],
             'effective_from' => ['required', 'date'],

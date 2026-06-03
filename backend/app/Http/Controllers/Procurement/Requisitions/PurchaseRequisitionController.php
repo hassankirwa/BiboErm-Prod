@@ -21,7 +21,14 @@ class PurchaseRequisitionController extends Controller
     {
         $this->authorize('viewAny', PurchaseRequisition::class);
 
-        $query = PurchaseRequisition::query()->with(['lines', 'project', 'requester'])->latest();
+        $query = PurchaseRequisition::query()->with([
+            'lines.warehouseItem',
+            'project',
+            'supplier',
+            'requester',
+            'approver',
+            'purchaseOrders',
+        ])->withCount('purchaseOrders')->latest();
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));
@@ -44,11 +51,13 @@ class PurchaseRequisitionController extends Controller
 
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.description' => ['required', 'string', 'max:255'],
             'lines.*.quantity' => ['required', 'numeric', 'min:0.001'],
-            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:inventory_items,id'],
+            'lines.*.required_quantity' => ['nullable', 'numeric', 'min:0.001'],
+            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
             'lines.*.sku' => ['nullable', 'string', 'max:50'],
             'lines.*.trigger_type' => ['nullable', 'string'],
             'lines.*.estimated_unit_price' => ['nullable', 'numeric'],
@@ -65,7 +74,9 @@ class PurchaseRequisitionController extends Controller
     {
         $this->authorize('view', $requisition);
 
-        return new PurchaseRequisitionResource($requisition->load(['lines', 'project', 'requester', 'approver']));
+        return new PurchaseRequisitionResource(
+            $requisition->load(['lines.warehouseItem', 'project', 'supplier', 'requester', 'approver', 'purchaseOrders'])
+        );
     }
 
     public function update(Request $request, PurchaseRequisition $requisition): PurchaseRequisitionResource
@@ -74,14 +85,20 @@ class PurchaseRequisitionController extends Controller
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
+            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'lines' => ['sometimes', 'array', 'min:1'],
             'lines.*.description' => ['required_with:lines', 'string', 'max:255'],
             'lines.*.quantity' => ['required_with:lines', 'numeric', 'min:0.001'],
-            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:inventory_items,id'],
+            'lines.*.required_quantity' => ['nullable', 'numeric', 'min:0.001'],
+            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
         ]);
 
         if (array_key_exists('notes', $validated)) {
             $requisition->update(['notes' => $validated['notes']]);
+        }
+
+        if (array_key_exists('supplier_id', $validated)) {
+            $requisition->update(['supplier_id' => $validated['supplier_id']]);
         }
 
         if (isset($validated['lines'])) {
@@ -93,11 +110,14 @@ class PurchaseRequisitionController extends Controller
                     'description' => $line['description'],
                     'sku' => $line['sku'] ?? null,
                     'quantity' => $line['quantity'],
+                    'required_quantity' => $line['required_quantity'] ?? $line['quantity'],
                     'trigger_type' => $line['trigger_type'] ?? 'manual',
                 ]);
             }
         }
 
-        return new PurchaseRequisitionResource($requisition->fresh(['lines', 'project']));
+        return new PurchaseRequisitionResource(
+            $requisition->fresh(['lines.warehouseItem', 'project', 'supplier', 'requester', 'approver'])
+        );
     }
 }

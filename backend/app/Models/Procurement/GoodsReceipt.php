@@ -21,6 +21,7 @@ class GoodsReceipt extends Model
         'verified_at',
         'verified_by',
         'notes',
+        'quality_inspection_notes',
         'created_by',
     ];
 

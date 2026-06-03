@@ -4,9 +4,9 @@ namespace App\Services\Procurement\Requisitions;
 
 use App\Enums\Procurement\RequisitionTrigger;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
-use App\Models\InventoryItem;
 use App\Models\Procurement\PurchaseRequisition;
 use App\Models\User;
+use App\Models\Warehouse\Item;
 use Illuminate\Validation\ValidationException;
 
 class AutoDraftRequisitionService
@@ -24,14 +24,14 @@ class AutoDraftRequisitionService
 
         $lines = [];
         foreach ($event->shortageLines as $shortage) {
-            $item = InventoryItem::query()->find($shortage['warehouse_item_id']);
+            $item = Item::query()->find($shortage['warehouse_item_id']);
             $lines[] = [
                 'warehouse_item_id' => $shortage['warehouse_item_id'],
                 'project_bom_line_id' => $shortage['project_bom_line_id'] ?? null,
                 'description' => $item?->name ?? 'Material shortage',
                 'sku' => $item?->sku,
                 'quantity' => $shortage['qty_short'],
-                'unit_of_measure' => $item?->unit,
+                'unit_of_measure' => $item?->unit_of_measure,
                 'trigger_type' => RequisitionTrigger::BomShortage->value,
             ];
         }

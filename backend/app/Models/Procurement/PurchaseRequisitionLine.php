@@ -3,7 +3,8 @@
 namespace App\Models\Procurement;
 
 use App\Enums\Procurement\RequisitionTrigger;
-use App\Models\InventoryItem;
+use App\Models\ProjectBomLine;
+use App\Models\Warehouse\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,6 +17,7 @@ class PurchaseRequisitionLine extends Model
         'description',
         'sku',
         'quantity',
+        'required_quantity',
         'unit_of_measure',
         'trigger_type',
         'estimated_unit_price',
@@ -27,6 +29,7 @@ class PurchaseRequisitionLine extends Model
         return [
             'trigger_type' => RequisitionTrigger::class,
             'quantity' => 'decimal:3',
+            'required_quantity' => 'decimal:3',
             'estimated_unit_price' => 'decimal:2',
         ];
     }
@@ -38,6 +41,11 @@ class PurchaseRequisitionLine extends Model
 
     public function warehouseItem(): BelongsTo
     {
-        return $this->belongsTo(InventoryItem::class, 'warehouse_item_id');
+        return $this->belongsTo(Item::class, 'warehouse_item_id');
+    }
+
+    public function projectBomLine(): BelongsTo
+    {
+        return $this->belongsTo(ProjectBomLine::class, 'project_bom_line_id');
     }
 }

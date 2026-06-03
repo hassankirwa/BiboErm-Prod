@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import {
   BIBO_DEAL_STAGES,
-  createProjectFromDeal,
+  dealDisplayName,
   dealValue,
   fetchDeal,
   fetchDealPayments,
@@ -387,12 +387,20 @@ export default function DealDetailPage({
     });
   }
 
-  async function handleCreateProject() {
-    await runAction("create-project", async () => {
-      const result = await createProjectFromDeal(dealId);
-      setDeal(result.data.deal);
-      toast.success("Project created from deal.");
-    });
+  function handleCreateProject() {
+    if (!deal) return;
+
+    const params = new URLSearchParams();
+    params.set("deal_id", String(dealId));
+    if (deal.account_id) {
+      params.set("account_id", String(deal.account_id));
+    }
+    params.set("deal_label", dealDisplayName(deal));
+    if (deal.account?.name) {
+      params.set("account_name", deal.account.name);
+    }
+
+    router.push(`/crm/projects/new?${params.toString()}`);
   }
 
   function renderActions() {

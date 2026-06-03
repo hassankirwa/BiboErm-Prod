@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { PurchaseOrdersStats } from "@/components/procurement/purchase-orders-stats";
 import { PurchaseOrdersTable } from "@/components/procurement/purchase-orders-table";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
@@ -18,11 +19,13 @@ export default function PurchaseOrdersPage() {
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Purchase Orders"
-        subtitle="Manage procurement orders"
+        subtitle="Manage procurement orders and start new POs from approved requisitions"
         actions={
-          <Button size="sm" className="h-8 gap-1.5">
-            <Plus className="h-4 w-4" />
-            Create PO
+          <Button asChild size="sm" className="h-8 gap-1.5">
+            <Link href="/procurement/requisitions">
+              <ArrowRight className="h-4 w-4" />
+              Open requisitions
+            </Link>
           </Button>
         }
       />

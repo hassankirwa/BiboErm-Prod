@@ -33,6 +33,7 @@ class GoodsReceiptService
                 'status' => GoodsReceiptStatus::Pending,
                 'received_at' => $data['received_at'] ?? now(),
                 'notes' => $data['notes'] ?? null,
+                'quality_inspection_notes' => $data['quality_inspection_notes'] ?? null,
                 'created_by' => $user->id,
             ]);
 
@@ -58,7 +59,7 @@ class GoodsReceiptService
         });
     }
 
-    public function updateLines(GoodsReceipt $grn, array $lines): GoodsReceipt
+    public function updateLines(GoodsReceipt $grn, array $lines, array $header = []): GoodsReceipt
     {
         foreach ($lines as $lineData) {
             $line = GoodsReceiptLine::query()
@@ -76,11 +77,20 @@ class GoodsReceiptService
             ]);
         }
 
+        $headerUpdates = array_filter([
+            'notes' => $header['notes'] ?? null,
+            'quality_inspection_notes' => $header['quality_inspection_notes'] ?? null,
+        ], fn ($value) => $value !== null);
+
+        if ($headerUpdates !== []) {
+            $grn->update($headerUpdates);
+        }
+
         if ($grn->status === GoodsReceiptStatus::Pending) {
             $grn->update(['status' => GoodsReceiptStatus::Verifying]);
         }
 
-        return $grn->fresh(['lines', 'attachments']);
+        return $grn->fresh(['lines', 'attachments', 'purchaseOrder.lines', 'purchaseOrder.supplier', 'creator']);
     }
 
     public function verify(GoodsReceipt $grn, User $user): GoodsReceipt
@@ -124,11 +134,42 @@ class GoodsReceiptService
                 $grn->project_id,
                 $user->id,
                 $acceptedLines,
+                $this->buildBomLineSummary($acceptedLines),
             );
 
             $this->audit->log('grn.verified', $grn);
 
             return $grn->fresh(['lines', 'attachments', 'purchaseOrder']);
         });
+    }
+
+    /**
+     * @param  array<int, array{purchase_order_line_id: int, warehouse_item_id: ?int, qty_accepted: float, to_bin_id?: ?int}>  $acceptedLines
+     * @return array<int, array{warehouse_item_id: int, qty_required: string, project_bom_line_id: null, required_length_mm: null, bom_line_ref: null}>
+     */
+    protected function buildBomLineSummary(array $acceptedLines): array
+    {
+        $totals = [];
+
+        foreach ($acceptedLines as $line) {
+            $itemId = $line['warehouse_item_id'] ?? null;
+
+            if (! $itemId) {
+                continue;
+            }
+
+            $totals[$itemId] = ($totals[$itemId] ?? 0.0) + (float) $line['qty_accepted'];
+        }
+
+        return collect($totals)
+            ->map(fn (float $qtyAccepted, int $itemId) => [
+                'warehouse_item_id' => $itemId,
+                'qty_required' => number_format($qtyAccepted, 3, '.', ''),
+                'project_bom_line_id' => null,
+                'required_length_mm' => null,
+                'bom_line_ref' => null,
+            ])
+            ->values()
+            ->all();
     }
 }

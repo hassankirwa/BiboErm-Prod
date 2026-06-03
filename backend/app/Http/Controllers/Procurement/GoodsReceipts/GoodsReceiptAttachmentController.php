@@ -25,7 +25,7 @@ class GoodsReceiptAttachmentController extends Controller
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:10240'],
-            'type' => ['required', 'string', 'in:receipt_photo,invoice_photo,delivery_note'],
+            'type' => ['required', 'string', 'in:receipt_photo,invoice_photo,delivery_note,other_document'],
         ]);
 
         $stored = $this->files->store(

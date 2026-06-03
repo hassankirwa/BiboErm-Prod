@@ -6,6 +6,7 @@ use App\Enums\ProjectStage;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -36,6 +37,7 @@ class Project extends Model
         'project_manager_id',
         'client_notes',
         'internal_notes',
+        'stage_data',
     ];
 
     protected function casts(): array
@@ -48,6 +50,7 @@ class Project extends Model
             'projected_end' => 'date',
             'actual_start' => 'date',
             'actual_end' => 'date',
+            'stage_data' => 'array',
         ];
     }
 
@@ -71,8 +74,83 @@ class Project extends Model
         return $this->belongsTo(User::class, 'project_manager_id');
     }
 
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class);
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
+    }
+
     public function stageLogs(): HasMany
     {
         return $this->hasMany(ProjectStageLog::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ProjectDocument::class)->orderByDesc('version');
+    }
+
+    public function boms(): HasMany
+    {
+        return $this->hasMany(ProjectBom::class)->orderByDesc('version');
+    }
+
+    public function latestBom(): HasOne
+    {
+        return $this->hasOne(ProjectBom::class)->latestOfMany('version');
+    }
+
+    public function engineers(): HasMany
+    {
+        return $this->hasMany(ProjectEngineer::class)->whereNull('removed_at');
+    }
+
+    public function engineerAssignments(): HasMany
+    {
+        return $this->hasMany(ProjectEngineer::class);
+    }
+
+    public function delays(): HasMany
+    {
+        return $this->hasMany(ProjectDelay::class)->latest('logged_at');
+    }
+
+    public function floors(): HasMany
+    {
+        return $this->hasMany(ProjectFloor::class)->orderBy('sort_order');
+    }
+
+    public function scopeVisibleTo($query, User $user)
+    {
+        if ($user->can('projects.view_all') || $user->can('projects.manage') || $user->can('projects.material_status.view')) {
+            return $query;
+        }
+
+        return $query->where(function ($projectQuery) use ($user) {
+            $projectQuery
+                ->where('project_manager_id', $user->id)
+                ->orWhere('sales_rep_id', $user->id)
+                ->orWhereHas('engineerAssignments', function ($engineersQuery) use ($user) {
+                    $engineersQuery
+                        ->where('user_id', $user->id)
+                        ->whereNull('removed_at');
+                });
+        });
+    }
+
+    /** Nairobi projects: fabrication at workshop, then full install on site. */
+    public function isNairobiTwoPhase(): bool
+    {
+        return $this->location_type === 'nairobi';
+    }
+
+    /** @deprecated Use isNairobiTwoPhase() — Nairobi is two-phase, not fabrication-only. */
+    public function isFabricationOnlyNairobi(): bool
+    {
+        return false;
     }
 }

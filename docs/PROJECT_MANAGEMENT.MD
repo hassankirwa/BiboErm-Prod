@@ -65,7 +65,7 @@
 4. **Glass is procurement-only** — `is_glass = true`, `is_procurement_only = true`; never a warehouse stock row.
 5. **Client addons** the company does not manufacture → `ProjectAddonRequested` → Procurement requisition.
 6. **Dashboard buckets:** queued (pre-production), started (in production), awaiting procurement (aggregate WH shortage + open PRs).
-7. **Nairobi vs outside Nairobi:** `location_type` drives installation scope (fabrication-only vs full install) per README §8.2.
+7. **Nairobi vs outside Nairobi:** `location_type` + `install_mode` drive workflow — workshop fabrication always in Production; on-site work in [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD). `nairobi_fabrication_only` skips field install; `nairobi_site_install` and `outside_full_install` use Field Installation module.
 
 ```mermaid
 flowchart TB
@@ -193,9 +193,9 @@ Stage values **must** match [`backend/app/Enums/ProjectStage.php`](../backend/ap
 | 11 | `FabricationStage` | `fabrication_stage` | PROD stage complete | **Automatic** (PROD) |
 | 12 | `GlassAssembly` | `glass_assembly` | PROD reaches glass assembly | **Automatic** (PROD) → notifies PROC for glass order |
 | 13 | `QcPreInstallation` | `qc_pre_installation` | QC post-fabrication pass | **Manual/Automatic** (QC result → PM listener) |
-| 14 | `InTransit` | `in_transit` | Dispatch to site (**outside Nairobi / full install only**) | **Manual** (PM) |
-| 15 | `Installation` | `installation` | Installation team on site (**skipped for Nairobi fabrication-only**) | **Manual** (PM) |
-| 16 | `SiteQc` | `site_qc` | Site QC inspection (**skipped for Nairobi fabrication-only**) | **Automatic** (QC) |
+| 14 | `InTransit` | `in_transit` | Dispatch to site (outside Nairobi) or workshop handoff (Nairobi phase 1 → 2) | **Manual** (PM) |
+| 15 | `Installation` | `installation` | Installation team on site (Nairobi phase 2 and outside Nairobi) | **Manual** (PM) |
+| 16 | `SiteQc` | `site_qc` | Site QC inspection | **Automatic** (QC) |
 | 17 | `Snagging` | `snagging` | Snagging items logged | **Manual** (PM/QC) |
 | 18 | `ProjectComplete` | `project_complete` | Client sign-off + final payment flag | **Manual** (PM) |
 
@@ -569,6 +569,10 @@ CREATE TABLE projects (
 **SQL only** (implementation agent converts to Laravel migration):
 
 ```sql
+-- Field Installation gate (PM owns — see [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD) §3)
+ALTER TABLE projects ADD COLUMN install_mode VARCHAR(40) NOT NULL DEFAULT 'nairobi_site_install';
+-- Values: nairobi_fabrication_only | nairobi_site_install | outside_full_install
+
 -- BOM header (versioned)
 CREATE TABLE project_boms (
     id                  BIGSERIAL PRIMARY KEY,
@@ -818,6 +822,8 @@ Register in `AppServiceProvider::boot` under named methods (`registerProjectEven
 | `ProjectMaterialShortageDetected` | Warehouse | `OnProjectMaterialShortageDetected` | `ProjectStageService` → `awaiting_procurement`; log delay if configured |
 | `ProjectMaterialsReady` | Warehouse | `OnProjectMaterialsReady` | `ProjectStageService` → `materials_ready` |
 | `ProductionStageCompleted` | Production | `OnProductionStageCompleted` | Map production stage → project stage (e.g. cutting → `cutting_stage`); at `glass_assembly` ensure PROC notified |
+| `FieldInstallationCompleted` | Field Installation | `OnFieldInstallationCompleted` | `ProjectStageService` → `site_qc` when job completes |
+| `FieldNonConformityReported` | Field Installation | `OnFieldNonConformityReported` | Notify PM; optional `project_delays` on critical severity |
 
 **Related events PM does not publish but depends on:**
 
@@ -835,6 +841,8 @@ Event::listen(DealProjectCreated::class, OnDealProjectCreated::class);
 Event::listen(ProjectMaterialShortageDetected::class, OnProjectMaterialShortageDetected::class);
 Event::listen(ProjectMaterialsReady::class, OnProjectMaterialsReady::class);
 Event::listen(ProductionStageCompleted::class, OnProductionStageCompleted::class);
+Event::listen(FieldInstallationCompleted::class, OnFieldInstallationCompleted::class);
+Event::listen(FieldNonConformityReported::class, OnFieldNonConformityReported::class);
 ```
 
 **Production → PM stage mapping (Agent 4 coordinates):**
@@ -1136,7 +1144,7 @@ See [INTEGRATION_CONTRACT.MD](./INTEGRATION_CONTRACT.MD) §11 for all 14 locked 
 | CRM initial stage | `deposit_received` if deposit satisfied; else `awaiting_deposit` |
 | Reservation | All-or-nothing — `materials_reserved` only when **every** stockable BOM line fully reserved |
 | `account_id` | Required on every project |
-| Nairobi projects | `project_type` + `location_type` skip stages 14–16 when fabrication-only |
+| Nairobi projects | Two-phase: fabrication stages 10–13, then install stages 14–16 (same as outside Nairobi) |
 | PR approved | PM notification listener **and** material-status poll |
 | Material status permission | `projects.material_status.view` |
 | Glass orders | Created by PROC on `ProductionStageCompleted(fabrication)` only — not on PM `glass_assembly` advance |
@@ -1162,7 +1170,7 @@ See [INTEGRATION_CONTRACT.MD](./INTEGRATION_CONTRACT.MD) §11 for all 14 locked 
 1. Confirm production stage enum values for mapping table (§10).  
 2. Who creates production order — listener on `ProjectMaterialsReady` only? **Yes.**  
 3. `ProductionStageCompleted` payload: scalar IDs per contract §11.1.  
-4. Nairobi projects: stop production pipeline at `qc_pre_installation` without installation stages? **Yes (Q10).**
+4. Nairobi projects: two-phase workflow — fabrication then full on-site install (stages 14–16 apply). **Yes (updated 2026-05-31).**
 
 ### For CRM / Foundation
 

@@ -74,6 +74,10 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
   return query ? `?${query}` : "";
 }
 
+export function dealDisplayName(deal: ApiDeal): string {
+  return deal.name ?? deal.title ?? deal.reference ?? `Deal #${deal.id}`;
+}
+
 export function dealValue(deal: ApiDeal): number {
   const raw =
     deal.final_agreed_amount ??

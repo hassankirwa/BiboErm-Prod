@@ -237,7 +237,14 @@ All migration files live in `backend/database/migrations/`. **Planned** rows des
 | Migration | Status | Tables / changes |
 |-----------|--------|------------------|
 | `2025_05_19_600000_create_production_tables.php` | Applied | `production_orders`, `production_stage_logs` |
-| `2025_05_19_600001_expand_production_tables.php` | **Planned** | `production_order_teams`, `production_material_releases`, `cutting_sheets`, `installation_checklists` — see [docs/PRODUCTION.MD](docs/PRODUCTION.MD) §6 |
+| `2025_05_19_600001_expand_production_tables.php` | **Planned** | `production_order_teams`, `production_material_releases`, `cutting_sheets` — see [docs/PRODUCTION.MD](docs/PRODUCTION.MD) §7 |
+
+#### Field Installation
+
+| Migration | Status | Tables / changes |
+|-----------|--------|------------------|
+| `2025_05_19_650000_create_field_installation_tables.php` | **Planned** | `field_installation_jobs`, `field_installation_job_members`, `field_installation_daily_logs`, `field_installation_photos` — see [docs/FIELD_INSTALLATION.MD](docs/FIELD_INSTALLATION.MD) §6 |
+| `2025_05_19_650001_expand_field_installation_tables.php` | **Planned** | `field_delivery_records`, `field_delivery_lines`, `field_non_conformities`, `field_installation_units`, `field_tool_assignments` — see [docs/FIELD_INSTALLATION.MD](docs/FIELD_INSTALLATION.MD) §6 |
 
 #### Quality Control
 
@@ -509,7 +516,7 @@ Sources aluminium, accessories, rubbers, and **project-specific glass**.
 
 ### 8.5 Production Module
 
-> **Implementation plan:** [docs/PRODUCTION.MD](docs/PRODUCTION.MD)
+> **Implementation plan:** [docs/PRODUCTION.MD](docs/PRODUCTION.MD) · v1.1
 
 Manufacturing from material prep through assembly.
 
@@ -519,7 +526,23 @@ Manufacturing from material prep through assembly.
 
 **Offcuts:** cutting sheet from BOM, immediate offcut logging, staged warehouse release.
 
-**Installation:** checklists, team/tools assignment, on-site updates, damage photos; Nairobi vs outside Nairobi rules.
+**On-site install:** see [Field Installation](#855-field-installation-module) — not part of the Production developer scope.
+
+---
+
+### 8.55 Field Installation Module
+
+> **Implementation plan:** [docs/FIELD_INSTALLATION.MD](docs/FIELD_INSTALLATION.MD) · v1.0
+
+On-site execution after workshop production completes. Per-project jobs with daily progress logs, photo evidence, delivery receipts, and non-conformity tracking.
+
+**Nairobi site install:** install pre-fabricated units at client premises; daily logs + photos.
+
+**Outside Nairobi:** record goods delivery (photos, counts), log transport/install issues, then full on-site install with daily progress.
+
+**Tools:** field engineers receive tools via Warehouse issue API; assignments linked to jobs; return required before job close.
+
+**Handoff:** Production ends at `qc_post_fabrication`; Field Installation starts when PM reaches `qc_pre_installation` / `installation` (see `projects.install_mode`).
 
 ---
 
@@ -597,7 +620,7 @@ Hardware-layer access control.
 
 ## 10. Cross-Module Integration
 
-> **Integration contract (Agents 1–4):** [docs/INTEGRATION_CONTRACT.MD](docs/INTEGRATION_CONTRACT.MD) — **v1.1 · 14 decisions resolved (2026-05-26)** · Developer handoff: contract §12
+> **Integration contract (Agents 1–5):** [docs/INTEGRATION_CONTRACT.MD](docs/INTEGRATION_CONTRACT.MD) — **v1.2 · Field Installation added** · Developer handoff: contract §12
 
 The **project** is the central binding entity.
 
@@ -675,7 +698,8 @@ Navigation definitions live in `frontend/lib/navigation.ts`.
 | Project Management | **Schema defined — implementation starting** | Base `projects` tables applied; BOM expansion planned ([docs/PROJECT_MANAGEMENT.MD](docs/PROJECT_MANAGEMENT.MD)) |
 | Warehouse FIFO & BOM | **Schema defined — implementation starting** | Stub migration applied; refactor per [docs/WAREHOUSE_MIGRATION_SPEC.MD](docs/WAREHOUSE_MIGRATION_SPEC.MD) |
 | Procurement | **Schema defined — implementation starting** | Suppliers/POs applied; GRN/glass expansion planned ([docs/PROCUREMENT.MD](docs/PROCUREMENT.MD)) |
-| Production | **Schema defined — implementation starting** | Base orders applied; teams/cutting sheets planned ([docs/PRODUCTION.MD](docs/PRODUCTION.MD)) |
+| Production | **Schema defined — implementation starting** | Base orders applied; expansion planned ([docs/PRODUCTION.MD](docs/PRODUCTION.MD)) |
+| Field Installation | **Schema defined — implementation starting** | Migrations `650000`/`650001` planned ([docs/FIELD_INSTALLATION.MD](docs/FIELD_INSTALLATION.MD)) |
 | QC & Finance | **Schema defined** | Checklist/invoice tables in migrations; services not yet built |
 | Owen audit logging | **Planned / partial** | `audit_logs` table exists; full cross-module Owen integration pending |
 | Gmail & PDF integrations | Planned | Quotes, emails, documents |

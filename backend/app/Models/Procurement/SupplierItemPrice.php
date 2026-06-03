@@ -2,8 +2,8 @@
 
 namespace App\Models\Procurement;
 
-use App\Models\InventoryItem;
 use App\Models\User;
+use App\Models\Warehouse\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -38,7 +38,7 @@ class SupplierItemPrice extends Model
 
     public function warehouseItem(): BelongsTo
     {
-        return $this->belongsTo(InventoryItem::class, 'warehouse_item_id');
+        return $this->belongsTo(Item::class, 'warehouse_item_id');
     }
 
     public function creator(): BelongsTo

@@ -22,7 +22,11 @@ return [
             'deal_payments.record', 'deal_payments.view',
             'activities.view', 'activities.create', 'activities.complete',
             'field_day.view', 'field_day.create', 'field_day.manage',
-            'projects.view', 'projects.manage',
+            'projects.view', 'projects.manage', 'projects.view_all', 'projects.create', 'projects.update',
+            'projects.assign_pm', 'projects.assign_engineers', 'projects.advance_stage', 'projects.advance_stage_warehouse', 'projects.advance_stage_production', 'projects.site_assessment_notes', 'projects.log_delay',
+            'projects.update_timeline', 'projects.bom.view', 'projects.bom.upload', 'projects.bom.finalize',
+            'projects.documents.view', 'projects.documents.upload', 'projects.addons.create',
+            'projects.material_status.view', 'projects.floors.manage', 'projects.client_portal.view',
             'warehouse.view', 'warehouse.manage',
             'warehouse.stock.view', 'warehouse.stock.view_all',
             'warehouse.master_data.view', 'warehouse.master_data.manage',
@@ -52,7 +56,7 @@ return [
             'deal_payments.record', 'deal_payments.view',
             'activities.view', 'activities.create', 'activities.complete',
             'field_day.view', 'field_day.create',
-            'projects.view',
+            'projects.view', 'projects.create', 'projects.advance_stage_sales',
         ],
 
         'field_officer' => [
@@ -67,7 +71,11 @@ return [
             'analytics.view',
             'crm.view',
             'deals.view',
-            'projects.view', 'projects.manage',
+            'projects.view', 'projects.manage', 'projects.update', 'projects.assign_pm',
+            'projects.assign_engineers', 'projects.advance_stage', 'projects.site_assessment_notes', 'projects.log_delay',
+            'projects.update_timeline', 'projects.bom.view', 'projects.bom.upload',
+            'projects.bom.finalize', 'projects.documents.view', 'projects.documents.upload',
+            'projects.addons.create', 'projects.material_status.view', 'projects.floors.manage',
             'warehouse.view',
             'procurement.view',
             'production.view',
@@ -77,7 +85,8 @@ return [
 
         'production_manager' => [
             'analytics.view',
-            'projects.view',
+            'projects.view', 'projects.material_status.view', 'projects.site_assessment_notes',
+            'projects.advance_stage_production',
             'warehouse.stock.view',
             'warehouse.reservations.view',
             'warehouse.reservations.release',
@@ -92,11 +101,12 @@ return [
             'warehouse.locations.view', 'warehouse.locations.manage',
             'warehouse.stock.adjust', 'warehouse.stock.transfer', 'warehouse.stock.receive', 'warehouse.stock.issue',
             'warehouse.reservations.view',
+            'warehouse.reservations.create',
             'warehouse.accessories.manage', 'warehouse.rubbers.manage',
             'warehouse.tools.view', 'warehouse.tools.manage', 'warehouse.tools.issue',
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view',
-            'projects.view',
+            'projects.view', 'projects.material_status.view', 'projects.advance_stage_warehouse',
         ],
 
         'warehouse_manager_aluminium' => [
@@ -106,24 +116,27 @@ return [
             'warehouse.locations.view', 'warehouse.locations.manage',
             'warehouse.stock.adjust', 'warehouse.stock.transfer', 'warehouse.stock.receive', 'warehouse.stock.issue',
             'warehouse.reservations.view',
+            'warehouse.reservations.create',
             'warehouse.aluminium.manage', 'warehouse.offcuts.manage', 'warehouse.offcuts.log', 'warehouse.offcuts.allocate',
             'warehouse.tools.view', 'warehouse.tools.manage', 'warehouse.tools.issue',
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view',
-            'projects.view',
+            'projects.view', 'projects.material_status.view', 'projects.advance_stage_warehouse',
         ],
 
         'procurement_officer' => [
             'procurement.view', 'procurement.manage',
+            'procurement.grn.view', 'procurement.grn.create', 'procurement.grn.verify',
             'warehouse.view',
             'warehouse.stock.view',
-            'projects.view',
+            'warehouse.locations.view',
+            'projects.view', 'projects.material_status.view',
         ],
 
         'qc_inspector' => [
             'qc.view', 'qc.manage',
             'production.view',
-            'projects.view',
+            'projects.view', 'projects.material_status.view',
         ],
 
         'hr_manager' => [
@@ -136,7 +149,7 @@ return [
         'finance_officer' => [
             'finance.view', 'finance.manage',
             'procurement.view',
-            'projects.view',
+            'projects.view', 'projects.material_status.view',
             'analytics.view',
         ],
 
@@ -174,6 +187,7 @@ return [
         'warehouse_item' => ['view' => 'warehouse.stock.view', 'manage' => 'warehouse.master_data.manage'],
         'inventory_item' => ['view' => 'warehouse.stock.view', 'manage' => 'warehouse.manage'],
         'supplier' => ['view' => 'procurement.view', 'manage' => 'procurement.manage'],
+        'driver' => ['view' => 'procurement.view', 'manage' => 'procurement.manage'],
         'purchase_requisition' => ['view' => 'procurement.view', 'manage' => 'procurement.manage'],
         'purchase_order' => [
             'view' => 'procurement.view',

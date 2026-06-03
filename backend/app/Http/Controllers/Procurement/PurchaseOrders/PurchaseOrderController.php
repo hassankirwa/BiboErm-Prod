@@ -19,7 +19,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('viewAny', PurchaseOrder::class);
 
-        $query = PurchaseOrder::query()->with(['supplier', 'project', 'lines'])->latest();
+        $query = PurchaseOrder::query()->with(['supplier', 'project', 'lines', 'transportOrders.driver'])->latest();
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));
@@ -47,7 +47,16 @@ class PurchaseOrderController extends Controller
             'lines.*.description' => ['required', 'string'],
             'lines.*.quantity' => ['required', 'numeric', 'min:0.001'],
             'lines.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:inventory_items,id'],
+            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
+            'lines.*.sku' => ['nullable', 'string'],
+            'transport' => ['nullable', 'array'],
+            'transport.transport_type' => ['required_with:transport', 'string', 'max:30'],
+            'transport.driver_id' => ['nullable', 'integer', 'exists:procurement_drivers,id'],
+            'transport.vehicle' => ['nullable', 'string'],
+            'transport.driver_name' => ['nullable', 'string'],
+            'transport.driver_phone' => ['nullable', 'string'],
+            'transport.expected_arrival' => ['nullable', 'date'],
+            'transport.notes' => ['nullable', 'string'],
         ]);
 
         $requisition = PurchaseRequisition::query()->findOrFail($validated['requisition_id']);
@@ -60,7 +69,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('view', $purchaseOrder);
 
-        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'project', 'lines', 'requisition']));
+        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'project', 'lines', 'requisition', 'transportOrders.driver']));
     }
 
     public function update(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource

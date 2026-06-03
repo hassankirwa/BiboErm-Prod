@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Supplier } from "@/lib/api/procurement";
 import { listSuppliers } from "@/lib/api/procurement";
+import { supplierCategoryLabel } from "@/lib/procurement/supplier-categories";
 
 function getInitials(name: string): string {
   return name
@@ -23,17 +24,19 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function SuppliersTable() {
+export function SuppliersTable({ refreshKey = 0 }: { refreshKey?: number }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     listSuppliers({ per_page: 50 })
       .then((res) => setSuppliers(res.data))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return <p className="p-6 text-sm text-muted-foreground">Loading suppliers…</p>;
@@ -74,7 +77,7 @@ export function SuppliersTable() {
               <TableCell>
                 <code className="text-sm">{supplier.code}</code>
               </TableCell>
-              <TableCell>{supplier.category ?? "—"}</TableCell>
+              <TableCell>{supplierCategoryLabel(supplier.category)}</TableCell>
               <TableCell>
                 <div className="text-sm">{supplier.email ?? "—"}</div>
                 <div className="text-xs text-muted-foreground">{supplier.phone ?? ""}</div>

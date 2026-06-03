@@ -5,6 +5,7 @@ namespace App\Services\Warehouse\Reservations;
 use App\Enums\Warehouse\ItemCategory;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Events\Warehouse\ProjectMaterialsReady;
+use App\Events\Warehouse\ProjectMaterialsReserved;
 use App\Models\User;
 use App\Models\Warehouse\StockReservation;
 use App\Services\Warehouse\WarehouseAuditLogger;
@@ -62,13 +63,13 @@ class ProjectMaterialReservationOrchestrator
         ]);
 
         if ($emitEvents) {
-            event(new ProjectMaterialsReady(
+            event(new ProjectMaterialsReserved(
                 projectId: $projectId,
                 reservationId: $reservation->id,
                 fifoSequence: $reservation->fifo_sequence,
             ));
 
-            $this->audit->materialsReady($projectId, [
+            $this->audit->log('warehouse.materials_reserved', 'project', $projectId, [
                 'reservation_id' => $reservation->id,
                 'fifo_sequence' => $reservation->fifo_sequence,
             ]);

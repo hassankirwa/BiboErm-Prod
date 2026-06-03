@@ -28,7 +28,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ChevronLeft, Mail, Phone, MapPin, Globe, Pencil } from "lucide-react";
+import { ChevronLeft, Mail, Phone, MapPin, Globe, Pencil, FolderKanban } from "lucide-react";
 import {
   fetchAccount,
   fetchAccountDeals,
@@ -236,7 +236,18 @@ export default function AccountDetailPage({
         actions={
           <div className="flex items-center gap-2">
             {!isEditing && (
-              <PermissionGate permission="accounts.update">
+              <>
+                <PermissionGate permission="projects.create">
+                  <Button size="sm" asChild>
+                    <Link
+                      href={`/crm/projects/new?account_id=${accountId}`}
+                    >
+                      <FolderKanban className="mr-1 h-4 w-4" />
+                      Create Project
+                    </Link>
+                  </Button>
+                </PermissionGate>
+                <PermissionGate permission="accounts.update">
                 <Button
                   variant="outline"
                   size="sm"
@@ -245,7 +256,8 @@ export default function AccountDetailPage({
                   <Pencil className="mr-1 h-4 w-4" />
                   Edit
                 </Button>
-              </PermissionGate>
+                </PermissionGate>
+              </>
             )}
             <Button variant="outline" size="sm" asChild>
               <Link href="/crm/accounts">

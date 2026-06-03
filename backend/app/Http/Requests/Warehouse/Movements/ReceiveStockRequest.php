@@ -15,7 +15,8 @@ class ReceiveStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'goods_receipt_id' => ['nullable', 'integer'],
+            'goods_receipt_id' => ['nullable', 'integer', 'exists:goods_receipts,id'],
+            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'reference_type' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],

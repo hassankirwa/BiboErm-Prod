@@ -2,8 +2,8 @@
 
 namespace App\Models\Procurement;
 
-use App\Models\InventoryItem;
-use App\Models\WarehouseBin;
+use App\Models\Warehouse\Bin;
+use App\Models\Warehouse\Item;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -42,11 +42,11 @@ class GoodsReceiptLine extends Model
 
     public function warehouseItem(): BelongsTo
     {
-        return $this->belongsTo(InventoryItem::class, 'warehouse_item_id');
+        return $this->belongsTo(Item::class, 'warehouse_item_id');
     }
 
     public function toBin(): BelongsTo
     {
-        return $this->belongsTo(WarehouseBin::class, 'to_bin_id');
+        return $this->belongsTo(Bin::class, 'to_bin_id');
     }
 }

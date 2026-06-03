@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import type { StockLevel } from "@/lib/api/warehouse";
 import {
   MoreHorizontal,
   Eye,
@@ -27,23 +28,20 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
-import { mockWarehouseItems } from "@/lib/data/warehouse";
 
 const categoryLabels: Record<string, string> = {
   aluminium_profile: "Aluminium Profile",
   accessory: "Accessory",
   rubber: "Rubber/Gasket",
-  glass: "Glass",
 };
 
 const categoryColors: Record<string, string> = {
   aluminium_profile: "bg-primary/10 text-primary",
   accessory: "bg-info/10 text-info",
   rubber: "bg-warning/10 text-warning",
-  glass: "bg-chart-5/10 text-chart-5",
 };
 
-export function InventoryTable() {
+export function InventoryTable({ items }: { items: StockLevel[] }) {
   return (
     <div className="rounded-md border border-border bg-card">
       <Table>
@@ -61,12 +59,16 @@ export function InventoryTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mockWarehouseItems.map((item) => {
-            const available = item.currentStock - item.reservedStock;
-            const isLowStock = available < item.minStock;
+          {items.map((item) => {
+            const available = Number(item.quantity_available);
+            const current = Number(item.quantity_on_hand);
+            const reserved = Number(item.quantity_reserved);
+            const minStock = Number(item.item?.min_stock_qty ?? 0);
+            const unit = item.item?.unit_of_measure ?? "";
+            const isLowStock = available < minStock;
             const stockPercent = Math.min(
               100,
-              Math.round((available / item.minStock) * 100)
+              Math.round((available / Math.max(minStock, 1)) * 100)
             );
 
             return (
@@ -74,43 +76,43 @@ export function InventoryTable() {
                 <TableCell>
                   <div>
                     <p className="font-medium text-foreground flex items-center gap-2">
-                      {item.name}
+                      {item.item?.name ?? `Item #${item.item_id}`}
                       {isLowStock && (
                         <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                       )}
                     </p>
-                    {item.finish && (
-                      <p className="text-xs text-muted-foreground">{item.finish}</p>
+                    {item.location?.deck?.name && (
+                      <p className="text-xs text-muted-foreground">{item.location.deck.name}</p>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
                   <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                    {item.code}
+                    {item.item?.sku ?? `#${item.item_id}`}
                   </code>
                 </TableCell>
                 <TableCell>
                   <Badge
                     variant="secondary"
-                    className={categoryColors[item.category]}
+                    className={categoryColors[item.item?.category ?? ""] ?? ""}
                   >
-                    {categoryLabels[item.category]}
+                    {categoryLabels[item.item?.category ?? ""] ?? item.item?.category ?? "Unknown"}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <div className="text-sm">
-                    <span className="font-medium">{item.location.section}</span>
+                    <span className="font-medium">{item.location?.section?.code ?? "—"}</span>
                     <span className="text-muted-foreground">
                       {" "}
-                      / {item.location.bin}
+                      / {item.bin?.code ?? "—"}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {item.currentStock} {item.unit}
+                  {current.toFixed(3)} {unit}
                 </TableCell>
                 <TableCell className="text-right text-warning">
-                  {item.reservedStock} {item.unit}
+                  {reserved.toFixed(3)} {unit}
                 </TableCell>
                 <TableCell className="text-right">
                   <span
@@ -118,13 +120,13 @@ export function InventoryTable() {
                       isLowStock ? "text-destructive font-medium" : "text-success"
                     }
                   >
-                    {available} {item.unit}
+                    {available.toFixed(3)} {unit}
                   </span>
                 </TableCell>
                 <TableCell>
                   <div className="w-24">
                     <div className="flex items-center justify-between text-[10px] mb-1">
-                      <span className="text-muted-foreground">Min: {item.minStock}</span>
+                      <span className="text-muted-foreground">Min: {minStock.toFixed(3)}</span>
                       <span
                         className={
                           isLowStock ? "text-destructive" : "text-muted-foreground"
@@ -178,6 +180,13 @@ export function InventoryTable() {
               </TableRow>
             );
           })}
+          {items.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                No inventory records found.
+              </TableCell>
+            </TableRow>
+          ) : null}
         </TableBody>
       </Table>
     </div>

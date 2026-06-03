@@ -18,7 +18,7 @@ return new class extends Migration
         Schema::create('purchase_requisition_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('purchase_requisition_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('warehouse_item_id')->nullable()->constrained('inventory_items')->nullOnDelete();
+            $table->unsignedBigInteger('warehouse_item_id')->nullable();
             $table->unsignedBigInteger('project_bom_line_id')->nullable();
             $table->string('description');
             $table->string('sku', 50)->nullable();
@@ -35,8 +35,9 @@ return new class extends Migration
         });
 
         Schema::table('purchase_order_lines', function (Blueprint $table) {
-            $table->foreignId('warehouse_item_id')->nullable()->after('purchase_order_id')->constrained('inventory_items')->nullOnDelete();
+            $table->unsignedBigInteger('warehouse_item_id')->nullable()->after('purchase_order_id');
             $table->decimal('received_qty', 15, 3)->default(0)->after('line_total');
+            $table->index('warehouse_item_id');
         });
 
         Schema::table('purchase_orders', function (Blueprint $table) {
@@ -84,17 +85,19 @@ return new class extends Migration
             $table->id();
             $table->foreignId('goods_receipt_id')->constrained()->cascadeOnDelete();
             $table->foreignId('purchase_order_line_id')->constrained();
-            $table->foreignId('warehouse_item_id')->nullable()->constrained('inventory_items')->nullOnDelete();
+            $table->unsignedBigInteger('warehouse_item_id')->nullable();
             $table->decimal('qty_received', 15, 3);
             $table->decimal('qty_accepted', 15, 3)->default(0);
             $table->decimal('qty_rejected', 15, 3)->default(0);
             $table->text('rejection_reason')->nullable();
-            $table->foreignId('to_bin_id')->nullable()->constrained('warehouse_bins')->nullOnDelete();
+            $table->unsignedBigInteger('to_bin_id')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
 
             $table->index('goods_receipt_id');
             $table->index('purchase_order_line_id');
+            $table->index('warehouse_item_id');
+            $table->index('to_bin_id');
         });
 
         Schema::create('goods_receipt_attachments', function (Blueprint $table) {
@@ -165,7 +168,7 @@ return new class extends Migration
         Schema::create('supplier_item_prices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('warehouse_item_id')->constrained('inventory_items')->cascadeOnDelete();
+            $table->unsignedBigInteger('warehouse_item_id');
             $table->decimal('unit_price', 15, 2);
             $table->string('currency', 3)->default('KES');
             $table->date('effective_from');
@@ -208,7 +211,8 @@ return new class extends Migration
         Schema::dropIfExists('transport_orders');
 
         Schema::table('purchase_order_lines', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('warehouse_item_id');
+            $table->dropIndex(['warehouse_item_id']);
+            $table->dropColumn('warehouse_item_id');
             $table->dropColumn('received_qty');
         });
 

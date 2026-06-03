@@ -13,6 +13,7 @@ class TransportOrder extends Model
         'purchase_order_id',
         'transport_type',
         'vehicle',
+        'driver_id',
         'driver_name',
         'driver_phone',
         'expected_arrival',
@@ -33,6 +34,11 @@ class TransportOrder extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 
     public function creator(): BelongsTo

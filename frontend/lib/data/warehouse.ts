@@ -1,6 +1,21 @@
-export { mockWarehouseItems } from "@/lib/mock-data";
+export {
+  getLocationTree,
+  listAccessories,
+  listAluminiumProfiles,
+  listDoorTypes,
+  listInventory,
+  listMovements,
+  listOffcuts,
+  listRubbers,
+  listTools,
+} from "@/lib/api/warehouse";
 
-export async function getWarehouseItems() {
-  const { mockWarehouseItems } = await import("@/lib/mock-data");
-  return mockWarehouseItems;
-}
+export type {
+  DoorType,
+  Offcut,
+  StockLevel,
+  StockMovement,
+  Tool,
+  WarehouseItem,
+  WarehouseLocationTree,
+} from "@/lib/api/warehouse";

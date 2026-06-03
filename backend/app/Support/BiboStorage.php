@@ -117,7 +117,14 @@ final class BiboStorage
         }
 
         return rtrim((string) config('app.url'), '/')
-            ."/api/files/{$parsed['category']}/{$parsed['owner']}/{$parsed['filename']}";
+            ."/api/v1/files/{$parsed['category']}/{$parsed['owner']}/{$parsed['filename']}";
+    }
+
+    /** Public media URL when available; otherwise authenticated private API URL. */
+    public static function resolveStoredUrl(string $relativePath): ?string
+    {
+        return self::resolvePublicUrl($relativePath)
+            ?? self::resolvePrivateApiUrl($relativePath);
     }
 
     public static function ensureCategoryDirectoriesExist(): void

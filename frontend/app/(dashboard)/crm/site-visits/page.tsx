@@ -33,11 +33,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, MapPin, Calendar, Clock } from "lucide-react";
+import { DealPicker } from "@/components/crm/deal-picker";
+import { LeadPicker } from "@/components/crm/lead-picker";
 import {
   fetchSiteVisits,
   scheduleSiteVisit,
   type ApiSiteVisit,
 } from "@/lib/api/crm/site-visits";
+import { dealDisplayName } from "@/lib/api/crm/deals";
+import { leadDisplayName, type ApiLead } from "@/lib/api/crm/leads";
+import type { ApiDeal } from "@/lib/api/crm/types";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
@@ -68,14 +73,16 @@ export default function SiteVisitsPage() {
   >([]);
   const [saving, setSaving] = useState(false);
 
+  const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+  const [selectedDealLabel, setSelectedDealLabel] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [selectedLeadLabel, setSelectedLeadLabel] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
     visit_date: "",
     visit_time: "",
     assigned_field_officer_id: "",
     site_address: "",
-    deal_id: "",
-    lead_id: "",
     notes_for_field_officer: "",
   });
 
@@ -116,8 +123,8 @@ export default function SiteVisitsPage() {
         visit_time: form.visit_time || undefined,
         assigned_field_officer_id: Number(form.assigned_field_officer_id),
         site_address: form.site_address || undefined,
-        deal_id: form.deal_id ? Number(form.deal_id) : undefined,
-        lead_id: form.lead_id ? Number(form.lead_id) : undefined,
+        deal_id: selectedDealId ?? undefined,
+        lead_id: selectedLeadId ?? undefined,
         notes_for_field_officer: form.notes_for_field_officer || undefined,
       });
       setDialogOpen(false);
@@ -127,10 +134,12 @@ export default function SiteVisitsPage() {
         visit_time: "",
         assigned_field_officer_id: "",
         site_address: "",
-        deal_id: "",
-        lead_id: "",
         notes_for_field_officer: "",
       });
+      setSelectedDealId(null);
+      setSelectedDealLabel(null);
+      setSelectedLeadId(null);
+      setSelectedLeadLabel(null);
       toast.success("Site visit scheduled.");
       loadVisits();
     } catch (err) {
@@ -299,23 +308,35 @@ export default function SiteVisitsPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="sv-deal">Deal ID (optional)</Label>
-                <Input
-                  id="sv-deal"
-                  value={form.deal_id}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, deal_id: e.target.value }))
-                  }
+                <Label>Deal (optional)</Label>
+                <DealPicker
+                  value={selectedDealId}
+                  displayLabel={selectedDealLabel}
+                  disabled={saving}
+                  onSelect={(deal: ApiDeal) => {
+                    setSelectedDealId(deal.id);
+                    setSelectedDealLabel(dealDisplayName(deal));
+                  }}
+                  onClear={() => {
+                    setSelectedDealId(null);
+                    setSelectedDealLabel(null);
+                  }}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="sv-lead">Lead ID (optional)</Label>
-                <Input
-                  id="sv-lead"
-                  value={form.lead_id}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, lead_id: e.target.value }))
-                  }
+                <Label>Lead (optional)</Label>
+                <LeadPicker
+                  value={selectedLeadId}
+                  displayLabel={selectedLeadLabel}
+                  disabled={saving}
+                  onSelect={(lead: ApiLead) => {
+                    setSelectedLeadId(lead.id);
+                    setSelectedLeadLabel(leadDisplayName(lead));
+                  }}
+                  onClear={() => {
+                    setSelectedLeadId(null);
+                    setSelectedLeadLabel(null);
+                  }}
                 />
               </div>
             </div>

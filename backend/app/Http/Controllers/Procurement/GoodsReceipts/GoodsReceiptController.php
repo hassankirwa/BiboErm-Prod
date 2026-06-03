@@ -19,9 +19,14 @@ class GoodsReceiptController extends Controller
     {
         $this->authorize('viewAny', GoodsReceipt::class);
 
-        $query = GoodsReceipt::query()->with(['purchaseOrder', 'lines'])->latest();
+        $query = GoodsReceipt::query()
+            ->with(['purchaseOrder.supplier', 'purchaseOrder.lines', 'lines', 'creator'])
+            ->latest();
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));
+        }
+        if ($request->filled('purchase_order_id')) {
+            $query->where('purchase_order_id', $request->integer('purchase_order_id'));
         }
 
         return GoodsReceiptResource::collection($query->paginate($request->integer('per_page', 25)));
@@ -37,10 +42,11 @@ class GoodsReceiptController extends Controller
             'transport_order_id' => ['nullable', 'integer', 'exists:transport_orders,id'],
             'received_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+            'quality_inspection_notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.purchase_order_line_id' => ['required', 'integer', 'exists:purchase_order_lines,id'],
             'lines.*.qty_received' => ['required', 'numeric', 'min:0'],
-            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:inventory_items,id'],
+            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
         ]);
 
         $order = PurchaseOrder::query()->findOrFail($validated['purchase_order_id']);
@@ -53,6 +59,6 @@ class GoodsReceiptController extends Controller
     {
         $this->authorize('view', $goodsReceipt);
 
-        return new GoodsReceiptResource($goodsReceipt->load(['lines', 'attachments', 'purchaseOrder']));
+        return new GoodsReceiptResource($goodsReceipt->load(['lines', 'attachments', 'purchaseOrder.lines', 'purchaseOrder.supplier', 'creator']));
     }
 }
