@@ -150,6 +150,17 @@ class FifoReservationService
                     throw new InvalidArgumentException('Release quantity exceeds reserved amount.');
                 }
 
+                $level = $this->stockLevels->getOrCreateLevel($line->item_id, $line->bin_id);
+                $reservedOnHand = (string) $level->quantity_reserved;
+
+                if (bccomp($reservedOnHand, $toRelease, 3) < 0) {
+                    $toRelease = $reservedOnHand;
+                }
+
+                if (bccomp($toRelease, '0', 3) !== 1) {
+                    continue;
+                }
+
                 $this->stockLevels->decrementReserved($line->item_id, $line->bin_id, $toRelease);
                 $this->stockLevels->decrementOnHand($line->item_id, $line->bin_id, $toRelease);
 

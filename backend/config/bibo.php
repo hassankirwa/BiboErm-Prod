@@ -98,6 +98,7 @@ return [
             'materials_reserved' => 'Materials reserved',
             'awaiting_procurement' => 'Awaiting procurement',
             'materials_ready' => 'Materials ready',
+            'materials_released' => 'Materials released',
             'cutting_stage' => 'Cutting',
             'fabrication_stage' => 'Fabrication',
             'glass_assembly' => 'Glass assembly',
@@ -116,6 +117,8 @@ return [
         'stage_waiting_messages' => [
             'material_check' => 'Waiting for warehouse to complete material check and reservation.',
             'materials_reserved' => 'Materials reserved — awaiting production start or warehouse release.',
+            'materials_released' => 'Reserved stock staged for production pickup — shop floor fetches per stage; return offcuts to warehouse after use.',
+            'materials_ready' => 'Stock reserved — warehouse must stage materials before production fetches.',
             'awaiting_procurement' => 'Waiting for procurement to fulfill material shortages.',
         ],
 
@@ -147,12 +150,14 @@ return [
                 'transitions' => [
                     ['from' => 'materials_reserved', 'to' => ['materials_ready']],
                     ['from' => 'awaiting_procurement', 'to' => ['materials_ready']],
+                    ['from' => 'materials_ready', 'to' => ['materials_released']],
                 ],
             ],
             [
                 'permission' => 'projects.advance_stage_production',
                 'transitions' => [
                     ['from' => 'materials_ready', 'to' => ['cutting_stage']],
+                    ['from' => 'materials_released', 'to' => ['cutting_stage']],
                     ['from' => 'cutting_stage', 'to' => ['fabrication_stage']],
                     ['from' => 'fabrication_stage', 'to' => ['glass_assembly']],
                     ['from' => 'glass_assembly', 'to' => ['qc_pre_installation']],

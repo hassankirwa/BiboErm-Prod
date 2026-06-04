@@ -23,6 +23,7 @@ import {
   stageProgressPercent,
 } from "@/lib/production/utils";
 import { ChevronRight, Calendar } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { toast } from "sonner";
 
 type Props = {
@@ -65,8 +66,8 @@ export function ProductionSchedule({
       toast.success("Schedule updated");
       setEditing(null);
       onScheduleUpdated?.();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to update schedule");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to update schedule"));
     } finally {
       setSaving(false);
     }
@@ -155,12 +156,29 @@ export function ProductionSchedule({
                     ))}
                   </div>
                 )}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span>Pipeline progress</span>
-                    <span>{progress}%</span>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Production pipeline</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatProductionStage(order.current_stage)} stage in the shop floor workflow
+                    </p>
                   </div>
-                  <Progress value={progress} className="h-2" />
+                  {typeof order.project_completion_percent === "number" ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Project overall (PM)</span>
+                        <span>{order.project_completion_percent}%</span>
+                      </div>
+                      <Progress value={order.project_completion_percent} className="h-2" />
+                      <p className="text-[10px] text-muted-foreground">
+                        Matches completion on the project overview in Project Management
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>

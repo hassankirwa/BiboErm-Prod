@@ -125,7 +125,7 @@ export function InviteEmployeeDialog({
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] w-[min(60vw,calc(100%-2rem))] max-w-[min(60vw,calc(100%-2rem))] sm:w-[60vw] sm:max-w-[60vw] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

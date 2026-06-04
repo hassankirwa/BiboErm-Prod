@@ -9,6 +9,7 @@ import {
   type LeadKanbanCard,
   type LeadKanbanStageId,
 } from "@/lib/leads-kanban-data";
+import type { LeadViewMode } from "@/lib/leads-list-data";
 import {
   addLead,
   moveLeadToStage,
@@ -29,7 +30,7 @@ export function LeadsKanbanView({
   onAddLead,
   onActivitySave,
 }: {
-  returnView?: string;
+  returnView?: LeadViewMode;
   apiCards?: LeadKanbanCard[];
   onStageChange?: (leadId: string, stageId: LeadKanbanStageId) => Promise<void>;
   onAddLead?: (values: import("@/lib/lead-form-config").LeadFormValues) => Promise<void>;
@@ -96,7 +97,7 @@ export function LeadsKanbanView({
             "sm:auto-cols-[min(46vw,220px)]",
             "md:auto-cols-[min(32vw,200px)]",
             "lg:auto-cols-[min(30vw,190px)]",
-            "xl:w-full xl:min-w-0 xl:grid-flow-row xl:grid-cols-5 xl:auto-cols-fr"
+            "xl:auto-cols-[190px]"
           )}
         >
           {leadKanbanStages.map((stage) => {

@@ -8,6 +8,7 @@ use App\Models\LeaveRequest;
 use App\Models\ProfileChangeRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class HrDashboardController extends Controller
 {
@@ -47,13 +48,15 @@ class HrDashboardController extends Controller
         ]);
     }
 
-    public function pendingProfileChanges(): JsonResponse
+    public function pendingProfileChanges(Request $request): JsonResponse
     {
+        $limit = min(max((int) $request->integer('limit', 10), 1), 100);
+
         $requests = ProfileChangeRequest::query()
             ->with('user:id,name,email')
             ->where('status', ProfileChangeRequest::STATUS_PENDING)
             ->latest('id')
-            ->limit(10)
+            ->limit($limit)
             ->get()
             ->map(fn (ProfileChangeRequest $request) => [
                 'id' => $request->id,

@@ -31,3 +31,14 @@ export class ApiError extends Error {
     return this.firstFieldError ?? this.message;
   }
 }
+
+/** User-facing message from API failures (422 field errors, etc.). */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    return err.firstError() ?? err.message ?? fallback;
+  }
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  return fallback;
+}

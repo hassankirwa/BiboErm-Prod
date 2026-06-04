@@ -31,6 +31,11 @@ class GoodsReceiptVerificationService
             if ((float) $line->qty_rejected > 0 && blank($line->rejection_reason)) {
                 return false;
             }
+            $procurementOnly = (bool) ($line->is_procurement_only ?? false);
+
+            if ((float) $line->qty_accepted > 0 && empty($line->warehouse_item_id) && ! $procurementOnly) {
+                return false;
+            }
         }
 
         $types = $grn->attachments->pluck('type')->map(fn ($t) => $t instanceof AttachmentType ? $t->value : (string) $t);
@@ -43,7 +48,10 @@ class GoodsReceiptVerificationService
     {
         if (! $this->canVerify($grn)) {
             throw ValidationException::withMessages([
-                'grn' => ['GRN cannot be verified. Complete qty/quality checks and upload receipt and invoice photos.'],
+                'grn' => [
+                    'GRN cannot be verified. Complete qty/quality checks, upload receipt and invoice photos, '
+                    .'and link warehouse catalog items for stock lines (procurement-only items such as glass or add-ons do not need a warehouse link).',
+                ],
             ]);
         }
     }

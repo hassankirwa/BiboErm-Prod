@@ -14,7 +14,8 @@
 | `/production/orders` | Order list | `GET /production/orders` |
 | `/production/orders/[id]` | Order detail, stage actions, cutting sheet | `GET /production/orders/{id}`, stage/offcut/team endpoints |
 | `/production/cutting` | Cutting queue filter | `GET /production/orders` (client filter) |
-| `/production/assembly` | Assembly queue + glass badge | `GET /production/orders`, `GET /procurement/glass-orders?project_id=` |
+| `/production/assembly` | Assembly queue + glass badge | `GET /production/orders`, `GET /production/schedule` (`glass_status`) |
+| `/production` | Redirect | → `/production/schedule` |
 
 **Project detail:** `/projects/[id]?tab=production` — `GET /production/orders?project_id=`
 
@@ -37,7 +38,12 @@ Field Installation is **not** under Production nav (see [FIELD_INSTALLATION.MD](
 1. Warehouse emits `ProjectMaterialsReady` → backend creates `production_order` (no manual create in UI).
 2. Operator **starts** current stage → partial WH material release.
 3. Operator **completes** stage → `ProductionStageCompleted` → PM/PROC listeners.
-4. At **cutting** complete: offcuts required (`POST .../offcuts` with `storage_area: production_workspace`).
+4. At **cutting** complete: offcuts are optional (`POST .../offcuts` when there are reusable pieces, or complete with none). UI picks profiles from the cutting sheet when logging.
+5. QC inspections link from order detail when `qc.view` / `qc.inspect` is granted.
+
+API errors: use `getApiErrorMessage()` from `@/lib/api/errors` in catch blocks (surfaces Laravel 422 field messages).
+
+See [PRODUCTION_GAP_AUDIT.md](./PRODUCTION_GAP_AUDIT.md) for known gaps and remediation status.
 
 ```mermaid
 flowchart LR

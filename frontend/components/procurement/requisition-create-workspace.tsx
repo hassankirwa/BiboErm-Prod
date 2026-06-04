@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,9 @@ import {
   listSuppliers,
   type LowStockRequisitionSourceItem,
   type Supplier,
+  type WarehouseItemCategory,
 } from "@/lib/api/procurement";
+import { listWarehouseItems, warehouseItemLabel, type WarehouseItem } from "@/lib/api/warehouse";
 import {
   getProjectMaterialShortages,
   type ProjectMaterialLine,
@@ -58,6 +61,19 @@ function parseQty(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const LOW_STOCK_CATEGORY_LABELS: Record<WarehouseItemCategory, string> = {
+  aluminium_profile: "Aluminium profiles",
+  accessory: "Accessories",
+  rubber: "Rubbers & gaskets",
+};
+
+function formatLowStockCategory(category?: string | null) {
+  if (!category) {
+    return "—";
+  }
+  return LOW_STOCK_CATEGORY_LABELS[category as WarehouseItemCategory] ?? category;
+}
+
 function formatOverage(requiredQty: string, orderQty: string) {
   const required = parseQty(requiredQty);
   const order = parseQty(orderQty);
@@ -69,6 +85,7 @@ function formatOverage(requiredQty: string, orderQty: string) {
 }
 
 export function RequisitionCreateWorkspace() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"low-stock" | "project-materials">("low-stock");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [supplierId, setSupplierId] = useState<string>("");
@@ -76,6 +93,7 @@ export function RequisitionCreateWorkspace() {
   const [submitting, setSubmitting] = useState(false);
 
   const [lowStockItems, setLowStockItems] = useState<LowStockRequisitionSourceItem[]>([]);
+  const [lowStockCategory, setLowStockCategory] = useState<"all" | WarehouseItemCategory>("all");
   const [projectEntries, setProjectEntries] = useState<ProjectMaterialShortageEntry[]>([]);
   const [loadingLowStock, setLoadingLowStock] = useState(true);
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -85,6 +103,7 @@ export function RequisitionCreateWorkspace() {
     Array<{ projectId: number; bomLineId: number }>
   >([]);
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
+  const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
 
   useEffect(() => {
     void listSuppliers({ per_page: 100 })
@@ -95,12 +114,30 @@ export function RequisitionCreateWorkspace() {
   }, []);
 
   useEffect(() => {
-    void getLowStockRequisitionSource()
-      .then((res) => setLowStockItems(res.data ?? []))
+    setLoadingLowStock(true);
+    void getLowStockRequisitionSource(
+      lowStockCategory === "all" ? undefined : { category: lowStockCategory },
+    )
+      .then((res) => {
+        const items = res.data ?? [];
+        setLowStockItems(items);
+        const actionableIds = new Set(
+          items
+            .filter((item) => item.can_create_requisition)
+            .map((item) => item.warehouse_item_id),
+        );
+        setSelectedLowStockIds((current) => current.filter((id) => actionableIds.has(id)));
+      })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : "Failed to load low-stock items.");
       })
       .finally(() => setLoadingLowStock(false));
+  }, [lowStockCategory]);
+
+  useEffect(() => {
+    void listWarehouseItems()
+      .then(setWarehouseItems)
+      .catch(() => setWarehouseItems([]));
   }, []);
 
   useEffect(() => {
@@ -178,6 +215,7 @@ export function RequisitionCreateWorkspace() {
           orderQty: existing?.orderQty ?? match.line.quantity_to_requisition,
           projectBomLineId: bomLineId,
           projectId,
+          warehouseItemId: match.line.warehouse_item_id ?? existing?.warehouseItemId,
         },
       ];
     });
@@ -217,6 +255,10 @@ export function RequisitionCreateWorkspace() {
     (line) => parseQty(line.orderQty) < parseQty(line.requiredQty),
   );
 
+  const unlinkedProjectLines = draftLines.filter(
+    (line) => line.source === "project_material" && !line.warehouseItemId,
+  );
+
   const handleSubmit = async () => {
     if (!supplierId) {
       toast.error("Select a supplier before submitting.");
@@ -233,13 +275,21 @@ export function RequisitionCreateWorkspace() {
       return;
     }
 
+    if (unlinkedProjectLines.length > 0) {
+      toast.error(
+        "Link each project material to a warehouse catalog item in the review table below.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const lowStockLines = draftLines.filter((line) => line.source === "low_stock");
       const projectLines = draftLines.filter((line) => line.source === "project_material");
+      const createdRequisitionIds: number[] = [];
 
       if (lowStockLines.length > 0) {
-        await createLowStockRequisition({
+        const res = await createLowStockRequisition({
           supplier_id: Number(supplierId),
           warehouse_item_ids: lowStockLines.map((line) => line.warehouseItemId!),
           notes: notes.trim() || undefined,
@@ -248,6 +298,7 @@ export function RequisitionCreateWorkspace() {
             quantity: parseQty(line.orderQty),
           })),
         });
+        createdRequisitionIds.push(res.data.id);
       }
 
       const projectGroups = projectLines.reduce<Record<number, DraftLine[]>>((groups, line) => {
@@ -258,7 +309,7 @@ export function RequisitionCreateWorkspace() {
       }, {});
 
       for (const [projectId, lines] of Object.entries(projectGroups)) {
-        await createProjectMaterialsRequisition({
+        const res = await createProjectMaterialsRequisition({
           project_id: Number(projectId),
           supplier_id: Number(supplierId),
           project_bom_line_ids: lines.map((line) => line.projectBomLineId!),
@@ -266,15 +317,26 @@ export function RequisitionCreateWorkspace() {
           lines: lines.map((line) => ({
             project_bom_line_id: line.projectBomLineId!,
             quantity: parseQty(line.orderQty),
+            warehouse_item_id: line.warehouseItemId,
           })),
         });
+        createdRequisitionIds.push(res.data.id);
       }
 
-      toast.success("Requisition submitted for admin approval.");
-      setSelectedLowStockIds([]);
-      setSelectedProjectLines([]);
-      setDraftLines([]);
-      setNotes("");
+      const redirectId = createdRequisitionIds[0];
+      if (!redirectId) {
+        return;
+      }
+
+      if (createdRequisitionIds.length > 1) {
+        toast.success(
+          `Created ${createdRequisitionIds.length} requisitions. Opening the first one.`,
+        );
+      } else {
+        toast.success("Requisition submitted for admin approval.");
+      }
+
+      router.push(`/procurement/requisitions/${redirectId}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create requisition.");
     } finally {
@@ -325,12 +387,40 @@ export function RequisitionCreateWorkspace() {
         </TabsList>
 
         <TabsContent value="low-stock" className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="low-stock-category">Material type</Label>
+              <Select
+                value={lowStockCategory}
+                onValueChange={(value) =>
+                  setLowStockCategory(value as typeof lowStockCategory)
+                }
+              >
+                <SelectTrigger id="low-stock-category" className="w-[220px]">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All types</SelectItem>
+                  <SelectItem value="aluminium_profile">Aluminium profiles</SelectItem>
+                  <SelectItem value="rubber">Rubbers & gaskets</SelectItem>
+                  <SelectItem value="accessory">Accessories</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="pb-2 text-xs text-muted-foreground">
+              {loadingLowStock
+                ? "Loading…"
+                : `${actionableLowStock.length} item${actionableLowStock.length === 1 ? "" : "s"} below minimum`}
+            </p>
+          </div>
           {loadingLowStock ? (
             <p className="text-sm text-muted-foreground">Loading low-stock items…</p>
           ) : actionableLowStock.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                No low-stock items are waiting for a requisition.
+                {lowStockCategory === "all"
+                  ? "No low-stock items are waiting for a requisition."
+                  : `No low-stock ${formatLowStockCategory(lowStockCategory).toLowerCase()} are waiting for a requisition.`}
               </CardContent>
             </Card>
           ) : (
@@ -340,6 +430,7 @@ export function RequisitionCreateWorkspace() {
                   <TableRow>
                     <TableHead className="w-12">Pick</TableHead>
                     <TableHead>Material</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead className="text-right">Available</TableHead>
                     <TableHead className="text-right">Minimum</TableHead>
@@ -358,6 +449,9 @@ export function RequisitionCreateWorkspace() {
                         />
                       </TableCell>
                       <TableCell>{item.name}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatLowStockCategory(item.category)}
+                      </TableCell>
                       <TableCell>{item.sku}</TableCell>
                       <TableCell className="text-right">{item.available_qty}</TableCell>
                       <TableCell className="text-right">{item.min_stock_qty}</TableCell>
@@ -427,7 +521,18 @@ export function RequisitionCreateWorkspace() {
                                     }
                                   />
                                 </TableCell>
-                                <TableCell>{line.material_name}</TableCell>
+                                <TableCell>
+                                  {line.material_name}
+                                  {!line.warehouse_item_id ? (
+                                    <span className="mt-0.5 block text-xs font-medium text-amber-700">
+                                      Procurement-only — pick catalog item when reviewing
+                                    </span>
+                                  ) : (
+                                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                                      Item #{line.warehouse_item_id}
+                                    </span>
+                                  )}
+                                </TableCell>
                                 <TableCell>{line.material_code ?? "—"}</TableCell>
                                 <TableCell className="text-right">{line.required_qty}</TableCell>
                                 <TableCell className="text-right font-medium">
@@ -467,6 +572,7 @@ export function RequisitionCreateWorkspace() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Material</TableHead>
+                    <TableHead>Warehouse item</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead className="text-right">Required</TableHead>
                     <TableHead className="text-right">Order qty</TableHead>
@@ -486,6 +592,38 @@ export function RequisitionCreateWorkspace() {
                               <div className="text-xs text-muted-foreground">{line.sku}</div>
                             ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {line.source === "project_material" && !line.warehouseItemId ? (
+                            <select
+                              className="h-9 w-full min-w-[200px] rounded-md border border-input bg-background px-2 text-sm"
+                              value={line.warehouseItemId ?? ""}
+                              onChange={(event) => {
+                                const itemId = Number(event.target.value);
+                                if (!itemId) return;
+                                setDraftLines((current) =>
+                                  current.map((entry) =>
+                                    entry.key === line.key
+                                      ? { ...entry, warehouseItemId: itemId }
+                                      : entry,
+                                  ),
+                                );
+                              }}
+                            >
+                              <option value="">Select catalog item…</option>
+                              {warehouseItems.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {warehouseItemLabel(item)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : line.warehouseItemId ? (
+                            <span className="text-xs text-muted-foreground">
+                              #{line.warehouseItemId}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Linked</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">

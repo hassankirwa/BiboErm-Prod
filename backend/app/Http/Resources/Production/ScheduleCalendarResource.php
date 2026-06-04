@@ -18,6 +18,10 @@ class ScheduleCalendarResource extends JsonResource
             'project_id' => $this->project_id,
             'project_name' => $this->whenLoaded('project', fn () => $this->project->name),
             'project_stage' => $this->whenLoaded('project', fn () => $this->project->stage?->value),
+            'project_completion_percent' => $this->whenLoaded(
+                'project',
+                fn () => (int) $this->project->completion_percent,
+            ),
             'status' => $this->status?->value,
             'current_stage' => $this->current_stage?->value,
             'current_stage_label' => $this->current_stage?->label(),

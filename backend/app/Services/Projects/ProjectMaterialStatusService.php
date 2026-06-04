@@ -2,14 +2,22 @@
 
 namespace App\Services\Projects;
 
+use App\Enums\Warehouse\StockMovementType;
 use App\Models\Procurement\GlassOrder;
+use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\PurchaseRequisitionLine;
 use App\Models\Project;
 use App\Models\ProjectBom;
+use App\Models\Warehouse\StockMovement;
 use App\Models\Warehouse\StockReservation;
+use App\Services\Procurement\GoodsReceipts\GrnProcurementOnlyResolver;
 
 class ProjectMaterialStatusService
 {
+    public function __construct(
+        protected GrnProcurementOnlyResolver $procurementOnlyResolver,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -181,6 +189,90 @@ class ProjectMaterialStatusService
                 'delivered_at' => $order->delivered_at?->toIso8601String(),
             ])->values()->all(),
             'fifo_position' => $fifoPosition,
+            'goods_receipts' => $this->buildGoodsReceiptsSummary($project),
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function buildGoodsReceiptsSummary(Project $project): array
+    {
+        $receipts = GoodsReceipt::query()
+            ->where('project_id', $project->id)
+            ->whereHas(
+                'purchaseOrder',
+                fn ($query) => $query->where('project_id', $project->id),
+            )
+            ->with([
+                'purchaseOrder.supplier',
+                'purchaseOrder.lines',
+                'lines.purchaseOrderLine',
+                'lines.warehouseItem',
+            ])
+            ->orderByDesc('received_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->unique('purchase_order_id')
+            ->values();
+
+        if ($receipts->isEmpty()) {
+            return [];
+        }
+
+        $putawayNotesByGrn = StockMovement::query()
+            ->where('movement_type', StockMovementType::Inbound)
+            ->where('reference_type', 'goods_receipt')
+            ->whereIn('reference_id', $receipts->pluck('id'))
+            ->orderByDesc('performed_at')
+            ->get()
+            ->groupBy('reference_id')
+            ->map(fn ($movements) => $movements->first()?->notes)
+            ->all();
+
+        return $receipts
+            ->map(function (GoodsReceipt $grn) use ($putawayNotesByGrn) {
+                $this->procurementOnlyResolver->annotateGoodsReceipt($grn);
+
+                $poLines = $grn->purchaseOrder?->lines?->keyBy('id') ?? collect();
+
+                return [
+                    'id' => $grn->id,
+                    'grn_number' => $grn->grn_number,
+                    'status' => $grn->status?->value ?? $grn->status,
+                    'received_at' => $grn->received_at?->toIso8601String(),
+                    'verified_at' => $grn->verified_at?->toIso8601String(),
+                    'notes' => $grn->notes,
+                    'quality_inspection_notes' => $grn->quality_inspection_notes,
+                    'putaway_notes' => $putawayNotesByGrn[$grn->id] ?? null,
+                    'purchase_order' => $grn->purchaseOrder ? [
+                        'id' => $grn->purchaseOrder->id,
+                        'reference' => $grn->purchaseOrder->reference,
+                        'supplier_name' => $grn->purchaseOrder->supplier?->name,
+                    ] : null,
+                    'lines' => $grn->lines->map(function ($line) use ($poLines) {
+                        $poLine = $poLines->get($line->purchase_order_line_id);
+                        $warehouseItem = $line->warehouseItem;
+
+                        return [
+                            'id' => $line->id,
+                            'description' => $poLine?->description ?? 'Line item',
+                            'warehouse_item_id' => $line->warehouse_item_id,
+                            'warehouse_item_sku' => $warehouseItem?->sku,
+                            'warehouse_item_name' => $warehouseItem?->name,
+                            'warehouse_item_category' => $warehouseItem?->category?->value ?? $warehouseItem?->category,
+                            'is_procurement_only' => (bool) ($line->is_procurement_only ?? false),
+                            'qty_received' => (string) $line->qty_received,
+                            'qty_accepted' => (string) $line->qty_accepted,
+                            'qty_rejected' => (string) $line->qty_rejected,
+                            'to_bin_id' => $line->to_bin_id,
+                            'notes' => $line->notes,
+                        ];
+                    })->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

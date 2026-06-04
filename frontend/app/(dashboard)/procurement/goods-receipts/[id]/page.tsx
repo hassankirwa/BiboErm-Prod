@@ -1,120 +1,320 @@
 "use client";
 
+
+
 import Link from "next/link";
+
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { AppHeader } from "@/components/app-header";
-import { Badge } from "@/components/ui/badge";
+import { GrnQcLink } from "@/components/procurement/grn-qc-link";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
+
+  GoodsReceiptReceivingDetail,
+
+  type EditableGrnLine,
+
+  type GrnAttachmentType,
+
+} from "@/components/procurement/goods-receipt-receiving-detail";
+
+import {
+
   getGoodsReceipt,
+
   type GoodsReceipt,
+
   updateGoodsReceiptLines,
+
   uploadGoodsReceiptAttachment,
+
   verifyGoodsReceipt,
+
 } from "@/lib/api/procurement";
-import { getLocationTree, flattenBinsFromLocationTree } from "@/lib/api/warehouse";
+
+import {
+
+  getLocationTree,
+
+  listWarehouseItems,
+
+  type WarehouseItem,
+
+  type WarehouseLocationTree,
+
+} from "@/lib/api/warehouse";
+
 import { toast } from "sonner";
 
-type EditableLine = {
-  id: number;
-  purchase_order_line_id: number;
-  warehouse_item_id: number | null;
-  description: string;
-  qty_received: number;
-  qty_accepted: number;
-  qty_rejected: number;
-  rejection_reason: string;
-  to_bin_id: number | null;
-  notes: string;
-};
 
-type AttachmentType =
-  | "receipt_photo"
-  | "invoice_photo"
-  | "delivery_note"
-  | "other_document";
 
-const attachmentLabels: Record<AttachmentType, string> = {
-  receipt_photo: "Receipt photo",
-  invoice_photo: "Invoice photo",
-  delivery_note: "Delivery note",
-  other_document: "Other document",
-};
+function mapGrnLines(data: GoodsReceipt): EditableGrnLine[] {
+
+  return (data.lines ?? []).map((line) => {
+
+    const poLine = data.purchaseOrder?.lines?.find(
+
+      (entry) => entry.id === line.purchase_order_line_id,
+
+    );
+
+
+
+    return {
+
+      id: line.id,
+
+      purchase_order_line_id: line.purchase_order_line_id,
+
+      warehouse_item_id: line.warehouse_item_id ?? poLine?.warehouse_item_id ?? null,
+
+      warehouse_item_category:
+
+        (line.warehouse_item_category as string | null | undefined) ?? null,
+
+      is_procurement_only: Boolean(line.is_procurement_only),
+
+      description: poLine?.description ?? `PO line #${line.purchase_order_line_id}`,
+
+      qty_received: Number(line.qty_received),
+
+      qty_accepted: (() => {
+
+        const received = Number(line.qty_received);
+
+        const accepted = Number(line.qty_accepted);
+
+        return accepted > 0 ? accepted : received;
+
+      })(),
+
+      qty_rejected: Number(line.qty_rejected),
+
+      rejection_reason: line.rejection_reason ?? "",
+
+      to_bin_id: line.to_bin_id,
+
+      notes: line.notes ?? "",
+
+    };
+
+  });
+
+}
+
+
 
 export default function GoodsReceiptDetailPage() {
+
   const params = useParams<{ id: string }>();
+
   const id = Number(params.id);
+
   const [grn, setGrn] = useState<GoodsReceipt | null>(null);
-  const [lines, setLines] = useState<EditableLine[]>([]);
-  const [binOptions, setBinOptions] = useState<Array<{ id: number; label: string }>>([]);
+
+  const [lines, setLines] = useState<EditableGrnLine[]>([]);
+
+  const [locationTree, setLocationTree] = useState<WarehouseLocationTree[]>([]);
+
+  const [locationsLoading, setLocationsLoading] = useState(true);
+
+  const [locationsError, setLocationsError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
+
   const [saving, setSaving] = useState(false);
+
   const [verifying, setVerifying] = useState(false);
+
   const [notes, setNotes] = useState("");
+
   const [qualityNotes, setQualityNotes] = useState("");
-  const [files, setFiles] = useState<Partial<Record<AttachmentType, File | null>>>({});
 
-  const load = () => {
-    setLoading(true);
+  const [uploadingAttachment, setUploadingAttachment] = useState<GrnAttachmentType | null>(null);
 
-    getGoodsReceipt(id)
-      .then((grnRes) => {
-        const data = grnRes.data;
-        setGrn(data);
-        setNotes(data.notes ?? "");
-        setQualityNotes(data.quality_inspection_notes ?? "");
-        setLines(
-          (data.lines ?? []).map((line) => ({
-            id: line.id,
-            purchase_order_line_id: line.purchase_order_line_id,
-            warehouse_item_id: line.warehouse_item_id,
-            description:
-              data.purchaseOrder?.lines?.find((poLine) => poLine.id === line.purchase_order_line_id)
-                ?.description ?? `PO line #${line.purchase_order_line_id}`,
-            qty_received: Number(line.qty_received),
-            qty_accepted: Number(line.qty_accepted),
-            qty_rejected: Number(line.qty_rejected),
-            rejection_reason: line.rejection_reason ?? "",
-            to_bin_id: line.to_bin_id,
-            notes: line.notes ?? "",
-          })),
-        );
-      })
-      .catch((error: Error) => toast.error(error.message || "Failed to load goods receipt."))
-      .finally(() => setLoading(false));
+  const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
 
-    getLocationTree()
-      .then((locationRes) => setBinOptions(flattenBinsFromLocationTree(locationRes.data)))
-      .catch(() => {
-        setBinOptions([]);
-      });
-  };
+  const [itemsLoading, setItemsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!Number.isFinite(id)) {
-      return;
+
+
+  const fetchStorageLocations = useCallback(async () => {
+
+    setLocationsLoading(true);
+
+    setLocationsError(null);
+
+
+
+    try {
+
+      const locationRes = await getLocationTree({ for_putaway: true });
+
+      setLocationTree(locationRes.data ?? []);
+
+    } catch (error) {
+
+      setLocationTree([]);
+
+      const message =
+
+        error instanceof Error ? error.message : "Failed to load warehouse storage locations.";
+
+      setLocationsError(message);
+
+      toast.error(message);
+
+    } finally {
+
+      setLocationsLoading(false);
+
     }
 
-    load();
-  }, [id]);
+  }, []);
 
-  const attachmentTypes = useMemo(
-    () => new Set((grn?.attachments ?? []).map((attachment) => attachment.type)),
-    [grn],
+
+
+  const load = useCallback(
+
+    async (options?: { silent?: boolean }) => {
+
+      if (!Number.isFinite(id)) {
+
+        setLoading(false);
+
+        return;
+
+      }
+
+
+
+      if (!options?.silent) {
+
+        setLoading(true);
+
+      }
+
+
+
+      try {
+
+        const [grnRes] = await Promise.all([
+
+          getGoodsReceipt(id),
+
+          options?.silent ? Promise.resolve() : fetchStorageLocations(),
+
+        ]);
+
+
+
+        const data = grnRes.data;
+
+        setGrn(data);
+
+        setNotes(data.notes ?? "");
+
+        setQualityNotes(data.quality_inspection_notes ?? "");
+
+        setLines(mapGrnLines(data));
+
+      } catch (error) {
+
+        toast.error(error instanceof Error ? error.message : "Failed to load goods receipt.");
+
+      } finally {
+
+        if (!options?.silent) {
+
+          setLoading(false);
+
+        }
+
+      }
+
+    },
+
+    [fetchStorageLocations, id],
+
   );
 
+
+
+  useEffect(() => {
+
+    if (!Number.isFinite(id)) {
+
+      return;
+
+    }
+
+
+
+    void load();
+
+    setItemsLoading(true);
+
+    void listWarehouseItems()
+
+      .then(setWarehouseItems)
+
+      .catch(() => setWarehouseItems([]))
+
+      .finally(() => setItemsLoading(false));
+
+  }, [id, load]);
+
+
+
+  const attachmentTypes = useMemo(
+
+    () => new Set((grn?.attachments ?? []).map((attachment) => attachment.type)),
+
+    [grn],
+
+  );
+
+
+
   const canVerify =
+
     lines.every((line) => {
+
       const balances = line.qty_accepted + line.qty_rejected === line.qty_received;
+
       const hasReason = line.qty_rejected === 0 || line.rejection_reason.trim().length > 0;
-      return balances && hasReason;
+
+      const hasWarehouseItem =
+        line.qty_accepted <= 0 ||
+        line.is_procurement_only ||
+        Boolean(line.warehouse_item_id);
+
+      return balances && hasReason && hasWarehouseItem;
+
     }) &&
+
     attachmentTypes.has("receipt_photo") &&
+
     attachmentTypes.has("invoice_photo");
+
+
+
+  const linesPayload = () =>
+    lines.map((line) => ({
+      id: line.id,
+      qty_received: line.qty_received,
+      qty_accepted: line.qty_accepted,
+      qty_rejected: line.qty_rejected,
+      rejection_reason: line.rejection_reason || null,
+      to_bin_id: line.to_bin_id,
+      warehouse_item_id: line.warehouse_item_id,
+      notes: line.notes || null,
+    }));
 
   const saveLines = async () => {
     setSaving(true);
@@ -122,18 +322,10 @@ export default function GoodsReceiptDetailPage() {
       await updateGoodsReceiptLines(id, {
         notes: notes || null,
         quality_inspection_notes: qualityNotes || null,
-        lines: lines.map((line) => ({
-          id: line.id,
-          qty_received: line.qty_received,
-          qty_accepted: line.qty_accepted,
-          qty_rejected: line.qty_rejected,
-          rejection_reason: line.rejection_reason || null,
-          to_bin_id: line.to_bin_id,
-          notes: line.notes || null,
-        })),
+        lines: linesPayload(),
       });
       toast.success("GRN updated.");
-      load();
+      await load({ silent: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update GRN.");
     } finally {
@@ -141,30 +333,46 @@ export default function GoodsReceiptDetailPage() {
     }
   };
 
-  const upload = async (type: AttachmentType) => {
-    const file = files[type];
 
-    if (!file) {
-      toast.error("Choose a file first.");
-      return;
-    }
+
+  const uploadAttachment = async (type: GrnAttachmentType, file: File) => {
+
+    setUploadingAttachment(type);
 
     try {
+
       await uploadGoodsReceiptAttachment(id, { file, type });
-      toast.success(`${attachmentLabels[type]} uploaded.`);
-      setFiles((current) => ({ ...current, [type]: null }));
-      load();
+
+      toast.success("Document saved.");
+
+      await load({ silent: true });
+
     } catch (error) {
+
       toast.error(error instanceof Error ? error.message : "Upload failed.");
+
+      throw error;
+
+    } finally {
+
+      setUploadingAttachment(null);
+
     }
+
   };
+
+
 
   const runVerify = async () => {
     setVerifying(true);
     try {
-      await verifyGoodsReceipt(id);
-      toast.success("GRN verified. Stock will be updated on warehouse putaway.");
-      load();
+      await verifyGoodsReceipt(id, {
+        notes: notes || null,
+        quality_inspection_notes: qualityNotes || null,
+        lines: linesPayload(),
+      });
+      toast.success("GRN verified. Putaway locations saved.");
+      await load({ silent: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Verification failed.");
     } finally {
@@ -172,230 +380,104 @@ export default function GoodsReceiptDetailPage() {
     }
   };
 
+
+
   return (
+
     <div className="flex min-w-0 w-full flex-col">
+
       <AppHeader
-        title={grn?.grn_number ?? "Goods Receipt"}
-        subtitle="Log quantities, quality checks, documents, then verify to update stock"
+
+        title={grn?.grn_number ?? "Warehouse receiving"}
+
+        subtitle="Log quantities, quality checks, and documents — then verify before putaway"
+
         actions={
+
           <div className="flex items-center gap-2">
+
             <Button variant="outline" size="sm" asChild>
-              <Link href="/procurement/goods-receipts">Receiving logs</Link>
+
+              <Link href="/warehouse/receiving-logs">Receiving logs</Link>
+
             </Button>
+
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/warehouse/receive?grn=${id}`}>Put away stock</Link>
+
+              <Link href="/procurement/goods-receipts">Procurement GRNs</Link>
+
             </Button>
-            <Button size="sm" disabled={!canVerify || verifying || grn?.status === "verified"} onClick={runVerify}>
-              {verifying ? "Verifying..." : "Verify & update stock"}
-            </Button>
+
+            {Number.isFinite(id) && id > 0 ? <GrnQcLink grnId={id} /> : null}
+
           </div>
+
         }
+
       />
+
       <div className="space-y-6 p-6">
+
         {loading ? (
+
           <p className="text-sm text-muted-foreground">Loading goods receipt…</p>
+
         ) : grn ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <Badge variant="secondary">{grn.status}</Badge>
-              <span>
-                PO: <strong>{grn.purchaseOrder?.reference ?? `#${grn.purchase_order_id}`}</strong>
-              </span>
-              <span>
-                Supplier: <strong>{grn.purchaseOrder?.supplier?.name ?? "—"}</strong>
-              </span>
-              <span>Received: {new Date(grn.received_at).toLocaleString()}</span>
-            </div>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Received lines</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {lines.map((line, index) => (
-                    <div key={line.id} className="rounded-lg border p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-medium">{line.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Item {line.warehouse_item_id ?? "n/a"} · PO line #{line.purchase_order_line_id}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">Line {index + 1}</Badge>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <Input
-                          type="number"
-                          placeholder="Qty received"
-                          value={line.qty_received}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id
-                                  ? { ...entry, qty_received: Number(event.target.value) }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Qty accepted"
-                          value={line.qty_accepted}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id
-                                  ? { ...entry, qty_accepted: Number(event.target.value) }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Qty rejected"
-                          value={line.qty_rejected}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id
-                                  ? { ...entry, qty_rejected: Number(event.target.value) }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        />
-                        <select
-                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                          value={line.to_bin_id ?? ""}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id
-                                  ? {
-                                      ...entry,
-                                      to_bin_id: event.target.value ? Number(event.target.value) : null,
-                                    }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        >
-                          <option value="">Select putaway bin</option>
-                          {binOptions.map((bin) => (
-                            <option key={bin.id} value={bin.id}>
-                              {bin.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <Input
-                          placeholder="Rejection reason"
-                          value={line.rejection_reason}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id
-                                  ? { ...entry, rejection_reason: event.target.value }
-                                  : entry,
-                              ),
-                            )
-                          }
-                        />
-                        <Input
-                          placeholder="Quality / line notes"
-                          value={line.notes}
-                          onChange={(event) =>
-                            setLines((current) =>
-                              current.map((entry) =>
-                                entry.id === line.id ? { ...entry, notes: event.target.value } : entry,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-                  ))}
+          <GoodsReceiptReceivingDetail
 
-                  <Textarea
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                    placeholder="General receiving notes"
-                  />
-                  <Textarea
-                    value={qualityNotes}
-                    onChange={(event) => setQualityNotes(event.target.value)}
-                    placeholder="Quality inspection notes"
-                  />
-                  <Button onClick={saveLines} disabled={saving}>
-                    {saving ? "Saving..." : "Save updates"}
-                  </Button>
-                </CardContent>
-              </Card>
+            grn={grn}
 
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Verification checklist</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <p>Receipt photo: {attachmentTypes.has("receipt_photo") ? "Uploaded" : "Missing"}</p>
-                    <p>Invoice photo: {attachmentTypes.has("invoice_photo") ? "Uploaded" : "Missing"}</p>
-                    <p>
-                      Qty balances valid:{" "}
-                      {lines.every((line) => line.qty_accepted + line.qty_rejected === line.qty_received)
-                        ? "Yes"
-                        : "No"}
-                    </p>
-                    <p>
-                      Rejection reasons complete:{" "}
-                      {lines.every((line) => line.qty_rejected === 0 || line.rejection_reason.trim())
-                        ? "Yes"
-                        : "No"}
-                    </p>
-                  </CardContent>
-                </Card>
+            lines={lines}
 
-                {(Object.keys(attachmentLabels) as AttachmentType[]).map((type) => (
-                  <Card key={type}>
-                    <CardHeader>
-                      <CardTitle className="text-base">{attachmentLabels[type]}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <Input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        capture={type.includes("photo") ? "environment" : undefined}
-                        onChange={(event) =>
-                          setFiles((current) => ({
-                            ...current,
-                            [type]: event.target.files?.[0] ?? null,
-                          }))
-                        }
-                      />
-                      <Button size="sm" variant="outline" onClick={() => void upload(type)}>
-                        Upload {attachmentLabels[type].toLowerCase()}
-                      </Button>
-                      {(grn.attachments ?? [])
-                        .filter((attachment) => attachment.type === type)
-                        .map((attachment) => (
-                          <p key={attachment.id} className="text-xs text-muted-foreground">
-                            {attachment.original_filename ?? attachment.path}
-                          </p>
-                        ))}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </>
+            setLines={setLines}
+
+            locationTree={locationTree}
+
+            locationsLoading={locationsLoading}
+
+            locationsError={locationsError}
+
+            notes={notes}
+
+            setNotes={setNotes}
+
+            qualityNotes={qualityNotes}
+
+            setQualityNotes={setQualityNotes}
+
+            warehouseItems={warehouseItems}
+
+            itemsLoading={itemsLoading}
+
+            uploadingAttachment={uploadingAttachment}
+
+            saving={saving}
+
+            verifying={verifying}
+
+            canVerify={canVerify}
+
+            onSave={() => void saveLines()}
+
+            onAttachmentUpload={uploadAttachment}
+
+            onVerify={() => void runVerify()}
+
+          />
+
         ) : (
+
           <p className="text-sm text-muted-foreground">GRN not found.</p>
+
         )}
+
       </div>
+
     </div>
+
   );
+
 }
+
+

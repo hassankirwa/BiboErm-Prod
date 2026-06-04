@@ -84,7 +84,9 @@ class SiteVisit extends Model
 
         return $query->where(function ($q) use ($user) {
             $q->where('assigned_field_officer_id', $user->id)
-                ->orWhere('scheduled_by', $user->id);
+                ->orWhere('scheduled_by', $user->id)
+                ->orWhereIn('lead_id', Lead::query()->visibleTo($user)->select('id'))
+                ->orWhereIn('deal_id', Deal::query()->visibleTo($user)->select('id'));
         });
     }
 }

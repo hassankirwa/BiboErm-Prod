@@ -13,6 +13,7 @@ enum ProjectStage: string
     case MaterialsReserved = 'materials_reserved';
     case AwaitingProcurement = 'awaiting_procurement';
     case MaterialsReady = 'materials_ready';
+    case MaterialsReleased = 'materials_released';
     case CuttingStage = 'cutting_stage';
     case FabricationStage = 'fabrication_stage';
     case GlassAssembly = 'glass_assembly';

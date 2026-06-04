@@ -15,7 +15,10 @@ class ContactController extends Controller
     {
         $this->authorize('viewAny', Contact::class);
 
-        $query = Contact::query()->with(['account', 'owner'])->latest();
+        $query = Contact::query()
+            ->visibleTo($request->user())
+            ->with(['account', 'owner'])
+            ->latest();
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -27,6 +30,10 @@ class ContactController extends Controller
 
         if ($accountId = $request->query('account_id')) {
             $query->where('account_id', $accountId);
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
         }
 
         return ContactResource::collection(
@@ -69,14 +76,14 @@ class ContactController extends Controller
             'created_by' => $user->id,
         ]);
 
-        return new ContactResource($contact->load(['account', 'owner']));
+        return new ContactResource($contact->load(['account', 'owner', 'sourceLead']));
     }
 
     public function show(Contact $contact): ContactResource
     {
         $this->authorize('view', $contact);
 
-        return new ContactResource($contact->load(['account', 'owner']));
+        return new ContactResource($contact->load(['account', 'owner', 'sourceLead']));
     }
 
     public function update(Request $request, Contact $contact): ContactResource
@@ -94,11 +101,12 @@ class ContactController extends Controller
             'preferred_contact_method' => ['nullable', 'string', 'max:30'],
             'status' => ['nullable', 'string', 'max:50'],
             'account_id' => ['nullable', 'exists:accounts,id'],
+            'source_lead_id' => ['nullable', 'exists:leads,id'],
             'notes' => ['nullable', 'string'],
         ]);
 
         $contact->update($validated);
 
-        return new ContactResource($contact->fresh()->load(['account', 'owner']));
+        return new ContactResource($contact->fresh()->load(['account', 'owner', 'sourceLead']));
     }
 }

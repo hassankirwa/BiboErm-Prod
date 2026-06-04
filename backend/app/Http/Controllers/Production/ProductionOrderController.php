@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Production;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Production\UpdateProductionOrderStatusRequest;
 use App\Http\Requests\Production\UpdateScheduleRequest;
+use App\Enums\Production\ProductionOrderStatus;
 use App\Http\Resources\Production\ProductionOrderResource;
 use App\Models\Production\ProductionOrder;
 use App\Services\Production\ProductionOrderService;
@@ -20,6 +22,8 @@ class ProductionOrderController extends Controller
     {
         $this->authorize('viewAny', ProductionOrder::class);
 
+        $this->orders->syncOrdersForMaterialsReadyProjects();
+
         $query = ProductionOrder::query()
             ->with(['project', 'stageLogs', 'teams.user'])
             ->orderBy('fifo_position');
@@ -32,7 +36,11 @@ class ProductionOrderController extends Controller
             $query->where('status', $status);
         }
 
-        if ($request->boolean('assigned_to_me') && ! $request->user()->can('production.schedule.manage')) {
+        if (
+            $request->boolean('assigned_to_me')
+            && ! $request->user()->can('production.schedule.manage')
+            && ! $request->user()->can('production.manage')
+        ) {
             $query->whereHas('teams', fn ($teamQuery) => $teamQuery->where('user_id', $request->user()->id));
         }
 
@@ -59,6 +67,18 @@ class ProductionOrderController extends Controller
         $this->authorize('updateSchedule', $order);
 
         $updated = $this->orders->updateSchedule($order, $request->validated());
+
+        return new ProductionOrderResource($updated->load('project'));
+    }
+
+    public function updateStatus(
+        UpdateProductionOrderStatusRequest $request,
+        ProductionOrder $order,
+    ): ProductionOrderResource {
+        $this->authorize('manageStages', $order);
+
+        $status = ProductionOrderStatus::from($request->validated('status'));
+        $updated = $this->orders->updateStatus($order, $status);
 
         return new ProductionOrderResource($updated->load('project'));
     }

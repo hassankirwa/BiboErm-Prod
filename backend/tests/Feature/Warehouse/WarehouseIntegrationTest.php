@@ -146,7 +146,7 @@ class WarehouseIntegrationTest extends WarehouseFeatureTestCase
         $accessory = $this->itemBySku('ACC-HNG-001');
         $profile = $this->itemBySku('PROF-SLD-80MM');
         $accessoryBin = $this->binBySectionAndCode('SEC-SLD', 'BIN2');
-        $profileBin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $profileBin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $this->actingAsSanctum($manager)
             ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [

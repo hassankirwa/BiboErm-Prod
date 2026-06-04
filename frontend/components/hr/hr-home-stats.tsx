@@ -53,7 +53,7 @@ const statCards: StatCard[] = [
   {
     key: "profile_change_requests_pending",
     label: "Profile change requests",
-    href: "/hr/employees",
+    href: "/hr/employees?filter=profile_change_requests",
     icon: ClipboardList,
     iconClassName: "bg-violet-100 text-violet-700",
     highlight: true,

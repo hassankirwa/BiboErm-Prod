@@ -687,6 +687,7 @@ class ProjectController extends Controller
 
         $startedStages = [
             ProjectStage::MaterialsReady->value,
+            ProjectStage::MaterialsReleased->value,
             ProjectStage::CuttingStage->value,
             ProjectStage::FabricationStage->value,
             ProjectStage::GlassAssembly->value,

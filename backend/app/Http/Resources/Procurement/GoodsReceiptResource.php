@@ -29,6 +29,8 @@ class GoodsReceiptResource extends JsonResource
                 'goods_receipt_id' => $line->goods_receipt_id,
                 'purchase_order_line_id' => $line->purchase_order_line_id,
                 'warehouse_item_id' => $line->warehouse_item_id,
+                'warehouse_item_category' => $line->warehouseItem?->category?->value ?? $line->warehouseItem?->category,
+                'is_procurement_only' => (bool) ($line->is_procurement_only ?? false),
                 'qty_received' => $line->qty_received,
                 'qty_accepted' => $line->qty_accepted,
                 'qty_rejected' => $line->qty_rejected,

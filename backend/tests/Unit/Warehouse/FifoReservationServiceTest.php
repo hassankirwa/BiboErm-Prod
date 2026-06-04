@@ -137,4 +137,34 @@ class FifoReservationServiceTest extends TestCase
 
         $this->assertSame(bcsub((string) $beforeOnHand, '5', 3), (string) $afterOnHand);
     }
+
+    public function test_release_caps_to_stock_level_reserved_when_drifted(): void
+    {
+        $project = $this->createTestProject();
+        $item = $this->itemBySku('ACC-HDL-001');
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN1');
+
+        $result = $this->fifo->reserveForProject(
+            user: $this->user,
+            projectId: $project->id,
+            bomLines: [[
+                'item_id' => $item->id,
+                'quantity' => 5,
+            ]],
+        );
+
+        $line = $result['reservation']->lines->first();
+        $level = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->firstOrFail();
+        $level->quantity_reserved = '0';
+        $level->save();
+
+        $released = $this->fifo->release($result['reservation']->fresh());
+
+        $this->assertSame('0.000', (string) $level->fresh()->quantity_reserved);
+        $this->assertSame('0.000', (string) $line->fresh()->quantity_released);
+        $this->assertSame(ReservationStatus::Partial, $released->status);
+    }
 }

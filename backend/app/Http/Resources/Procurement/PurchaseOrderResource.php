@@ -25,6 +25,10 @@ class PurchaseOrderResource extends JsonResource
             'approved_at' => $this->approved_at?->toIso8601String(),
             'sent_at' => $this->sent_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+            'goods_receipts_count' => $this->when(
+                isset($this->goods_receipts_count),
+                fn () => (int) $this->goods_receipts_count,
+            ),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier ? [
                 'id' => $this->supplier->id,
                 'code' => $this->supplier->code,

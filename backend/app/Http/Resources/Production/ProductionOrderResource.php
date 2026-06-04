@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Production;
 
 use App\Models\Production\ProductionOrder;
+use App\Services\Production\ProductionGlassRequirementService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,10 +22,13 @@ class ProductionOrderResource extends JsonResource
                 'reference' => $this->project->reference,
                 'name' => $this->project->name,
                 'stage' => $this->project->stage?->value,
+                'completion_percent' => (int) $this->project->completion_percent,
             ]),
             'status' => $this->status?->value,
             'current_stage' => $this->current_stage?->value,
             'current_stage_label' => $this->current_stage?->label(),
+            'glass_assembly' => app(ProductionGlassRequirementService::class)
+                ->glassAssemblyContext($this->project_id),
             'fifo_position' => $this->fifo_position,
             'scheduled_start' => $this->scheduled_start?->toDateString(),
             'scheduled_end' => $this->scheduled_end?->toDateString(),

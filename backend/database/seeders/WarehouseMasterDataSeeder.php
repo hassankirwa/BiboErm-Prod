@@ -74,7 +74,7 @@ class WarehouseMasterDataSeeder extends Seeder
             $sectionCode = str_contains($data['sku'], 'SLD') ? 'SEC-ALU-SLD-FRAME' : 'SEC-ALU-CSM-FRAME';
             $binId = Bin::query()
                 ->whereHas('section', fn ($q) => $q->where('code', $sectionCode))
-                ->where('code', 'BIN1')
+                ->where('code', 'CAGE1')
                 ->value('id');
 
             if ($binId) {

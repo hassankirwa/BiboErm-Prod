@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { ProductionOrdersTable } from "@/components/production/production-orders-table";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { CUTTING_STAGES, type ProductionOrder } from "@/lib/api/production";
+import { loadOrdersForStages } from "@/lib/production/load-queue-orders";
+import { isProductionManager } from "@/lib/production/utils";
 import { usePermissions } from "@/hooks/use-permissions";
-import { listProductionOrders, type ProductionOrder } from "@/lib/api/production";
-import { isCuttingQueueOrder, isProductionManager } from "@/lib/production/utils";
 import { toast } from "sonner";
 
 export default function ProductionCuttingPage() {
@@ -16,12 +18,12 @@ export default function ProductionCuttingPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    listProductionOrders({
-      per_page: 100,
+    loadOrdersForStages(CUTTING_STAGES, {
+      per_page: 50,
       assigned_to_me: !manager,
     })
-      .then((res) => setOrders(res.data))
-      .catch((e: Error) => toast.error(e.message || "Failed to load cutting queue"))
+      .then(setOrders)
+      .catch((err) => toast.error(getApiErrorMessage(err, "Failed to load cutting queue")))
       .finally(() => setLoading(false));
   }, [manager]);
 
@@ -29,23 +31,13 @@ export default function ProductionCuttingPage() {
     load();
   }, [load]);
 
-  const queue = useMemo(
-    () =>
-      orders.filter(
-        (o) =>
-          (o.status === "scheduled" || o.status === "in_progress") &&
-          isCuttingQueueOrder(o),
-      ),
-    [orders],
-  );
-
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Cutting Queue"
         subtitle={
           manager
-            ? "Material prep, QC pre-check, and cutting stages"
+            ? "Material prep, QC pre-check, and cutting (server-filtered by stage)"
             : "Orders assigned to you in cutting stages"
         }
       />
@@ -53,7 +45,7 @@ export default function ProductionCuttingPage() {
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
-          <ProductionOrdersTable orders={queue} />
+          <ProductionOrdersTable orders={orders} />
         )}
       </div>
     </div>

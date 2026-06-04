@@ -170,6 +170,7 @@ export function PurchaseOrderCreateWorkspace() {
           tax: parseQty(group.tax),
           lines: group.lines.map((line) => ({
             requisition_id: line.requisition_id,
+            requisition_line_id: line.requisition_line_id,
             description: line.description,
             quantity: parseQty(line.quantity),
             unit_price: parseQty(line.unit_price),
@@ -339,7 +340,19 @@ export function PurchaseOrderCreateWorkspace() {
                     <TableBody>
                       {group.lines.map((line, lineIndex) => (
                         <TableRow key={`${line.requisition_line_id}-${lineIndex}`}>
-                          <TableCell>{line.description}</TableCell>
+                          <TableCell>
+                            <span>{line.description}</span>
+                            {line.warehouse_item_id ? (
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                Warehouse item #{line.warehouse_item_id}
+                                {line.sku ? ` · ${line.sku}` : ""}
+                              </span>
+                            ) : (
+                              <span className="mt-0.5 block text-xs font-medium text-destructive">
+                                Not linked to warehouse catalog — link on project BOM before receiving
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>{line.sku ?? "—"}</TableCell>
                           <TableCell>
                             <code className="text-xs">{line.requisition_reference}</code>

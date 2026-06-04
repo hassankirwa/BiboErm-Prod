@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             ProcurementSeeder::class,
             WarehouseStructureSeeder::class,
             WarehouseMasterDataSeeder::class,
+            LowStockDemoSeeder::class,
         ]);
 
         app()->make(PermissionRegistrar::class)->forgetCachedPermissions();

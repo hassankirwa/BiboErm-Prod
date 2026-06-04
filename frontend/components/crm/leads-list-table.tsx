@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowRight,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -49,11 +50,15 @@ import {
   type LeadActivity,
   type LeadListRow,
 } from "@/lib/leads-list-data";
-import { deleteLead } from "@/lib/api/crm/leads";
+import { deleteLead, updateLeadStatus } from "@/lib/api/crm/leads";
 import { createActivity } from "@/lib/api/crm/activities";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
-import { statusToKanbanStage } from "@/lib/crm-lead-status";
+import {
+  LEAD_STATUS_LABELS,
+  getNextLeadStatusAction,
+  statusToKanbanStage,
+} from "@/lib/crm-lead-status";
 import type { LeadKanbanCard } from "@/lib/leads-kanban-data";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { LeadsActivityModal } from "@/components/crm/leads-activity-modal";
@@ -67,14 +72,18 @@ const listTagBase =
 function ListTag({
   children,
   className,
+  title,
   widthClass,
 }: {
   children: React.ReactNode;
   className?: string;
+  title?: string;
   widthClass: string;
 }) {
   return (
-    <span className={cn(listTagBase, widthClass, className)}>{children}</span>
+    <span className={cn(listTagBase, widthClass, className)} title={title}>
+      {children}
+    </span>
   );
 }
 
@@ -148,16 +157,18 @@ function listRowToKanbanCard(row: LeadListRow): LeadKanbanCard {
 function LeadListRowMenu({
   row,
   returnView,
-  onDeleted,
+  onChanged,
 }: {
   row: LeadListRow;
   returnView: string;
-  onDeleted?: () => void;
+  onChanged?: () => void;
 }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const nextStatusAction = getNextLeadStatusAction(row.statusKey);
 
   async function handleLogCallSave(payload: {
     subject: string;
@@ -193,13 +204,30 @@ function LeadListRowMenu({
       await deleteLead(Number(row.id));
       toast.success("Lead deleted.");
       setDeleteOpen(false);
-      onDeleted?.();
+      onChanged?.();
     } catch (err) {
       toast.error(
         err instanceof ApiError ? err.message : "Failed to delete lead.",
       );
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleAdvanceStatus() {
+    if (!nextStatusAction) return;
+    setAdvancing(true);
+    try {
+      await ensureCsrfCookie();
+      await updateLeadStatus(Number(row.id), nextStatusAction.status);
+      toast.success(`Lead advanced to ${LEAD_STATUS_LABELS[nextStatusAction.status]}.`);
+      onChanged?.();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to advance lead.",
+      );
+    } finally {
+      setAdvancing(false);
     }
   }
 
@@ -230,6 +258,20 @@ function LeadListRowMenu({
               </Link>
             </DropdownMenuItem>
           </PermissionGate>
+          {nextStatusAction && (
+            <PermissionGate permission="leads.update">
+              <DropdownMenuItem
+                disabled={advancing}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void handleAdvanceStatus();
+                }}
+              >
+                <ArrowRight className="mr-2 h-4 w-4" />
+                {advancing ? "Advancing..." : nextStatusAction.label}
+              </DropdownMenuItem>
+            </PermissionGate>
+          )}
           <PermissionGate permission="leads.update">
             <DropdownMenuItem onSelect={() => setActivityOpen(true)}>
               <Phone className="mr-2 h-4 w-4" />
@@ -312,11 +354,11 @@ function LeadListRowMenu({
 function LeadMobileCard({
   row,
   returnView,
-  onDeleted,
+  onChanged,
 }: {
   row: LeadListRow;
   returnView: string;
-  onDeleted?: () => void;
+  onChanged?: () => void;
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -356,7 +398,7 @@ function LeadMobileCard({
         <LeadListRowMenu
           row={row}
           returnView={returnView}
-          onDeleted={onDeleted}
+          onChanged={onChanged}
         />
       </div>
     </div>
@@ -546,7 +588,7 @@ export function LeadsListTable({
                   <LeadListRowMenu
                     row={row}
                     returnView={returnView}
-                    onDeleted={onLeadDeleted}
+                    onChanged={onLeadDeleted}
                   />
                 </td>
               </tr>
@@ -562,7 +604,7 @@ export function LeadsListTable({
             key={row.id}
             row={row}
             returnView={returnView}
-            onDeleted={onLeadDeleted}
+            onChanged={onLeadDeleted}
           />
         ))}
       </div>

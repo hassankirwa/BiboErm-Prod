@@ -153,8 +153,13 @@ class CrmSalesReportService
             ->count();
 
         $siteVisitsCount = (clone $siteVisitQuery)
-            ->whereDate('visit_date', '>=', $fromDate)
-            ->whereDate('visit_date', '<=', $toDate)
+            ->where(function (Builder $q) use ($fromDate, $toDate) {
+                $q->where(function (Builder $inner) use ($fromDate, $toDate) {
+                    $inner->whereNotNull('visit_date')
+                        ->whereDate('visit_date', '>=', $fromDate)
+                        ->whereDate('visit_date', '<=', $toDate);
+                })->orWhereBetween('site_visits.created_at', [$fromDate, $toDate]);
+            })
             ->count();
 
         $paymentsReceived = (float) (clone $paymentQuery)
@@ -301,7 +306,18 @@ class CrmSalesReportService
         if ($ownerId) {
             $query->where(function (Builder $q) use ($ownerId) {
                 $q->where('assigned_field_officer_id', $ownerId)
-                    ->orWhere('scheduled_by', $ownerId);
+                    ->orWhere('scheduled_by', $ownerId)
+                    ->orWhereHas('lead', function (Builder $lead) use ($ownerId) {
+                        $lead->where('lead_owner_id', $ownerId)
+                            ->orWhere('assigned_sales_user_id', $ownerId)
+                            ->orWhere('assigned_to', $ownerId)
+                            ->orWhere('created_by', $ownerId);
+                    })
+                    ->orWhereHas('deal', function (Builder $deal) use ($ownerId) {
+                        $deal->where('deal_owner_id', $ownerId)
+                            ->orWhere('owner_id', $ownerId)
+                            ->orWhere('created_by', $ownerId);
+                    });
             });
         }
 

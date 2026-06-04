@@ -16,13 +16,20 @@ class AccountController extends Controller
     {
         $this->authorize('viewAny', Account::class);
 
-        $query = Account::query()->with(['owner', 'primaryContact'])->latest();
+        $query = Account::query()
+            ->visibleTo($request->user())
+            ->with(['owner', 'primaryContact'])
+            ->latest();
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
                     ->orWhere('email', 'ilike', "%{$search}%");
             });
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
         }
 
         return AccountResource::collection(

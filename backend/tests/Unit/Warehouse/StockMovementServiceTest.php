@@ -35,7 +35,7 @@ class StockMovementServiceTest extends TestCase
     public function test_receive_creates_inbound_movement_with_document_number(): void
     {
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $movement = $this->movements->receive(
             performer: $this->user,

@@ -10,7 +10,7 @@ class WarehouseMovementsTest extends WarehouseFeatureTestCase
     {
         $user = $this->warehouseAluminiumManager();
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $before = StockLevel::query()
             ->where('item_id', $item->id)
@@ -94,7 +94,7 @@ class WarehouseMovementsTest extends WarehouseFeatureTestCase
     {
         $user = $this->warehouseAluminiumManager();
         $item = $this->itemBySku('PROF-CSM-70MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-CSM-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-CSM-FRAME', 'CAGE1');
 
         $before = StockLevel::query()
             ->where('item_id', $item->id)
@@ -144,7 +144,7 @@ class WarehouseMovementsTest extends WarehouseFeatureTestCase
     {
         $user = $this->warehouseAluminiumManager();
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
         $project = $this->createTestProject();
 
         $before = StockLevel::query()
@@ -180,7 +180,7 @@ class WarehouseMovementsTest extends WarehouseFeatureTestCase
     {
         $user = $this->warehouseAluminiumManager();
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $this->actingAsSanctum($user)
             ->postJson('/api/v1/warehouse/movements/receive', [
@@ -219,7 +219,7 @@ class WarehouseMovementsTest extends WarehouseFeatureTestCase
     {
         $user = $this->warehouseAccessoriesManager();
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $this->actingAsSanctum($user)
             ->postJson('/api/v1/warehouse/movements/receive', [

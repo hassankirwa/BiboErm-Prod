@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CrmActivity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CrmActivityController extends Controller
 {
@@ -26,7 +27,26 @@ class CrmActivityController extends Controller
         }
 
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            if ($status === 'open') {
+                $query->where('status', '!=', 'completed');
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        if ($activityType = $request->query('activity_type')) {
+            $query->where(function ($q) use ($activityType) {
+                $q->where('activity_type', $activityType)
+                    ->orWhere('type', $activityType);
+            });
+        }
+
+        if ($contactId = $request->query('contact_id')) {
+            $query->where('contact_id', $contactId);
+        }
+
+        if ($assignedTo = $request->query('assigned_to')) {
+            $query->where('assigned_to', $assignedTo);
         }
 
         return response()->json(
@@ -38,9 +58,23 @@ class CrmActivityController extends Controller
     {
         $this->authorize('create', CrmActivity::class);
 
+        $activityTypes = ['task', 'call', 'email', 'meeting', 'schedule_call'];
+
         $validated = $request->validate([
-            'activity_type' => ['required_without:type', 'nullable', 'string', 'max:30'],
-            'type' => ['required_without:activity_type', 'nullable', 'string', 'max:64'],
+            'activity_type' => [
+                'required_without:type',
+                'nullable',
+                'string',
+                'max:30',
+                Rule::in($activityTypes),
+            ],
+            'type' => [
+                'required_without:activity_type',
+                'nullable',
+                'string',
+                'max:64',
+                Rule::in($activityTypes),
+            ],
             'subject' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],

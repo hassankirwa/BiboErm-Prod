@@ -456,6 +456,38 @@ export type ProjectMaterialLine = {
   can_create_requisition: boolean;
 };
 
+export type ProjectProcurementReceiptLine = {
+  id: number;
+  description: string;
+  warehouse_item_id: number | null;
+  warehouse_item_sku: string | null;
+  warehouse_item_name: string | null;
+  warehouse_item_category: string | null;
+  is_procurement_only: boolean;
+  qty_received: string;
+  qty_accepted: string;
+  qty_rejected: string;
+  to_bin_id: number | null;
+  notes: string | null;
+};
+
+export type ProjectProcurementReceipt = {
+  id: number;
+  grn_number: string;
+  status: string;
+  received_at: string | null;
+  verified_at: string | null;
+  notes: string | null;
+  quality_inspection_notes: string | null;
+  putaway_notes: string | null;
+  purchase_order: {
+    id: number;
+    reference: string;
+    supplier_name: string | null;
+  } | null;
+  lines: ProjectProcurementReceiptLine[];
+};
+
 export type ProjectMaterialStatus = {
   project_id: number;
   stage: string;
@@ -471,6 +503,7 @@ export type ProjectMaterialStatus = {
   };
   lines: ProjectMaterialLine[];
   fifo_position: number | null;
+  goods_receipts?: ProjectProcurementReceipt[];
 };
 
 export type ProjectMaterialShortageEntry = {
@@ -768,6 +801,7 @@ export const PROJECT_STAGE_LABELS: Record<string, string> = {
   materials_reserved: "Materials reserved",
   awaiting_procurement: "Awaiting procurement",
   materials_ready: "Materials ready",
+  materials_released: "Staged for production",
   cutting_stage: "Cutting",
   fabrication_stage: "Fabrication",
   glass_assembly: "Glass assembly",
@@ -787,6 +821,10 @@ export const STAGE_WAITING_MESSAGES: Record<string, string> = {
   material_check: "Waiting for warehouse to check stock and reserve materials.",
   materials_reserved: "Materials reserved — warehouse must confirm ready for production.",
   awaiting_procurement: "Waiting for procurement to fulfill material shortages.",
+  materials_ready:
+    "Stock reserved in warehouse — stage materials for production before shop floor fetches.",
+  materials_released:
+    "Reserved stock ready for production pickup — fetch per stage; log offcuts back to warehouse.",
 };
 
 /** PM-manual next stages from the current stage. */
@@ -806,11 +844,13 @@ export const PM_MANUAL_NEXT_STAGES: Record<string, string[]> = {
 export const WAREHOUSE_MANUAL_NEXT_STAGES: Record<string, string[]> = {
   materials_reserved: ["materials_ready"],
   awaiting_procurement: ["materials_ready"],
+  materials_ready: ["materials_released"],
 };
 
 /** Production manager manual advance targets. */
 export const PRODUCTION_MANUAL_NEXT_STAGES: Record<string, string[]> = {
   materials_ready: ["cutting_stage"],
+  materials_released: ["cutting_stage"],
   cutting_stage: ["fabrication_stage"],
   fabrication_stage: ["glass_assembly"],
   glass_assembly: ["qc_pre_installation"],

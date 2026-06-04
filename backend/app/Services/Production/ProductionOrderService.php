@@ -100,4 +100,56 @@ class ProductionOrderService
 
         return (int) ($reservation?->fifo_sequence ?? 0);
     }
+
+    /**
+     * Ensures every project at materials_ready has an active production order (FIFO backfill).
+     */
+    public function syncOrdersForMaterialsReadyProjects(): int
+    {
+        $created = 0;
+
+        $projectIds = Project::query()
+            ->where('stage', ProjectStage::MaterialsReady)
+            ->pluck('id');
+
+        foreach ($projectIds as $projectId) {
+            if ($this->hasActiveOrderForProject((int) $projectId)) {
+                continue;
+            }
+
+            $fifo = $this->fifoSequenceForProject((int) $projectId);
+            $order = $this->createFromMaterialsReady((int) $projectId, max(1, $fifo));
+
+            if ($order) {
+                $created++;
+            }
+        }
+
+        return $created;
+    }
+
+    public function updateStatus(ProductionOrder $order, ProductionOrderStatus $status): ProductionOrder
+    {
+        if ($order->status === ProductionOrderStatus::Completed) {
+            throw ValidationException::withMessages([
+                'status' => ['Completed production orders cannot change status.'],
+            ]);
+        }
+
+        if ($status === ProductionOrderStatus::Completed) {
+            throw ValidationException::withMessages([
+                'status' => ['Use complete-stage on the final pipeline stage to finish an order.'],
+            ]);
+        }
+
+        $previous = $order->status;
+        $order->status = $status;
+        $order->save();
+
+        $this->audit->orderStatusChanged($order, ['status' => $previous->value], [
+            'status' => $status->value,
+        ]);
+
+        return $order->fresh();
+    }
 }

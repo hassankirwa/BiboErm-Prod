@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProductionStageBadge } from "@/components/production/production-stage-badge";
 import { listProductionOrders, type ProductionOrder } from "@/lib/api/production";
 import { formatProjectStage } from "@/lib/api/projects";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { toast } from "sonner";
 
 type Props = {
@@ -21,12 +22,14 @@ export function ProjectDetailProduction({ projectId, projectStage }: Props) {
   useEffect(() => {
     listProductionOrders({ project_id: projectId, per_page: 10 })
       .then((res) => setOrders(res.data))
-      .catch((e: Error) => toast.error(e.message || "Failed to load production orders"))
+      .catch((err) =>
+        toast.error(getApiErrorMessage(err, "Failed to load production orders")),
+      )
       .finally(() => setLoading(false));
   }, [projectId]);
 
   const active = orders.find(
-    (o) => o.status === "scheduled" || o.status === "in_progress",
+    (o) => o.status === "scheduled" || o.status === "in_progress" || o.status === "on_hold",
   );
 
   return (
@@ -55,6 +58,7 @@ export function ProjectDetailProduction({ projectId, projectStage }: Props) {
             <p>
               Pipeline: <ProductionStageBadge stage={active.current_stage} />
             </p>
+            <p className="capitalize text-muted-foreground">Status: {active.status.replace(/_/g, " ")}</p>
             <Button size="sm" asChild>
               <Link href={`/production/orders/${active.id}`}>Open order</Link>
             </Button>
@@ -67,10 +71,36 @@ export function ProjectDetailProduction({ projectId, projectStage }: Props) {
         </p>
       )}
 
-      {orders.length > 1 && (
-        <p className="text-xs text-muted-foreground">
-          {orders.length} production order(s) on record for this project.
-        </p>
+      {orders.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Production orders</CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/production/schedule">FIFO schedule</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              {orders.map((order) => (
+                <li
+                  key={order.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2"
+                >
+                  <Link
+                    href={`/production/orders/${order.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {order.reference}
+                  </Link>
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <ProductionStageBadge stage={order.current_stage} />
+                    <span className="capitalize">{order.status.replace(/_/g, " ")}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

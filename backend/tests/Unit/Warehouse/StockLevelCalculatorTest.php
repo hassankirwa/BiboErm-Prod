@@ -37,7 +37,7 @@ class StockLevelCalculatorTest extends TestCase
     public function test_increment_and_decrement_on_hand(): void
     {
         $item = $this->itemBySku('PROF-CSM-70MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-CSM-FRAME', 'BIN2');
+        $bin = $this->binBySectionAndCode('SEC-ALU-CSM-FRAME', 'CAGE2');
 
         $this->calculator->incrementOnHand($item->id, $bin->id, '5.500');
         $this->calculator->decrementOnHand($item->id, $bin->id, '2.000');
@@ -78,7 +78,7 @@ class StockLevelCalculatorTest extends TestCase
     public function test_decrement_on_hand_throws_when_insufficient(): void
     {
         $item = $this->itemBySku('PROF-SLD-80MM');
-        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'BIN1');
+        $bin = $this->binBySectionAndCode('SEC-ALU-SLD-FRAME', 'CAGE1');
 
         $this->expectException(\InvalidArgumentException::class);
 

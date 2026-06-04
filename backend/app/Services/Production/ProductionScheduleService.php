@@ -11,6 +11,7 @@ class ProductionScheduleService
 {
     public function __construct(
         protected ProjectMaterialStatusService $materialStatus,
+        protected ProductionOrderService $orders,
     ) {}
 
     /**
@@ -18,6 +19,8 @@ class ProductionScheduleService
      */
     public function calendarQueue(): Collection
     {
+        $this->orders->syncOrdersForMaterialsReadyProjects();
+
         $orders = ProductionOrder::query()
             ->with(['project', 'teams.user', 'stageLogs'])
             ->whereIn('status', [

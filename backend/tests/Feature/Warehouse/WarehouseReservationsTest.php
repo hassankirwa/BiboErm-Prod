@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Warehouse;
 
+use App\Enums\ProjectStage;
 use App\Enums\Warehouse\ReservationStatus;
 use App\Models\Warehouse\StockLevel;
 use App\Models\Warehouse\StockReservation;
+use App\Services\Projects\ProjectStageService;
 
 class WarehouseReservationsTest extends WarehouseFeatureTestCase
 {
@@ -214,5 +216,37 @@ class WarehouseReservationsTest extends WarehouseFeatureTestCase
                 ]],
             ])
             ->assertForbidden();
+    }
+
+    public function test_release_project_materials_advances_to_materials_released(): void
+    {
+        $manager = $this->operationsManager();
+        $releaser = $this->productionManager();
+        $project = $this->createTestProject(['stage' => ProjectStage::MaterialsReady->value]);
+        $item = $this->itemBySku('ACC-HDL-001');
+
+        $this->actingAsSanctum($manager)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 4,
+                ]],
+            ])
+            ->assertOk();
+
+        app(ProjectStageService::class)->initialize($project->fresh(), $manager);
+
+        $this->actingAsSanctum($releaser)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/release-materials", [
+                'notes' => 'Handoff to cutting',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.project_stage', ProjectStage::MaterialsReleased->value)
+            ->assertJsonFragment(['status' => ReservationStatus::Pending->value]);
+
+        $this->assertSame(
+            ProjectStage::MaterialsReleased,
+            $project->fresh()->stage,
+        );
     }
 }

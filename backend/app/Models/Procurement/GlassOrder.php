@@ -15,6 +15,7 @@ class GlassOrder extends Model
         'project_id',
         'supplier_id',
         'purchase_order_id',
+        'purchase_requisition_id',
         'specs',
         'status',
         'ordered_at',
@@ -49,6 +50,11 @@ class GlassOrder extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function purchaseRequisition(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseRequisition::class);
     }
 
     public function creator(): BelongsTo

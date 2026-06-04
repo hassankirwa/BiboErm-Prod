@@ -33,6 +33,7 @@ const stageColors: Record<string, string> = {
   materials_reserved: "bg-warning/10 text-warning",
   awaiting_procurement: "bg-warning/10 text-warning",
   materials_ready: "bg-success/10 text-success",
+  materials_released: "bg-success/10 text-success",
   cutting_stage: "bg-primary/10 text-primary",
   fabrication_stage: "bg-primary/10 text-primary",
   glass_assembly: "bg-primary/10 text-primary",

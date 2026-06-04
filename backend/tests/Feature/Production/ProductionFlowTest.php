@@ -88,6 +88,22 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(1, ProductionOrder::query()->where('project_id', $project->id)->count());
     }
 
+    public function test_sync_backfills_production_order_for_materials_ready_project(): void
+    {
+        $project = $this->createProjectAtStage(ProjectStage::MaterialsReady);
+
+        $this->assertDatabaseMissing('production_orders', ['project_id' => $project->id]);
+
+        $created = app(ProductionOrderService::class)->syncOrdersForMaterialsReadyProjects();
+
+        $this->assertSame(1, $created);
+        $this->assertDatabaseHas('production_orders', [
+            'project_id' => $project->id,
+            'status' => ProductionOrderStatus::Scheduled->value,
+            'current_stage' => ProductionStage::MaterialPrep->value,
+        ]);
+    }
+
     public function test_orders_list_sorted_by_fifo_position(): void
     {
         $projectA = $this->createProjectAtStage(ProjectStage::MaterialsReady);
@@ -131,7 +147,7 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(10, $order->fifo_position);
     }
 
-    public function test_complete_cutting_without_offcuts_returns_validation_error(): void
+    public function test_complete_cutting_without_offcuts_succeeds(): void
     {
         $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
 
@@ -139,8 +155,10 @@ class ProductionFlowTest extends TestCase
             ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
                 'stage' => 'cutting',
             ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['offcuts']);
+            ->assertOk();
+
+        $order->refresh();
+        $this->assertSame(ProductionStage::Fabrication, $order->current_stage);
     }
 
     public function test_complete_cutting_dispatches_production_stage_completed_with_user(): void
@@ -206,7 +224,7 @@ class ProductionFlowTest extends TestCase
         $order = app(ProductionOrderService::class)->createFromMaterialsReady($project->id, 1);
 
         $teamMember = User::factory()->create();
-        $teamMember->givePermissionTo(['production.view', 'production.manage']);
+        $teamMember->givePermissionTo(['production.view']);
 
         \App\Models\Production\ProductionOrderTeam::query()->create([
             'production_order_id' => $order->id,
@@ -246,7 +264,10 @@ class ProductionFlowTest extends TestCase
 
     public function test_start_stage_cutting_records_material_release(): void
     {
-        $order = $this->createOrderInStage(ProductionStage::MaterialPrep);
+        $order = $this->createOrderInStage(ProductionStage::Cutting);
+        Project::query()->whereKey($order->project_id)->update([
+            'stage' => ProjectStage::MaterialsReleased,
+        ]);
 
         $reservation = \App\Models\Warehouse\StockReservation::query()->create([
             'reservation_number' => 'RSV-TEST-001',
@@ -286,15 +307,30 @@ class ProductionFlowTest extends TestCase
 
         $this->actingAs($this->manager, 'sanctum')
             ->postJson("/api/v1/production/orders/{$order->id}/start-stage", [
-                'stage' => 'material_prep',
+                'stage' => 'cutting',
             ])
             ->assertOk();
 
         $this->assertDatabaseHas('production_material_releases', [
             'production_order_id' => $order->id,
             'stock_reservation_line_id' => $line->id,
-            'stage' => 'material_prep',
+            'stage' => 'cutting',
         ]);
+    }
+
+    public function test_start_stage_rejects_fetch_when_materials_not_staged(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting);
+        Project::query()->whereKey($order->project_id)->update([
+            'stage' => ProjectStage::MaterialsReady,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/start-stage", [
+                'stage' => 'cutting',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['materials']);
     }
 
     public function test_glass_order_created_once_on_fabrication_complete(): void
@@ -325,6 +361,186 @@ class ProductionFlowTest extends TestCase
         ));
 
         $this->assertSame(ProjectStage::FabricationStage, $project->fresh()->stage);
+    }
+
+    public function test_schedule_endpoint_returns_fifo_sorted_orders(): void
+    {
+        $projectA = $this->createProjectAtStage(ProjectStage::MaterialsReady);
+        $projectB = $this->createProjectAtStage(ProjectStage::MaterialsReady);
+
+        app(ProductionOrderService::class)->createFromMaterialsReady($projectA->id, 30);
+        app(ProductionOrderService::class)->createFromMaterialsReady($projectB->id, 5);
+
+        $response = $this->actingAs($this->manager, 'sanctum')
+            ->getJson('/api/v1/production/schedule');
+
+        $response->assertOk();
+        $positions = collect($response->json('data'))->pluck('fifo_position')->all();
+        $this->assertSame([5, 30], $positions);
+    }
+
+    public function test_offcuts_proxy_logs_offcut_during_cutting(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+
+        $item = \App\Models\Warehouse\Item::query()->create([
+            'sku' => 'ALU-OFFCUT',
+            'name' => 'Offcut Profile',
+            'category' => \App\Enums\Warehouse\ItemCategory::AluminiumProfile,
+            'unit_of_measure' => 'm',
+            'is_active' => true,
+        ]);
+
+        $this->mock(OffcutLoggingService::class)
+            ->shouldReceive('logFromArray')
+            ->once()
+            ->andReturn(new OffcutPiece(['id' => 1, 'item_id' => $item->id]));
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/offcuts", [
+                'offcuts' => [
+                    ['item_id' => $item->id, 'length_mm' => 400],
+                ],
+            ])
+            ->assertOk();
+    }
+
+    public function test_qc_pre_check_complete_dispatches_production_stage_completed(): void
+    {
+        Event::fake([ProductionStageCompleted::class]);
+
+        $order = $this->createOrderInStage(ProductionStage::QcPreCheck, started: true);
+
+        app(\App\Services\Production\ProductionStageService::class)->complete(
+            order: $order,
+            stage: ProductionStage::QcPreCheck,
+            user: $this->manager,
+        );
+
+        Event::assertDispatched(ProductionStageCompleted::class, function (ProductionStageCompleted $event) use ($order) {
+            return $event->productionStage === 'qc_pre_check'
+                && $event->productionOrderId === $order->id;
+        });
+    }
+
+    public function test_qc_post_fabrication_complete_advances_project_stage(): void
+    {
+        $project = $this->createProjectAtStage(ProjectStage::GlassAssembly);
+        $order = ProductionOrder::query()->create([
+            'reference' => 'PROD-QC-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => ProductionOrderStatus::InProgress,
+            'current_stage' => ProductionStage::QcPostFabrication,
+            'fifo_position' => 1,
+            'actual_start' => now()->toDateString(),
+        ]);
+
+        \App\Models\Production\ProductionStageLog::query()->create([
+            'production_order_id' => $order->id,
+            'stage' => ProductionStage::QcPostFabrication,
+            'status' => 'started',
+            'started_at' => now(),
+        ]);
+
+        app(OnProductionStageCompleted::class)->handle(new ProductionStageCompleted(
+            projectId: $project->id,
+            productionOrderId: $order->id,
+            productionStage: 'qc_post_fabrication',
+        ));
+
+        $this->assertSame(ProjectStage::QcPreInstallation, $project->fresh()->stage);
+    }
+
+    public function test_order_status_can_be_set_to_on_hold(): void
+    {
+        $project = $this->createProjectAtStage(ProjectStage::MaterialsReady);
+        $order = app(ProductionOrderService::class)->createFromMaterialsReady($project->id, 1);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->patchJson("/api/v1/production/orders/{$order->id}/status", [
+                'status' => 'on_hold',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'on_hold');
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->patchJson("/api/v1/production/orders/{$order->id}/status", [
+                'status' => 'in_progress',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+    }
+
+    public function test_start_glass_assembly_rejected_when_no_glass_on_bom(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
+        $this->createProjectBom($order->project_id, withGlass: false);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/start-stage", [
+                'stage' => 'glass_assembly',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['glass']);
+    }
+
+    public function test_start_glass_assembly_rejected_when_glass_not_delivered(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
+        $this->createProjectBom($order->project_id, withGlass: true);
+        $this->createGlassOrder($order->project_id, \App\Enums\Procurement\GlassOrderStatus::Ordered);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/start-stage", [
+                'stage' => 'glass_assembly',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['glass']);
+    }
+
+    public function test_skip_glass_assembly_advances_to_finishing_when_no_glass(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
+        $this->createProjectBom($order->project_id, withGlass: false);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/skip-stage", [
+                'stage' => 'glass_assembly',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.current_stage', 'finishing');
+
+        $this->assertDatabaseHas('production_stage_logs', [
+            'production_order_id' => $order->id,
+            'stage' => 'glass_assembly',
+            'status' => 'skipped',
+        ]);
+    }
+
+    public function test_skip_glass_assembly_rejected_when_glass_required(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
+        $this->createProjectBom($order->project_id, withGlass: true);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/skip-stage", [
+                'stage' => 'glass_assembly',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['glass']);
+    }
+
+    public function test_order_detail_includes_glass_assembly_context(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
+        $this->createProjectBom($order->project_id, withGlass: false);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->getJson("/api/v1/production/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('data.glass_assembly.requires_glass', false)
+            ->assertJsonPath('data.glass_assembly.can_skip', true)
+            ->assertJsonPath('data.glass_assembly.can_start', false);
     }
 
     protected function createWarehouseBin(): int
@@ -401,5 +617,50 @@ class ProductionFlowTest extends TestCase
         }
 
         return $order;
+    }
+
+    protected function createProjectBom(int $projectId, bool $withGlass): \App\Models\ProjectBom
+    {
+        $bom = \App\Models\ProjectBom::query()->create([
+            'project_id' => $projectId,
+            'version' => 1,
+            'status' => 'finalized',
+        ]);
+
+        \App\Models\ProjectBomLine::query()->create([
+            'bom_id' => $bom->id,
+            'line_type' => 'accessory',
+            'material_code' => 'ACC-001',
+            'material_name' => 'Handle Set',
+            'quantity' => 1,
+            'is_glass' => false,
+            'sort_order' => 1,
+        ]);
+
+        if ($withGlass) {
+            \App\Models\ProjectBomLine::query()->create([
+                'bom_id' => $bom->id,
+                'line_type' => 'glass',
+                'material_code' => 'GLS-001',
+                'material_name' => '6mm Clear Tempered',
+                'quantity' => 2,
+                'is_procurement_only' => true,
+                'is_glass' => true,
+                'sort_order' => 2,
+            ]);
+        }
+
+        return $bom;
+    }
+
+    protected function createGlassOrder(int $projectId, \App\Enums\Procurement\GlassOrderStatus $status): void
+    {
+        \App\Models\Procurement\GlassOrder::query()->create([
+            'order_number' => 'GLS-'.uniqid(),
+            'project_id' => $projectId,
+            'specs' => ['source' => 'test'],
+            'status' => $status,
+            'created_by' => $this->manager->id,
+        ]);
     }
 }

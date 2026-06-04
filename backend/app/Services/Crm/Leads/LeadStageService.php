@@ -18,9 +18,9 @@ class LeadStageService
         'new' => ['contacted', 'not_reachable', 'unqualified'],
         'contacted' => ['interested', 'not_reachable', 'unqualified'],
         'interested' => ['qualified', 'unqualified'],
-        'qualified' => ['site_visit_required', 'site_visit_scheduled', 'converted'],
+        'qualified' => ['site_visit_required'],
         'site_visit_required' => ['site_visit_scheduled'],
-        'site_visit_scheduled' => ['measurements_captured', 'converted'],
+        'site_visit_scheduled' => ['measurements_captured'],
         'measurements_captured' => ['converted'],
     ];
 

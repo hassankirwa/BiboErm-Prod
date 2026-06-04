@@ -128,6 +128,12 @@ Route::prefix('v1')->group(function () {
             });
         });
 
+    Route::middleware(['auth:sanctum', 'active'])
+        ->prefix('lookups')
+        ->group(function () {
+            require __DIR__.'/api/lookups.php';
+        });
+
     Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () {
         require __DIR__.'/api/crm/leads.php';
         require __DIR__.'/api/crm/contacts.php';
@@ -166,5 +172,15 @@ Route::prefix('v1')->group(function () {
             require __DIR__.'/api/production/orders.php';
             require __DIR__.'/api/production/schedule.php';
             require __DIR__.'/api/production/cutting.php';
+        });
+
+    Route::middleware(['auth:sanctum', 'active'])
+        ->prefix('qc')
+        ->group(function () {
+            require __DIR__.'/api/qc/templates.php';
+            require __DIR__.'/api/qc/inspections.php';
+            require __DIR__.'/api/qc/defects.php';
+            require __DIR__.'/api/qc/schedules.php';
+            require __DIR__.'/api/qc/dashboard.php';
         });
 }); // v1

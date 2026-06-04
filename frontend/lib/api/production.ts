@@ -24,6 +24,7 @@ export type ProductionOrder = {
   status: ProductionOrderStatus;
   current_stage: ProductionStageValue;
   current_stage_label?: string;
+  glass_assembly?: GlassAssemblyContext;
   fifo_position: number;
   scheduled_start: string | null;
   scheduled_end: string | null;
@@ -35,6 +36,7 @@ export type ProductionOrder = {
     reference: string;
     name: string;
     stage: string;
+    completion_percent?: number;
   } | null;
   stage_logs?: ProductionStageLog[];
   teams?: ProductionOrderTeam[];
@@ -54,6 +56,14 @@ export type ProductionStageLog = {
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
+};
+
+export type GlassAssemblyContext = {
+  requires_glass: boolean;
+  glass_present: boolean;
+  can_start: boolean;
+  can_skip: boolean;
+  glass_order_status: string | null;
 };
 
 export type ProductionOrderTeam = {
@@ -98,6 +108,7 @@ export type ScheduleOrder = {
   project_id: number;
   project_name?: string;
   project_stage?: string;
+  project_completion_percent?: number;
   status: ProductionOrderStatus;
   current_stage: ProductionStageValue;
   current_stage_label?: string;
@@ -220,6 +231,16 @@ export async function completeProductionStage(
   });
 }
 
+export async function skipProductionStage(
+  orderId: number,
+  payload: { stage: "glass_assembly"; notes?: string },
+) {
+  return apiRequest<{ data: ProductionOrder }>(`/production/orders/${orderId}/skip-stage`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export async function listCuttingSheet(orderId: number) {
   return apiRequest<{ data: CuttingSheetLine[] }>(
     `/production/orders/${orderId}/cutting-sheet`,
@@ -267,6 +288,16 @@ export async function listProductionTeams(orderId: number) {
   return apiRequest<{ data: ProductionOrderTeam[] }>(
     `/production/orders/${orderId}/teams`,
   );
+}
+
+export async function updateProductionOrderStatus(
+  orderId: number,
+  payload: { status: ProductionOrderStatus },
+) {
+  return apiRequest<{ data: ProductionOrder }>(`/production/orders/${orderId}/status`, {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export async function assignProductionTeam(

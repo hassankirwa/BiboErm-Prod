@@ -51,8 +51,16 @@ export function HrHomePendingActions() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="text-base">Profile change requests</CardTitle>
+          {items.length > 0 && (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/hr/employees?filter=profile_change_requests">
+                View all
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (

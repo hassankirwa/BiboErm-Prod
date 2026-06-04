@@ -106,9 +106,14 @@ export default function PurchaseOrderDetailPage() {
                 Approve
               </Button>
             ) : null}
-            <Button variant="secondary" asChild>
-              <Link href={`/procurement/goods-receipts/create?po=${order.id}`}>Receive goods</Link>
-            </Button>
+            {(order.goods_receipts_count ?? 0) === 0 &&
+            order.status !== "cancelled" &&
+            order.status !== "draft" &&
+            order.status !== "pending_approval" ? (
+              <Button variant="secondary" asChild>
+                <Link href={`/procurement/goods-receipts/create?po=${order.id}`}>Receive goods</Link>
+              </Button>
+            ) : null}
             <PurchaseOrderPdfPreviewButton order={order} size="default" variant="default" />
           </div>
         }

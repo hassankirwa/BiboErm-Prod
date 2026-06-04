@@ -152,12 +152,63 @@ class WarehouseStructureSeeder extends Seeder
                 ]
             );
 
-            foreach (['BIN1', 'BIN2', 'BIN3'] as $i => $code) {
+            $this->migrateLegacyAluminiumBinCodes($section);
+
+            $cages = [
+                'CAGE1' => 'Cage 1',
+                'CAGE2' => 'Cage 2',
+                'CAGE3' => 'Cage 3',
+            ];
+
+            $sort = 1;
+            foreach ($cages as $code => $name) {
                 Bin::query()->updateOrCreate(
                     ['section_id' => $section->id, 'code' => $code],
-                    ['sort_order' => $i + 1, 'is_active' => true]
+                    [
+                        'name' => $name,
+                        'sort_order' => $sort++,
+                        'is_active' => true,
+                    ]
                 );
             }
+        }
+    }
+
+    /**
+     * Rename legacy BIN* codes on aluminium profile sections (keeps stock_levels FKs intact).
+     */
+    private function migrateLegacyAluminiumBinCodes(Section $section): void
+    {
+        $map = [
+            'BIN1' => ['code' => 'CAGE1', 'name' => 'Cage 1'],
+            'BIN2' => ['code' => 'CAGE2', 'name' => 'Cage 2'],
+            'BIN3' => ['code' => 'CAGE3', 'name' => 'Cage 3'],
+        ];
+
+        foreach ($map as $legacyCode => $target) {
+            $legacy = Bin::query()
+                ->where('section_id', $section->id)
+                ->where('code', $legacyCode)
+                ->first();
+
+            if (! $legacy) {
+                continue;
+            }
+
+            $targetExists = Bin::query()
+                ->where('section_id', $section->id)
+                ->where('code', $target['code'])
+                ->whereKeyNot($legacy->id)
+                ->exists();
+
+            if ($targetExists) {
+                continue;
+            }
+
+            $legacy->update([
+                'code' => $target['code'],
+                'name' => $target['name'],
+            ]);
         }
     }
 

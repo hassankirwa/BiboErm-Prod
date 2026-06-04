@@ -60,7 +60,8 @@ Ground truth as of v1.1 — use this table before coding to avoid duplicating wo
 | Routes                           | **Registered**         | `[backend/routes/api/production/](../backend/routes/api/production/)` under `/api/v1/production`                                                                                                                              |
 | Offcut `storage_area`            | **Implemented**        | Migration `2026_06_03_120000_add_offcut_storage_area.php`; `production_workspace` nullable bin                                                                                                                                |
 | Permissions (seeded)             | **Coarse keys**        | `production.view`, `production.manage`, `production.schedule.manage`                                                                                                                                                           |
-| PHPUnit                          | **11 tests**           | `[backend/tests/Feature/Production/ProductionFlowTest.php](../backend/tests/Feature/Production/ProductionFlowTest.php)`                                                                                                        |
+| PHPUnit                          | **16+ tests**          | `[backend/tests/Feature/Production/ProductionFlowTest.php](../backend/tests/Feature/Production/ProductionFlowTest.php)`                                                                                                        |
+| Gap audit doc                    | **Exists**             | `[docs/PRODUCTION_GAP_AUDIT.md](./PRODUCTION_GAP_AUDIT.md)`                                                                                                                                                                     |
 | Frontend                         | **Live API**           | See [PRODUCTION_FRONTEND_GUIDE.md](./PRODUCTION_FRONTEND_GUIDE.md) — `frontend/lib/api/production.ts`, routes §17                                                                                                               |
 
 
@@ -277,56 +278,29 @@ Stages **14–18** (`in_transit`, `installation`, `site_qc`, …) are owned by *
 
 Same convention as CRM and Warehouse ([SALES_CRM.MD §3](./SALES_CRM.MD), [WAREHOUSE.MD §4](./WAREHOUSE.MD#4-repository--folder-structure)).
 
-Legend: ✅ exists · ⬜ planned (Dev 4 owns all ⬜ paths)
+Legend: ✅ implemented
 
 ```
 backend/app/
 ├── Enums/Production/
-│   ├── ProductionStage.php                    ✅ partial — expand per §3.1
-│   ├── ProductionOrderStatus.php              ⬜ scheduled, in_progress, completed, on_hold
-│   └── TeamRole.php                           ⬜ cutting_lead, fabrication_lead, ...
+│   ├── ProductionStage.php                    ✅ 8 pipeline stages
+│   ├── ProductionOrderStatus.php              ✅ scheduled, in_progress, completed, on_hold
+│   └── TeamRole.php                           ✅ cutting_lead, fabrication_lead, assembly_lead, qc_liaison
 ├── Events/Production/
-│   └── ProductionStageCompleted.php           ✅ scalar IDs only
+│   └── ProductionStageCompleted.php           ✅ scalar IDs + optional completedByUserId
 ├── Listeners/Production/
-│   ├── CreateProductionOrder.php              ⬜ listens: ProjectMaterialsReady
-│   └── RequestStageMaterialRelease.php        ⬜ on stage start (calls WH service)
-├── Http/Controllers/Production/
-│   ├── ProductionOrderController.php          ⬜
-│   ├── ProductionScheduleController.php       ⬜
-│   ├── StartProductionStageController.php     ⬜
-│   ├── CompleteProductionStageController.php  ⬜
-│   ├── CuttingSheetController.php             ⬜
-│   ├── ProductionTeamController.php           ⬜
-├── Http/Requests/Production/
-│   ├── StartStageRequest.php                  ⬜
-│   ├── CompleteStageRequest.php               ⬜
-│   ├── StoreCuttingSheetRequest.php           ⬜
-│   └── UpdateScheduleRequest.php              ⬜
-├── Http/Resources/Production/
-│   ├── ProductionOrderResource.php            ⬜
-│   ├── ProductionStageLogResource.php         ⬜
-│   ├── CuttingSheetResource.php               ⬜
-│   └── ScheduleCalendarResource.php           ⬜
-├── Models/Production/
-│   ├── ProductionOrder.php                    ⬜
-│   ├── ProductionStageLog.php                 ⬜
-│   ├── ProductionOrderTeam.php                ⬜
-│   ├── ProductionMaterialRelease.php          ⬜
-│   ├── CuttingSheet.php                       ⬜
-├── Services/Production/
-│   ├── ProductionOrderService.php             ⬜
-│   ├── ProductionScheduleService.php          ⬜ FIFO sort + calendar reorder rules
-│   ├── ProductionStageService.php             ⬜ stage start/complete orchestration
-│   ├── CuttingSheetGeneratorService.php       ⬜ BOM → cutting lines
-│   ├── MaterialReleaseRequestService.php      ⬜ delegates to WH release API
-├── Policies/Production/
-│   ├── ProductionOrderPolicy.php              ⬜
-│   └── ProductionSchedulePolicy.php           ⬜
-└── routes/api/production/
-    ├── orders.php                             ⬜
-    ├── schedule.php                           ⬜
-    ├── cutting.php                            ⬜
+│   ├── CreateProductionOrder.php              ✅ ProjectMaterialsReady
+│   └── NotifyProductionManagersOfNewOrder.php ✅
+├── Http/Controllers/Production/             ✅ orders, schedule, stages, cutting, teams, offcuts
+├── Http/Requests/Production/                  ✅
+├── Http/Resources/Production/                 ✅
+├── Models/Production/                         ✅ incl. CuttingSheet, ProductionMaterialRelease
+├── Services/Production/                       ✅ release via MaterialReleaseRequestService on start-stage
+├── Policies/Production/                       ✅
+└── routes/api/production/                     ✅ orders.php, schedule.php, cutting.php
 ```
+
+> Release on stage **start** is implemented in `ProductionStageService` (not a separate listener). See [PRODUCTION_GAP_AUDIT.md](./PRODUCTION_GAP_AUDIT.md).
 
 **Do not create** `Events/Production/OffcutLogged.php` — Warehouse owns `App\Events\Warehouse\OffcutLogged` ([WAREHOUSE.MD](./WAREHOUSE.MD) §11).
 
@@ -844,7 +818,9 @@ Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
 | ------ | ---------------------------- | ---------------------------- | ------------------------------------ |
 | GET    | `/orders/{id}/cutting-sheet` | `production.view`            | BOM-derived cutting lines            |
 | POST   | `/orders/{id}/cutting-sheet` | `production.manage`          | Regenerate or manual overrides       |
+| PATCH  | `/orders/{id}/cutting-sheet/{line}` | `production.manage`   | Manual line edit (requires `reason`) |
 | POST   | `/orders/{id}/offcuts`       | `production.manage`          | Optional proxy to WH offcut API (§9) |
+| PATCH  | `/orders/{id}/status`        | `production.manage`          | Set `scheduled` / `in_progress` / `on_hold` |
 | GET    | `/orders/{id}/teams`         | `production.view`            | Team assignments                     |
 | POST   | `/orders/{id}/teams`         | `production.schedule.manage` | Assign user to stage/role            |
 
@@ -976,13 +952,14 @@ flowchart LR
 
 | From | To   | Integration                                                         | Status                                  |
 | ---- | ---- | ------------------------------------------------------------------- | --------------------------------------- |
-| WH   | PROD | `ProjectMaterialsReady` → `CreateProductionOrder` + `fifo_position` | Listener **missing**                    |
-| PM   | PROD | BOM lines → cutting sheet generation (read)                         | **Planned**                             |
-| PROD | WH   | Stage start → partial reservation release; cutting → offcut API     | **Partial** (WH listener on complete)   |
+| WH   | PROD | `ProjectMaterialsReady` → `CreateProductionOrder` + `fifo_position` | **Exists**                              |
+| PM   | PROD | BOM lines → cutting sheet generation (read)                         | **Exists**                              |
+| PROD | WH   | Stage start → partial reservation release; cutting → offcut API     | **Exists** (Option A; WH complete listener no-op) |
 | PROD | PM   | `ProductionStageCompleted` → `ProjectStageService`                  | **Exists**                              |
 | PROD | PROC | `ProductionStageCompleted(fabrication)` → `glass_orders`            | **Exists**                              |
-| PM   | PROD | Project tab: `GET /production/orders?project_id=`                   | **Planned**                             |
-| WH   | PROD | `fifo_sequence` on reservation → schedule priority                  | **Planned** (via CreateProductionOrder) |
+| PROD | QC   | `ProductionStageCompleted` → auto inspection (pre/post fab)       | **Exists** (see gap audit)              |
+| PM   | PROD | Project tab: `GET /production/orders?project_id=`                   | **Exists** (frontend tab)               |
+| WH   | PROD | `fifo_sequence` on reservation → schedule priority                  | **Exists** (via CreateProductionOrder)  |
 
 
 **Production must NOT:** create projects; approve PRs; verify GRNs; write `projects.stage` directly; override FIFO reservation order ([INTEGRATION_CONTRACT.MD](./INTEGRATION_CONTRACT.MD) §7.2).
@@ -1141,9 +1118,13 @@ Run: `cd backend; php artisan test --filter=ProductionFlowTest`
 | `sash` complete                                  | PM remains / at `fabrication_stage`                               |
 | Schedule PATCH                                   | Updates `scheduled_start` only; ignores `fifo_position`           |
 | FIFO list sort                                   | `GET /orders` returns ascending `fifo_position`                   |
+| `GET /schedule`                                  | FIFO queue with material/glass enrichment                         |
+| `POST /offcuts` proxy                            | Logs offcut via WH service                                        |
+| `qc_pre_check` complete                          | Dispatches `ProductionStageCompleted` for QC listener             |
+| `qc_post_fabrication` complete                   | PM → `qc_pre_installation` + QC inspection hook                   |
 
 
-Use Sanctum actingAs with `production_manager` permissions. Mock WH services where integration is cross-module to keep tests isolated.
+Use Sanctum actingAs with `production_manager` permissions. See [PRODUCTION_GAP_AUDIT.md](./PRODUCTION_GAP_AUDIT.md) for remaining test gaps. Mock WH services where integration is cross-module to keep tests isolated.
 
 ---
 

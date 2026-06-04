@@ -18,6 +18,7 @@ use App\Listeners\Procurement\NotifyGlassProcurement;
 use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
 use App\Listeners\Production\CreateProductionOrder;
 use App\Listeners\Production\NotifyProductionManagersOfNewOrder;
+use App\Listeners\QualityControl\CreateProductionQcInspection;
 use App\Listeners\Projects\OnDealProjectCreated;
 use App\Listeners\Projects\OnProductionStageCompleted;
 use App\Listeners\Projects\OnProjectBomFinalized;
@@ -204,6 +205,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerProcurementListeners();
         $this->registerWarehouseListeners();
         $this->registerProductionListeners();
+        $this->registerQualityControlListeners();
     }
 
     protected function registerProjectListeners(): void
@@ -236,5 +238,10 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(ProjectMaterialsReady::class, CreateProductionOrder::class);
         Event::listen(ProjectMaterialsReady::class, NotifyProductionManagersOfNewOrder::class);
+    }
+
+    protected function registerQualityControlListeners(): void
+    {
+        Event::listen(ProductionStageCompleted::class, CreateProductionQcInspection::class);
     }
 }

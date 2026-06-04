@@ -77,7 +77,7 @@ enum ProductionStage: string
     public function warehouseReleaseStage(): ?self
     {
         return match ($this) {
-            self::MaterialPrep, self::Cutting => self::Cutting,
+            self::Cutting => self::Cutting,
             self::Fabrication, self::Sash => self::Fabrication,
             self::GlassAssembly, self::Finishing => self::GlassAssembly,
             default => null,
@@ -94,5 +94,13 @@ enum ProductionStage: string
             self::QcPostFabrication => true,
             default => false,
         };
+    }
+
+    /**
+     * Stages that dispatch ProductionStageCompleted (PM sync, PROC, QC listeners).
+     */
+    public function emitsProductionStageCompleted(): bool
+    {
+        return $this->emitsProjectStageSync() || $this === self::QcPreCheck;
     }
 }

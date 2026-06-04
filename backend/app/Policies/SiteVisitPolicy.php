@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Models\Deal;
+use App\Models\Lead;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Policies\Concerns\ChecksCrmPermissions;
@@ -25,7 +27,19 @@ class SiteVisitPolicy
             return true;
         }
 
-        return $this->ownsRecord($user, $siteVisit, ['assigned_field_officer_id', 'scheduled_by']);
+        if ($this->ownsRecord($user, $siteVisit, ['assigned_field_officer_id', 'scheduled_by'])) {
+            return true;
+        }
+
+        if ($siteVisit->lead_id && Lead::query()->visibleTo($user)->whereKey($siteVisit->lead_id)->exists()) {
+            return true;
+        }
+
+        if ($siteVisit->deal_id && Deal::query()->visibleTo($user)->whereKey($siteVisit->deal_id)->exists()) {
+            return true;
+        }
+
+        return false;
     }
 
     public function create(User $user): bool

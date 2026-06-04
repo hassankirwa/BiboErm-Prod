@@ -131,6 +131,7 @@ export type FetchEmployeesParams = {
   status?: string;
   search?: string;
   department_id?: number;
+  has_pending_profile_change?: boolean;
 };
 
 export type HrDashboardStats = {
@@ -159,10 +160,17 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
   return apiRequest("/hr/dashboard/stats");
 }
 
-export async function fetchPendingProfileChanges(): Promise<{
+export async function fetchPendingProfileChanges(params?: {
+  limit?: number;
+}): Promise<{
   data: HrPendingProfileChange[];
 }> {
-  return apiRequest("/hr/dashboard/pending-profile-changes");
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const query = qs.toString();
+  return apiRequest(
+    `/hr/dashboard/pending-profile-changes${query ? `?${query}` : ""}`
+  );
 }
 
 export async function fetchEmployees(
@@ -174,6 +182,7 @@ export async function fetchEmployees(
   if (params.status) qs.set("status", params.status);
   if (params.search) qs.set("search", params.search);
   if (params.department_id) qs.set("department_id", String(params.department_id));
+  if (params.has_pending_profile_change) qs.set("has_pending_profile_change", "1");
   const query = qs.toString();
   return apiRequest(`/hr/employees${query ? `?${query}` : ""}`);
 }

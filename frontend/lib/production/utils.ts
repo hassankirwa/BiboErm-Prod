@@ -7,6 +7,17 @@ import {
   type ScheduleOrder,
 } from "@/lib/api/production";
 
+export const PRODUCTION_STAGE_OPTIONS = (
+  Object.entries(PRODUCTION_STAGE_LABELS) as [ProductionStageValue, string][]
+).map(([value, label]) => ({ value, label }));
+
+export const TEAM_ROLE_OPTIONS = [
+  { value: "cutting_lead", label: "Cutting lead" },
+  { value: "fabrication_lead", label: "Fabrication lead" },
+  { value: "assembly_lead", label: "Assembly lead" },
+  { value: "qc_liaison", label: "QC liaison" },
+] as const;
+
 export function formatProductionStage(stage: string): string {
   return (
     PRODUCTION_STAGE_LABELS[stage as ProductionStageValue] ??
@@ -23,7 +34,30 @@ export function isAssemblyQueueOrder(order: ProductionOrder): boolean {
 }
 
 export function isProductionManager(can: (permission: string) => boolean): boolean {
-  return can("production.schedule.manage");
+  return can("production.schedule.manage") || can("production.manage");
+}
+
+/** Mirrors backend ProductionOrderPolicy::manageStages */
+export function canManageProductionStages(
+  can: (permission: string) => boolean,
+  userId: number | undefined,
+  order: ProductionOrder,
+): boolean {
+  if (!can("production.manage")) {
+    return false;
+  }
+
+  if (isProductionManager(can)) {
+    return true;
+  }
+
+  if (!userId) {
+    return false;
+  }
+
+  return (order.teams ?? []).some(
+    (t) => t.user_id === userId && t.stage === order.current_stage,
+  );
 }
 
 export function materialReadinessLabel(

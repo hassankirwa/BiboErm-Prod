@@ -26,9 +26,19 @@ class ProductionAuditLogger
         $this->log('production.stage_completed', $log, null, $context ?? $log->toArray());
     }
 
+    public function stageSkipped(Model $log, ?array $context = null): void
+    {
+        $this->log('production.stage_skipped', $log, null, $context ?? $log->toArray());
+    }
+
     public function scheduleReordered(Model $order, ?array $oldValues, ?array $newValues): void
     {
         $this->log('production.schedule_reordered', $order, $oldValues, $newValues);
+    }
+
+    public function orderStatusChanged(Model $order, ?array $oldValues, ?array $newValues): void
+    {
+        $this->log('production.order_status_changed', $order, $oldValues, $newValues);
     }
 
     public function cuttingSheetGenerated(Model $sheet, ?array $context = null): void
