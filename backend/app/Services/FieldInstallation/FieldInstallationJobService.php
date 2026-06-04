@@ -1,0 +1,309 @@
+<?php
+
+namespace App\Services\FieldInstallation;
+
+use App\Enums\FieldInstallation\FieldJobStatus;
+use App\Enums\FieldInstallation\FieldJobType;
+use App\Enums\InstallMode;
+use App\Enums\ProjectStage;
+use App\Events\FieldInstallation\FieldInstallationCompleted;
+use App\Events\FieldInstallation\FieldInstallationJobStarted;
+use App\Models\FieldInstallation\FieldInstallationJob;
+use App\Models\FieldInstallation\FieldInstallationJobMember;
+use App\Models\Production\ProductionOrder;
+use App\Models\Project;
+use App\Models\User;
+use App\Services\Projects\ProjectStageService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class FieldInstallationJobService
+{
+    public function __construct(
+        protected FieldInstallationReferenceGenerator $references,
+        protected FieldInstallationAuditLogger $audit,
+        protected FieldUnitProgressService $unitProgress,
+        protected ProjectStageService $projectStages,
+    ) {}
+
+    public function create(User $actor, array $data): FieldInstallationJob
+    {
+        $project = Project::query()->findOrFail($data['project_id']);
+        $this->assertCanCreateForProject($project);
+
+        return DB::transaction(function () use ($actor, $data, $project) {
+            $jobType = $this->resolveJobType($project, $data['job_type'] ?? null);
+            $productionOrderId = $data['production_order_id']
+                ?? ProductionOrder::query()
+                    ->where('project_id', $project->id)
+                    ->latest('id')
+                    ->value('id');
+
+            $job = FieldInstallationJob::query()->create([
+                'reference' => $this->references->next(),
+                'project_id' => $project->id,
+                'production_order_id' => $productionOrderId,
+                'job_type' => $jobType,
+                'status' => FieldJobStatus::Scheduled,
+                'team_lead_id' => $data['team_lead_id'] ?? $actor->id,
+                'scheduled_start' => $data['scheduled_start'] ?? null,
+                'scheduled_end' => $data['scheduled_end'] ?? null,
+                'site_address' => $data['site_address'] ?? $project->site_address,
+                'site_contact_name' => $data['site_contact_name'] ?? null,
+                'site_contact_phone' => $data['site_contact_phone'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $actor->id,
+            ]);
+
+            if (! empty($data['member_ids']) && is_array($data['member_ids'])) {
+                foreach ($data['member_ids'] as $memberId) {
+                    $this->assignMember($job, (int) $memberId, 'engineer', $actor);
+                }
+            }
+
+            $this->audit->log('field.job_created', $job, newValues: [
+                'reference' => $job->reference,
+                'project_id' => $job->project_id,
+                'job_type' => $job->job_type->value,
+            ]);
+
+            return $job->fresh(['project', 'teamLead', 'activeMembers.user']);
+        });
+    }
+
+    public function update(FieldInstallationJob $job, array $data): FieldInstallationJob
+    {
+        $job->update(collect($data)->only([
+            'team_lead_id',
+            'scheduled_start',
+            'scheduled_end',
+            'site_address',
+            'site_contact_name',
+            'site_contact_phone',
+            'notes',
+        ])->filter(fn ($value) => $value !== null)->all());
+
+        return $job->fresh(['project', 'teamLead', 'activeMembers.user']);
+    }
+
+    public function start(FieldInstallationJob $job, User $actor): FieldInstallationJob
+    {
+        if ($job->status !== FieldJobStatus::Scheduled) {
+            throw ValidationException::withMessages([
+                'status' => ['Only scheduled jobs can be started.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($job, $actor) {
+            $job->update([
+                'status' => FieldJobStatus::InProgress,
+                'actual_start' => now(),
+            ]);
+
+            $this->unitProgress->generateFromBom($job);
+
+            event(new FieldInstallationJobStarted(
+                jobId: $job->id,
+                projectId: $job->project_id,
+                startedByUserId: $actor->id,
+            ));
+
+            $this->audit->log('field.job_started', $job, newValues: ['status' => FieldJobStatus::InProgress->value]);
+
+            return $job->fresh(['project', 'units', 'activeMembers.user']);
+        });
+    }
+
+    public function complete(FieldInstallationJob $job, User $actor): FieldInstallationJob
+    {
+        if ($job->status !== FieldJobStatus::InProgress && $job->status !== FieldJobStatus::OnHold) {
+            throw ValidationException::withMessages([
+                'status' => ['Job must be in progress or on hold to complete.'],
+            ]);
+        }
+
+        $this->assertAllUnitsComplete($job);
+        $this->assertAllToolsReturned($job);
+
+        return DB::transaction(function () use ($job, $actor) {
+            $job->update([
+                'status' => FieldJobStatus::Completed,
+                'actual_end' => now(),
+                'percent_complete' => 100,
+            ]);
+
+            event(new FieldInstallationCompleted(
+                jobId: $job->id,
+                projectId: $job->project_id,
+                completedByUserId: $actor->id,
+            ));
+
+            $this->audit->log('field.job_completed', $job, newValues: ['status' => FieldJobStatus::Completed->value]);
+
+            return $job->fresh(['project', 'units', 'toolAssignments.toolIssuance']);
+        });
+    }
+
+    public function cancel(FieldInstallationJob $job, User $actor): FieldInstallationJob
+    {
+        if (! in_array($job->status, [FieldJobStatus::Scheduled, FieldJobStatus::OnHold], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Only scheduled or on-hold jobs can be cancelled.'],
+            ]);
+        }
+
+        $job->update(['status' => FieldJobStatus::Cancelled]);
+
+        $this->audit->log('field.job_completed', $job, newValues: [
+            'status' => FieldJobStatus::Cancelled->value,
+            'cancelled_by' => $actor->id,
+        ]);
+
+        return $job->fresh();
+    }
+
+    public function assignMember(
+        FieldInstallationJob $job,
+        int $userId,
+        string $role,
+        User $assignedBy,
+    ): FieldInstallationJobMember {
+        return FieldInstallationJobMember::query()->updateOrCreate(
+            [
+                'job_id' => $job->id,
+                'user_id' => $userId,
+            ],
+            [
+                'role' => $role,
+                'assigned_at' => now(),
+                'assigned_by' => $assignedBy->id,
+                'removed_at' => null,
+            ],
+        );
+    }
+
+    public function removeMember(FieldInstallationJob $job, int $userId): void
+    {
+        FieldInstallationJobMember::query()
+            ->where('job_id', $job->id)
+            ->where('user_id', $userId)
+            ->whereNull('removed_at')
+            ->update(['removed_at' => now()]);
+    }
+
+    public function assertCanCreateForProject(Project $project): void
+    {
+        $installMode = $project->install_mode instanceof InstallMode
+            ? $project->install_mode
+            : InstallMode::tryFrom((string) $project->install_mode);
+
+        if ($installMode === InstallMode::NairobiFabricationOnly) {
+            throw ValidationException::withMessages([
+                'project_id' => ['Field installation is not required for fabrication-only projects.'],
+            ]);
+        }
+
+        if (! $this->projectStageAtLeast($project, ProjectStage::QcPreInstallation)) {
+            throw ValidationException::withMessages([
+                'project_id' => ['Project must be at qc_pre_installation stage or later.'],
+            ]);
+        }
+
+        $hasActive = FieldInstallationJob::query()
+            ->where('project_id', $project->id)
+            ->whereIn('status', [
+                FieldJobStatus::Scheduled->value,
+                FieldJobStatus::InProgress->value,
+                FieldJobStatus::OnHold->value,
+            ])
+            ->exists();
+
+        if ($hasActive) {
+            throw ValidationException::withMessages([
+                'project_id' => ['Project already has an active field installation job.'],
+            ]);
+        }
+    }
+
+    protected function assertAllUnitsComplete(FieldInstallationJob $job): void
+    {
+        $pending = $job->units()
+            ->whereNotIn('status', [
+                \App\Enums\FieldInstallation\FieldUnitStatus::Installed->value,
+                \App\Enums\FieldInstallation\FieldUnitStatus::Waived->value,
+            ])
+            ->count();
+
+        if ($pending > 0) {
+            throw ValidationException::withMessages([
+                'units' => ['All installation units must be installed or waived before completing the job.'],
+            ]);
+        }
+    }
+
+    protected function assertAllToolsReturned(FieldInstallationJob $job): void
+    {
+        $open = $job->toolAssignments()
+            ->where(function ($query): void {
+                $query->whereNull('returned_at')
+                    ->orWhereHas('toolIssuance', fn ($issuance) => $issuance->whereNull('return_date'));
+            })
+            ->count();
+
+        if ($open > 0) {
+            throw ValidationException::withMessages([
+                'tools' => ['All tools must be returned before completing the job.'],
+            ]);
+        }
+    }
+
+    protected function resolveJobType(Project $project, ?string $requested): FieldJobType
+    {
+        if ($requested) {
+            return FieldJobType::from($requested);
+        }
+
+        $installMode = $project->install_mode instanceof InstallMode
+            ? $project->install_mode
+            : InstallMode::tryFrom((string) $project->install_mode);
+
+        return match ($installMode) {
+            InstallMode::OutsideFullInstall => FieldJobType::OutsideFullInstall,
+            default => FieldJobType::NairobiSiteInstall,
+        };
+    }
+
+    protected function projectStageAtLeast(Project $project, ProjectStage $minimum): bool
+    {
+        $current = $this->projectStages->currentStage($project);
+        $stages = [
+            ProjectStage::AwaitingDeposit,
+            ProjectStage::DepositReceived,
+            ProjectStage::SiteAssessment,
+            ProjectStage::FinalDesignApproval,
+            ProjectStage::BomFinalized,
+            ProjectStage::MaterialCheck,
+            ProjectStage::MaterialsReserved,
+            ProjectStage::AwaitingProcurement,
+            ProjectStage::MaterialsReady,
+            ProjectStage::CuttingStage,
+            ProjectStage::FabricationStage,
+            ProjectStage::GlassAssembly,
+            ProjectStage::QcPreInstallation,
+            ProjectStage::InTransit,
+            ProjectStage::Installation,
+            ProjectStage::SiteQc,
+            ProjectStage::Snagging,
+            ProjectStage::ProjectComplete,
+        ];
+
+        $currentIndex = array_search($current, $stages, true);
+        $minimumIndex = array_search($minimum, $stages, true);
+
+        if ($currentIndex === false || $minimumIndex === false) {
+            return false;
+        }
+
+        return $currentIndex >= $minimumIndex;
+    }
+}

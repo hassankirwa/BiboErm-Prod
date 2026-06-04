@@ -183,4 +183,43 @@ Route::prefix('v1')->group(function () {
             require __DIR__.'/api/qc/schedules.php';
             require __DIR__.'/api/qc/dashboard.php';
         });
+    });
+
+Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () {
+    require __DIR__.'/api/crm/leads.php';
+    require __DIR__.'/api/crm/contacts.php';
+    require __DIR__.'/api/crm/accounts.php';
+    require __DIR__.'/api/crm/deals.php';
+    require __DIR__.'/api/crm/site-visits.php';
+    require __DIR__.'/api/crm/quotations.php';
+    require __DIR__.'/api/crm/activities.php';
+    require __DIR__.'/api/crm/field-day.php';
+    require __DIR__.'/api/crm/lookups.php';
+    require __DIR__.'/api/crm/reports.php';
+});
+
+Route::middleware(['auth:sanctum', 'active', 'device.trusted'])->prefix('projects')->group(function () {
+    require __DIR__.'/api/projects.php';
+});
+
+Route::middleware(['auth:sanctum', 'active'])->prefix('procurement')->group(function () {
+    require __DIR__.'/api/procurement.php';
+});
+
+Route::middleware(['auth:sanctum', 'active', 'device.trusted'])->prefix('warehouse')->group(function () {
+    require __DIR__.'/api/warehouse/locations.php';
+    require __DIR__.'/api/warehouse/inventory.php';
+    require __DIR__.'/api/warehouse/movements.php';
+    require __DIR__.'/api/warehouse/reservations.php';
+    require __DIR__.'/api/warehouse/offcuts.php';
+    require __DIR__.'/api/warehouse/master-data.php';
+    require __DIR__.'/api/warehouse/tools.php';
+    require __DIR__.'/api/warehouse/stock-take.php';
+});
+
+Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
+    ->prefix('field-installation')
+    ->group(function () {
+        require __DIR__.'/api/field-installation.php';
+    });
 }); // v1

@@ -70,6 +70,17 @@ return [
                     'projects.bom.view', 'projects.bom.upload', 'projects.manage',
                 ],
             ],
+            'field-installation-photos' => [
+                'public' => false,
+                'max_kb' => (int) env('BIBO_FIELD_INSTALLATION_PHOTO_MAX_KB', 10240),
+                'max_width' => (int) env('BIBO_FIELD_INSTALLATION_PHOTO_MAX_WIDTH', 4096),
+                'max_height' => (int) env('BIBO_FIELD_INSTALLATION_PHOTO_MAX_HEIGHT', 4096),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp'],
+                'image_only' => true,
+                'permissions' => [
+                    'field_installation.view', 'field_installation.log', 'field_installation.manage',
+                ],
+            ],
             'site-assessment' => [
                 'public' => false,
                 'max_kb' => (int) env('BIBO_SITE_ASSESSMENT_MAX_KB', 10240),
@@ -176,6 +187,10 @@ return [
         'employee_number_pad' => (int) env('BIBO_EMPLOYEE_NUMBER_PAD', 4),
     ],
 
+    'field_installation' => [
+        'reference_prefix' => env('BIBO_FIELD_INSTALLATION_REF_PREFIX', 'FI'),
+    ],
+
     'procurement' => [
         'supplier_code_prefix' => env('BIBO_SUPPLIER_CODE_PREFIX', 'SUP'),
         'supplier_code_pad' => (int) env('BIBO_SUPPLIER_CODE_PAD', 3),
@@ -200,6 +215,7 @@ return [
         'finance' => ['finance_officer'],
         'it' => ['it_admin', 'super_admin'],
         'project_management' => ['project_manager'],
+        'field_installation' => ['installation_lead', 'field_installation_engineer'],
         'operations' => ['operations_manager', 'field_officer', 'reception'],
         'reception' => ['reception'],
     ],
@@ -256,6 +272,12 @@ return [
                 'name' => 'IT User',
                 'department_slug' => 'it',
                 'role' => 'it_admin',
+            ],
+            'field_installation' => [
+                'name' => 'Field Installation Lead',
+                'email' => 'field_installation@bibo.com',
+                'department_slug' => 'field_installation',
+                'role' => 'installation_lead',
             ],
         ],
     ],

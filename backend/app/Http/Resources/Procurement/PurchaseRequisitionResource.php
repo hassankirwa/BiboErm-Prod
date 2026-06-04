@@ -53,8 +53,8 @@ class PurchaseRequisitionResource extends JsonResource
                     'quantity' => $line->quantity,
                     'required_quantity' => $line->required_quantity,
                     'overage_quantity' => $line->required_quantity !== null
-                        && bccomp((string) $line->quantity, (string) $line->required_quantity, 3) === 1
-                        ? bcsub((string) $line->quantity, (string) $line->required_quantity, 3)
+                        && \bccomp((string) $line->quantity, (string) $line->required_quantity, 3) === 1
+                        ? \bcsub((string) $line->quantity, (string) $line->required_quantity, 3)
                         : null,
                     'trigger_type' => $line->trigger_type?->value ?? $line->trigger_type,
                     'warehouse_item_id' => $line->warehouse_item_id,

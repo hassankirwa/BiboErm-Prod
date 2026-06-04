@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
+use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +24,7 @@ class Project extends Model
         'account_id',
         'type',
         'location_type',
+        'install_mode',
         'site_address',
         'stage',
         'completion_percent',
@@ -44,6 +47,7 @@ class Project extends Model
     {
         return [
             'stage' => ProjectStage::class,
+            'install_mode' => InstallMode::class,
             'quoted_amount' => 'decimal:2',
             'deposit_received' => 'decimal:2',
             'projected_start' => 'date',
@@ -117,6 +121,11 @@ class Project extends Model
     public function delays(): HasMany
     {
         return $this->hasMany(ProjectDelay::class)->latest('logged_at');
+    }
+
+    public function fieldInstallationJobs(): HasMany
+    {
+        return $this->hasMany(FieldInstallationJob::class);
     }
 
     public function floors(): HasMany
