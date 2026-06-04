@@ -1,43 +1,54 @@
+"use client";
+
 import { Card, CardContent } from "@/components/ui/card";
-import { mockProductionOrders } from "@/lib/data/production";
 import { Factory, Scissors, Wrench, CheckCircle } from "lucide-react";
+import type { ProductionOrder } from "@/lib/api/production";
+import { isAssemblyQueueOrder, isCuttingQueueOrder } from "@/lib/production/utils";
 
-const stats = [
-  {
-    label: "In Production",
-    value: mockProductionOrders.length,
-    subtext: "Active orders",
-    icon: Factory,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-  },
-  {
-    label: "Cutting",
-    value: mockProductionOrders.filter((o) => o.stage === "cutting").length,
-    subtext: "In cutting stage",
-    icon: Scissors,
-    color: "text-warning",
-    bgColor: "bg-warning/10",
-  },
-  {
-    label: "Fabrication",
-    value: mockProductionOrders.filter((o) => o.stage === "fabrication").length,
-    subtext: "Assembly in progress",
-    icon: Wrench,
-    color: "text-info",
-    bgColor: "bg-info/10",
-  },
-  {
-    label: "Ready for QC",
-    value: mockProductionOrders.filter((o) => o.stage === "qc_post_fabrication").length,
-    subtext: "Awaiting inspection",
-    icon: CheckCircle,
-    color: "text-success",
-    bgColor: "bg-success/10",
-  },
-];
+type Props = {
+  orders: ProductionOrder[];
+};
 
-export function ProductionStats() {
+export function ProductionStats({ orders }: Props) {
+  const active = orders.filter(
+    (o) => o.status === "scheduled" || o.status === "in_progress",
+  );
+
+  const stats = [
+    {
+      label: "In Production",
+      value: active.length,
+      subtext: "Active orders",
+      icon: Factory,
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+    },
+    {
+      label: "Cutting",
+      value: active.filter(isCuttingQueueOrder).length,
+      subtext: "Cutting queue",
+      icon: Scissors,
+      color: "text-warning",
+      bgColor: "bg-warning/10",
+    },
+    {
+      label: "Assembly",
+      value: active.filter(isAssemblyQueueOrder).length,
+      subtext: "Fabrication & assembly",
+      icon: Wrench,
+      color: "text-info",
+      bgColor: "bg-info/10",
+    },
+    {
+      label: "Ready for QC",
+      value: active.filter((o) => o.current_stage === "qc_post_fabrication").length,
+      subtext: "Post-fabrication QC",
+      icon: CheckCircle,
+      color: "text-success",
+      bgColor: "bg-success/10",
+    },
+  ];
+
   return (
     <div className="grid gap-4 md:grid-cols-4">
       {stats.map((stat) => {

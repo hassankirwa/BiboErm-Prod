@@ -28,9 +28,15 @@ class ReleaseReservedStockController extends Controller
 
         if ($stage = $data['production_stage'] ?? null) {
             $productionStage = \App\Enums\Production\ProductionStage::from($stage);
-            $updated = $this->stageRelease->releaseForStage($reservation->project_id, $productionStage);
+            $result = $this->stageRelease->releaseForStage(
+                projectId: $reservation->project_id,
+                stage: $productionStage,
+                performer: $request->user(),
+            );
 
-            return new StockReservationResource($updated ?? $reservation->fresh(['lines.item', 'lines.bin', 'project']));
+            return new StockReservationResource(
+                $result['reservation'] ?? $reservation->fresh(['lines.item', 'lines.bin', 'project'])
+            );
         }
 
         $updated = $this->fifoReservation->release(

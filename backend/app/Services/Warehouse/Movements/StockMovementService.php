@@ -212,6 +212,54 @@ class StockMovementService
     }
 
     /**
+     * Record an outbound movement document without mutating stock levels.
+     * Used when stock was already released via reservation services.
+     *
+     * @param  array<int, array{item_id: int, from_bin_id: int, quantity: string}>  $lines
+     */
+    public function recordOutboundDocument(
+        User $performer,
+        array $lines,
+        ?string $referenceType = 'project',
+        ?int $referenceId = null,
+        ?string $notes = null,
+    ): StockMovement {
+        return DB::transaction(function () use ($performer, $lines, $referenceType, $referenceId, $notes) {
+            $movement = StockMovement::query()->create([
+                'movement_number' => $this->numbers->next('SM', 'stock_movements', 'movement_number'),
+                'movement_type' => StockMovementType::Outbound,
+                'reference_type' => $referenceType,
+                'reference_id' => $referenceId,
+                'notes' => $notes,
+                'performed_by' => $performer->id,
+                'performed_at' => now(),
+                'created_at' => now(),
+            ]);
+
+            foreach ($lines as $line) {
+                StockMovementLine::query()->create([
+                    'stock_movement_id' => $movement->id,
+                    'item_id' => $line['item_id'],
+                    'from_bin_id' => $line['from_bin_id'],
+                    'to_bin_id' => null,
+                    'quantity' => (string) $line['quantity'],
+                    'unit_cost' => null,
+                ]);
+            }
+
+            $movement = $movement->load('lines.item', 'lines.fromBin', 'performer');
+
+            $this->audit->stockIssued($movement->id, [
+                'movement_number' => $movement->movement_number,
+                'project_id' => $referenceId,
+                'via' => 'production_stage_release',
+            ]);
+
+            return $movement;
+        });
+    }
+
+    /**
      * @param  array<int, array{item_id: int, from_bin_id: int|null, to_bin_id: int|null, quantity: string, unit_cost: float|null}>  $lines
      */
     protected function assertPerformerCanAccessBins(User $performer, array $lines): void

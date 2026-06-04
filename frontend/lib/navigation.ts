@@ -261,7 +261,6 @@ export const departments: Department[] = [
       { name: "Orders", path: "/production/orders" },
       { name: "Cutting", path: "/production/cutting" },
       { name: "Assembly", path: "/production/assembly" },
-      { name: "Installation", path: "/production/installation" },
     ],
     nav: {
       topItems: [
@@ -278,7 +277,6 @@ export const departments: Department[] = [
             { name: "Orders", path: "/production/orders" },
             { name: "Cutting", path: "/production/cutting" },
             { name: "Assembly", path: "/production/assembly" },
-            { name: "Installation", path: "/production/installation" },
           ],
         },
       ],
@@ -522,7 +520,7 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Factory,
     iconClassName: "bg-sky-100 text-sky-600",
     badge: { label: "4 Delayed", className: "text-sky-600" },
-    permission: "production.schedule.manage",
+    permission: "production.view",
   },
   {
     id: "qc",
@@ -539,14 +537,6 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Truck,
     iconClassName: "bg-indigo-100 text-indigo-600",
     badge: { label: "2 Today", className: "text-indigo-600" },
-  },
-  {
-    id: "installation",
-    name: "Installation",
-    href: "/production/installation",
-    icon: Wrench,
-    iconClassName: "bg-blue-100 text-blue-700",
-    badge: { label: "5 Scheduled", className: "text-blue-600" },
   },
   {
     id: "finance",

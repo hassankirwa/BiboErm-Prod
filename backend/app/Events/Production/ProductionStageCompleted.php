@@ -13,5 +13,6 @@ class ProductionStageCompleted
         public int $projectId,
         public int $productionOrderId,
         public string $productionStage,
+        public ?int $completedByUserId = null,
     ) {}
 }

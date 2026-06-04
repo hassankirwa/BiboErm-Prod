@@ -47,18 +47,21 @@ Ground truth as of v1.1 — use this table before coding to avoid duplicating wo
 | Area                             | Status                 | Path / notes                                                                                                                                                                                                                   |
 | -------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Base migration `600000`          | **Applied**            | `[backend/database/migrations/2025_05_19_600000_create_production_tables.php](../backend/database/migrations/2025_05_19_600000_create_production_tables.php)` — `production_orders`, `production_stage_logs`                   |
-| Expansion migration `600001`     | **Planned (Dev 4)**    | `production_order_teams`, `production_material_releases`, `cutting_sheets` only — **no installation tables** (see [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD))                                                                 |
-| `ProductionStage` enum           | **Partial**            | `[backend/app/Enums/Production/ProductionStage.php](../backend/app/Enums/Production/ProductionStage.php)` — missing `material_prep`, `qc_pre_check`, `finishing`, `qc_post_fabrication`; has stale `qc_pre_installation` case  |
-| `ProductionStageCompleted` event | **Exists**             | `[backend/app/Events/Production/ProductionStageCompleted.php](../backend/app/Events/Production/ProductionStageCompleted.php)` — scalar IDs: `projectId`, `productionOrderId`, `productionStage`                                |
+| Expansion migration `600001` (Production) | **Applied**     | `[backend/database/migrations/2025_05_19_600001_expand_production_tables.php](../backend/database/migrations/2025_05_19_600001_expand_production_tables.php)` — `production_order_teams`, `production_material_releases`, `cutting_sheets` only. **No installation tables** in this file (boundary vs [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD)) |
+| Field Installation `650000`/`650001` | **Not implemented (Dev 5)** | On-site install, daily logs, delivery NCs, checklists — separate module; Production ends at `qc_post_fabrication`. Do not add install schema to `600001`. See [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD) §0 |
+| `ProductionStage` enum           | **Complete**           | `[backend/app/Enums/Production/ProductionStage.php](../backend/app/Enums/Production/ProductionStage.php)` — 8 pipeline stages                                                                                                    |
+| `ProductionStageCompleted` event | **Exists**             | `[backend/app/Events/Production/ProductionStageCompleted.php](../backend/app/Events/Production/ProductionStageCompleted.php)` — scalar IDs                                                                                     |
 | PM stage sync listener           | **Exists (PM owns)**   | `[backend/app/Listeners/Projects/OnProductionStageCompleted.php](../backend/app/Listeners/Projects/OnProductionStageCompleted.php)` — **do not edit from Production module**                                                   |
 | PROC glass listener              | **Exists (PROC owns)** | `[backend/app/Listeners/Procurement/NotifyGlassProcurement.php](../backend/app/Listeners/Procurement/NotifyGlassProcurement.php)` — fabrication only                                                                           |
-| WH stage release listener        | **Exists (WH owns)**   | `[backend/app/Listeners/Warehouse/ReleaseMaterialsOnProductionStageCompleted.php](../backend/app/Listeners/Warehouse/ReleaseMaterialsOnProductionStageCompleted.php)` — fires on **complete** today; target is **start** — §10 |
-| `ProjectMaterialsReady` → PM     | **Exists (PM owns)**   | `[backend/app/Listeners/Projects/OnProjectMaterialsReady.php](../backend/app/Listeners/Projects/OnProjectMaterialsReady.php)` — advances to `materials_ready` only                                                             |
-| `CreateProductionOrder` listener | **Missing**            | Planned under `Listeners/Production/`                                                                                                                                                                                          |
-| Models / services / controllers  | **Missing**            | No `Models/Production/`, `Services/Production/`, `Http/Controllers/Production/`                                                                                                                                                |
-| Routes                           | **Missing**            | No `routes/api/production/`; not registered in `[backend/routes/api.php](../backend/routes/api.php)`                                                                                                                           |
-| Permissions (seeded)             | **Coarse keys**        | `production.view`, `production.manage`, `production.schedule.manage`, `projects.advance_stage_production`                                                                                                                      |
-| PHPUnit                          | **None**               | §24                                                                                                                                                                                                                            |
+| WH stage release listener        | **No-op (Option A)**   | `[backend/app/Listeners/Warehouse/ReleaseMaterialsOnProductionStageCompleted.php](../backend/app/Listeners/Warehouse/ReleaseMaterialsOnProductionStageCompleted.php)` — release on **start-stage** via PROD                    |
+| `ProjectMaterialsReady` → PM     | **Exists (PM owns)**   | `[backend/app/Listeners/Projects/OnProjectMaterialsReady.php](../backend/app/Listeners/Projects/OnProjectMaterialsReady.php)`                                                                                                  |
+| `CreateProductionOrder` listener | **Exists**             | `[backend/app/Listeners/Production/CreateProductionOrder.php](../backend/app/Listeners/Production/CreateProductionOrder.php)`                                                                                                  |
+| Models / services / controllers  | **Implemented**        | `backend/app/Models/Production/`, `Services/Production/`, `Http/Controllers/Production/`                                                                                                                                       |
+| Routes                           | **Registered**         | `[backend/routes/api/production/](../backend/routes/api/production/)` under `/api/v1/production`                                                                                                                              |
+| Offcut `storage_area`            | **Implemented**        | Migration `2026_06_03_120000_add_offcut_storage_area.php`; `production_workspace` nullable bin                                                                                                                                |
+| Permissions (seeded)             | **Coarse keys**        | `production.view`, `production.manage`, `production.schedule.manage`                                                                                                                                                           |
+| PHPUnit                          | **11 tests**           | `[backend/tests/Feature/Production/ProductionFlowTest.php](../backend/tests/Feature/Production/ProductionFlowTest.php)`                                                                                                        |
+| Frontend                         | **Live API**           | See [PRODUCTION_FRONTEND_GUIDE.md](./PRODUCTION_FRONTEND_GUIDE.md) — `frontend/lib/api/production.ts`, routes §17                                                                                                               |
 
 
 ### Event wiring (actual `AppServiceProvider`)
@@ -67,22 +70,23 @@ Ground truth as of v1.1 — use this table before coding to avoid duplicating wo
 Event::listen(ProjectMaterialsReady::class, OnProjectMaterialsReady::class);           // PM — exists
 Event::listen(ProductionStageCompleted::class, OnProductionStageCompleted::class);     // PM — exists
 Event::listen(ProductionStageCompleted::class, NotifyGlassProcurement::class);         // PROC — exists
-Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class); // WH — exists
-// Planned (Dev 4):
-Event::listen(ProjectMaterialsReady::class, CreateProductionOrder::class);
+Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class); // WH — registered; no-op (Option A)
+Event::listen(ProjectMaterialsReady::class, CreateProductionOrder::class);                         // PROD — exists
 ```
 
 ```mermaid
 flowchart LR
     WH_Ready[ProjectMaterialsReady] --> PM_Ready[OnProjectMaterialsReady]
     PM_Ready --> PMStage[materials_ready]
-    WH_Ready -.->|missing| CreatePO[CreateProductionOrder]
+    WH_Ready --> CreatePO[CreateProductionOrder]
 
-    StartStage[start-stage API] -.->|planned| ReleaseStart[WH release on start]
+    StartStage[start-stage API] --> ReleaseStart[WH release on start]
     CompleteStage[complete-stage API] --> PSC[ProductionStageCompleted]
     PSC --> PM_Sync[OnProductionStageCompleted]
     PSC --> Glass[NotifyGlassProcurement]
-    PSC --> WH_Release[ReleaseMaterialsOnProductionStageCompleted]
+    PSC --> WH_Release[ReleaseMaterialsOnProductionStageCompleted no-op]
+
+    PSC -->|qc_post_fabrication| FieldInstall[Field Installation Dev 5 not built]
 ```
 
 
@@ -1169,6 +1173,7 @@ Sub-stages (`sash`, `finishing`) and `qc_pre_check` do not advance PM stage inde
 | [PROCUREMENT.MD](./PROCUREMENT.MD)                   | PROC       | Exists        |
 | [FIELD_INSTALLATION.MD](./FIELD_INSTALLATION.MD)     | Field      | Exists · v1.0 |
 | [USER_ONBOARDING.MD](./USER_ONBOARDING.MD)           | Foundation | Exists        |
+| [PRODUCTION_FRONTEND_GUIDE.MD](./PRODUCTION_FRONTEND_GUIDE.md) | Production | Exists        |
 | [SALES_CRM.MD](./SALES_CRM.MD)                       | CRM        | Exists        |
 
 
