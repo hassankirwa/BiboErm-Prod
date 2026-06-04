@@ -223,7 +223,7 @@ export function CrmSalesReportsDashboard() {
   const hasChartData = pipelineChartData.length > 0 || leadsBySource.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-5">
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-end gap-2">
           <div>

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Warehouse\Item;
 use App\Services\Procurement\ProcurementAuditLogger;
 use App\Services\Procurement\ProcurementReferenceGenerator;
+use App\Services\Procurement\ProcurementWarehouseItemResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +22,7 @@ class PurchaseOrderService
     public function __construct(
         protected ProcurementReferenceGenerator $refs,
         protected ProcurementAuditLogger $audit,
+        protected ProcurementWarehouseItemResolver $warehouseItems,
     ) {}
 
     public function createFromRequisition(PurchaseRequisition $requisition, User $user, array $data): PurchaseOrder
@@ -38,6 +40,7 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($requisition, $user, $data) {
+            $requisition->loadMissing(['lines.projectBomLine']);
             $lines = $data['lines'] ?? [];
             $subtotal = 0;
 
@@ -52,7 +55,15 @@ class PurchaseOrderService
             ]);
 
             foreach ($lines as $line) {
-                $itemId = $line['warehouse_item_id'] ?? null;
+                $reqLine = isset($line['requisition_line_id'])
+                    ? $requisition->lines->firstWhere('id', (int) $line['requisition_line_id'])
+                    : $requisition->lines->first(
+                        fn ($reqLine) => trim((string) $reqLine->description) === trim((string) ($line['description'] ?? '')),
+                    );
+
+                $itemId = $this->warehouseItems->resolveFromRequisitionLine($reqLine)
+                    ?? ($line['warehouse_item_id'] ?? null);
+
                 $sku = $line['sku'] ?? null;
                 if ($itemId) {
                     $item = Item::query()->find($itemId);

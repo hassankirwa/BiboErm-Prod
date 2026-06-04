@@ -30,10 +30,13 @@ class NotifyGlassProcurement
             return;
         }
 
+        $specs = $this->glassOrders->specsFromProject($event->projectId);
+        $specs['source'] = 'production_fabrication_complete';
+
         $this->glassOrders->create($user, [
             'project_id' => $event->projectId,
-            'specs' => ['source' => 'production_fabrication_complete'],
-            'notes' => 'Auto-created from production fabrication stage',
+            'specs' => $specs,
+            'notes' => 'Auto-created from production fabrication stage — complete dimensions and requirements before ordering.',
         ]);
     }
 }

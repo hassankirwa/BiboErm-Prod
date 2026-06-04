@@ -16,6 +16,6 @@ class MarkGlassOrderOrderedController extends Controller
     {
         $this->authorize('update', $glassOrder);
 
-        return new GlassOrderResource($this->service->markOrdered($glassOrder));
+        return new GlassOrderResource($this->service->markOrdered($glassOrder, $request->user()));
     }
 }

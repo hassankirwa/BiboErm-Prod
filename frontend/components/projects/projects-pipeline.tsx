@@ -37,6 +37,7 @@ const stageColors: Record<string, string> = {
   materials_reserved: "bg-warning/20",
   awaiting_procurement: "bg-warning/20",
   materials_ready: "bg-success/20",
+  materials_released: "bg-success/30",
   cutting_stage: "bg-primary/20",
   fabrication_stage: "bg-primary/20",
   glass_assembly: "bg-primary/20",
@@ -52,6 +53,7 @@ const materialColors: Record<string, string> = {
   shortage: "bg-destructive/10 text-destructive",
   procurement: "bg-warning/10 text-warning",
   ready: "bg-success/10 text-success",
+  released: "bg-success/10 text-success",
   checking: "bg-info/10 text-info",
 };
 
@@ -76,7 +78,13 @@ const phaseStages: Record<Exclude<PhaseFilter, "all">, string[]> = {
     "final_design_approval",
     "bom_finalized",
   ],
-  materials: ["material_check", "materials_reserved", "awaiting_procurement", "materials_ready"],
+  materials: [
+    "material_check",
+    "materials_reserved",
+    "awaiting_procurement",
+    "materials_ready",
+    "materials_released",
+  ],
   production: [
     "cutting_stage",
     "fabrication_stage",

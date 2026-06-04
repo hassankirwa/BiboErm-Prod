@@ -7,25 +7,35 @@ use App\Http\Resources\Procurement\PurchaseOrderResource;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\PurchaseRequisition;
 use App\Services\Procurement\PurchaseOrders\PurchaseOrderService;
+use App\Services\Procurement\ProcurementWarehouseItemResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class PurchaseOrderController extends Controller
 {
-    public function __construct(protected PurchaseOrderService $service) {}
+    public function __construct(
+        protected PurchaseOrderService $service,
+        protected ProcurementWarehouseItemResolver $warehouseItems,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', PurchaseOrder::class);
 
-        $query = PurchaseOrder::query()->with(['supplier', 'project', 'lines', 'transportOrders.driver'])->latest();
+        $query = PurchaseOrder::query()
+            ->with(['supplier', 'project', 'lines', 'transportOrders.driver'])
+            ->withCount('goodsReceipts')
+            ->latest();
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));
         }
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
+        }
+        if ($request->boolean('without_goods_receipts')) {
+            $query->whereDoesntHave('goodsReceipts');
         }
 
         return PurchaseOrderResource::collection(
@@ -69,7 +79,18 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('view', $purchaseOrder);
 
-        return new PurchaseOrderResource($purchaseOrder->load(['supplier', 'project', 'lines', 'requisition', 'transportOrders.driver']));
+        $this->warehouseItems->syncPurchaseOrderFromRequisition($purchaseOrder);
+
+        $purchaseOrder = $purchaseOrder->fresh([
+            'supplier',
+            'project',
+            'lines',
+            'requisition',
+            'transportOrders.driver',
+        ]);
+        $purchaseOrder->loadCount('goodsReceipts');
+
+        return new PurchaseOrderResource($purchaseOrder);
     }
 
     public function update(Request $request, PurchaseOrder $purchaseOrder): PurchaseOrderResource

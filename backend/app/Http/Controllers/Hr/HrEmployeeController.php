@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProfileChangeRequest;
 use App\Models\User;
 use App\Services\Profile\ProfileChangeRequestService;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,12 @@ class HrEmployeeController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
+        }
+
+        if ($request->boolean('has_pending_profile_change')) {
+            $query->whereHas('profileChangeRequests', function ($q) {
+                $q->where('status', ProfileChangeRequest::STATUS_PENDING);
+            });
         }
 
         if ($request->filled('department_id')) {

@@ -137,9 +137,14 @@ export function PurchaseOrdersTable() {
                       Approve
                     </Button>
                   ) : null}
-                  <Button size="sm" variant="secondary" asChild>
-                    <Link href={`/procurement/goods-receipts/create?po=${po.id}`}>Receive</Link>
-                  </Button>
+                  {(po.goods_receipts_count ?? 0) === 0 &&
+                  po.status !== "cancelled" &&
+                  po.status !== "draft" &&
+                  po.status !== "pending_approval" ? (
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link href={`/procurement/goods-receipts/create?po=${po.id}`}>Receive</Link>
+                    </Button>
+                  ) : null}
                   <PurchaseOrderPdfPreviewButton order={po} label="PDF" />
                 </div>
               </TableCell>

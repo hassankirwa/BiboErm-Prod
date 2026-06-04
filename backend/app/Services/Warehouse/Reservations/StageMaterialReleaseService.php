@@ -5,18 +5,24 @@ namespace App\Services\Warehouse\Reservations;
 use App\Enums\Production\ProductionStage;
 use App\Enums\Warehouse\ItemCategory;
 use App\Enums\Warehouse\ReservationStatus;
+use App\Models\User;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\StockReservationLine;
+use App\Services\Warehouse\Movements\StockMovementService;
 use App\Services\Warehouse\WarehouseAuditLogger;
 
 class StageMaterialReleaseService
 {
     public function __construct(
         protected FifoReservationService $fifoReservation,
+        protected StockMovementService $movements,
         protected WarehouseAuditLogger $audit,
     ) {}
 
-    public function releaseForStage(int $projectId, ProductionStage $stage): ?StockReservation
+    /**
+     * @return array{reservation: StockReservation|null, movement_id: int|null}
+     */
+    public function releaseForStage(int $projectId, ProductionStage $stage, User $performer): array
     {
         $reservation = StockReservation::query()
             ->where('project_id', $projectId)
@@ -28,14 +34,18 @@ class StageMaterialReleaseService
             ->first();
 
         if (! $reservation) {
-            return null;
+            return ['reservation' => null, 'movement_id' => null];
         }
 
         $categories = $this->categoriesForStage($stage);
 
         if ($categories === []) {
-            return null;
+            return ['reservation' => $reservation, 'movement_id' => null];
         }
+
+        $reservation->load(['lines.item']);
+
+        $beforeReleased = $this->releasedQuantitiesByLine($reservation);
 
         $itemIds = StockReservationLine::query()
             ->where('reservation_id', $reservation->id)
@@ -45,7 +55,7 @@ class StageMaterialReleaseService
             ->all();
 
         if ($itemIds === []) {
-            return null;
+            return ['reservation' => $reservation, 'movement_id' => null];
         }
 
         $updated = $this->fifoReservation->release(
@@ -53,13 +63,44 @@ class StageMaterialReleaseService
             itemIds: $itemIds,
         );
 
+        $movementLines = [];
+
+        foreach ($updated->lines as $line) {
+            $previous = $beforeReleased[$line->id] ?? '0';
+            $delta = bcsub((string) $line->quantity_released, $previous, 3);
+
+            if (bccomp($delta, '0', 3) !== 1) {
+                continue;
+            }
+
+            $movementLines[] = [
+                'item_id' => $line->item_id,
+                'from_bin_id' => $line->bin_id,
+                'quantity' => $delta,
+            ];
+        }
+
+        $movementId = null;
+
+        if ($movementLines !== []) {
+            $movement = $this->movements->recordOutboundDocument(
+                performer: $performer,
+                lines: $movementLines,
+                referenceType: 'project',
+                referenceId: $projectId,
+                notes: "Production stage release: {$stage->value}",
+            );
+            $movementId = $movement->id;
+        }
+
         $this->audit->reservationReleased($updated->id, [
             'project_id' => $projectId,
             'production_stage' => $stage->value,
             'item_ids' => $itemIds,
+            'movement_id' => $movementId,
         ]);
 
-        return $updated;
+        return ['reservation' => $updated, 'movement_id' => $movementId];
     }
 
     /**
@@ -68,9 +109,22 @@ class StageMaterialReleaseService
     public function categoriesForStage(ProductionStage $stage): array
     {
         return match ($stage) {
-            ProductionStage::Cutting => [ItemCategory::AluminiumProfile],
-            ProductionStage::Fabrication => [ItemCategory::Accessory, ItemCategory::Rubber],
+            ProductionStage::Cutting, ProductionStage::MaterialPrep => [ItemCategory::AluminiumProfile],
+            ProductionStage::Fabrication, ProductionStage::Sash => [ItemCategory::Accessory],
+            ProductionStage::GlassAssembly, ProductionStage::Finishing => [ItemCategory::Rubber],
             default => [],
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function releasedQuantitiesByLine(StockReservation $reservation): array
+    {
+        return StockReservationLine::query()
+            ->where('reservation_id', $reservation->id)
+            ->pluck('quantity_released', 'id')
+            ->map(fn ($qty) => (string) $qty)
+            ->all();
     }
 }

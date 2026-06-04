@@ -205,7 +205,12 @@ export default function RequisitionsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <code className="text-sm">{pr.reference}</code>
+                          <Link
+                            href={`/procurement/requisitions/${pr.id}`}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            <code>{pr.reference}</code>
+                          </Link>
                           {pr.requires_admin_approval ? (
                             <div>
                               <Badge variant="outline" className="text-[10px]">

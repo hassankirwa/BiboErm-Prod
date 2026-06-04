@@ -3,6 +3,7 @@
 namespace App\Models\Warehouse;
 
 use App\Enums\Warehouse\OffcutStatus;
+use App\Enums\Warehouse\OffcutStorageArea;
 use App\Models\Project;
 use App\Models\User;
 use App\Traits\Auditable;
@@ -19,6 +20,7 @@ class OffcutPiece extends Model
         'offcut_number',
         'item_id',
         'bin_id',
+        'storage_area',
         'length_mm',
         'quantity_pieces',
         'source_project_id',
@@ -33,6 +35,7 @@ class OffcutPiece extends Model
     protected function casts(): array
     {
         return [
+            'storage_area' => OffcutStorageArea::class,
             'status' => OffcutStatus::class,
             'logged_at' => 'datetime',
             'created_at' => 'datetime',

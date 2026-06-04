@@ -20,23 +20,28 @@ export type LeadStatus = (typeof LEAD_STATUSES)[number];
 export const KANBAN_STAGE_TO_STATUS: Record<LeadKanbanStageId, LeadStatus> = {
   new: "new",
   contacted: "contacted",
+  interested: "interested",
+  not_reachable: "not_reachable",
+  unqualified: "unqualified",
   qualified: "qualified",
+  site_visit_required: "site_visit_required",
   site_visit_scheduled: "site_visit_scheduled",
   measurements_captured: "measurements_captured",
+  converted: "converted",
 };
 
 /** Group backend statuses into kanban columns for display. */
 export const STATUS_TO_KANBAN_STAGE: Record<string, LeadKanbanStageId> = {
   new: "new",
   contacted: "contacted",
-  interested: "contacted",
-  not_reachable: "new",
-  unqualified: "new",
+  interested: "interested",
+  not_reachable: "not_reachable",
+  unqualified: "unqualified",
   qualified: "qualified",
-  site_visit_required: "qualified",
+  site_visit_required: "site_visit_required",
   site_visit_scheduled: "site_visit_scheduled",
   measurements_captured: "measurements_captured",
-  converted: "measurements_captured",
+  converted: "converted",
 };
 
 /** Mirrors backend LeadStageService transitions. */
@@ -44,10 +49,23 @@ export const LEAD_STATUS_TRANSITIONS: Record<string, string[]> = {
   new: ["contacted", "not_reachable", "unqualified"],
   contacted: ["interested", "not_reachable", "unqualified"],
   interested: ["qualified", "unqualified"],
-  qualified: ["site_visit_required", "site_visit_scheduled", "converted"],
+  qualified: ["site_visit_required"],
   site_visit_required: ["site_visit_scheduled"],
-  site_visit_scheduled: ["measurements_captured", "converted"],
+  site_visit_scheduled: ["measurements_captured"],
   measurements_captured: ["converted"],
+};
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  new: "New Lead",
+  contacted: "Contacted",
+  interested: "Interested",
+  not_reachable: "Not Reachable",
+  unqualified: "Unqualified",
+  qualified: "Qualified",
+  site_visit_required: "Site Visit Required",
+  site_visit_scheduled: "Site Visit Scheduled",
+  measurements_captured: "Measurements Captured",
+  converted: "Converted",
 };
 
 export function statusToKanbanStage(status: string | null | undefined): LeadKanbanStageId {
@@ -91,4 +109,28 @@ export function canKanbanMove(
   if (current === targetStatus) return true;
   if (statusToKanbanStage(current) === targetStageId) return true;
   return isValidLeadStatusTransition(current, targetStatus);
+}
+
+export function getNextLeadStatus(status: string | null | undefined): LeadStatus | null {
+  const normalized = (status ?? "new").toLowerCase();
+  const allowed = LEAD_STATUS_TRANSITIONS[normalized] ?? [];
+  const next = allowed.find(
+    (candidate) => candidate !== "not_reachable" && candidate !== "unqualified",
+  );
+
+  return LEAD_STATUSES.includes(next as LeadStatus) ? (next as LeadStatus) : null;
+}
+
+export function getNextLeadStatusAction(status: string | null | undefined): {
+  status: LeadStatus;
+  label: string;
+} | null {
+  const next = getNextLeadStatus(status);
+
+  if (!next) return null;
+
+  return {
+    status: next,
+    label: `Advance to ${LEAD_STATUS_LABELS[next]}`,
+  };
 }

@@ -17,7 +17,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PermissionGate } from "@/components/auth/permission-gate";
+import { LeadPicker } from "@/components/crm/lead-picker";
 import { createContact } from "@/lib/api/crm/contacts";
+import { leadDisplayName, type ApiLead } from "@/lib/api/crm/leads";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -28,6 +30,8 @@ export default function ContactsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+  const [selectedLeadLabel, setSelectedLeadLabel] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -35,6 +39,17 @@ export default function ContactsPage() {
     job_title: "",
     notes: "",
   });
+
+  function resetForm() {
+    setForm({ name: "", email: "", phone: "", job_title: "", notes: "" });
+    setSelectedLeadId(null);
+    setSelectedLeadLabel(null);
+  }
+
+  function handleLeadSelect(lead: ApiLead) {
+    setSelectedLeadId(lead.id);
+    setSelectedLeadLabel(leadDisplayName(lead));
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -48,10 +63,11 @@ export default function ContactsPage() {
         phone: form.phone.trim() || undefined,
         job_title: form.job_title.trim() || undefined,
         notes: form.notes.trim() || undefined,
+        source_lead_id: selectedLeadId ?? undefined,
       });
       toast.success("Contact created.");
       setDialogOpen(false);
-      setForm({ name: "", email: "", phone: "", job_title: "", notes: "" });
+      resetForm();
       setRefreshKey((k) => k + 1);
       router.push(`/crm/contacts/${contact.id}`);
     } catch (err) {
@@ -109,12 +125,34 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New Contact</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Lead (optional)</Label>
+              <LeadPicker
+                value={selectedLeadId}
+                displayLabel={selectedLeadLabel}
+                onSelect={handleLeadSelect}
+                onClear={() => {
+                  setSelectedLeadId(null);
+                  setSelectedLeadLabel(null);
+                }}
+                disabled={saving}
+              />
+              <p className="text-xs text-muted-foreground">
+                Link this contact to a lead for tracking and conversion history.
+              </p>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="contact-name">Name *</Label>
               <Input

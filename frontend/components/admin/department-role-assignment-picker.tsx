@@ -163,15 +163,15 @@ export function DepartmentRoleAssignmentPicker({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <div className="space-y-2">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+        <div className="min-w-0 space-y-2">
           <Label className="text-xs text-muted-foreground">Department</Label>
           <Select
             value={departmentId}
             onValueChange={handleDepartmentChange}
             disabled={disabled}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full min-w-0">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
@@ -184,14 +184,14 @@ export function DepartmentRoleAssignmentPicker({
           </Select>
         </div>
 
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label className="text-xs text-muted-foreground">Role</Label>
           <Select
             value={roleId}
             onValueChange={setRoleId}
             disabled={disabled || !departmentId || loadingRoles}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full min-w-0">
               <SelectValue
                 placeholder={
                   !departmentId

@@ -32,6 +32,7 @@ class BatchPurchaseOrderController extends Controller
             'groups.*.lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
             'groups.*.lines.*.sku' => ['nullable', 'string'],
             'groups.*.lines.*.requisition_id' => ['nullable', 'integer', 'exists:purchase_requisitions,id'],
+            'groups.*.lines.*.requisition_line_id' => ['nullable', 'integer', 'exists:purchase_requisition_lines,id'],
             'groups.*.transport' => ['nullable', 'array'],
             'groups.*.transport.transport_type' => ['required_with:groups.*.transport', 'string', 'max:30'],
             'groups.*.transport.driver_id' => ['nullable', 'integer', 'exists:procurement_drivers,id'],

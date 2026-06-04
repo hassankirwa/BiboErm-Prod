@@ -22,6 +22,7 @@ class ProjectDashboardService
             ProjectStage::MaterialsReserved->value,
             ProjectStage::AwaitingProcurement->value,
             ProjectStage::MaterialsReady->value,
+            ProjectStage::MaterialsReleased->value,
         ];
     }
 
@@ -46,6 +47,7 @@ class ProjectDashboardService
                     $stage === ProjectStage::MaterialsReserved->value => 'reserved',
                     $stage === ProjectStage::AwaitingProcurement->value => 'procurement',
                     $stage === ProjectStage::MaterialsReady->value => 'ready',
+                    $stage === ProjectStage::MaterialsReleased->value => 'released',
                     default => 'checking',
                 },
                 'label' => match (true) {
@@ -53,7 +55,8 @@ class ProjectDashboardService
                     ($status['summary']['shortage_lines'] ?? 0) > 0 => 'Material shortage',
                     $stage === ProjectStage::MaterialsReserved->value => 'Reserved — awaiting production',
                     $stage === ProjectStage::AwaitingProcurement->value => 'Awaiting procurement',
-                    $stage === ProjectStage::MaterialsReady->value => 'Materials ready',
+                    $stage === ProjectStage::MaterialsReady->value => 'Materials ready — release pending',
+                    $stage === ProjectStage::MaterialsReleased->value => 'Staged for production pickup',
                     default => 'Material check',
                 },
                 'summary' => $status['summary'],
@@ -123,6 +126,7 @@ class ProjectDashboardService
 
         $startedStages = [
             ProjectStage::MaterialsReady->value,
+            ProjectStage::MaterialsReleased->value,
             ProjectStage::CuttingStage->value,
             ProjectStage::FabricationStage->value,
             ProjectStage::GlassAssembly->value,

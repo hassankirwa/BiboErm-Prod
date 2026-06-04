@@ -189,7 +189,7 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
         id: String(v.id),
         title: v.title ?? v.visit_number ?? `Visit ${v.id}`,
         meta: v.visit_date?.slice?.(0, 10) ?? v.visit_date,
-        href: `/crm/site-visits`,
+        href: `/crm/site-visits/${v.id}`,
       })),
       emptyLabel: "No site visits",
     },

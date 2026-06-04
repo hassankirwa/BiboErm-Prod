@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Procurement\Requisitions;
 
+use App\Enums\Warehouse\ItemCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Procurement\PurchaseRequisitionResource;
 use App\Models\Procurement\PurchaseRequisition;
@@ -20,7 +21,11 @@ class RequisitionSourceController extends Controller
     {
         $this->authorize('create', PurchaseRequisition::class);
 
-        $items = $this->sources->lowStockSource();
+        $validated = $request->validate([
+            'category' => ['nullable', 'string', 'in:'.implode(',', array_column(ItemCategory::cases(), 'value'))],
+        ]);
+
+        $items = $this->sources->lowStockSource($validated['category'] ?? null);
 
         return response()->json([
             'data' => $items,
@@ -30,6 +35,18 @@ class RequisitionSourceController extends Controller
                     $items,
                     fn (array $item) => (bool) ($item['can_create_requisition'] ?? false)
                 )),
+                'category' => $validated['category'] ?? null,
+                'categories' => array_map(
+                    fn (ItemCategory $case) => [
+                        'value' => $case->value,
+                        'label' => match ($case) {
+                            ItemCategory::AluminiumProfile => 'Aluminium profiles',
+                            ItemCategory::Accessory => 'Accessories',
+                            ItemCategory::Rubber => 'Rubbers & gaskets',
+                        },
+                    ],
+                    ItemCategory::cases(),
+                ),
             ],
         ]);
     }
@@ -74,6 +91,7 @@ class RequisitionSourceController extends Controller
             'lines' => ['nullable', 'array'],
             'lines.*.project_bom_line_id' => ['required', 'integer', 'exists:project_bom_lines,id'],
             'lines.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
         ]);
 
         $project = Project::query()->findOrFail($validated['project_id']);

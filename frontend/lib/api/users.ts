@@ -70,7 +70,9 @@ export async function fetchUsers(params?: {
   if (params?.role) qs.set("role", params.role);
   if (params?.page) qs.set("page", String(params.page));
   const query = qs.toString();
-  return apiFetch<PaginatedUsers>(`/api/v1/users${query ? `?${query}` : ""}`);
+  return apiFetch<PaginatedUsers>(
+    `/api/v1/lookups/assignable-users${query ? `?${query}` : ""}`,
+  );
 }
 
 export async function fetchUser(id: number): Promise<ApiUserDetail> {

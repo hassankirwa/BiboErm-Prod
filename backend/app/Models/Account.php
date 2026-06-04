@@ -71,4 +71,17 @@ class Account extends Model
     {
         return $this->hasMany(Deal::class);
     }
+
+    public function scopeVisibleTo($query, User $user)
+    {
+        if ($user->can('accounts.view_all')) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($user) {
+            $q->where('account_owner_id', $user->id)
+                ->orWhere('owner_id', $user->id)
+                ->orWhere('created_by', $user->id);
+        });
+    }
 }

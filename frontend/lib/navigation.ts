@@ -57,6 +57,8 @@ import {
 export type SubModule = {
   name: string;
   path: string;
+  /** When true, only highlight on exact path match (not child routes). */
+  exact?: boolean;
   /** Spatie permission required to show this nav item */
   permission?: string;
 };
@@ -95,6 +97,11 @@ export const departments: Department[] = [
       { name: "Projects", path: "/crm/projects", permission: "projects.view" },
       { name: "Site Visits", path: "/crm/site-visits" },
       { name: "Field Day", path: "/crm/field-day", permission: "field_day.view" },
+      {
+        name: "Field Day Reports",
+        path: "/crm/field-day/reports",
+        permission: "field_day.view",
+      },
       { name: "Activities", path: "/crm/activities" },
     ],
     nav: {
@@ -120,15 +127,21 @@ export const departments: Department[] = [
               path: "/crm/field-day",
               permission: "field_day.view",
             },
+            {
+              name: "Field Day Reports",
+              path: "/crm/field-day/reports",
+              permission: "field_day.view",
+            },
           ],
         },
         {
           label: "Activities",
           icon: ListTodo,
           items: [
-            { name: "Tasks", path: "/crm/activities" },
-            { name: "Meetings", path: "/crm/activities" },
-            { name: "Calls", path: "/crm/activities" },
+            { name: "All Activities", path: "/crm/activities", exact: true },
+            { name: "Tasks", path: "/crm/activities/tasks" },
+            { name: "Meetings", path: "/crm/activities/meetings" },
+            { name: "Calls", path: "/crm/activities/calls" },
           ],
         },
       ],
@@ -183,8 +196,6 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
-        { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
-      { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
         { name: "Reports", path: "/analytics" },
         { name: "Analytics", path: "/analytics" },
       ],
@@ -195,7 +206,7 @@ export const departments: Department[] = [
           items: [
             { name: "Inventory", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
             { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
-      { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
+            { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
             { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
             { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
             { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
@@ -261,12 +272,16 @@ export const departments: Department[] = [
       { name: "Orders", path: "/production/orders" },
       { name: "Cutting", path: "/production/cutting" },
       { name: "Assembly", path: "/production/assembly" },
+      { name: "Schedule", path: "/production/schedule", permission: "production.view" },
+      { name: "Orders", path: "/production/orders", permission: "production.view" },
+      { name: "Cutting", path: "/production/cutting", permission: "production.view" },
+      { name: "Assembly", path: "/production/assembly", permission: "production.view" },
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/production/schedule" },
-        { name: "Reports", path: "/analytics" },
-        { name: "Analytics", path: "/analytics" },
+        { name: "Home", path: "/production/schedule", permission: "production.view" },
+        { name: "Reports", path: "/analytics", permission: "analytics.view" },
+        { name: "Analytics", path: "/analytics", permission: "analytics.view" },
       ],
       groups: [
         {
@@ -301,6 +316,10 @@ export const departments: Department[] = [
           icon: Wrench,
           items: [
             { name: "Jobs", path: "/field-installation/jobs", permission: "field_installation.view" },
+            { name: "Schedule", path: "/production/schedule", permission: "production.view" },
+            { name: "Orders", path: "/production/orders", permission: "production.view" },
+            { name: "Cutting", path: "/production/cutting", permission: "production.view" },
+            { name: "Assembly", path: "/production/assembly", permission: "production.view" },
           ],
         },
       ],
@@ -312,26 +331,28 @@ export const departments: Department[] = [
     icon: ClipboardCheck,
     path: "/qc",
     subModules: [
-      { name: "Inspections", path: "/qc/inspections" },
-      { name: "Checklists", path: "/qc/checklists" },
-      { name: "Defects", path: "/qc/defects" },
-      { name: "Reports", path: "/qc/reports" },
+      { name: "Dashboard", path: "/qc/dashboard", permission: "qc.view" },
+      { name: "Inspections", path: "/qc/inspections", permission: "qc.view" },
+      { name: "Templates", path: "/qc/templates", permission: "qc.view" },
+      { name: "Schedules", path: "/qc/schedules", permission: "qc.view" },
+      { name: "Defects", path: "/qc/defects", permission: "qc.view" },
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/qc/inspections" },
-        { name: "Reports", path: "/qc/reports" },
-        { name: "Analytics", path: "/analytics" },
+        { name: "Home", path: "/qc/dashboard" },
+        { name: "Inspections", path: "/qc/inspections" },
+        { name: "Defects", path: "/qc/defects" },
       ],
       groups: [
         {
           label: "Quality",
           icon: ClipboardCheck,
           items: [
-            { name: "Inspections", path: "/qc/inspections" },
-            { name: "Checklists", path: "/qc/checklists" },
-            { name: "Defects", path: "/qc/defects" },
-            { name: "Reports", path: "/qc/reports" },
+            { name: "Dashboard", path: "/qc/dashboard", permission: "qc.view" },
+            { name: "Inspections", path: "/qc/inspections", permission: "qc.view" },
+            { name: "Templates", path: "/qc/templates", permission: "qc.view" },
+            { name: "Schedules", path: "/qc/schedules", permission: "qc.view" },
+            { name: "Defects", path: "/qc/defects", permission: "qc.view" },
           ],
         },
       ],
@@ -543,16 +564,15 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/production/schedule",
     icon: Factory,
     iconClassName: "bg-sky-100 text-sky-600",
-    badge: { label: "4 Delayed", className: "text-sky-600" },
-    permission: "production.schedule.manage",
+    permission: "production.view",
   },
   {
     id: "qc",
     name: "Quality Control",
-    href: "/qc/inspections",
+    href: "/qc/dashboard",
     icon: ShieldCheck,
     iconClassName: "bg-cyan-100 text-cyan-600",
-    permission: "qc.inspect",
+    permission: "qc.view",
   },
   {
     id: "dispatch",
@@ -777,9 +797,17 @@ export function isWorkspaceRoute(pathname: string): boolean {
 }
 
 /** Match list routes and single-segment detail pages (e.g. /projects/12). */
-export function isDepartmentNavItemActive(pathname: string, path: string): boolean {
+export function isDepartmentNavItemActive(
+  pathname: string,
+  path: string,
+  exact = false,
+): boolean {
   if (pathname === path) {
     return true;
+  }
+
+  if (exact) {
+    return false;
   }
 
   if (!pathname.startsWith(`${path}/`)) {

@@ -39,6 +39,9 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
 export async function fetchActivities(params?: {
   lead_id?: number;
   deal_id?: number;
+  contact_id?: number;
+  assigned_to?: number;
+  activity_type?: string;
   status?: string;
   page?: number;
   per_page?: number;

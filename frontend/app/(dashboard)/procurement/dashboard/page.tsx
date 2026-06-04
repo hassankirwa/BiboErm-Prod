@@ -148,11 +148,23 @@ export default function ProcurementDashboardPage() {
                     <div key={order.id} className="flex items-center justify-between rounded-lg border p-3">
                       <div>
                         <p className="font-medium">{order.order_number}</p>
-                        <p className="text-xs text-muted-foreground">Project #{order.project_id}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {order.project?.reference
+                            ? `${order.project.name} · ${order.project.reference}`
+                            : `Project #${order.project_id}`}
+                        </p>
                       </div>
-                      <Badge variant="secondary" className={statusColors[order.status] ?? ""}>
-                        {order.status.replaceAll("_", " ")}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className={statusColors[order.status] ?? ""}>
+                          {order.status.replaceAll("_", " ")}
+                        </Badge>
+                        <Link
+                          className="text-sm text-primary underline-offset-4 hover:underline"
+                          href={`/procurement/glass-orders/${order.id}`}
+                        >
+                          Open
+                        </Link>
+                      </div>
                     </div>
                   ))}
                   {glass.length === 0 ? <p className="text-sm text-muted-foreground">No glass orders pending.</p> : null}

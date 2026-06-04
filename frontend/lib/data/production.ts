@@ -1,6 +1,5 @@
+/**
+ * @deprecated Production UI uses @/lib/api/production (live API).
+ * Mock exports retained for legacy references only.
+ */
 export { mockProductionOrders } from "@/lib/mock-data";
-
-export async function getProductionOrders() {
-  const { mockProductionOrders } = await import("@/lib/mock-data");
-  return mockProductionOrders;
-}

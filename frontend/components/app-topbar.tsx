@@ -48,7 +48,7 @@ export function AppTopbar() {
   const roleLabel = roles[0]?.replace(/_/g, " ") ?? "User";
 
   return (
-    <header className="sticky top-0 z-30 w-full max-w-full shrink-0 border-b border-border bg-card">
+    <header className="sticky top-0 z-40 w-full max-w-full shrink-0 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex h-14 items-center gap-2 overflow-hidden px-3 sm:gap-3 sm:px-4">
         <SidebarTrigger className="shrink-0 md:hidden" />
 

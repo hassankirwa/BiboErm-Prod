@@ -1,7 +1,7 @@
 import type { ApiLead } from "@/lib/api/crm/types";
 import { leadDisplayName } from "@/lib/api/crm/leads";
 import { getUserInitials } from "@/lib/api/auth";
-import { statusToKanbanStage } from "@/lib/crm-lead-status";
+import { LEAD_STATUS_LABELS, statusToKanbanStage } from "@/lib/crm-lead-status";
 import type { LeadKanbanCard, LeadKanbanStageId } from "@/lib/leads-kanban-data";
 import type { LeadListRow } from "@/lib/leads-list-data";
 import type { LeadMapMarker } from "@/lib/leads-map-data";
@@ -133,12 +133,5 @@ export function apiCardsToCalendarEvents(
 }
 
 export function getLeadStageLabel(stageId: LeadKanbanStageId): string {
-  const labels: Record<LeadKanbanStageId, string> = {
-    new: "New Lead",
-    contacted: "Contacted",
-    qualified: "Qualified",
-    site_visit_scheduled: "Site Visit Scheduled",
-    measurements_captured: "Measurements Captured",
-  };
-  return labels[stageId] ?? stageId;
+  return LEAD_STATUS_LABELS[stageId] ?? stageId;
 }

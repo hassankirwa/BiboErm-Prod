@@ -87,8 +87,11 @@ export type PurchaseRequisitionLine = {
   } | null;
 };
 
+export type WarehouseItemCategory = "aluminium_profile" | "accessory" | "rubber";
+
 export type LowStockRequisitionSourceItem = {
   warehouse_item_id: number;
+  category?: WarehouseItemCategory;
   sku: string;
   name: string;
   unit_of_measure: string | null;
@@ -122,6 +125,7 @@ export type PurchaseOrder = {
     reference: string;
   } | null;
   lines?: PurchaseOrderLine[];
+  goods_receipts_count?: number;
   transport_orders?: Array<{
     id: number;
     transport_number: string;
@@ -150,6 +154,8 @@ export type GoodsReceiptLine = {
   goods_receipt_id: number;
   purchase_order_line_id: number;
   warehouse_item_id: number | null;
+  warehouse_item_category?: WarehouseItemCategory | string | null;
+  is_procurement_only?: boolean;
   qty_received: string;
   qty_accepted: string;
   qty_rejected: string;
@@ -163,8 +169,10 @@ export type GoodsReceiptAttachment = {
   goods_receipt_id?: number;
   type: string;
   path: string;
+  url?: string | null;
   firebase_url?: string | null;
   original_filename?: string | null;
+  uploaded_at?: string | null;
 };
 
 export type GoodsReceipt = {
@@ -186,18 +194,48 @@ export type GoodsReceipt = {
   creator?: { id: number; name: string; email: string } | null;
 };
 
+export type GlassOrderPane = {
+  name?: string;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  quantity?: number | null;
+  glass_type?: string | null;
+  tint?: string | null;
+  notes?: string | null;
+  bom_line_id?: number | null;
+};
+
+export type GlassOrderSpecs = {
+  source?: string;
+  requirements?: string;
+  panes?: GlassOrderPane[];
+};
+
 export type GlassOrder = {
   id: number;
   order_number: string;
   project_id: number;
   supplier_id: number | null;
   purchase_order_id: number | null;
+  specs?: GlassOrderSpecs;
   status: string;
   ordered_at: string | null;
   expected_delivery: string | null;
   delivered_at: string | null;
   delivery_location: string | null;
   notes: string | null;
+  created_at?: string | null;
+  project?: {
+    id: number;
+    reference: string;
+    name: string;
+  } | null;
+  supplier?: {
+    id: number;
+    code: string;
+    name: string;
+    category: string | null;
+  } | null;
 };
 
 export type TransportOrder = {
@@ -414,7 +452,12 @@ export type PurchaseOrderDraftGroup = {
   lines: PurchaseOrderDraftLine[];
 };
 
-export async function listPurchaseOrders(params?: { status?: string; project_id?: number; per_page?: number }) {
+export async function listPurchaseOrders(params?: {
+  status?: string;
+  project_id?: number;
+  per_page?: number;
+  without_goods_receipts?: boolean;
+}) {
   return apiRequest<Paginated<PurchaseOrder>>(`/procurement/purchase-orders${buildQuery(params)}`);
 }
 
@@ -505,11 +548,18 @@ export async function getRequisition(id: number) {
   return apiRequest<{ data: PurchaseRequisition }>(`/procurement/requisitions/${id}`);
 }
 
-export async function getLowStockRequisitionSource() {
+export async function getLowStockRequisitionSource(params?: {
+  category?: WarehouseItemCategory;
+}) {
   return apiRequest<{
     data: LowStockRequisitionSourceItem[];
-    meta?: { total_items?: number; actionable_items?: number };
-  }>("/procurement/requisition-sources/low-stock");
+    meta?: {
+      total_items?: number;
+      actionable_items?: number;
+      category?: WarehouseItemCategory | null;
+      categories?: Array<{ value: WarehouseItemCategory; label: string }>;
+    };
+  }>(`/procurement/requisition-sources/low-stock${buildQuery(params)}`);
 }
 
 export async function getProcurementDashboard() {
@@ -538,7 +588,9 @@ export async function createGoodsReceipt(payload: {
   lines: Array<{
     purchase_order_line_id: number;
     qty_received: number;
+    qty_accepted?: number;
     warehouse_item_id?: number;
+    to_bin_id?: number | null;
     notes?: string;
   }>;
 }) {
@@ -562,8 +614,12 @@ export async function updateGoodsReceiptLines(
       qty_rejected?: number;
       rejection_reason?: string | null;
       to_bin_id?: number | null;
+      warehouse_item_id?: number | null;
       notes?: string | null;
     }>;
+    notes?: string | null;
+    quality_inspection_notes?: string | null;
+    project_id?: number | null;
   },
 ) {
   return apiRequest<{ data: GoodsReceipt }>(`/procurement/goods-receipts/${id}/lines`, {
@@ -591,14 +647,80 @@ export async function uploadGoodsReceiptAttachment(
   });
 }
 
-export async function verifyGoodsReceipt(id: number) {
+export async function verifyGoodsReceipt(
+  id: number,
+  payload?: {
+    lines?: Array<{
+      id: number;
+      qty_received: number;
+      qty_accepted?: number;
+      qty_rejected?: number;
+      rejection_reason?: string | null;
+      to_bin_id?: number | null;
+      warehouse_item_id?: number | null;
+      notes?: string | null;
+    }>;
+    notes?: string | null;
+    quality_inspection_notes?: string | null;
+  },
+) {
   return apiRequest<{ data: GoodsReceipt }>(`/procurement/goods-receipts/${id}/verify`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function listGlassOrders(params?: {
+  per_page?: number;
+  project_id?: number;
+}) {
+  return apiRequest<Paginated<GlassOrder>>(`/procurement/glass-orders${buildQuery(params)}`);
+}
+
+export async function getGlassOrder(id: number) {
+  return apiRequest<{ data: GlassOrder }>(`/procurement/glass-orders/${id}`);
+}
+
+export async function createGlassOrder(payload: {
+  project_id: number;
+  supplier_id?: number | null;
+  specs?: GlassOrderSpecs;
+  expected_delivery?: string | null;
+  delivery_location?: string | null;
+  notes?: string | null;
+}) {
+  return apiRequest<{ data: GlassOrder }>("/procurement/glass-orders", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateGlassOrder(
+  id: number,
+  payload: {
+    supplier_id?: number | null;
+    specs?: GlassOrderSpecs;
+    expected_delivery?: string | null;
+    delivery_location?: string | null;
+    notes?: string | null;
+  },
+) {
+  return apiRequest<{ data: GlassOrder }>(`/procurement/glass-orders/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function markGlassOrderOrdered(id: number) {
+  return apiRequest<{ data: GlassOrder }>(`/procurement/glass-orders/${id}/mark-ordered`, {
     method: "POST",
   });
 }
 
-export async function listGlassOrders(params?: { per_page?: number }) {
-  return apiRequest<Paginated<GlassOrder>>(`/procurement/glass-orders${buildQuery(params)}`);
+export async function markGlassOrderDelivered(id: number) {
+  return apiRequest<{ data: GlassOrder }>(`/procurement/glass-orders/${id}/mark-delivered`, {
+    method: "POST",
+  });
 }
 
 export async function listTransportOrders(params?: { per_page?: number }) {
@@ -679,7 +801,11 @@ export async function createProjectMaterialsRequisition(payload: {
   project_bom_line_ids: number[];
   supplier_id: number;
   notes?: string;
-  lines?: Array<{ project_bom_line_id: number; quantity: number }>;
+  lines?: Array<{
+    project_bom_line_id: number;
+    quantity: number;
+    warehouse_item_id?: number;
+  }>;
 }) {
   return apiRequest<{ data: PurchaseRequisition }>(
     "/procurement/requisition-sources/project-materials/requisitions",

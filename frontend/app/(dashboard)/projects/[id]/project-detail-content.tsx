@@ -9,6 +9,8 @@ import { ProjectDetailActionBar } from "@/components/projects/project-detail-act
 import { ProjectDetailBom } from "@/components/projects/project-detail-bom";
 import { ProjectDetailDesigns } from "@/components/projects/project-detail-designs";
 import { ProjectDetailOverview } from "@/components/projects/project-detail-overview";
+import { ProjectDetailProduction } from "@/components/projects/project-detail-production";
+import { ProjectDetailQc } from "@/components/projects/project-detail-qc";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,10 +24,10 @@ import { ApiError } from "@/lib/api/errors";
 import { ChevronLeft, ClipboardList, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-type ProjectTab = "overview" | "bom" | "designs";
+type ProjectTab = "overview" | "bom" | "designs" | "production" | "qc";
 
 function parseProjectTab(tab: string | null): ProjectTab {
-  if (tab === "bom" || tab === "designs") return tab;
+  if (tab === "bom" || tab === "designs" || tab === "production" || tab === "qc") return tab;
   return "overview";
 }
 
@@ -211,6 +213,12 @@ export function ProjectDetailContent({
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="bom">BOM</TabsTrigger>
               <TabsTrigger value="designs">Designs</TabsTrigger>
+              <PermissionGate permission="production.view">
+                <TabsTrigger value="production">Production</TabsTrigger>
+              </PermissionGate>
+              <PermissionGate permission="qc.view">
+                <TabsTrigger value="qc">Quality</TabsTrigger>
+              </PermissionGate>
             </TabsList>
             <TabsContent value="overview" className="mt-6">
               <ProjectDetailOverview project={project} onProjectUpdated={() => void reloadProject()} />
@@ -226,6 +234,19 @@ export function ProjectDetailContent({
                 uploadTrigger={designUploadTrigger}
               />
             </TabsContent>
+            <PermissionGate permission="production.view">
+              <TabsContent value="production" className="mt-6">
+                <ProjectDetailProduction
+                  projectId={project.id}
+                  projectStage={project.stage}
+                />
+              </TabsContent>
+            </PermissionGate>
+            <PermissionGate permission="qc.view">
+              <TabsContent value="qc" className="mt-6">
+                <ProjectDetailQc project={project} />
+              </TabsContent>
+            </PermissionGate>
           </Tabs>
           </div>
         </div>

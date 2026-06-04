@@ -65,4 +65,17 @@ class Contact extends Model
     {
         return $this->hasMany(CrmActivity::class);
     }
+
+    public function scopeVisibleTo($query, User $user)
+    {
+        if ($user->can('contacts.view_all')) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($user) {
+            $q->where('contact_owner_id', $user->id)
+                ->orWhere('owner_id', $user->id)
+                ->orWhere('created_by', $user->id);
+        });
+    }
 }

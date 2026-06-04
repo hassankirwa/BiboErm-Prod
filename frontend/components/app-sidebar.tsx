@@ -206,7 +206,7 @@ function DepartmentContent({
                       href={sub.path}
                       name={sub.name}
                       icon={department.icon}
-                      isActive={isDepartmentNavItemActive(pathname, sub.path)}
+                      isActive={isDepartmentNavItemActive(pathname, sub.path, sub.exact)}
                     />
                   ))}
                 </SidebarMenu>
@@ -230,7 +230,7 @@ function DepartmentContent({
               {workspaceLink}
               {nav.topItems.map((item) => {
                 const Icon = topItemIcons[item.name] ?? Home;
-                const isActive = isDepartmentNavItemActive(pathname, item.path);
+                const isActive = isDepartmentNavItemActive(pathname, item.path, item.exact);
                 return (
                   <NavItem
                     key={item.name}
@@ -251,7 +251,7 @@ function DepartmentContent({
           {nav.groups.map((group) => {
             const GroupIcon = group.icon;
             const isGroupActive = group.items.some((item) =>
-              isDepartmentNavItemActive(pathname, item.path),
+              isDepartmentNavItemActive(pathname, item.path, item.exact),
             );
 
             return (
@@ -284,10 +284,10 @@ function DepartmentContent({
                             <SidebarMenuSubItem key={item.path + item.name}>
                               <SidebarMenuSubButton
                                 asChild
-                                isActive={isDepartmentNavItemActive(pathname, item.path)}
+                                isActive={isDepartmentNavItemActive(pathname, item.path, item.exact)}
                                 className={cn(
                                   "text-neutral-600 hover:text-neutral-900",
-                                  isDepartmentNavItemActive(pathname, item.path) &&
+                                  isDepartmentNavItemActive(pathname, item.path, item.exact) &&
                                     "sidebar-sub-active",
                                 )}
                               >

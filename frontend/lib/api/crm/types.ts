@@ -62,6 +62,7 @@ export type ApiContact = {
   notes: string | null;
   owner_id: number | null;
   account?: ApiAccount | null;
+  source_lead?: ApiLead | null;
   owner?: ApiUser | null;
   created_at: string | null;
   updated_at: string | null;

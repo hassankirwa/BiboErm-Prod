@@ -85,6 +85,16 @@ class WarehouseAuditLogger
         $this->log('warehouse.materials_ready', 'project', $projectId, $context);
     }
 
+    public function materialsReserved(int $projectId, array $context = []): void
+    {
+        $this->log('warehouse.materials_reserved', 'project', $projectId, $context);
+    }
+
+    public function materialsStagedForProduction(int $projectId, array $context = []): void
+    {
+        $this->log('warehouse.materials_staged_for_production', 'project', $projectId, $context);
+    }
+
     public function fifoSequenceOverride(array $context = []): void
     {
         $this->log('fifo_sequence_override', 'stock_reservation', null, $context);

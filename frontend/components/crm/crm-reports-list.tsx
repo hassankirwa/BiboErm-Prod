@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { CrmPageContent } from "@/components/crm/crm-page-shell";
 import {
   Tooltip,
   TooltipContent,
@@ -241,7 +240,7 @@ export function CrmReportsList() {
   );
 
   return (
-    <CrmPageContent>
+    <div className="min-w-0 space-y-4">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Select
           value={folder}
@@ -470,6 +469,6 @@ export function CrmReportsList() {
       </div>
         </>
       )}
-    </CrmPageContent>
+    </div>
   );
 }

@@ -21,16 +21,43 @@ import { useAuth } from "@/contexts/auth-context";
 import { ApiError } from "@/lib/api/client";
 import * as adminApi from "@/lib/api/admin";
 import * as hrApi from "@/lib/api/hr";
-import type { HrEmployeeListItem } from "@/lib/api/hr";
+import type { HrDashboardStats, HrEmployeeListItem, HrPendingProfileChange } from "@/lib/api/hr";
+import { PROFILE_FIELD_LABELS } from "@/lib/profile-fields";
 import { cn } from "@/lib/utils";
 
-const TABS = [
-  { key: "", label: "All" },
-  { key: "pending_hr_review", label: "Pending HR" },
-  { key: "invited", label: "Invited" },
-  { key: "pending_profile_completion", label: "Profile pending" },
-  { key: "active", label: "Active" },
-] as const;
+type EmployeeTab = {
+  key: string;
+  label: string;
+  kind: "status" | "filter";
+  countKey?: keyof HrDashboardStats;
+};
+
+const TABS: EmployeeTab[] = [
+  { key: "", label: "All", kind: "status" },
+  { key: "pending_hr_review", label: "Pending HR", kind: "status", countKey: "pending_hr_review" },
+  { key: "invited", label: "Invited", kind: "status", countKey: "invited" },
+  {
+    key: "pending_profile_completion",
+    label: "Profile incomplete",
+    kind: "status",
+    countKey: "pending_profile_completion",
+  },
+  {
+    key: "profile_change_requests",
+    label: "Profile reviews",
+    kind: "filter",
+    countKey: "profile_change_requests_pending",
+  },
+  { key: "active", label: "Active", kind: "status", countKey: "active" },
+];
+
+function formatRequestedFields(fields: string[]): string {
+  if (!fields.length) return "Profile update";
+  return fields
+    .slice(0, 3)
+    .map((field) => PROFILE_FIELD_LABELS[field] ?? field)
+    .join(", ");
+}
 
 function EmployeesPageContent() {
   const router = useRouter();
@@ -38,27 +65,54 @@ function EmployeesPageContent() {
   const { hasPermission } = useAuth();
   const canInvite = hasPermission("users.invite");
 
-  const statusFilter = searchParams.get("status") ?? "";
+  const filterParam = searchParams.get("filter") ?? "";
+  const statusFilter = filterParam ? "" : (searchParams.get("status") ?? "");
+  const activeTabKey = filterParam || statusFilter;
+  const isProfileReviewsTab = filterParam === "profile_change_requests";
+
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [employees, setEmployees] = useState<HrEmployeeListItem[]>([]);
+  const [pendingChangeByUserId, setPendingChangeByUserId] = useState<
+    Record<number, HrPendingProfileChange>
+  >({});
+  const [stats, setStats] = useState<HrDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  useEffect(() => {
+    hrApi.fetchHrDashboardStats().then(setStats).catch(() => setStats(null));
+  }, []);
+
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await hrApi.fetchEmployees({
-        page,
-        per_page: 25,
-        status: statusFilter || undefined,
-        search: search.trim() || undefined,
-      });
+      const [result, pendingChanges] = await Promise.all([
+        hrApi.fetchEmployees({
+          page,
+          per_page: 25,
+          status: statusFilter || undefined,
+          search: search.trim() || undefined,
+          has_pending_profile_change: isProfileReviewsTab ? true : undefined,
+        }),
+        isProfileReviewsTab
+          ? hrApi.fetchPendingProfileChanges({ limit: 100 })
+          : Promise.resolve({ data: [] as HrPendingProfileChange[] }),
+      ]);
       setEmployees(result.data);
       setTotalPages(result.last_page);
+      if (isProfileReviewsTab) {
+        const byUserId: Record<number, HrPendingProfileChange> = {};
+        for (const item of pendingChanges.data) {
+          byUserId[item.user_id] = item;
+        }
+        setPendingChangeByUserId(byUserId);
+      } else {
+        setPendingChangeByUserId({});
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -68,21 +122,27 @@ function EmployeesPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, search, isProfileReviewsTab]);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter]);
+  }, [statusFilter, filterParam]);
 
   useEffect(() => {
     loadEmployees();
   }, [loadEmployees]);
 
-  const setStatusTab = (status: string) => {
+  const setEmployeeTab = (tab: EmployeeTab) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (status) params.set("status", status);
-    else params.delete("status");
     params.delete("page");
+    if (tab.kind === "filter") {
+      params.set("filter", tab.key);
+      params.delete("status");
+    } else {
+      params.delete("filter");
+      if (tab.key) params.set("status", tab.key);
+      else params.delete("status");
+    }
     router.push(`/hr/employees?${params.toString()}`);
     setPage(1);
   };
@@ -143,22 +203,49 @@ function EmployeesPageContent() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key || "all"}
-            type="button"
-            onClick={() => setStatusTab(tab.key)}
-            className={cn(
-              "rounded-full px-3 py-1 text-sm font-medium transition-colors",
-              statusFilter === tab.key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const isActive = activeTabKey === tab.key;
+          const count =
+            tab.countKey && stats ? stats[tab.countKey] : undefined;
+          const showCount = typeof count === "number" && count > 0;
+
+          return (
+            <button
+              key={tab.key || "all"}
+              type="button"
+              onClick={() => setEmployeeTab(tab)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80",
+                !isActive && showCount && tab.kind === "filter" && "ring-1 ring-violet-300"
+              )}
+            >
+              {tab.label}
+              {showCount && (
+                <span
+                  className={cn(
+                    "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
+                    isActive
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-background text-foreground"
+                  )}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
+
+      {isProfileReviewsTab && (
+        <p className="text-sm text-muted-foreground">
+          Employees who submitted profile updates awaiting HR approval. Open a record to
+          approve or reject changes.
+        </p>
+      )}
 
       <form onSubmit={handleSearch} className="flex max-w-md gap-2">
         <div className="relative flex-1">
@@ -194,6 +281,7 @@ function EmployeesPageContent() {
               <TableHead>Email</TableHead>
               <TableHead>Employee #</TableHead>
               <TableHead>Department</TableHead>
+              {isProfileReviewsTab && <TableHead>Requested changes</TableHead>}
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -201,36 +289,55 @@ function EmployeesPageContent() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell
+                  colSpan={isProfileReviewsTab ? 7 : 6}
+                  className="text-center text-muted-foreground"
+                >
                   Loading...
                 </TableCell>
               </TableRow>
             ) : employees.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No employees found.
+                <TableCell
+                  colSpan={isProfileReviewsTab ? 7 : 6}
+                  className="text-center text-muted-foreground"
+                >
+                  {isProfileReviewsTab
+                    ? "No pending profile change requests."
+                    : "No employees found."}
                 </TableCell>
               </TableRow>
             ) : (
               employees.map((emp) => {
                 const { department } = getPrimaryDepartment(emp);
+                const pendingChange = pendingChangeByUserId[emp.id];
                 return (
                   <TableRow key={emp.id}>
                     <TableCell className="font-medium">{emp.name}</TableCell>
                     <TableCell>{emp.email}</TableCell>
                     <TableCell>{emp.employee_profile?.employee_number ?? "—"}</TableCell>
                     <TableCell>{department}</TableCell>
+                    {isProfileReviewsTab && (
+                      <TableCell className="max-w-xs text-sm text-muted-foreground">
+                        {pendingChange
+                          ? formatRequestedFields(pendingChange.fields)
+                          : "—"}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <EmployeeStatusBadge status={emp.status} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {(emp.status === "pending_hr_review" ||
+                        {(isProfileReviewsTab ||
+                          emp.status === "pending_hr_review" ||
                           emp.status === "active" ||
                           emp.status === "pending_profile_completion") && (
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/hr/employees/${emp.id}`}>
-                              {emp.status === "pending_hr_review" ? "Review" : "View"}
+                              {isProfileReviewsTab || emp.status === "pending_hr_review"
+                                ? "Review"
+                                : "View"}
                             </Link>
                           </Button>
                         )}

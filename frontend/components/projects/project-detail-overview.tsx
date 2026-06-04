@@ -29,7 +29,9 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { Calendar, Check, MapPin, X } from "lucide-react";
 import { useMediaImageSrc } from "@/components/media/media-image";
+import { ProjectDetailProcurement } from "@/components/projects/project-detail-procurement";
 import { ProjectMaterialReserveAction } from "@/components/projects/project-material-reserve-action";
+import { ProjectMaterialReleaseAction } from "@/components/projects/project-material-release-action";
 
 type ProjectDetailOverviewProps = {
   project: ProjectDetail;
@@ -193,6 +195,11 @@ export function ProjectDetailOverview({ project, onProjectUpdated }: ProjectDeta
                 onReserved={onProjectUpdated}
               />
 
+              <ProjectMaterialReleaseAction
+                project={project}
+                onReleased={onProjectUpdated}
+              />
+
               {materialStatus.lines.some((line) => Number(line.shortage_qty) > 0) ? (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">Lines with shortage</p>
@@ -216,6 +223,10 @@ export function ProjectDetailOverview({ project, onProjectUpdated }: ProjectDeta
               ) : null}
             </CardContent>
           </Card>
+        ) : null}
+
+        {materialStatus ? (
+          <ProjectDetailProcurement project={project} materialStatus={materialStatus} />
         ) : null}
     </div>
   );

@@ -13,7 +13,7 @@ export default function DashboardLayout({
   return (
     <AuthGuard mode="dashboard">
       <SidebarProvider
-        className="max-w-[100dvw] overflow-x-hidden"
+        className="h-dvh max-w-[100dvw] overflow-hidden"
         style={
           {
             "--sidebar-width": "13.5rem",
@@ -21,7 +21,7 @@ export default function DashboardLayout({
           } as React.CSSProperties
         }
       >
-        <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-hidden">
+        <div className="flex h-full w-full max-w-full flex-col overflow-hidden">
           <AppTopbar />
           <div className="flex min-h-0 w-full min-w-0 flex-1 overflow-hidden">
             <AppSidebar />

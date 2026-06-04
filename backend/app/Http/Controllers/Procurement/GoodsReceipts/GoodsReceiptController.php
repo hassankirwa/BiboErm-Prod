@@ -47,6 +47,11 @@ class GoodsReceiptController extends Controller
             'lines.*.purchase_order_line_id' => ['required', 'integer', 'exists:purchase_order_lines,id'],
             'lines.*.qty_received' => ['required', 'numeric', 'min:0'],
             'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
+            'lines.*.to_bin_id' => ['nullable', 'integer', 'exists:warehouse_bins,id'],
+            'lines.*.qty_accepted' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.qty_rejected' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.rejection_reason' => ['nullable', 'string'],
+            'lines.*.notes' => ['nullable', 'string'],
         ]);
 
         $order = PurchaseOrder::query()->findOrFail($validated['purchase_order_id']);
@@ -59,6 +64,6 @@ class GoodsReceiptController extends Controller
     {
         $this->authorize('view', $goodsReceipt);
 
-        return new GoodsReceiptResource($goodsReceipt->load(['lines', 'attachments', 'purchaseOrder.lines', 'purchaseOrder.supplier', 'creator']));
+        return new GoodsReceiptResource($this->service->loadForApi($goodsReceipt));
     }
 }

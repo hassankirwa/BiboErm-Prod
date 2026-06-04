@@ -4,17 +4,24 @@ namespace App\Providers;
 
 use App\Events\FieldInstallation\FieldInstallationCompleted;
 use App\Events\FieldInstallation\FieldNonConformityReported;
+use App\Events\Crm\DealProjectCreated;
 use App\Events\Procurement\GoodsReceiptVerified;
 use App\Events\Procurement\PurchaseRequisitionApproved;
 use App\Events\Production\ProductionStageCompleted;
-use App\Events\Crm\DealProjectCreated;
-use App\Events\Projects\ProjectBomFinalized;
 use App\Events\Projects\ProjectAddonRequested;
+use App\Events\Projects\ProjectBomFinalized;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Events\Warehouse\ProjectMaterialsReady;
 use App\Events\Warehouse\ProjectMaterialsReserved;
 use App\Events\Warehouse\WarehouseLowStockDetected;
 use App\Listeners\FieldInstallation\NotifyPmOnFieldNonConformity;
+use App\Listeners\Procurement\CreateAddonRequisition;
+use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
+use App\Listeners\Procurement\NotifyGlassProcurement;
+use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
+use App\Listeners\Production\CreateProductionOrder;
+use App\Listeners\Production\NotifyProductionManagersOfNewOrder;
+use App\Listeners\QualityControl\CreateProductionQcInspection;
 use App\Listeners\Projects\OnDealProjectCreated;
 use App\Listeners\Projects\OnFieldInstallationCompleted;
 use App\Listeners\Projects\OnProductionStageCompleted;
@@ -35,6 +42,9 @@ use App\Listeners\Warehouse\HandleProjectBomFinalized;
 use App\Listeners\Warehouse\NotifyProcurementOfficersOfLowStock;
 use App\Listeners\Warehouse\ReceiveGoodsIntoWarehouse;
 use App\Listeners\Warehouse\ReleaseMaterialsOnProductionStageCompleted;
+use App\Models\Production\CuttingSheet;
+use App\Models\Production\ProductionOrder;
+use App\Models\Project;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\Warehouse\Bin;
@@ -45,12 +55,15 @@ use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\Tool;
 use App\Models\Warehouse\ToolIssuance;
 use App\Policies\FieldInstallation\FieldInstallationJobPolicy;
+use App\Policies\Production\ProductionOrderPolicy;
+use App\Policies\Production\ProductionSchedulePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\Warehouse\OffcutPolicy;
 use App\Policies\Warehouse\StockMovementPolicy;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\FieldInstallation\FieldInstallationAuditLogger;
 use App\Services\Procurement\ProcurementAuditLogger;
+use App\Services\Production\ProductionAuditLogger;
 use App\Services\Roles\SyncDepartmentRolesToSpatie;
 use App\Support\BiboStorage;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -75,6 +88,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(CrmAuditLogger::class);
         $this->app->singleton(ProcurementAuditLogger::class);
         $this->app->singleton(FieldInstallationAuditLogger::class);
+        $this->app->singleton(ProductionAuditLogger::class);
     }
 
     /**
@@ -92,7 +106,11 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('nonConformity', fn ($id) => FieldNonConformity::query()->findOrFail($id));
         Route::bind('toolAssignment', fn ($id) => FieldToolAssignment::query()->findOrFail($id));
         Route::bind('unit', fn ($id) => FieldInstallationUnit::query()->findOrFail($id));
+        Route::bind('order', fn ($id) => ProductionOrder::query()->findOrFail($id));
+        Route::bind('line', fn ($id) => CuttingSheet::query()->findOrFail($id));
 
+        Gate::policy(ProductionOrder::class, ProductionOrderPolicy::class);
+        Gate::define('production.schedule.viewAny', fn (User $user) => app(ProductionSchedulePolicy::class)->viewAny($user));
         Gate::policy(Bin::class, StockMovementPolicy::class);
         Gate::policy(FieldInstallationJob::class, FieldInstallationJobPolicy::class);
         Gate::policy(OffcutPiece::class, OffcutPolicy::class);
@@ -214,6 +232,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(FieldNonConformityReported::class, NotifyPmOnFieldNonConformity::class);
         Event::listen(FieldInstallationCompleted::class, OnFieldInstallationCompleted::class);
+        $this->registerProductionListeners();
+        $this->registerQualityControlListeners();
     }
 
     protected function registerProjectListeners(): void
@@ -240,5 +260,16 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(GoodsReceiptVerified::class, ReceiveGoodsIntoWarehouse::class);
         Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class);
         Event::listen(WarehouseLowStockDetected::class, NotifyProcurementOfficersOfLowStock::class);
+    }
+
+    protected function registerProductionListeners(): void
+    {
+        Event::listen(ProjectMaterialsReady::class, CreateProductionOrder::class);
+        Event::listen(ProjectMaterialsReady::class, NotifyProductionManagersOfNewOrder::class);
+    }
+
+    protected function registerQualityControlListeners(): void
+    {
+        Event::listen(ProductionStageCompleted::class, CreateProductionQcInspection::class);
     }
 }

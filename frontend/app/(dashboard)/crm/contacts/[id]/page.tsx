@@ -19,14 +19,16 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { PermissionGate } from "@/components/auth/permission-gate";
+import { LeadPicker } from "@/components/crm/lead-picker";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ChevronLeft, Mail, Phone, Building2, Pencil } from "lucide-react";
+import { ChevronLeft, Mail, Phone, Building2, Pencil, UserRound } from "lucide-react";
 import {
   contactDisplayName,
   fetchContact,
   updateContact,
   type ApiContact,
 } from "@/lib/api/crm/contacts";
+import { leadDisplayName } from "@/lib/api/crm/leads";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -40,7 +42,15 @@ function contactToForm(contact: ApiContact) {
     job_title: contact.job_title ?? "",
     status: contact.status ?? "new_contact",
     notes: contact.notes ?? "",
+    source_lead_id: contact.source_lead_id,
   };
+}
+
+function leadLabelFromContact(contact: ApiContact): string | null {
+  if (contact.source_lead) {
+    return leadDisplayName(contact.source_lead);
+  }
+  return contact.source_lead_id ? `Lead #${contact.source_lead_id}` : null;
 }
 
 export default function ContactDetailPage({
@@ -60,6 +70,7 @@ export default function ContactDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedLeadLabel, setSelectedLeadLabel] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -68,6 +79,7 @@ export default function ContactDetailPage({
     job_title: "",
     status: "new_contact",
     notes: "",
+    source_lead_id: null as number | null,
   });
 
   useEffect(() => {
@@ -92,6 +104,7 @@ export default function ContactDetailPage({
         if (!cancelled) {
           setContact(data);
           setForm(contactToForm(data));
+          setSelectedLeadLabel(leadLabelFromContact(data));
         }
       })
       .catch((err) => {
@@ -124,9 +137,11 @@ export default function ContactDetailPage({
         job_title: form.job_title.trim() || undefined,
         status: form.status || undefined,
         notes: form.notes.trim() || undefined,
+        source_lead_id: form.source_lead_id,
       });
       setContact(updated);
       setForm(contactToForm(updated));
+      setSelectedLeadLabel(leadLabelFromContact(updated));
       setIsEditing(false);
       router.replace(`/crm/contacts/${contactId}`);
       toast.success("Contact updated.");
@@ -140,7 +155,10 @@ export default function ContactDetailPage({
   }
 
   function handleCancelEdit() {
-    if (contact) setForm(contactToForm(contact));
+    if (contact) {
+      setForm(contactToForm(contact));
+      setSelectedLeadLabel(leadLabelFromContact(contact));
+    }
     setIsEditing(false);
     router.replace(`/crm/contacts/${contactId}`);
   }
@@ -267,6 +285,22 @@ export default function ContactDetailPage({
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label>Lead (optional)</Label>
+                  <LeadPicker
+                    value={form.source_lead_id}
+                    displayLabel={selectedLeadLabel}
+                    onSelect={(lead) => {
+                      setForm((f) => ({ ...f, source_lead_id: lead.id }));
+                      setSelectedLeadLabel(leadDisplayName(lead));
+                    }}
+                    onClear={() => {
+                      setForm((f) => ({ ...f, source_lead_id: null }));
+                      setSelectedLeadLabel(null);
+                    }}
+                    disabled={saving}
+                  />
+                </div>
+                <div className="grid gap-2">
                   <Label>Status</Label>
                   <Select
                     value={form.status}
@@ -346,6 +380,17 @@ export default function ContactDetailPage({
                       className="text-primary hover:underline"
                     >
                       {contact.account.name}
+                    </Link>
+                  </p>
+                )}
+                {contact.source_lead_id && (
+                  <p className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4 text-muted-foreground" />
+                    <Link
+                      href={`/crm/leads/${contact.source_lead_id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {leadLabelFromContact(contact)}
                     </Link>
                   </p>
                 )}

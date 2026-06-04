@@ -27,7 +27,7 @@ export type CreateContactPayload = {
   status?: string;
   account_id?: number;
   contact_owner_id?: number;
-  source_lead_id?: number;
+  source_lead_id?: number | null;
   notes?: string;
 };
 

@@ -16,7 +16,7 @@ export const MODULE_HOME_ROUTES: Record<string, string> = {
   production: "/production/schedule",
   warehouse: "/warehouse/inventory",
   procurement: "/procurement/orders",
-  qc: "/qc/inspections",
+  qc: "/qc/dashboard",
   hr: "/hr",
   finance: "/finance/invoices",
   it: "/it/users",

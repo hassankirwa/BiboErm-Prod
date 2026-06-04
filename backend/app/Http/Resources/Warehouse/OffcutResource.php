@@ -14,6 +14,7 @@ class OffcutResource extends JsonResource
             'offcut_number' => $this->offcut_number,
             'item_id' => $this->item_id,
             'bin_id' => $this->bin_id,
+            'storage_area' => $this->storage_area?->value ?? $this->storage_area,
             'length_mm' => $this->length_mm,
             'quantity_pieces' => $this->quantity_pieces,
             'source_project_id' => $this->source_project_id,

@@ -41,6 +41,7 @@ return [
             'production.view', 'production.manage',
             'field_installation.view', 'field_installation.manage', 'field_installation.log',
             'field_installation.deliver', 'field_installation.tools',
+            'production.view', 'production.manage', 'production.schedule.manage',
             'qc.view', 'qc.manage',
             'finance.view', 'finance.manage',
             'hr.view',
@@ -107,7 +108,7 @@ return [
             'warehouse.stock.view',
             'warehouse.reservations.view',
             'warehouse.reservations.release',
-            'production.view', 'production.manage',
+            'production.view', 'production.manage', 'production.schedule.manage',
             'qc.view',
         ],
 

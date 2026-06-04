@@ -69,7 +69,18 @@ class ProjectMaterialReservationOrchestrator
                 fifoSequence: $reservation->fifo_sequence,
             ));
 
-            $this->audit->log('warehouse.materials_reserved', 'project', $projectId, [
+            $this->audit->materialsReserved($projectId, [
+                'reservation_id' => $reservation->id,
+                'fifo_sequence' => $reservation->fifo_sequence,
+            ]);
+
+            event(new ProjectMaterialsReady(
+                projectId: $projectId,
+                reservationId: $reservation->id,
+                fifoSequence: (int) $reservation->fifo_sequence,
+            ));
+
+            $this->audit->materialsReady($projectId, [
                 'reservation_id' => $reservation->id,
                 'fifo_sequence' => $reservation->fifo_sequence,
             ]);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Procurement\GlassOrders;
 
+use App\Enums\Procurement\GlassOrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Procurement\GlassOrderResource;
 use App\Models\Procurement\GlassOrder;
@@ -33,7 +34,7 @@ class GlassOrderController extends Controller
         $validated = $request->validate([
             'project_id' => ['required', 'integer', 'exists:projects,id'],
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
-            'specs' => ['required', 'array'],
+            'specs' => ['sometimes', 'array'],
             'expected_delivery' => ['nullable', 'date'],
             'delivery_location' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
@@ -55,9 +56,23 @@ class GlassOrderController extends Controller
     {
         $this->authorize('update', $glassOrder);
 
+        if ($glassOrder->status !== GlassOrderStatus::Draft) {
+            abort(422, 'Only draft glass orders can be edited.');
+        }
+
         $validated = $request->validate([
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'specs' => ['sometimes', 'array'],
+            'specs.requirements' => ['nullable', 'string'],
+            'specs.panes' => ['nullable', 'array'],
+            'specs.panes.*.name' => ['nullable', 'string'],
+            'specs.panes.*.width_mm' => ['nullable', 'numeric', 'min:0'],
+            'specs.panes.*.height_mm' => ['nullable', 'numeric', 'min:0'],
+            'specs.panes.*.quantity' => ['nullable', 'numeric', 'min:0'],
+            'specs.panes.*.glass_type' => ['nullable', 'string'],
+            'specs.panes.*.tint' => ['nullable', 'string'],
+            'specs.panes.*.notes' => ['nullable', 'string'],
+            'specs.panes.*.bom_line_id' => ['nullable', 'integer'],
             'expected_delivery' => ['nullable', 'date'],
             'delivery_location' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],

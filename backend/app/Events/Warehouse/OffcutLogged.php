@@ -13,7 +13,7 @@ class OffcutLogged
         public int $offcutPieceId,
         public int $warehouseItemId,
         public int $lengthMm,
-        public int $binId,
+        public ?int $binId,
         public ?int $sourceProjectId,
         public int $loggedByUserId,
     ) {}

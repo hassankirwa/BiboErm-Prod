@@ -1,183 +1,224 @@
 "use client";
 
+import Link from "next/link";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { mockProductionOrders } from "@/lib/data/production";
-import { mockProjects } from "@/lib/data/projects";
-import { Calendar, Users, ChevronRight, AlertCircle } from "lucide-react";
-import type { ProductionStage } from "@/lib/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { ScheduleOrder } from "@/lib/api/production";
+import { updateProductionSchedule } from "@/lib/api/production";
+import {
+  formatProductionStage,
+  materialReadinessLabel,
+  stageProgressPercent,
+} from "@/lib/production/utils";
+import { ChevronRight, Calendar } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/api/errors";
+import { toast } from "sonner";
 
-const stages: { id: ProductionStage; label: string; color: string }[] = [
-  { id: "scheduled", label: "Scheduled", color: "bg-muted" },
-  { id: "material_prep", label: "Material Prep", color: "bg-info/20" },
-  { id: "cutting", label: "Cutting", color: "bg-warning/20" },
-  { id: "fabrication", label: "Fabrication", color: "bg-primary/20" },
-  { id: "glass_assembly", label: "Glass Assembly", color: "bg-chart-5/20" },
-  { id: "qc_post_fabrication", label: "QC Check", color: "bg-success/20" },
-  { id: "ready_for_dispatch", label: "Ready", color: "bg-success/20" },
-];
-
-const stageIndex: Record<string, number> = {
-  scheduled: 0,
-  material_prep: 1,
-  qc_pre_check: 2,
-  cutting: 3,
-  fabrication: 4,
-  sash_fabrication: 5,
-  glass_assembly: 6,
-  final_assembly: 7,
-  qc_post_fabrication: 8,
-  ready_for_dispatch: 9,
+type Props = {
+  orders: ScheduleOrder[];
+  canReorder?: boolean;
+  onScheduleUpdated?: () => void;
 };
 
-function formatStage(stage: string): string {
-  return stage
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+const READINESS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  ready: "default",
+  partial: "secondary",
+  procurement_pending: "outline",
+  shortage: "destructive",
+};
 
-function getProject(projectId: string) {
-  return mockProjects.find((p) => p.id === projectId);
-}
+export function ProductionSchedule({
+  orders,
+  canReorder = false,
+  onScheduleUpdated,
+}: Props) {
+  const [editing, setEditing] = useState<ScheduleOrder | null>(null);
+  const [scheduledStart, setScheduledStart] = useState("");
+  const [scheduledEnd, setScheduledEnd] = useState("");
+  const [saving, setSaving] = useState(false);
 
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
+  function openSchedule(order: ScheduleOrder) {
+    setEditing(order);
+    setScheduledStart(order.scheduled_start ?? "");
+    setScheduledEnd(order.scheduled_end ?? "");
+  }
 
-export function ProductionSchedule() {
+  async function handleSaveSchedule() {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await updateProductionSchedule(editing.id, {
+        scheduled_start: scheduledStart || null,
+        scheduled_end: scheduledEnd || null,
+      });
+      toast.success("Schedule updated");
+      setEditing(null);
+      onScheduleUpdated?.();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to update schedule"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Active Production Orders</h3>
-        <Button variant="outline" size="sm">
-          View All Orders
+        <h3 className="text-lg font-semibold">FIFO Production Queue</h3>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/production/orders">View all orders</Link>
         </Button>
       </div>
 
       <div className="grid gap-4">
-        {mockProductionOrders.map((order) => {
-          const project = getProject(order.projectId);
-          const progress = Math.round(
-            ((stageIndex[order.stage] || 0) / 9) * 100
-          );
-          const isDelayed = order.actualStart && order.actualStart > order.scheduledStart;
+        {orders.length === 0 && (
+          <p className="text-sm text-muted-foreground">No active production orders.</p>
+        )}
+        {orders.map((order) => {
+          const progress = stageProgressPercent(order.current_stage);
+          const readiness = order.material_readiness;
 
           return (
             <Card key={order.id} className="border-border">
               <CardHeader className="p-4 pb-2">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <CardTitle className="text-base font-semibold">
-                        {project?.name || "Unknown Project"}
+                        {order.project_name ?? `Project #${order.project_id}`}
                       </CardTitle>
-                      {isDelayed && (
-                        <AlertCircle className="h-4 w-4 text-destructive" />
+                      <Badge variant="outline">FIFO #{order.fifo_position}</Badge>
+                      {readiness && (
+                        <Badge variant={READINESS_VARIANT[readiness.label] ?? "outline"}>
+                          {materialReadinessLabel(readiness.label)}
+                        </Badge>
+                      )}
+                      {order.glass_status?.status && (
+                        <Badge variant="outline">
+                          Glass: {order.glass_status.status.replace(/_/g, " ")}
+                        </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {order.id} | {project?.id}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {order.reference} · {formatProductionStage(order.current_stage)}
                     </p>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      order.stage === "cutting"
-                        ? "bg-warning/10 text-warning"
-                        : order.stage === "fabrication"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-info/10 text-info"
-                    }
-                  >
-                    {formatStage(order.stage)}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {canReorder && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Edit schedule dates"
+                        onClick={() => openSchedule(order)}
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link href={`/production/orders/${order.id}`}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-4 pt-2 space-y-4">
-                {/* Progress Bar */}
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{progress}%</span>
-                  </div>
-                  <Progress value={progress} className="h-2" />
+              <CardContent className="p-4 pt-0 space-y-3">
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span>Status: {order.status.replace(/_/g, " ")}</span>
+                  {order.project_stage && (
+                    <span>PM stage: {order.project_stage.replace(/_/g, " ")}</span>
+                  )}
+                  {order.scheduled_start && (
+                    <span>
+                      Scheduled: {order.scheduled_start}
+                      {order.scheduled_end ? ` → ${order.scheduled_end}` : ""}
+                    </span>
+                  )}
                 </div>
-
-                {/* Stage Pipeline */}
-                <div className="flex items-center gap-1 overflow-x-auto py-2">
-                  {stages.map((stage, i) => {
-                    const isActive = stage.id === order.stage;
-                    const isPast = stageIndex[order.stage] > stageIndex[stage.id];
-                    return (
-                      <div key={stage.id} className="flex items-center">
-                        <div
-                          className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap ${
-                            isActive
-                              ? "bg-primary text-primary-foreground"
-                              : isPast
-                              ? "bg-success/20 text-success"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {stage.label}
-                        </div>
-                        {i < stages.length - 1 && (
-                          <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Schedule and Team */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>
-                        {new Date(order.scheduledStart).toLocaleDateString()} -{" "}
-                        {new Date(order.scheduledEnd).toLocaleDateString()}
-                      </span>
-                    </div>
+                {(order.teams?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {order.teams!.map((team) => (
+                      <Badge key={team.id} variant="secondary" className="text-xs font-normal">
+                        {team.user?.name ?? `#${team.user_id}`} · {team.stage.replace(/_/g, " ")}
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                    <div className="flex -space-x-2">
-                      {order.cuttingTeam.slice(0, 3).map((memberId, i) => (
-                        <Avatar key={i} className="h-6 w-6 border-2 border-background">
-                          <AvatarFallback className="bg-primary/10 text-primary text-[8px]">
-                            {getInitials(memberId)}
-                          </AvatarFallback>
-                        </Avatar>
-                      ))}
-                      {order.cuttingTeam.length > 3 && (
-                        <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground border-2 border-background">
-                          +{order.cuttingTeam.length - 3}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {order.notes && (
-                  <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                    {order.notes}
-                  </p>
                 )}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span>Production pipeline</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatProductionStage(order.current_stage)} stage in the shop floor workflow
+                    </p>
+                  </div>
+                  {typeof order.project_completion_percent === "number" ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Project overall (PM)</span>
+                        <span>{order.project_completion_percent}%</span>
+                      </div>
+                      <Progress value={order.project_completion_percent} className="h-2" />
+                      <p className="text-[10px] text-muted-foreground">
+                        Matches completion on the project overview in Project Management
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update schedule dates</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            FIFO position #{editing?.fifo_position} is read-only and comes from warehouse reservations.
+          </p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Scheduled start</Label>
+              <Input
+                type="date"
+                value={scheduledStart}
+                onChange={(e) => setScheduledStart(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Scheduled end</Label>
+              <Input
+                type="date"
+                value={scheduledEnd}
+                onChange={(e) => setScheduledEnd(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSaveSchedule} disabled={saving}>
+              Save schedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
