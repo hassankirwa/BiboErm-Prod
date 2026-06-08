@@ -34,8 +34,9 @@ import {
 } from "@/lib/lead-form-config";
 import { KENYA_COUNTIES, getSubCountiesForCounty } from "@/lib/kenya-locations";
 import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
-import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
-import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { CrmSitePhotoPicker } from "@/components/crm/crm-site-photo-picker";
+import { SiteVisitAssigneeSelect } from "@/components/crm/site-visit-assignee-select";
 
 const MapPinPicker = dynamic(
   () =>
@@ -164,20 +165,10 @@ export function LeadFormFields({
   ) => void;
   variant?: "page" | "modal";
 }) {
+  const { user } = useAuth();
   const { lookups, assignableUsers, loading, error } = useCrmFormLookups({
     assignableRole: "sales_representative",
   });
-  const [fieldOfficers, setFieldOfficers] = useState<
-    { id: number; name: string }[]
-  >([]);
-
-  useEffect(() => {
-    fetchCrmAssignableUsers({ role: "field_officer" })
-      .then((res) =>
-        setFieldOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
-      )
-      .catch(() => setFieldOfficers([]));
-  }, []);
 
   const leadSources = lookups?.lead_sources ?? [];
   const leadTypes = lookups?.lead_types ?? [];
@@ -531,9 +522,13 @@ export function LeadFormFields({
         <Checkbox
           id="need-site-visit"
           checked={form.needSiteVisit}
-          onCheckedChange={(checked) =>
-            update("needSiteVisit", checked === true)
-          }
+          onCheckedChange={(checked) => {
+            const enabled = checked === true;
+            update("needSiteVisit", enabled);
+            if (enabled && !form.assignedFieldOfficerId && user?.id) {
+              update("assignedFieldOfficerId", user.id);
+            }
+          }}
         />
         <div className="grid gap-1">
           <Label htmlFor="need-site-visit" className="text-sm font-medium">
@@ -546,29 +541,54 @@ export function LeadFormFields({
       </div>
 
       {form.needSiteVisit ? (
-        <Field label="Assigned field officer">
-          <Select
-            value={
-              form.assignedFieldOfficerId
-                ? String(form.assignedFieldOfficerId)
-                : undefined
-            }
-            onValueChange={(v) =>
-              update("assignedFieldOfficerId", v ? Number(v) : null)
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select field officer" />
-            </SelectTrigger>
-            <SelectContent>
-              {fieldOfficers.map((officer) => (
-                <SelectItem key={officer.id} value={String(officer.id)}>
-                  {officer.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        <>
+          <Field label="Assigned to">
+            <SiteVisitAssigneeSelect
+              value={
+                form.assignedFieldOfficerId
+                  ? String(form.assignedFieldOfficerId)
+                  : ""
+              }
+              onValueChange={(v) =>
+                update("assignedFieldOfficerId", v ? Number(v) : null)
+              }
+              currentUserId={user?.id}
+              currentUserName={user?.name}
+              placeholder="Select assignee"
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Visit date"
+              hint="Optional — schedules a measurement visit when the lead is saved"
+            >
+              <Input
+                type="date"
+                className="h-9"
+                value={form.siteVisitDate}
+                onChange={(e) => update("siteVisitDate", e.target.value)}
+              />
+            </Field>
+            <Field label="Visit time">
+              <Input
+                type="time"
+                className="h-9"
+                value={form.siteVisitTime}
+                onChange={(e) => update("siteVisitTime", e.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="Notes for assignee">
+            <Textarea
+              rows={2}
+              value={form.siteVisitNotesForOfficer}
+              onChange={(e) =>
+                update("siteVisitNotesForOfficer", e.target.value)
+              }
+              placeholder="Access instructions, contact on site, scope of measurement…"
+            />
+          </Field>
+        </>
       ) : null}
     </div>
   );
@@ -602,6 +622,37 @@ export function LeadFormFields({
           </SelectContent>
         </Select>
       </Field>
+      <Field
+        label="Building construction stage"
+        hint="How far along is the structure — helps scope quoting"
+      >
+        <Select
+          value={
+            form.buildingConstructionStageId
+              ? String(form.buildingConstructionStageId)
+              : undefined
+          }
+          onValueChange={(v) =>
+            update("buildingConstructionStageId", v ? Number(v) : null)
+          }
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Select stage (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            {(lookups?.building_construction_stages ?? []).map((stage) => (
+              <SelectItem key={stage.id} value={String(stage.id)}>
+                {stage.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <CrmSitePhotoPicker
+        files={form.sitePhotoFiles}
+        onChange={(files) => update("sitePhotoFiles", files)}
+        hint="Photos of the site at intake — copied to the account when provisioned"
+      />
       <Field label="Requirement description">
         <Textarea
           value={form.requirementDescription}

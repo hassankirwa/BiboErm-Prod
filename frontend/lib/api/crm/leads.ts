@@ -1,4 +1,4 @@
-import { apiFetch } from "../client";
+import { apiFetch, ensureCsrfCookie } from "../client";
 import type { ApiAccount, ApiContact, ApiDeal, ApiLead, ApiLeadDetail, PaginatedResponse } from "./types";
 import { normalizeStringArray, unwrapResource } from "./types";
 
@@ -60,6 +60,7 @@ export type CreateLeadPayload = {
   notes?: string | null;
   source?: string | null;
   field_day_pin_id?: number | null;
+  building_construction_stage_id?: number | null;
   first_name?: string | null;
   last_name?: string | null;
   company?: string | null;
@@ -253,6 +254,26 @@ export async function uploadLeadAttachment(
   form.append("file", file);
 
   return apiFetch(`/api/v1/crm/leads/${leadId}/attachments`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function uploadLeadPhoto(
+  leadId: number,
+  file: File,
+  options?: { caption?: string; sort_order?: number },
+): Promise<{ data: { id: number; url?: string | null } }> {
+  await ensureCsrfCookie();
+
+  const form = new FormData();
+  form.append("file", file);
+  if (options?.caption) form.append("caption", options.caption);
+  if (options?.sort_order != null) {
+    form.append("sort_order", String(options.sort_order));
+  }
+
+  return apiFetch(`/api/v1/crm/leads/${leadId}/photos`, {
     method: "POST",
     body: form,
   });

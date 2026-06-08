@@ -176,4 +176,56 @@ export async function fetchAccountDeals(
 
 }
 
+export type ApiAccountDocument = {
+  id: number;
+  account_id: number;
+  document_type: string;
+  filename: string;
+  file_path: string;
+  firebase_url: string | null;
+  uploaded_by: number | null;
+  created_at: string | null;
+};
+
+export async function fetchAccountDocuments(
+  accountId: number,
+): Promise<{ data: ApiAccountDocument[] }> {
+  return apiFetch<{ data: ApiAccountDocument[] }>(
+    `/api/v1/crm/accounts/${accountId}/documents`,
+  );
+}
+
+export async function uploadAccountDocument(
+  accountId: number,
+  file: File,
+  documentType: "bom" | "design" | "accounting" | "site_photo" | "other",
+): Promise<{ data: ApiAccountDocument }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("document_type", documentType);
+
+  return apiFetch(`/api/v1/crm/accounts/${accountId}/documents`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export type CreateAccountQuotationPayload = {
+  lines: Array<{
+    description: string;
+    quantity: number;
+    unit_price: number;
+  }>;
+};
+
+export async function createAccountQuotation(
+  accountId: number,
+  payload: CreateAccountQuotationPayload,
+): Promise<{ data: { id: number } }> {
+  return apiFetch(`/api/v1/crm/accounts/${accountId}/quotations`, {
+    method: "POST",
+    json: payload,
+  });
+}
+
 

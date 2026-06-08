@@ -195,3 +195,21 @@ export async function convertFieldDayPinToLead(
   );
   return unwrapResource(res);
 }
+
+export async function uploadFieldDayPinPhoto(
+  pinId: number,
+  file: File,
+  options?: { caption?: string; sort_order?: number },
+): Promise<{ data: { id: number; url?: string | null } }> {
+  const form = new FormData();
+  form.append("file", file);
+  if (options?.caption) form.append("caption", options.caption);
+  if (options?.sort_order != null) {
+    form.append("sort_order", String(options.sort_order));
+  }
+
+  return apiFetch(`/api/v1/crm/field-day-pins/${pinId}/photos`, {
+    method: "POST",
+    body: form,
+  });
+}

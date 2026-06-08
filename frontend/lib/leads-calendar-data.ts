@@ -9,7 +9,7 @@ export type LeadCalendarEventType =
 
 export type LeadCalendarEvent = {
   id: string;
-  leadId: string;
+  leadId?: string;
   title: string;
   subtitle: string;
   date: string;
@@ -18,6 +18,7 @@ export type LeadCalendarEvent = {
   type: LeadCalendarEventType;
   owner: string;
   location?: string;
+  href?: string | null;
 };
 
 /** Demo events removed — calendar uses API lead cards when provided. */

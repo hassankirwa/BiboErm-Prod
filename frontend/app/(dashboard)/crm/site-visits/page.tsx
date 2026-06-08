@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { Badge } from "@/components/ui/badge";
@@ -18,13 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,10 +25,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, MapPin, Calendar, Clock } from "lucide-react";
+import { Plus, MapPin, Calendar, Clock, Eye, CheckCircle2, Loader2 } from "lucide-react";
+import { PermissionGate } from "@/components/auth/permission-gate";
 import { DealPicker } from "@/components/crm/deal-picker";
 import { LeadPicker } from "@/components/crm/lead-picker";
+import { ScheduleSiteVisitFieldOfficerTag } from "@/components/crm/schedule-site-visit-field-officer-tag";
 import {
+  approveSiteVisit,
   fetchSiteVisits,
   scheduleSiteVisit,
   type ApiSiteVisit,
@@ -44,7 +40,13 @@ import { dealDisplayName } from "@/lib/api/crm/deals";
 import { leadDisplayName, type ApiLead } from "@/lib/api/crm/leads";
 import type { ApiDeal } from "@/lib/api/crm/types";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
+import {
+  defaultSiteVisitAssigneeId,
+  SiteVisitAssigneeSelect,
+} from "@/components/crm/site-visit-assignee-select";
+import { useAuth } from "@/contexts/auth-context";
 import { ensureCsrfCookie } from "@/lib/api/client";
+import { resolveFieldOfficerName } from "@/lib/crm/site-visit-utils";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
 
@@ -58,12 +60,15 @@ function formatStatus(status: string | null): string {
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   approved: "default",
+  submitted_for_review: "secondary",
+  measurements_captured: "secondary",
   in_progress: "secondary",
   scheduled: "outline",
   assigned: "outline",
 };
 
 export default function SiteVisitsPage() {
+  const { user } = useAuth();
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +77,14 @@ export default function SiteVisitsPage() {
     { id: number; name: string }[]
   >([]);
   const [saving, setSaving] = useState(false);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
 
   const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
   const [selectedDealLabel, setSelectedDealLabel] = useState<string | null>(null);
+  const [selectedDeal, setSelectedDeal] = useState<ApiDeal | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [selectedLeadLabel, setSelectedLeadLabel] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<ApiLead | null>(null);
   const [form, setForm] = useState({
     title: "",
     visit_date: "",
@@ -106,12 +114,56 @@ export default function SiteVisitsPage() {
   }, [loadVisits]);
 
   useEffect(() => {
-    fetchCrmAssignableUsers({ role: "field_officer" })
+    fetchCrmAssignableUsers({ context: "site_visits" })
       .then((res) =>
         setFieldOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
       )
       .catch(() => {});
   }, []);
+
+  const leadFieldOfficerName = useMemo(
+    () =>
+      resolveFieldOfficerName(
+        selectedLead?.assigned_field_officer,
+        selectedLead?.assigned_field_officer_id,
+        fieldOfficers,
+      ),
+    [selectedLead, fieldOfficers],
+  );
+
+  const dealFieldOfficerName = useMemo(
+    () =>
+      resolveFieldOfficerName(
+        selectedDeal?.assigned_field_officer,
+        selectedDeal?.assigned_field_officer_id,
+        fieldOfficers,
+      ),
+    [selectedDeal, fieldOfficers],
+  );
+
+  function prefillFieldOfficerId(officerId: number | null | undefined) {
+    if (officerId == null) return;
+    setForm((f) => ({
+      ...f,
+      assigned_field_officer_id: String(officerId),
+    }));
+  }
+
+  async function handleApproveVisit(visitId: number) {
+    setApprovingId(visitId);
+    try {
+      await ensureCsrfCookie();
+      await approveSiteVisit(visitId);
+      toast.success("Site visit approved.");
+      loadVisits();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to approve visit.",
+      );
+    } finally {
+      setApprovingId(null);
+    }
+  }
 
   async function handleSchedule() {
     setSaving(true);
@@ -138,8 +190,10 @@ export default function SiteVisitsPage() {
       });
       setSelectedDealId(null);
       setSelectedDealLabel(null);
+      setSelectedDeal(null);
       setSelectedLeadId(null);
       setSelectedLeadLabel(null);
+      setSelectedLead(null);
       toast.success("Site visit scheduled.");
       loadVisits();
     } catch (err) {
@@ -167,7 +221,16 @@ export default function SiteVisitsPage() {
             <Button
               size="sm"
               className="h-8 gap-1.5"
-              onClick={() => setDialogOpen(true)}
+              onClick={() => {
+                setForm((f) => ({
+                  ...f,
+                  visit_date: f.visit_date || new Date().toISOString().slice(0, 10),
+                  assigned_field_officer_id:
+                    f.assigned_field_officer_id ||
+                    defaultSiteVisitAssigneeId(user?.id, null),
+                }));
+                setDialogOpen(true);
+              }}
             >
               <Plus className="h-4 w-4" />
               Schedule Visit
@@ -203,6 +266,7 @@ export default function SiteVisitsPage() {
                     <TableHead>Officer</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -256,6 +320,32 @@ export default function SiteVisitsPage() {
                         >
                           {formatStatus(visit.status)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/crm/site-visits/${visit.id}`}>
+                              <Eye className="mr-1 h-3.5 w-3.5" />
+                              View
+                            </Link>
+                          </Button>
+                          {visit.status === "submitted_for_review" && (
+                            <PermissionGate permission="site_visits.approve">
+                              <Button
+                                size="sm"
+                                disabled={approvingId === visit.id}
+                                onClick={() => void handleApproveVisit(visit.id)}
+                              >
+                                {approvingId === visit.id ? (
+                                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                                )}
+                                Approve
+                              </Button>
+                            </PermissionGate>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -316,10 +406,16 @@ export default function SiteVisitsPage() {
                   onSelect={(deal: ApiDeal) => {
                     setSelectedDealId(deal.id);
                     setSelectedDealLabel(dealDisplayName(deal));
+                    setSelectedDeal(deal);
+                    setSelectedLeadId(null);
+                    setSelectedLeadLabel(null);
+                    setSelectedLead(null);
+                    prefillFieldOfficerId(deal.assigned_field_officer_id);
                   }}
                   onClear={() => {
                     setSelectedDealId(null);
                     setSelectedDealLabel(null);
+                    setSelectedDeal(null);
                   }}
                 />
               </div>
@@ -332,33 +428,41 @@ export default function SiteVisitsPage() {
                   onSelect={(lead: ApiLead) => {
                     setSelectedLeadId(lead.id);
                     setSelectedLeadLabel(leadDisplayName(lead));
+                    setSelectedLead(lead);
+                    setSelectedDealId(null);
+                    setSelectedDealLabel(null);
+                    setSelectedDeal(null);
+                    prefillFieldOfficerId(lead.assigned_field_officer_id);
                   }}
                   onClear={() => {
                     setSelectedLeadId(null);
                     setSelectedLeadLabel(null);
+                    setSelectedLead(null);
                   }}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Field officer</Label>
-              <Select
+              <Label>Assigned to</Label>
+              <div className="flex flex-wrap gap-2">
+                <ScheduleSiteVisitFieldOfficerTag
+                  recordLabel="Lead"
+                  officerName={leadFieldOfficerName}
+                />
+                <ScheduleSiteVisitFieldOfficerTag
+                  recordLabel="Deal"
+                  officerName={dealFieldOfficerName}
+                />
+              </div>
+              <SiteVisitAssigneeSelect
                 value={form.assigned_field_officer_id}
                 onValueChange={(v) =>
                   setForm((f) => ({ ...f, assigned_field_officer_id: v }))
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select officer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {fieldOfficers.map((o) => (
-                    <SelectItem key={o.id} value={String(o.id)}>
-                      {o.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                currentUserId={user?.id}
+                currentUserName={user?.name}
+                placeholder="Select assignee"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sv-address">Site address</Label>

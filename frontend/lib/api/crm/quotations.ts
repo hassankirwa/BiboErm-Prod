@@ -87,15 +87,30 @@ export async function acceptQuotation(id: number): Promise<ApiQuotation> {
   return normalizeQuotation(res);
 }
 
-export async function reviseQuotation(
-  dealId: number,
-  quotationId: number,
-  payload: Omit<CreateQuotationPayload, "revision_of_id">,
+export async function appendQuotationNegotiationNote(
+  id: number,
+  body: string,
 ): Promise<ApiQuotation> {
-  return createQuotation(dealId, {
-    ...payload,
-    revision_of_id: quotationId,
-  });
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}/negotiation-notes`,
+    { method: "POST", json: { body } },
+  );
+  return normalizeQuotation(res);
+}
+
+export async function reviseQuotation(id: number): Promise<ApiQuotation> {
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}/revise`,
+    { method: "POST", json: {} },
+  );
+  return normalizeQuotation(res);
+}
+
+export async function fetchQuotationWithHistory(id: number): Promise<ApiQuotation> {
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}?include=history`,
+  );
+  return normalizeQuotation(res);
 }
 
 export function quotationPdfUrl(id: number): string {

@@ -80,11 +80,7 @@ import { CrmPillToggle } from "@/components/crm/crm-pill-toggle";
 
 import { formatDisplayDate } from "@/lib/activity-due-date";
 
-import { leadActivityLabels } from "@/lib/lead-activity-icons";
-
-import { formatKesFull, leadKanbanStages } from "@/lib/leads-kanban-data";
-
-import { getStageLabel } from "@/lib/lead-record-resolver";
+import { leadKanbanStages } from "@/lib/leads-kanban-data";
 
 import { useCrmLead } from "@/lib/use-crm-lead";
 
@@ -96,6 +92,8 @@ import {
 
   leadDisplayName,
 
+  updateLead,
+
   updateLeadStatus,
 
   uploadLeadAttachment,
@@ -105,6 +103,17 @@ import {
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 
 import { scheduleSiteVisit } from "@/lib/api/crm/site-visits";
+
+import { ScheduleSiteVisitFieldOfficerTag } from "@/components/crm/schedule-site-visit-field-officer-tag";
+
+import {
+  defaultSiteVisitAssigneeId,
+  SiteVisitAssigneeSelect,
+} from "@/components/crm/site-visit-assignee-select";
+
+import { useAuth } from "@/contexts/auth-context";
+
+import { resolveFieldOfficerName } from "@/lib/crm/site-visit-utils";
 
 import type { ApiLeadDetail } from "@/lib/api/crm/types";
 
@@ -116,15 +125,12 @@ import { ensureCsrfCookie } from "@/lib/api/client";
 
 import { ApiError } from "@/lib/api/errors";
 
-import {
-
-  CrmDetailField,
-
-  CrmRecordDetailShell,
-
-} from "@/components/crm/crm-record-detail-shell";
+import { CrmRecordDetailShell } from "@/components/crm/crm-record-detail-shell";
 
 import { LeadRelatedLists } from "@/components/crm/lead-related-lists";
+import { LeadDetailIntake } from "@/components/crm/lead-detail-intake";
+import { LeadQuotationActions } from "@/components/crm/lead-quotation-actions";
+import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
 
 import { PermissionGate } from "@/components/auth/permission-gate";
 
@@ -132,7 +138,17 @@ import { LeadComposeEmailDialog } from "@/components/crm/lead-compose-email-dial
 
 import { LeadsActivityModal } from "@/components/crm/leads-activity-modal";
 
-import { isLeadQualifiedForAccount } from "@/lib/crm-lead-status";
+import {
+  LeadNotesCanvas,
+  LeadStageNotesDialog,
+  appendLeadNote,
+  hasLeadNotes,
+} from "@/components/crm/lead-notes-canvas";
+
+import {
+  isLeadQualifiedForAccount,
+  statusToKanbanStage,
+} from "@/lib/crm-lead-status";
 
 import type { LeadActivityType } from "@/lib/leads-kanban-data";
 
@@ -174,15 +190,24 @@ type LeadOverride = {
 
 };
 
+type PendingStageAction =
+
+  | { kind: "contact"; label: "Contact Lead" }
+
+  | { kind: "status"; label: string; status: string; message: string };
+
 
 
 export function LeadDetailView({ leadId }: { leadId: string }) {
+
+  const { user } = useAuth();
 
   const searchParams = useSearchParams();
 
   const view = searchParams.get("view");
 
   const hook = useCrmLead(leadId);
+  const { lookups } = useCrmFormLookups();
 
   const [override, setOverride] = useState<LeadOverride | null>(null);
 
@@ -234,6 +259,13 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
   const [activityType, setActivityType] = useState<LeadActivityType | null>(null);
 
+  const [stageNotesOpen, setStageNotesOpen] = useState(false);
+
+  const [pendingStageAction, setPendingStageAction] =
+    useState<PendingStageAction | null>(null);
+
+  const [notesSaving, setNotesSaving] = useState(false);
+
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -274,7 +306,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
   useEffect(() => {
 
-    fetchCrmAssignableUsers({ role: "field_officer" })
+    fetchCrmAssignableUsers({ context: "site_visits" })
 
       .then((res) =>
 
@@ -290,7 +322,33 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
   const status = (lead?.status ?? card?.statusKey ?? "new").toLowerCase();
 
+  useEffect(() => {
+    const id = Number(leadId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const hasLinkedAccount = Boolean(
+      lead?.converted_account_id ?? lead?.converted_account?.id,
+    );
+    if (status !== "interested" || hasLinkedAccount) return;
 
+    const timer = window.setInterval(() => {
+      fetchLead(id)
+        .then((data) => {
+          const linkedAccountId =
+            data.converted_account_id ?? data.converted_account?.id ?? null;
+          if (linkedAccountId || data.status === "account_created") {
+            setOverride({ lead: data, card: apiLeadToKanbanCard(data) });
+          }
+        })
+        .catch(() => {});
+    }, 4000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    leadId,
+    status,
+    lead?.converted_account_id,
+    lead?.converted_account?.id,
+  ]);
 
   const latestSiteVisitId = useMemo(() => {
 
@@ -301,6 +359,37 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     return visits[visits.length - 1]?.id ?? null;
 
   }, [lead?.site_visits]);
+
+  const latestSiteVisit = useMemo(() => {
+    const visits = lead?.site_visits ?? [];
+    if (visits.length === 0) return null;
+    return visits[visits.length - 1] ?? null;
+  }, [lead?.site_visits]);
+
+  const linkedAccountId =
+    lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
+
+
+
+  const leadFieldOfficerName = useMemo(
+
+    () =>
+
+      resolveFieldOfficerName(
+
+        lead?.assigned_field_officer,
+
+        lead?.assigned_field_officer_id,
+
+        fieldOfficers,
+
+      ),
+
+    [lead, fieldOfficers],
+
+
+
+  );
 
 
 
@@ -334,9 +423,63 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
 
 
-  async function handleContactLead() {
+  function requestStageAction(action: PendingStageAction) {
 
-    await runStageAction(async () => {
+    setPendingStageAction(action);
+
+    setStageNotesOpen(true);
+
+  }
+
+
+
+  async function saveAppendedNote(noteText: string, label?: string) {
+
+    const updatedNotes = appendLeadNote(lead?.notes, noteText, { label });
+
+    await updateLead(Number(leadId), { notes: updatedNotes });
+
+  }
+
+
+
+  async function handleAddNote(noteText: string) {
+
+    setNotesSaving(true);
+
+    try {
+
+      await ensureCsrfCookie();
+
+      await saveAppendedNote(noteText);
+
+      await reloadLead();
+
+      toast.success("Note added.");
+
+    } catch (err) {
+
+      toast.error(
+
+        err instanceof ApiError ? err.message : "Failed to save note.",
+
+      );
+
+      throw err;
+
+    } finally {
+
+      setNotesSaving(false);
+
+    }
+
+  }
+
+
+
+  async function executePendingStageAction(action: PendingStageAction) {
+
+    if (action.kind === "contact") {
 
       await createActivity({
 
@@ -354,21 +497,63 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
       toast.success("Lead marked as contacted.");
 
-    });
+      return;
+
+    }
+
+    await updateLeadStatus(Number(leadId), action.status);
+
+    toast.success(action.message);
 
   }
 
 
 
-  async function handleStatusChange(nextStatus: string, message: string) {
+  async function handleStageNotesConfirm(noteText: string) {
 
-    await runStageAction(async () => {
+    if (!pendingStageAction || !noteText.trim()) return;
 
-      await updateLeadStatus(Number(leadId), nextStatus);
+    setNotesSaving(true);
 
-      toast.success(message);
+    try {
 
-    });
+      await ensureCsrfCookie();
+
+      await saveAppendedNote(noteText, pendingStageAction.label);
+
+      const action = pendingStageAction;
+
+      setStageNotesOpen(false);
+
+      setPendingStageAction(null);
+
+      setActionLoading(true);
+
+      try {
+
+        await executePendingStageAction(action);
+
+        await reloadLead();
+
+      } finally {
+
+        setActionLoading(false);
+
+      }
+
+    } catch (err) {
+
+      toast.error(
+
+        err instanceof ApiError ? err.message : "Failed to complete action.",
+
+      );
+
+    } finally {
+
+      setNotesSaving(false);
+
+    }
 
   }
 
@@ -384,6 +569,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         lead_id: Number(leadId),
 
+        account_id: lead?.converted_account_id ?? undefined,
+
         site_address:
 
           visitForm.site_address || lead?.site_address || undefined,
@@ -393,6 +580,10 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         visit_date: visitForm.visit_date,
 
         visit_time: visitForm.visit_time || undefined,
+
+        visit_purpose: "assessment",
+
+        requires_measurements: false,
 
         notes_for_field_officer: visitForm.notes_for_field_officer || undefined,
 
@@ -532,7 +723,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
           onClick={() => {
 
-            setActivityType("create_task");
+            setActivityType("follow_up");
 
             setActivityModalOpen(true);
 
@@ -552,7 +743,11 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
 
 
-    switch (status) {
+    const accountId =
+      lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
+    const accountHref = accountId ? `/crm/accounts/${accountId}` : null;
+
+    switch (statusToKanbanStage(status)) {
 
       case "new":
 
@@ -572,7 +767,21 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
               disabled={disabled}
 
-              onClick={() => void handleContactLead()}
+              onClick={() =>
+
+                requestStageAction({ kind: "contact", label: "Contact Lead" })
+
+              }
+
+              title={
+
+                lead && !hasLeadNotes(lead)
+
+                  ? "Add a note before contacting this lead"
+
+                  : undefined
+
+              }
 
             >
 
@@ -608,7 +817,27 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                 onClick={() =>
 
-                  void handleStatusChange("interested", "Marked as interested.")
+                  requestStageAction({
+
+                    kind: "status",
+
+                    label: "Mark Interested",
+
+                    status: "interested",
+
+                    message: "Marked as interested.",
+
+                  })
+
+                }
+
+                title={
+
+                  lead && !hasLeadNotes(lead)
+
+                    ? "Add a note before changing stage"
+
+                    : undefined
 
                 }
 
@@ -632,7 +861,27 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                 onClick={() =>
 
-                  void handleStatusChange("unqualified", "Marked as not interested.")
+                  requestStageAction({
+
+                    kind: "status",
+
+                    label: "Not Interested",
+
+                    status: "unqualified",
+
+                    message: "Marked as not interested.",
+
+                  })
+
+                }
+
+                title={
+
+                  lead && !hasLeadNotes(lead)
+
+                    ? "Add a note before changing stage"
+
+                    : undefined
 
                 }
 
@@ -656,31 +905,27 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
           <PermissionGate permission="leads.update">
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
 
               {activityButtons}
 
-              <Button
+              {accountHref ? (
 
-              size="sm"
+                <Button size="sm" className="h-9" asChild>
 
-              className="h-9"
+                  <Link href={accountHref}>Open Account</Link>
 
-              disabled={disabled}
+                </Button>
 
-              onClick={() =>
+              ) : (
 
-                void handleStatusChange("qualified", "Lead qualified.")
+                <Badge variant="secondary" className="h-9 px-3 font-normal">
 
-              }
+                  Account provisioning…
 
-            >
+                </Badge>
 
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-
-              Qualify Lead
-
-            </Button>
+              )}
 
             </div>
 
@@ -688,9 +933,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         );
 
-      case "qualified":
-
-      case "site_visit_required":
+      case "account_created":
 
         return (
 
@@ -698,11 +941,23 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             {activityButtons}
 
+            {accountHref ? (
+
+              <Button size="sm" className="h-9" asChild>
+
+                <Link href={accountHref}>Open Account</Link>
+
+              </Button>
+
+            ) : null}
+
             <PermissionGate permission="site_visits.schedule">
 
               <Button
 
                 size="sm"
+
+                variant="outline"
 
                 className="h-9"
 
@@ -720,6 +975,20 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                     visit_date: new Date().toISOString().slice(0, 10),
 
+                    assigned_field_officer_id: defaultSiteVisitAssigneeId(
+
+                      user?.id,
+
+                      lead?.assigned_field_officer_id ??
+
+                        (f.assigned_field_officer_id
+
+                          ? Number(f.assigned_field_officer_id)
+
+                          : null),
+
+                    ),
+
                   }));
 
                   setVisitDialogOpen(true);
@@ -736,77 +1005,49 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             </PermissionGate>
 
-            <PermissionGate permission="leads.convert">
+            {latestSiteVisitId ? (
 
               <Button size="sm" variant="outline" className="h-9" asChild>
 
-                <Link href={convertHref}>
+                <Link href={`/crm/site-visits/${latestSiteVisitId}`}>
 
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-
-                  Convert to Deal
+                  View Visit
 
                 </Link>
 
               </Button>
 
-            </PermissionGate>
+            ) : null}
+
+            {((latestSiteVisit?.status === "approved" && linkedAccountId) ||
+              lead?.latest_quotation ||
+              lead?.sales_deal?.id) ? (
+              <LeadQuotationActions
+                latestQuotation={lead?.latest_quotation}
+                salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
+                linkedAccountId={linkedAccountId}
+                showCreateQuotation={
+                  latestSiteVisit?.status === "approved" && !lead?.latest_quotation
+                }
+                disabled={disabled}
+                onRefresh={reloadLead}
+              />
+            ) : latestSiteVisit &&
+              ["submitted_for_review", "measurements_captured"].includes(
+                latestSiteVisit.status ?? "",
+              ) ? (
+
+              <Badge variant="secondary" className="h-9 px-3 font-normal">
+
+                Awaiting visit approval
+
+              </Badge>
+
+            ) : null}
 
           </div>
 
         );
-
-      case "site_visit_scheduled":
-
-        return latestSiteVisitId ? (
-
-          <Button size="sm" className="h-9" asChild>
-
-            <Link href={`/crm/site-visits/${latestSiteVisitId}`}>
-
-              <Calendar className="mr-1.5 h-3.5 w-3.5" />
-
-              View Visit
-
-            </Link>
-
-          </Button>
-
-        ) : null;
-
-      case "measurements_captured":
-
-        return (
-
-          <PermissionGate permission="leads.convert">
-
-            <Button size="sm" className="h-9" asChild>
-
-              <Link href={convertHref}>
-
-                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-
-                Convert to Deal
-
-              </Link>
-
-            </Button>
-
-          </PermissionGate>
-
-        );
-
-      case "converted":
-
-        return lead?.converted_deal_id ? (
-
-          <Button size="sm" className="h-9" asChild>
-
-            <Link href={`/crm/deals/${lead.converted_deal_id}`}>View Deal</Link>
-
-          </Button>
-
-        ) : null;
 
       default:
 
@@ -826,9 +1067,27 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
     latestSiteVisitId,
 
+    latestSiteVisit,
+
+    linkedAccountId,
+
     lead?.converted_deal_id,
 
+    lead?.converted_account_id,
+
+    lead?.latest_quotation,
+
+    lead?.sales_deal,
+
+    lead?.converted_deal,
+
+    reloadLead,
+
     lead?.site_address,
+
+    lead?.notes,
+
+    lead?.internal_notes,
 
     card?.title,
 
@@ -1046,107 +1305,21 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <div className="p-4 sm:p-6">
 
-              <h3 className="mb-4 text-sm font-semibold text-[#1e3a5f]">
+              <LeadDetailIntake
+                lead={lead}
+                productInterestLookups={lookups?.product_interests}
+              />
 
-                Lead Information
+              <PermissionGate permission="leads.update">
 
-              </h3>
-
-              <dl className="grid gap-x-8 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
-
-                <CrmDetailField label="Lead Name" value={card.title} />
-
-                <CrmDetailField label="Company" value={card.company} />
-
-                <CrmDetailField label="Location" value={card.location} />
-
-                <CrmDetailField
-
-                  label="Email"
-
-                  value={card.email}
-
-                  href={card.email ? `mailto:${card.email}` : undefined}
-
+                <LeadNotesCanvas
+                  lead={lead}
+                  leadTitle={card.title}
+                  saving={notesSaving}
+                  onAddNote={handleAddNote}
                 />
 
-                <CrmDetailField
-
-                  label="Phone"
-
-                  value={card.phone}
-
-                  href={
-
-                    card.phone
-
-                      ? `tel:${card.phone.replace(/\s/g, "")}`
-
-                      : undefined
-
-                  }
-
-                />
-
-                <CrmDetailField label="Source" value={card.source} />
-
-                <CrmDetailField
-
-                  label="Lead Stage"
-
-                  value={getStageLabel(card.stageId)}
-
-                />
-
-                <CrmDetailField label="Lead Owner" value={card.owner} />
-
-                <CrmDetailField
-
-                  label="Estimated Value"
-
-                  value={formatKesFull(card.estimatedValue)}
-
-                />
-
-                <CrmDetailField
-
-                  label="Next Action Date"
-
-                  value={formatDisplayDate(card.nextActionDate)}
-
-                />
-
-                <CrmDetailField label="Tag" value={card.tag} />
-
-                <CrmDetailField
-
-                  label="Latest Activity"
-
-                  value={
-
-                    card.lastActivityType
-
-                      ? leadActivityLabels[card.lastActivityType]
-
-                      : null
-
-                  }
-
-                />
-
-                <CrmDetailField
-
-                  label="Notes"
-
-                  value={card.notes}
-
-                  className="sm:col-span-2 xl:col-span-3"
-
-                />
-
-              </dl>
-
-
+              </PermissionGate>
 
               <PermissionGate permission="leads.update">
 
@@ -1426,9 +1599,17 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <div className="space-y-2">
 
-              <Label>Field officer</Label>
+              <Label>Assigned to</Label>
 
-              <Select
+              <ScheduleSiteVisitFieldOfficerTag
+
+                recordLabel="Lead"
+
+                officerName={leadFieldOfficerName}
+
+              />
+
+              <SiteVisitAssigneeSelect
 
                 value={visitForm.assigned_field_officer_id}
 
@@ -1444,29 +1625,13 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                 }
 
-              >
+                currentUserId={user?.id}
 
-                <SelectTrigger>
+                currentUserName={user?.name}
 
-                  <SelectValue placeholder="Select officer" />
+                placeholder="Select assignee"
 
-                </SelectTrigger>
-
-                <SelectContent>
-
-                  {fieldOfficers.map((o) => (
-
-                    <SelectItem key={o.id} value={String(o.id)}>
-
-                      {o.name}
-
-                    </SelectItem>
-
-                  ))}
-
-                </SelectContent>
-
-              </Select>
+              />
 
             </div>
 
@@ -1492,7 +1657,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <div className="space-y-2">
 
-              <Label htmlFor="ld-visit-notes">Notes for field officer</Label>
+              <Label htmlFor="ld-visit-notes">Notes for assignee</Label>
 
               <Textarea
 
@@ -1559,6 +1724,30 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         leadTitle={card?.title ?? "Lead"}
 
         onSave={handleActivitySave}
+
+      />
+
+
+
+      <LeadStageNotesDialog
+
+        open={stageNotesOpen}
+
+        onOpenChange={(open) => {
+
+          setStageNotesOpen(open);
+
+          if (!open) setPendingStageAction(null);
+
+        }}
+
+        actionLabel={pendingStageAction?.label ?? "continue"}
+
+        hasExistingNotes={lead ? hasLeadNotes(lead) : false}
+
+        saving={notesSaving || actionLoading}
+
+        onConfirm={handleStageNotesConfirm}
 
       />
 

@@ -3,9 +3,22 @@ import type { AuthDepartment, UserStatus } from "./types";
 /** Roles that can access the /workspace app hub (not settings). */
 export const WORKSPACE_HUB_ROLES = ["super_admin", "it_admin"] as const;
 
+/** Field measurements and installation — primary landing is /field, not CRM. */
+export const FIELD_MODULE_ROLES = [
+  "field_officer",
+  "installation_lead",
+  "field_installation_engineer",
+] as const;
+
 export function canAccessWorkspaceHub(roles: string[]): boolean {
   return roles.some((role) =>
     WORKSPACE_HUB_ROLES.includes(role as (typeof WORKSPACE_HUB_ROLES)[number])
+  );
+}
+
+export function isFieldModuleRole(roles: string[]): boolean {
+  return roles.some((role) =>
+    FIELD_MODULE_ROLES.includes(role as (typeof FIELD_MODULE_ROLES)[number])
   );
 }
 
@@ -13,6 +26,7 @@ export function canAccessWorkspaceHub(roles: string[]): boolean {
 export const MODULE_HOME_ROUTES: Record<string, string> = {
   workspace: "/workspace",
   crm: "/crm",
+  field: "/field",
   production: "/production/schedule",
   warehouse: "/warehouse/inventory",
   procurement: "/procurement/orders",
@@ -26,6 +40,8 @@ export const MODULE_HOME_ROUTES: Record<string, string> = {
 /** Slug fallbacks when `default_module` is missing on the payload. */
 const SLUG_MODULE_FALLBACK: Record<string, string> = {
   sales_marketing: "crm",
+  field: "field",
+  field_installation: "field",
   production: "production",
   warehouse: "warehouse",
   procurement: "procurement",
@@ -116,6 +132,10 @@ export function resolveHomeRoute(
     return "/workspace";
   }
 
+  if (isFieldModuleRole(roles)) {
+    return "/field";
+  }
+
   return resolveActiveUserRedirect(departments, roles);
 }
 
@@ -134,9 +154,7 @@ export function resolveAuthRedirect(
     case "inactive":
       return "/access-denied";
     case "active": {
-      if (serverRedirect && serverRedirect !== "/workspace") {
-        return serverRedirect;
-      }
+      const home = resolveHomeRoute(departments, roles);
 
       if (
         serverRedirect === "/workspace" &&
@@ -145,7 +163,14 @@ export function resolveAuthRedirect(
         return resolveActiveUserRedirect(departments, roles);
       }
 
-      return resolveHomeRoute(departments, roles);
+      if (serverRedirect && serverRedirect !== "/workspace") {
+        if (serverRedirect === "/crm" && isFieldModuleRole(roles)) {
+          return home;
+        }
+        return serverRedirect;
+      }
+
+      return home;
     }
     default:
       return "/";

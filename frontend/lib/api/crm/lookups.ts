@@ -8,6 +8,7 @@ export type CrmLookups = {
   counties: CrmLookupItem[];
   loss_reasons: CrmLookupItem[];
   visit_purposes: CrmLookupItem[];
+  building_construction_stages: CrmLookupItem[];
 };
 
 export type CrmAssignableUser = {
@@ -22,9 +23,13 @@ export async function fetchCrmLookups(): Promise<{ data: CrmLookups }> {
 
 export async function fetchCrmAssignableUsers(params?: {
   role?: string;
+  context?: "site_visits";
+  roles?: string[];
 }): Promise<{ data: CrmAssignableUser[] }> {
   const qs = new URLSearchParams();
   if (params?.role) qs.set("role", params.role);
+  if (params?.context) qs.set("context", params.context);
+  params?.roles?.forEach((role) => qs.append("roles[]", role));
   const query = qs.toString();
   return apiFetch<{ data: CrmAssignableUser[] }>(
     `/api/v1/crm/lookups/users${query ? `?${query}` : ""}`,

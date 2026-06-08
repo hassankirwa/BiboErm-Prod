@@ -1,4 +1,5 @@
 import type { ApiUser } from "../auth";
+import type { ProjectStageSiteAssessment } from "../projects";
 
 export type PaginatedMeta = {
   current_page: number;
@@ -141,6 +142,7 @@ export type ApiDeal = {
   loss_notes: string | null;
   lost_reason: string | null;
   project_id: number | null;
+  site_assessment: ProjectStageSiteAssessment | null;
   won_at: string | null;
   lost_at: string | null;
   owner_id: number | null;
@@ -149,6 +151,7 @@ export type ApiDeal = {
   contact?: ApiContact | null;
   account?: ApiAccount | null;
   owner?: ApiUser | null;
+  assigned_field_officer?: ApiUser | null;
   quotations?: ApiQuotation[];
   payments?: ApiDealPayment[];
   created_at: string | null;
@@ -187,6 +190,7 @@ export type ApiSiteVisit = {
   deal?: ApiDeal | null;
   assigned_field_officer?: ApiUser | null;
   photos?: ApiSiteVisitPhoto[];
+  measurement_lines?: ApiMeasurementLine[];
   created_at: string | null;
   updated_at: string | null;
 };
@@ -198,6 +202,19 @@ export type ApiSiteVisitPhoto = {
   url: string | null;
   uploaded_by: number | null;
   created_at: string | null;
+};
+
+export type ApiMeasurementLine = {
+  id?: number;
+  room_area_name: string;
+  width?: number | null;
+  height?: number | null;
+  quantity?: number | null;
+  material_preference?: string | null;
+  installation_notes?: string | null;
+  obstacles_notes?: string | null;
+  client_comments?: string | null;
+  sort_order?: number | null;
 };
 
 export type ApiLead = {
@@ -238,6 +255,8 @@ export type ApiLead = {
   assignee?: ApiUser | null;
   source: string | null;
   notes: string | null;
+  building_construction_stage_id?: number | null;
+  building_construction_stage?: CrmLookupItem | null;
   lead_source?: CrmLookupItem | null;
   created_at: string | null;
   updated_at: string | null;
@@ -283,6 +302,8 @@ export type ApiLeadDetail = ApiLead & {
   source_contact?: ApiContact | null;
   converted_account?: ApiAccount | null;
   converted_deal?: ApiDeal | null;
+  latest_quotation?: ApiQuotationSummary | null;
+  sales_deal?: ApiDeal | null;
   site_visits?: ApiSiteVisit[];
   activities?: ApiActivity[];
   attachments?: Array<{
@@ -291,6 +312,14 @@ export type ApiLeadDetail = ApiLead & {
     original_name?: string | null;
     mime_type?: string | null;
     size?: number | null;
+  }>;
+  photos?: Array<{
+    id: number;
+    file_path?: string | null;
+    firebase_url?: string | null;
+    url?: string | null;
+    caption?: string | null;
+    sort_order?: number | null;
   }>;
   created_by: number | null;
   updated_by: number | null;
@@ -301,17 +330,50 @@ export type ApiQuotationLine = {
   id: number;
   quotation_id: number;
   description: string;
+  series?: string | null;
+  code?: string | null;
+  glass_type?: string | null;
+  width_mm?: number | string | null;
+  height_mm?: number | string | null;
+  sqm_per_pcs?: number | string | null;
+  total_sqm?: number | string | null;
   quantity: number | string;
   unit_price: number | string;
   line_total: number | string;
   measurement_line_id?: number | null;
   sort_order?: number | null;
+  metadata?: Record<string, unknown> | null;
+  picture_data_url?: string | null;
+};
+
+export type ApiQuotationNegotiationNote = {
+  id: string;
+  body: string;
+  author_id: number;
+  author_name: string;
+  created_at: string;
+};
+
+export type ApiQuotationSummary = {
+  id: number;
+  quotation_number: string | null;
+  project_name?: string | null;
+  status: string | null;
+  revision_number?: number | null;
+  revision_label?: string | null;
+  total_amount: number | string | null;
+  sent_at: string | null;
+  accepted_at: string | null;
+  deal_id: number | null;
+  project_id?: number | null;
 };
 
 export type ApiQuotation = {
   id: number;
   quotation_number: string | null;
-  deal_id: number;
+  project_name?: string | null;
+  project_number?: string | null;
+  deal_id: number | null;
   account_id: number | null;
   contact_id: number | null;
   prepared_by: number | null;
@@ -319,12 +381,20 @@ export type ApiQuotation = {
   subtotal: number | string | null;
   discount_amount: number | string | null;
   tax_amount: number | string | null;
+  tax_rate?: number | string | null;
   total_amount: number | string | null;
   valid_until: string | null;
   terms_conditions: string | null;
   sent_at: string | null;
   accepted_at: string | null;
   revision_of_id: number | null;
+  revision_number?: number | null;
+  revision_label?: string | null;
+  is_reference_copy?: boolean;
+  root_quotation_id?: number | null;
+  negotiation_notes?: ApiQuotationNegotiationNote[];
+  project_id?: number | null;
+  revision_history?: ApiQuotation[];
   deal?: ApiDeal | null;
   account?: ApiAccount | null;
   contact?: ApiContact | null;
@@ -374,6 +444,12 @@ export type ApiFieldDayPin = {
     field_date: string;
     field_officer?: ApiUser | null;
   } | null;
+  photos?: Array<{
+    id: number;
+    file_path?: string | null;
+    firebase_url?: string | null;
+    caption?: string | null;
+  }>;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -401,7 +477,11 @@ export type ApiActivity = {
   status: string;
   priority: string | null;
   due_at: string | null;
+  scheduled_start_at?: string | null;
+  scheduled_end_at?: string | null;
+  location?: string | null;
   completed_at: string | null;
+  account_id?: number | null;
   lead_id: number | null;
   contact_id: number | null;
   deal_id: number | null;

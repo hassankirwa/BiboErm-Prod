@@ -20,9 +20,14 @@ import {
   type LeadFormValues,
 } from "@/lib/lead-form-config";
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
-import { createLead } from "@/lib/api/crm/leads";
+import { createLead, uploadLeadPhoto } from "@/lib/api/crm/leads";
 import { fetchFieldDayPin } from "@/lib/api/crm/field-day";
+import { scheduleSiteVisit } from "@/lib/api/crm/site-visits";
 import { leadFormToCreatePayload } from "@/lib/crm-lead-payload";
+import { usePermissions } from "@/hooks/use-permissions";
+import {
+  buildSiteAddressFromLocation,
+} from "@/lib/kenya-locations";
 import {
   isAdminOnlyLocationLabel,
   resolveKenyaAdminFromCoordinates,
@@ -38,6 +43,7 @@ export function LeadCreateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const { lookups } = useCrmFormLookups({
     assignableRole: "sales_representative",
   });
@@ -182,6 +188,16 @@ export function LeadCreateForm() {
       toast.error("Assign a field officer when a site visit is required.");
       return;
     }
+    if (
+      form.needSiteVisit &&
+      form.siteVisitDate &&
+      !can("site_visits.schedule")
+    ) {
+      toast.error(
+        "You cannot schedule site visits. Save without a visit date or ask sales to schedule.",
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       await ensureCsrfCookie();
@@ -192,6 +208,69 @@ export function LeadCreateForm() {
           fieldDayPinId,
         }),
       );
+
+      let photoUploadError: string | null = null;
+      if (form.sitePhotoFiles.length > 0) {
+        try {
+          for (let i = 0; i < form.sitePhotoFiles.length; i += 1) {
+            await uploadLeadPhoto(lead.id, form.sitePhotoFiles[i], {
+              sort_order: i,
+            });
+          }
+        } catch (photoErr) {
+          photoUploadError =
+            photoErr instanceof ApiError
+              ? photoErr.message
+              : "Site photos could not be uploaded.";
+        }
+      }
+
+      if (
+        form.needSiteVisit &&
+        form.siteVisitDate &&
+        form.assignedFieldOfficerId &&
+        can("site_visits.schedule")
+      ) {
+        const siteAddress =
+          buildSiteAddressFromLocation(form) ||
+          form.siteAddress.trim() ||
+          form.location.trim() ||
+          null;
+        try {
+          const visit = await scheduleSiteVisit({
+            title: form.title.trim() || lead.name,
+            lead_id: lead.id,
+            site_address: siteAddress ?? undefined,
+            latitude: form.latitude,
+            longitude: form.longitude,
+            assigned_field_officer_id: form.assignedFieldOfficerId,
+            visit_date: form.siteVisitDate,
+            visit_time: form.siteVisitTime || null,
+            visit_purpose: "assessment",
+            requires_measurements: false,
+            account_id: lead.converted_account_id ?? undefined,
+            notes_for_field_officer:
+              form.siteVisitNotesForOfficer.trim() || null,
+          });
+          toast.success("Lead and site visit scheduled.");
+          if (photoUploadError) {
+            toast.error(photoUploadError);
+          }
+          router.push(`/crm/site-visits/${visit.id}`);
+          return;
+        } catch (scheduleErr) {
+          toast.error(
+            scheduleErr instanceof ApiError
+              ? scheduleErr.message
+              : "Lead saved but site visit could not be scheduled.",
+          );
+        }
+      }
+
+      if (photoUploadError) {
+        toast.error(photoUploadError);
+      }
+
       router.push(`/crm/leads/${lead.id}`);
     } catch (err) {
       toast.error(

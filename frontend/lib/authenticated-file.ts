@@ -1,11 +1,18 @@
 import { getApiBaseUrl } from "@/lib/api/config";
+import { getDeviceUuid } from "@/lib/api/device";
 
 /** Private file URLs from the API (may omit /v1 on legacy records). */
 export function normalizePrivateFileApiUrl(url: string): string {
+  const apiBase = getApiBaseUrl().replace(/\/$/, "");
   let normalized = url.replace(/\/api\/files\//, "/api/v1/files/");
 
+  const pathMatch = normalized.match(/\/api\/v1\/files\/[^\s?#]+/);
+  if (pathMatch) {
+    return `${apiBase}${pathMatch[0]}`;
+  }
+
   if (normalized.startsWith("/")) {
-    normalized = `${getApiBaseUrl().replace(/\/$/, "")}${normalized}`;
+    normalized = `${apiBase}${normalized}`;
   }
 
   return normalized;
@@ -44,6 +51,8 @@ async function loadObjectUrl(
       headers: {
         Accept: "image/*,*/*",
         "X-Requested-With": "XMLHttpRequest",
+        "X-Device-UUID": getDeviceUuid(),
+        "X-Device-Id": getDeviceUuid(),
       },
     });
 
@@ -54,7 +63,12 @@ async function loadObjectUrl(
       return null;
     }
 
-    const blob = await response.blob();
+    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+    const buffer = await response.arrayBuffer();
+    const blobType = contentType.startsWith("image/")
+      ? contentType
+      : contentType || "application/octet-stream";
+    const blob = new Blob([buffer], { type: blobType });
     const objectUrl = URL.createObjectURL(blob);
     const current = objectUrlCache.get(normalized);
 

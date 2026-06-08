@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   acquireAuthenticatedFileObjectUrl,
-  invalidateAuthenticatedFileObjectUrl,
   isPrivateFileApiUrl,
+  invalidateAuthenticatedFileObjectUrl,
   releaseAuthenticatedFileObjectUrl,
 } from "@/lib/authenticated-file";
 import { resolveMediaUrl } from "@/lib/media";
@@ -23,32 +23,48 @@ export function useMediaImageSrc(src: string | null | undefined): {
   displaySrc: string | null;
   loading: boolean;
   onError: () => void;
+  failed: boolean;
 } {
   const [displaySrc, setDisplaySrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!src) {
       setDisplaySrc(null);
       setLoading(false);
+      setFailed(false);
       return;
     }
 
     if (!isPrivateFileApiUrl(src)) {
       setDisplaySrc(resolveMediaUrl(src));
       setLoading(false);
+      setFailed(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
     setDisplaySrc(null);
+    setFailed(false);
 
     void acquireAuthenticatedFileObjectUrl(src)
       .then((url) => {
         if (cancelled) return;
+        if (!url) {
+          setDisplaySrc(null);
+          setFailed(true);
+          return;
+        }
         setDisplaySrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDisplaySrc(null);
+          setFailed(true);
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -58,19 +74,28 @@ export function useMediaImageSrc(src: string | null | undefined): {
 
     return () => {
       cancelled = true;
-      releaseAuthenticatedFileObjectUrl(src);
+      const urlToRelease = src;
+      queueMicrotask(() => {
+        releaseAuthenticatedFileObjectUrl(urlToRelease);
+      });
     };
-  }, [src, retryKey]);
+  }, [src, retryNonce]);
 
   const onError = useCallback(() => {
     if (!src || !isPrivateFileApiUrl(src)) return;
 
     invalidateAuthenticatedFileObjectUrl(src);
-    setDisplaySrc(null);
-    setRetryKey((current) => current + 1);
-  }, [src]);
+    if (retryNonce < 1) {
+      setRetryNonce((nonce) => nonce + 1);
+      return;
+    }
 
-  return { displaySrc, loading, onError };
+    releaseAuthenticatedFileObjectUrl(src);
+    setDisplaySrc(null);
+    setFailed(true);
+  }, [src, retryNonce]);
+
+  return { displaySrc, loading, onError, failed };
 }
 
 export function MediaImage({ src, alt, className, fallback = null }: MediaImageProps) {

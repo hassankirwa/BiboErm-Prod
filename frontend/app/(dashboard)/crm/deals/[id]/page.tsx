@@ -76,7 +76,13 @@ import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { AccountPicker } from "@/components/crm/account-picker";
+import { ScheduleSiteVisitFieldOfficerTag } from "@/components/crm/schedule-site-visit-field-officer-tag";
+import {
+  defaultSiteVisitAssigneeId,
+  SiteVisitAssigneeSelect,
+} from "@/components/crm/site-visit-assignee-select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { resolveFieldOfficerName } from "@/lib/crm/site-visit-utils";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
@@ -124,7 +130,7 @@ export default function DealDetailPage({
   const { id } = use(params);
   const dealId = Number(id);
   const router = useRouter();
-  const { roles } = useAuth();
+  const { user, roles } = useAuth();
   const canOverrideDeposit = roles.includes("super_admin");
 
   const [deal, setDeal] = useState<ApiDeal | null>(null);
@@ -181,12 +187,23 @@ export default function DealDetailPage({
     site_address: "",
     requirement_summary: "",
     account_id: "",
+    assigned_field_officer_id: "",
   });
   const [editAccountLabel, setEditAccountLabel] = useState<string | null>(null);
 
   const latestQuotation = useMemo(
     () => (quotations.length > 0 ? quotations[quotations.length - 1] : null),
     [quotations],
+  );
+
+  const dealFieldOfficerName = useMemo(
+    () =>
+      resolveFieldOfficerName(
+        deal?.assigned_field_officer,
+        deal?.assigned_field_officer_id,
+        fieldOfficers,
+      ),
+    [deal, fieldOfficers],
   );
 
   const loadDeal = useCallback(async () => {
@@ -204,6 +221,9 @@ export default function DealDetailPage({
         site_address: data.site_address ?? "",
         requirement_summary: data.requirement_summary ?? "",
         account_id: data.account_id ? String(data.account_id) : "",
+        assigned_field_officer_id: data.assigned_field_officer_id
+          ? String(data.assigned_field_officer_id)
+          : "",
       });
       setEditAccountLabel(data.account?.name ?? null);
     } catch (err) {
@@ -229,7 +249,7 @@ export default function DealDetailPage({
   }, [loadDeal]);
 
   useEffect(() => {
-    fetchCrmAssignableUsers({ role: "field_officer" })
+    fetchCrmAssignableUsers({ context: "site_visits" })
       .then((res) =>
         setFieldOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
       )
@@ -371,6 +391,9 @@ export default function DealDetailPage({
         expected_close_date: editForm.expected_close_date || undefined,
         site_address: editForm.site_address.trim() || undefined,
         requirement_summary: editForm.requirement_summary.trim() || undefined,
+        assigned_field_officer_id: editForm.assigned_field_officer_id
+          ? Number(editForm.assigned_field_officer_id)
+          : undefined,
       });
       setDeal(updated);
       setEditDialogOpen(false);
@@ -445,7 +468,21 @@ export default function DealDetailPage({
         return btn(
           "schedule",
           "Schedule Site Visit",
-          () => setVisitDialogOpen(true),
+          () => {
+            setVisitForm((f) => ({
+              ...f,
+              title: dealTitle(deal),
+              site_address: deal.site_address ?? f.site_address,
+              assigned_field_officer_id: defaultSiteVisitAssigneeId(
+                user?.id,
+                deal.assigned_field_officer_id ??
+                  (f.assigned_field_officer_id
+                    ? Number(f.assigned_field_officer_id)
+                    : null),
+              ),
+            }));
+            setVisitDialogOpen(true);
+          },
           "secondary",
           <Calendar className="mr-2 h-4 w-4" />,
         );
@@ -845,8 +882,12 @@ export default function DealDetailPage({
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Field officer</Label>
-              <Select
+              <Label>Assigned to</Label>
+              <ScheduleSiteVisitFieldOfficerTag
+                recordLabel="Deal"
+                officerName={dealFieldOfficerName}
+              />
+              <SiteVisitAssigneeSelect
                 value={visitForm.assigned_field_officer_id}
                 onValueChange={(v) =>
                   setVisitForm((f) => ({
@@ -854,18 +895,10 @@ export default function DealDetailPage({
                     assigned_field_officer_id: v,
                   }))
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select officer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {fieldOfficers.map((o) => (
-                    <SelectItem key={o.id} value={String(o.id)}>
-                      {o.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                currentUserId={user?.id}
+                currentUserName={user?.name}
+                placeholder="Select assignee"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="visit-address">Site address</Label>
@@ -879,7 +912,7 @@ export default function DealDetailPage({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="visit-notes">Notes for field officer</Label>
+              <Label htmlFor="visit-notes">Notes for assignee</Label>
               <Textarea
                 id="visit-notes"
                 value={visitForm.notes_for_field_officer}
@@ -1252,6 +1285,26 @@ export default function DealDetailPage({
                   }))
                 }
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Field installation officer</Label>
+              <Select
+                value={editForm.assigned_field_officer_id || undefined}
+                onValueChange={(v) =>
+                  setEditForm((f) => ({ ...f, assigned_field_officer_id: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Assign field officer (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fieldOfficers.map((officer) => (
+                    <SelectItem key={officer.id} value={String(officer.id)}>
+                      {officer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

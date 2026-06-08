@@ -43,6 +43,14 @@ import { AccountPicker } from "@/components/crm/account-picker";
 import { ContactPicker } from "@/components/crm/contact-picker";
 import { fetchAccount } from "@/lib/api/crm/accounts";
 import { fetchContact } from "@/lib/api/crm/contacts";
+import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function formatStage(stage: string): string {
   return (
@@ -169,9 +177,21 @@ export default function DealsPage() {
     site_address: "",
     contact_id: "",
     account_id: "",
+    assigned_field_officer_id: "",
   });
   const [accountLabel, setAccountLabel] = useState<string | null>(null);
   const [contactLabel, setContactLabel] = useState<string | null>(null);
+  const [fieldOfficers, setFieldOfficers] = useState<
+    { id: number; name: string }[]
+  >([]);
+
+  useEffect(() => {
+    fetchCrmAssignableUsers({ role: "field_officer" })
+      .then((res) =>
+        setFieldOfficers(res.data.map((u) => ({ id: u.id, name: u.name }))),
+      )
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const contactId = searchParams.get("contact_id");
@@ -236,6 +256,9 @@ export default function DealsPage() {
           : undefined,
         expected_close_date: form.expected_close_date || undefined,
         site_address: form.site_address.trim() || undefined,
+        assigned_field_officer_id: form.assigned_field_officer_id
+          ? Number(form.assigned_field_officer_id)
+          : undefined,
       });
       setDialogOpen(false);
       setForm({
@@ -245,6 +268,7 @@ export default function DealsPage() {
         site_address: "",
         contact_id: "",
         account_id: "",
+        assigned_field_officer_id: "",
       });
       setAccountLabel(null);
       setContactLabel(null);
@@ -401,6 +425,26 @@ export default function DealsPage() {
                   setForm((f) => ({ ...f, site_address: e.target.value }))
                 }
               />
+            </div>
+            <div className="grid gap-2">
+              <Label>Field installation officer</Label>
+              <Select
+                value={form.assigned_field_officer_id || undefined}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, assigned_field_officer_id: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Assign field officer (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fieldOfficers.map((officer) => (
+                    <SelectItem key={officer.id} value={String(officer.id)}>
+                      {officer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button

@@ -18,8 +18,12 @@ export type CreateActivityPayload = {
   description?: string;
   body?: string;
   due_at?: string;
+  scheduled_start_at?: string;
+  scheduled_end_at?: string;
+  location?: string;
   priority?: string;
   lead_id?: number;
+  account_id?: number;
   contact_id?: number;
   deal_id?: number;
   assigned_to?: number;

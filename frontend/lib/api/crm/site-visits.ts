@@ -1,4 +1,5 @@
 import { apiFetch } from "../client";
+import { unwrapResource } from "./types";
 import type { ApiSiteVisit, PaginatedResponse } from "./types";
 
 export type { ApiSiteVisit } from "./types";
@@ -16,6 +17,7 @@ export type ScheduleSiteVisitPayload = {
   visit_date: string;
   visit_time?: string | null;
   visit_purpose?: string | null;
+  requires_measurements?: boolean;
   notes_for_field_officer?: string | null;
 };
 
@@ -68,14 +70,15 @@ export async function fetchTodaySiteVisits(): Promise<{ data: ApiSiteVisit[] }> 
   return apiFetch<{ data: ApiSiteVisit[] }>("/api/v1/crm/site-visits/today");
 }
 
+export async function fetchOpenAssignedSiteVisits(): Promise<{ data: ApiSiteVisit[] }> {
+  return apiFetch<{ data: ApiSiteVisit[] }>("/api/v1/crm/site-visits/open");
+}
+
 export async function fetchSiteVisit(id: number): Promise<ApiSiteVisit> {
   const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
     `/api/v1/crm/site-visits/${id}`,
   );
-  if (res && typeof res === "object" && "data" in res && res.data) {
-    return res.data;
-  }
-  return res as ApiSiteVisit;
+  return unwrapResource(res);
 }
 
 export async function scheduleSiteVisit(
@@ -91,36 +94,41 @@ export async function startSiteVisit(
   id: number,
   payload?: { latitude?: number; longitude?: number },
 ): Promise<ApiSiteVisit> {
-  return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/start`, {
-    method: "POST",
-    json: payload ?? {},
-  });
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/start`,
+    { method: "POST", json: payload ?? {} },
+  );
+  return unwrapResource(res);
 }
 
 export async function submitSiteVisitMeasurements(
   id: number,
   payload: SubmitSiteVisitMeasurementsPayload,
 ): Promise<ApiSiteVisit> {
-  return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/measurements`, {
-    method: "POST",
-    json: payload,
-  });
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/measurements`,
+    { method: "POST", json: payload },
+  );
+  return unwrapResource(res);
 }
 
 export async function submitSiteVisit(
   id: number,
   payload: SubmitSiteVisitPayload = {},
 ): Promise<ApiSiteVisit> {
-  return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/submit`, {
-    method: "POST",
-    json: payload,
-  });
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/submit`,
+    { method: "POST", json: payload },
+  );
+  return unwrapResource(res);
 }
 
 export async function approveSiteVisit(id: number): Promise<ApiSiteVisit> {
-  return apiFetch<ApiSiteVisit>(`/api/v1/crm/site-visits/${id}/approve`, {
-    method: "POST",
-  });
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/approve`,
+    { method: "POST" },
+  );
+  return unwrapResource(res);
 }
 
 /** Upload visit photo when backend exposes POST /api/v1/crm/site-visits/{id}/photos */

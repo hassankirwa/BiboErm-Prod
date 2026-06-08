@@ -28,12 +28,25 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { usePermissions } from "@/hooks/use-permissions";
-import { ChevronLeft, Mail, Phone, MapPin, Globe, Pencil, FolderKanban } from "lucide-react";
+import {
+  ChevronLeft,
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+  Pencil,
+  FolderKanban,
+  Upload,
+  FileText,
+} from "lucide-react";
 import {
   fetchAccount,
   fetchAccountDeals,
+  fetchAccountDocuments,
   updateAccount,
+  uploadAccountDocument,
   type ApiAccount,
+  type ApiAccountDocument,
 } from "@/lib/api/crm/accounts";
 import type { ApiDeal } from "@/lib/api/crm/types";
 import { ensureCsrfCookie } from "@/lib/api/client";
@@ -97,6 +110,12 @@ export default function AccountDetailPage({
     physical_address: "",
     billing_address: "",
   });
+  const [documents, setDocuments] = useState<ApiAccountDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [documentType, setDocumentType] = useState<
+    "bom" | "design" | "accounting" | "site_photo" | "other"
+  >("other");
 
   useEffect(() => {
     if (searchParams.get("edit") === "1" && canEdit) {
@@ -161,6 +180,44 @@ export default function AccountDetailPage({
       cancelled = true;
     };
   }, [accountId, canViewDeals]);
+
+  useEffect(() => {
+    if (!Number.isFinite(accountId) || accountId <= 0) return;
+
+    let cancelled = false;
+    setDocumentsLoading(true);
+
+    fetchAccountDocuments(accountId)
+      .then((res) => {
+        if (!cancelled) setDocuments(res.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setDocuments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDocumentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId]);
+
+  async function handleDocumentUpload(file: File) {
+    setUploadingDocument(true);
+    try {
+      await ensureCsrfCookie();
+      const res = await uploadAccountDocument(accountId, file, documentType);
+      setDocuments((current) => [res.data, ...current]);
+      toast.success("Document uploaded.");
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to upload document.",
+      );
+    } finally {
+      setUploadingDocument(false);
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -480,6 +537,108 @@ export default function AccountDetailPage({
             </CardContent>
           </Card>
         )}
+
+        <Card className="max-w-3xl border-border">
+          <CardHeader>
+            <CardTitle className="text-base">Documents</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <PermissionGate permission="accounts.update">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="document-type">Document type</Label>
+                  <Select
+                    value={documentType}
+                    onValueChange={(value) =>
+                      setDocumentType(
+                        value as
+                          | "bom"
+                          | "design"
+                          | "accounting"
+                          | "site_photo"
+                          | "other",
+                      )
+                    }
+                  >
+                    <SelectTrigger id="document-type" className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bom">BOM</SelectItem>
+                      <SelectItem value="design">Design</SelectItem>
+                      <SelectItem value="accounting">Accounting sheet</SelectItem>
+                      <SelectItem value="site_photo">Site photo</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <input
+                    id="account-document-upload"
+                    type="file"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleDocumentUpload(file);
+                      event.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={uploadingDocument}
+                    onClick={() =>
+                      document.getElementById("account-document-upload")?.click()
+                    }
+                  >
+                    <Upload className="h-4 w-4" />
+                    {uploadingDocument ? "Uploading…" : "Upload"}
+                  </Button>
+                </div>
+              </div>
+            </PermissionGate>
+
+            {documentsLoading ? (
+              <div className="flex justify-center py-6">
+                <Spinner className="h-6 w-6 text-primary" />
+              </div>
+            ) : documents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No documents uploaded yet. Add BOMs, designs, or accounting sheets
+                for quotation prep.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {documents.map((doc) => (
+                  <li
+                    key={doc.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate font-medium">{doc.filename}</span>
+                      <Badge variant="outline" className="shrink-0 capitalize">
+                        {doc.document_type.replace(/_/g, " ")}
+                      </Badge>
+                    </div>
+                    {doc.firebase_url ? (
+                      <a
+                        href={doc.firebase_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-primary hover:underline"
+                      >
+                        Open
+                      </a>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         {canViewDeals && (
           <Card className="max-w-3xl border-border">

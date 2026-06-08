@@ -66,9 +66,15 @@ export type LeadFormValues = {
   longitude: number | null;
   needSiteVisit: boolean;
   assignedFieldOfficerId: number | null;
+  /** When set with needSiteVisit, schedules a site visit after lead create. */
+  siteVisitDate: string;
+  siteVisitTime: string;
+  siteVisitNotesForOfficer: string;
   productInterests: string[];
   requirementDescription: string;
   propertySiteType: string;
+  buildingConstructionStageId: number | null;
+  sitePhotoFiles: File[];
   estimatedValue: number;
   estimatedBudget: number;
   urgency: string;
@@ -114,9 +120,14 @@ export function emptyLeadForm(
     longitude: null,
     needSiteVisit: false,
     assignedFieldOfficerId: null,
+    siteVisitDate: "",
+    siteVisitTime: "",
+    siteVisitNotesForOfficer: "",
     productInterests: [],
     requirementDescription: "",
     propertySiteType: "",
+    buildingConstructionStageId: null,
+    sitePhotoFiles: [],
     estimatedValue: 0,
     estimatedBudget: 0,
     urgency: "",

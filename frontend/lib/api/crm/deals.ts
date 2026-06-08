@@ -6,6 +6,10 @@ import type {
   PaginatedResponse,
 } from "./types";
 import { unwrapResource } from "./types";
+import type {
+  SiteAssessmentImage,
+  SiteAssessmentNotesPayload,
+} from "../projects";
 
 export type { ApiDeal, BiboDealStage } from "./types";
 
@@ -103,6 +107,7 @@ export type CreateDealPayload = {
   site_address?: string;
   requirement_summary?: string;
   product_interests?: string[];
+  assigned_field_officer_id?: number;
 };
 
 export async function createDeal(payload: CreateDealPayload): Promise<ApiDeal> {
@@ -220,5 +225,38 @@ export async function createProjectFromDeal(
   return apiFetch(`/api/v1/crm/deals/${id}/create-project`, {
     method: "POST",
     json: {},
+  });
+}
+
+export async function updateDealSiteAssessment(
+  dealId: number,
+  payload: SiteAssessmentNotesPayload,
+): Promise<ApiDeal> {
+  const res = await apiFetch<ApiDeal | { data: ApiDeal }>(
+    `/api/v1/crm/deals/${dealId}/site-assessment`,
+    { method: "PATCH", json: payload },
+  );
+  return unwrapResource(res);
+}
+
+export async function uploadDealSiteAssessmentImage(
+  dealId: number,
+  file: File,
+): Promise<{ data: SiteAssessmentImage }> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch(`/api/v1/crm/deals/${dealId}/site-assessment/images`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function deleteDealSiteAssessmentImage(
+  dealId: number,
+  path: string,
+): Promise<{ data: { deleted: boolean } }> {
+  return apiFetch(`/api/v1/crm/deals/${dealId}/site-assessment/images`, {
+    method: "DELETE",
+    json: { path },
   });
 }

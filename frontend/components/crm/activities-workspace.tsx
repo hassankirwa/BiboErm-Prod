@@ -62,8 +62,15 @@ import type { ApiLead } from "@/lib/api/crm/leads";
 import { leadDisplayName } from "@/lib/api/crm/leads";
 import { getUserInitials } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/errors";
+import {
+  activityTypeLabel,
+  defaultLogTypeForCategory,
+  logTypeOptionsForCategory,
+  normalizeActivityCategory,
+  type ActivityCategory,
+} from "@/lib/crm-activity-types";
 
-export type ActivityTypeFilter = "all" | "task" | "meeting" | "call" | "email";
+export type ActivityTypeFilter = "all" | ActivityCategory;
 
 const PAGE_META: Record<
   ActivityTypeFilter,
@@ -77,22 +84,22 @@ const PAGE_META: Record<
   task: {
     title: "Tasks",
     description: "Open and completed task activities",
-    defaultLogType: "task",
+    defaultLogType: defaultLogTypeForCategory("task"),
   },
   meeting: {
     title: "Meetings",
     description: "Scheduled and completed meetings",
-    defaultLogType: "meeting",
+    defaultLogType: defaultLogTypeForCategory("meeting"),
   },
   call: {
     title: "Calls",
     description: "Logged and scheduled calls",
-    defaultLogType: "call",
+    defaultLogType: defaultLogTypeForCategory("call"),
   },
   email: {
     title: "Emails",
     description: "Email activity log",
-    defaultLogType: "email",
+    defaultLogType: defaultLogTypeForCategory("email"),
   },
 };
 
@@ -112,7 +119,7 @@ function getStatusVariant(
 }
 
 function getTypeIcon(type: string) {
-  switch (type.toLowerCase()) {
+  switch (normalizeActivityCategory(type)) {
     case "call":
       return <Phone className="h-4 w-4" />;
     case "email":
@@ -443,7 +450,7 @@ export function ActivitiesWorkspace({ typeFilter = "all" }: Props) {
                           <div className="h-8 w-8 rounded-[5px] bg-muted flex items-center justify-center">
                             {getTypeIcon(type)}
                           </div>
-                          <span className="text-sm capitalize">{type}</span>
+                          <span className="text-sm">{activityTypeLabel(type)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">
@@ -560,10 +567,22 @@ export function ActivitiesWorkspace({ typeFilter = "all" }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="call">Call</SelectItem>
-                  <SelectItem value="meeting">Meeting</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="task">Task</SelectItem>
+                  {(typeFilter === "all"
+                    ? [
+                        { value: "call_log", label: "Call log" },
+                        { value: "schedule_call", label: "Scheduled call" },
+                        { value: "meeting_note", label: "Meeting note" },
+                        { value: "meeting", label: "Scheduled meeting" },
+                        { value: "email_sent", label: "Email sent" },
+                        { value: "task", label: "Task" },
+                        { value: "follow_up", label: "Follow-up" },
+                      ]
+                    : logTypeOptionsForCategory(typeFilter)
+                  ).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

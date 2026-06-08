@@ -18,9 +18,11 @@ import {
   convertFieldDayPinToLead,
   fetchFieldDays,
   startFieldDay,
+  uploadFieldDayPinPhoto,
   type ApiFieldDay,
   type ApiFieldDayPin,
 } from "@/lib/api/crm/field-day";
+import { CrmSitePhotoPicker } from "@/components/crm/crm-site-photo-picker";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { useAuth } from "@/contexts/auth-context";
@@ -45,6 +47,7 @@ type PinDraft = {
   subcounty: string;
   ward: string;
   locationAddress: string;
+  sitePhotoFiles: File[];
 };
 
 function emptyPinDraft(): PinDraft {
@@ -60,6 +63,7 @@ function emptyPinDraft(): PinDraft {
     subcounty: "",
     ward: "",
     locationAddress: "",
+    sitePhotoFiles: [],
   };
 }
 
@@ -177,6 +181,14 @@ export default function FieldDayPage() {
         location_address: pinDraft.locationAddress.trim() || null,
       });
 
+      if (pinDraft.sitePhotoFiles.length > 0) {
+        for (let i = 0; i < pinDraft.sitePhotoFiles.length; i += 1) {
+          await uploadFieldDayPinPhoto(pin.id, pinDraft.sitePhotoFiles[i], {
+            sort_order: i,
+          });
+        }
+      }
+
       setActiveFieldDay((current) =>
         current
           ? {
@@ -247,7 +259,7 @@ export default function FieldDayPage() {
               <Link href="/crm/site-visits/today">Today&apos;s Visits</Link>
             </Button>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/crm">CRM Home</Link>
+              <Link href="/field">Field</Link>
             </Button>
           </div>
         }
@@ -472,6 +484,14 @@ export default function FieldDayPage() {
                           placeholder="Site observations, measurements, product interest…"
                         />
                       </div>
+
+                      <CrmSitePhotoPicker
+                        files={pinDraft.sitePhotoFiles}
+                        onChange={(files) =>
+                          setPinDraft((d) => ({ ...d, sitePhotoFiles: files }))
+                        }
+                        hint="At least one site photo is required before converting this pin to a lead"
+                      />
 
                       <Button
                         className="w-full gap-1.5 sm:w-auto"

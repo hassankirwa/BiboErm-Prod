@@ -2,16 +2,13 @@ export type LeadKanbanStageId =
   | "new"
   | "contacted"
   | "interested"
+  | "account_created"
   | "not_reachable"
-  | "unqualified"
-  | "qualified"
-  | "site_visit_required"
-  | "site_visit_scheduled"
-  | "measurements_captured"
-  | "converted";
+  | "unqualified";
 
 export type LeadActivityType =
   | "create_task"
+  | "follow_up"
   | "schedule_meeting"
   | "schedule_call";
 
@@ -83,44 +80,8 @@ export const leadKanbanStages: {
     addBtnClass: "text-cyan-700 hover:bg-cyan-50",
   },
   {
-    id: "qualified",
-    label: "Qualified",
-    headerBg: "bg-teal-50",
-    headerBorder: "border-teal-200",
-    countBadge: "bg-teal-600 text-white",
-    tagClass: "bg-teal-100 text-teal-800",
-    addBtnClass: "text-teal-700 hover:bg-teal-50",
-  },
-  {
-    id: "site_visit_required",
-    label: "Site Visit Required",
-    headerBg: "bg-orange-50",
-    headerBorder: "border-orange-200",
-    countBadge: "bg-orange-600 text-white",
-    tagClass: "bg-orange-100 text-orange-800",
-    addBtnClass: "text-orange-700 hover:bg-orange-50",
-  },
-  {
-    id: "site_visit_scheduled",
-    label: "Site Visit Scheduled",
-    headerBg: "bg-green-50",
-    headerBorder: "border-green-200",
-    countBadge: "bg-green-600 text-white",
-    tagClass: "bg-green-100 text-green-800",
-    addBtnClass: "text-green-700 hover:bg-green-50",
-  },
-  {
-    id: "measurements_captured",
-    label: "Measurements Captured",
-    headerBg: "bg-amber-50",
-    headerBorder: "border-amber-200",
-    countBadge: "bg-amber-600 text-white",
-    tagClass: "bg-amber-100 text-amber-800",
-    addBtnClass: "text-amber-700 hover:bg-amber-50",
-  },
-  {
-    id: "converted",
-    label: "Converted",
+    id: "account_created",
+    label: "Account Created",
     headerBg: "bg-emerald-50",
     headerBorder: "border-emerald-200",
     countBadge: "bg-emerald-600 text-white",

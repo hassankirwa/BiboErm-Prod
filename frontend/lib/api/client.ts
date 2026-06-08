@@ -4,8 +4,9 @@ import { API_URL, getApiBaseUrl } from "./config";
 import { ensureCsrfCookie, getCsrfTokenFromCookie, getXsrfToken } from "./csrf";
 import { getDeviceUuid } from "./device";
 import { ApiError } from "./errors";
+import { buildCacheKey, cachedRequest, invalidateApiCache } from "./request-cache";
 
-export { ApiError, ensureCsrfCookie };
+export { ApiError, ensureCsrfCookie, invalidateApiCache };
 
 export type ApiRequestOptions = {
   method?: string;
@@ -19,6 +20,10 @@ export type ApiRequestOptions = {
 type ApiFetchOptions = RequestInit & {
   json?: unknown;
   skipAuthHeaders?: boolean;
+  /** Bypass in-memory GET cache (default false). */
+  skipCache?: boolean;
+  /** How long to reuse a successful GET response (default 30s). */
+  cacheTtlMs?: number;
 };
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -142,50 +147,74 @@ export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
-  const { json, skipAuthHeaders, headers: initHeaders, ...rest } = options;
+  const {
+    json,
+    skipAuthHeaders,
+    skipCache = false,
+    cacheTtlMs,
+    headers: initHeaders,
+    ...rest
+  } = options;
   const method = (rest.method ?? "GET").toUpperCase();
-  const headers = new Headers(initHeaders);
+  const url = `${API_URL}${path}`;
+  const isCacheableGet = method === "GET" && !skipCache;
 
-  headers.set("Accept", "application/json");
-  headers.set("X-Requested-With", "XMLHttpRequest");
+  const execute = async (): Promise<T> => {
+    const headers = new Headers(initHeaders);
 
-  if (!skipAuthHeaders) {
-    const deviceUuid = getDeviceUuid();
-    headers.set("X-Device-UUID", deviceUuid);
-    headers.set("X-Device-Id", deviceUuid);
+    headers.set("Accept", "application/json");
+    headers.set("X-Requested-With", "XMLHttpRequest");
+
+    if (!skipAuthHeaders) {
+      const deviceUuid = getDeviceUuid();
+      headers.set("X-Device-UUID", deviceUuid);
+      headers.set("X-Device-Id", deviceUuid);
+    }
+
+    if (json !== undefined) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    if (MUTATING_METHODS.has(method)) {
+      const csrf = getCsrfTokenFromCookie();
+      if (csrf) {
+        headers.set("X-XSRF-TOKEN", csrf);
+      }
+    }
+
+    const res = await fetch(url, {
+      ...rest,
+      method,
+      credentials: "include",
+      headers,
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+    });
+
+    if (res.status === 204) {
+      return undefined as T;
+    }
+
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+    if (!res.ok) {
+      const message =
+        (typeof body.message === "string" && body.message) ||
+        "Request failed. Please try again.";
+      throw new ApiError(res.status, message, body);
+    }
+
+    return body as T;
+  };
+
+  if (isCacheableGet) {
+    return cachedRequest<T>(buildCacheKey(method, url), execute, { ttlMs: cacheTtlMs });
   }
 
-  if (json !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
+  const result = await execute();
 
   if (MUTATING_METHODS.has(method)) {
-    const csrf = getCsrfTokenFromCookie();
-    if (csrf) {
-      headers.set("X-XSRF-TOKEN", csrf);
-    }
+    invalidateApiCache(`GET:${API_URL}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    method,
-    credentials: "include",
-    headers,
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-  });
-
-  if (res.status === 204) {
-    return undefined as T;
-  }
-
-  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-
-  if (!res.ok) {
-    const message =
-      (typeof body.message === "string" && body.message) ||
-      "Request failed. Please try again.";
-    throw new ApiError(res.status, message, body);
-  }
-
-  return body as T;
+  return result;
 }

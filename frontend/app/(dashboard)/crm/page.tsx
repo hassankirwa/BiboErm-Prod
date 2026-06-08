@@ -1,6 +1,5 @@
 import { CrmPageBackground } from "@/components/crm/crm-page-background";
-import { CrmHomeStats } from "@/components/crm/crm-home-stats";
-import { CrmHomeTables } from "@/components/crm/crm-home-tables";
+import { CrmHomeDashboard } from "@/components/crm/crm-home-dashboard";
 import { CrmHomeQuickActions } from "@/components/crm/crm-home-quick-actions";
 
 export default function CrmHomePage() {
@@ -23,8 +22,7 @@ export default function CrmHomePage() {
               <CrmHomeQuickActions />
             </div>
 
-            <CrmHomeStats />
-            <CrmHomeTables />
+            <CrmHomeDashboard />
           </div>
         </div>
       </div>

@@ -130,15 +130,15 @@ export function WorkspaceSummaryWidgets() {
       </Card>
 
       <Card className="min-w-0 w-full rounded-[10px] border-border/60 shadow-sm">
-        <WidgetCardHeader title="Field Day" href="/crm/field-day" linkLabel="Open field day" />
+        <WidgetCardHeader title="Field" href="/field" linkLabel="Open field module" />
         <CardContent className="space-y-3 px-4 pb-4 text-sm">
           <div className="flex items-start gap-2">
             <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-            <span className="min-w-0">Log GPS pins and convert to leads</span>
+            <span className="min-w-0">Site visits, measurements, and field day</span>
           </div>
           <div className="flex items-start gap-2">
             <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-            <span className="min-w-0">Review field officer routes</span>
+            <span className="min-w-0">Installation jobs and daily logs</span>
           </div>
         </CardContent>
       </Card>

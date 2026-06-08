@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { isFieldModuleRole } from "@/lib/auth/redirect";
 import {
   LayoutGrid,
   Star,
@@ -61,6 +62,8 @@ export type SubModule = {
   exact?: boolean;
   /** Spatie permission required to show this nav item */
   permission?: string;
+  /** Show when the user has any of these permissions (OR). Overrides `permission` when set. */
+  anyPermissions?: string[];
 };
 
 export type NavGroup = {
@@ -155,6 +158,8 @@ export const departments: Department[] = [
     subModules: [
       { name: "All Projects", path: "/projects" },
       { name: "Pipeline", path: "/projects/pipeline" },
+      { name: "Design", path: "/projects/design", permission: "projects.view" },
+      { name: "Quotation", path: "/projects/quotations", permission: "quotations.view" },
       { name: "Timeline", path: "/projects/timeline" },
       { name: "Client Portal", path: "/projects/client-portal" },
     ],
@@ -171,6 +176,8 @@ export const departments: Department[] = [
           items: [
             { name: "All Projects", path: "/projects" },
             { name: "Pipeline", path: "/projects/pipeline" },
+            { name: "Design", path: "/projects/design", permission: "projects.view" },
+            { name: "Quotation", path: "/projects/quotations", permission: "quotations.view" },
             { name: "Timeline", path: "/projects/timeline" },
             { name: "Client Portal", path: "/projects/client-portal" },
           ],
@@ -298,28 +305,88 @@ export const departments: Department[] = [
     },
   },
   {
-    id: "field_installation",
-    name: "Field Installation",
-    icon: Wrench,
-    path: "/field-installation",
+    id: "field",
+    name: "Field",
+    icon: MapPin,
+    path: "/field",
     subModules: [
-      { name: "Jobs", path: "/field-installation/jobs", permission: "field_installation.view" },
+      { name: "Home", path: "/field" },
+      {
+        name: "Open Deal Visits",
+        path: "/field/open-visits",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
+      {
+        name: "Today's Visits",
+        path: "/field/site-visits/today",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
+      {
+        name: "Site Visits",
+        path: "/crm/site-visits",
+        anyPermissions: [
+          "site_visits.view",
+          "site_visits.execute",
+          "field_installation.view",
+          "field_installation.log",
+        ],
+      },
+      {
+        name: "Installation Jobs",
+        path: "/field-installation/jobs",
+        permission: "field_installation.view",
+      },
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/field-installation/jobs" },
-        { name: "Reports", path: "/analytics" },
+        { name: "Home", path: "/field" },
+        {
+          name: "Open Deal Visits",
+          path: "/field/open-visits",
+          anyPermissions: ["site_visits.execute", "field_installation.log"],
+        },
+        {
+          name: "Today's Visits",
+          path: "/field/site-visits/today",
+          anyPermissions: ["site_visits.execute", "field_installation.log"],
+        },
       ],
       groups: [
         {
-          label: "Field Installation",
+          label: "Measurements",
+          icon: ClipboardList,
+          items: [
+            {
+              name: "Open Deal Visits",
+              path: "/field/open-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today's Visits",
+              path: "/field/site-visits/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "All Site Visits",
+              path: "/crm/site-visits",
+              anyPermissions: [
+                "site_visits.view",
+                "site_visits.execute",
+                "field_installation.view",
+                "field_installation.log",
+              ],
+            },
+          ],
+        },
+        {
+          label: "Installation",
           icon: Wrench,
           items: [
-            { name: "Jobs", path: "/field-installation/jobs", permission: "field_installation.view" },
-            { name: "Schedule", path: "/production/schedule", permission: "production.view" },
-            { name: "Orders", path: "/production/orders", permission: "production.view" },
-            { name: "Cutting", path: "/production/cutting", permission: "production.view" },
-            { name: "Assembly", path: "/production/assembly", permission: "production.view" },
+            {
+              name: "Jobs",
+              path: "/field-installation/jobs",
+              permission: "field_installation.view",
+            },
           ],
         },
       ],
@@ -469,7 +536,21 @@ export type WorkspaceApp = {
   badge?: { label: string; className: string };
   /** Spatie permission required to show this app tile */
   permission?: string;
+  /** Show when the user has any of these permissions (OR). Overrides `permission` when set. */
+  anyPermissions?: string[];
 };
+
+/** Routes that use the Field department sidebar (measurements, installation). */
+const FIELD_MODULE_PATH_PREFIXES = [
+  "/field",
+  "/field-installation",
+] as const;
+
+export function isFieldModulePath(pathname: string): boolean {
+  return FIELD_MODULE_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 export const workspaceApps: WorkspaceApp[] = [
   {
@@ -481,12 +562,16 @@ export const workspaceApps: WorkspaceApp[] = [
     permission: "leads.view",
   },
   {
-    id: "field-day",
-    name: "Field Day",
-    href: "/crm/field-day",
+    id: "field",
+    name: "Field",
+    href: "/field",
     icon: MapPin,
-    iconClassName: "bg-green-100 text-green-600",
-    permission: "field_day.view",
+    iconClassName: "bg-green-100 text-green-700",
+    anyPermissions: [
+      "site_visits.view",
+      "site_visits.execute",
+      "field_installation.view",
+    ],
   },
   {
     id: "project-management",
@@ -499,9 +584,10 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "estimations",
     name: "Estimations",
-    href: "/projects",
+    href: "/projects/design",
     icon: Calculator,
     iconClassName: "bg-yellow-100 text-yellow-600",
+    permission: "projects.view",
   },
   {
     id: "warehouse",
@@ -537,9 +623,10 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "quotes",
     name: "Quotes",
-    href: "/crm/deals",
+    href: "/projects/quotations",
     icon: FileText,
     iconClassName: "bg-pink-100 text-pink-600",
+    permission: "quotations.view",
   },
   {
     id: "offcuts",
@@ -581,14 +668,6 @@ export const workspaceApps: WorkspaceApp[] = [
     icon: Truck,
     iconClassName: "bg-indigo-100 text-indigo-600",
     badge: { label: "2 Today", className: "text-indigo-600" },
-  },
-  {
-    id: "installation",
-    name: "Field Installation",
-    href: "/field-installation/jobs",
-    icon: Wrench,
-    iconClassName: "bg-blue-100 text-blue-700",
-    permission: "field_installation.view",
   },
   {
     id: "finance",
@@ -636,10 +715,21 @@ function hasNavPermission(
   permission: string | undefined,
   permissions: string[],
   roles: string[] = [],
+  anyPermissions?: string[],
 ): boolean {
-  if (!permission) return true;
   if (roles.includes("super_admin")) return true;
   if (permissions.includes("*")) return true;
+  if (
+    roles.includes("field_officer") &&
+    (permission === "site_visits.execute" ||
+      anyPermissions?.includes("site_visits.execute"))
+  ) {
+    return true;
+  }
+  if (anyPermissions?.length) {
+    return anyPermissions.some((p) => permissions.includes(p));
+  }
+  if (!permission) return true;
   return permissions.includes(permission);
 }
 
@@ -649,7 +739,12 @@ export function filterSubModulesByPermissions(
   roles: string[] = [],
 ): SubModule[] {
   return items.filter((item) =>
-    hasNavPermission(item.permission, permissions, roles),
+    hasNavPermission(
+      item.permission,
+      permissions,
+      roles,
+      item.anyPermissions,
+    ),
   );
 }
 
@@ -692,7 +787,12 @@ export function filterAppsByPermissions(
   roles: string[] = []
 ): WorkspaceApp[] {
   return apps.filter((app) =>
-    hasNavPermission(app.permission, permissions, roles),
+    hasNavPermission(
+      app.permission,
+      permissions,
+      roles,
+      app.anyPermissions,
+    ),
   );
 }
 
@@ -724,7 +824,8 @@ function isProjectsModulePath(pathname: string): boolean {
 const SLUG_TO_DEPARTMENT_ID: Record<string, string> = {
   sales_marketing: "crm",
   production: "production",
-  field_installation: "field_installation",
+  field: "field",
+  field_installation: "field",
   warehouse: "warehouse",
   procurement: "procurement",
   quality_control: "qc",
@@ -743,8 +844,13 @@ export function getDepartmentNavForSlug(slug: string): Department | null {
 }
 
 export function getPrimaryDepartmentNav(
-  authDepartments: Array<{ slug: string; is_primary: boolean }>
+  authDepartments: Array<{ slug: string; is_primary: boolean }>,
+  roles: string[] = [],
 ): Department | null {
+  if (isFieldModuleRole(roles)) {
+    return departments.find((department) => department.id === "field") ?? null;
+  }
+
   if (!authDepartments.length) return null;
   const primary =
     authDepartments.find((department) => department.is_primary) ??
@@ -765,6 +871,10 @@ export function isWorkspaceSettingsPath(pathname: string): boolean {
 export function getActiveDepartment(pathname: string): Department | null {
   if (isProjectsModulePath(pathname)) {
     return departments.find((department) => department.id === "projects") ?? null;
+  }
+
+  if (isFieldModulePath(pathname)) {
+    return departments.find((department) => department.id === "field") ?? null;
   }
 
   if (

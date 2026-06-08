@@ -35,11 +35,13 @@ import {
 } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/auth-context";
-import { canAccessWorkspaceHub, isWorkspaceHubPath } from "@/lib/auth/redirect";
+import { canAccessWorkspaceHub, isFieldModuleRole, isWorkspaceHubPath } from "@/lib/auth/redirect";
 import {
+  departments,
   getActiveDepartment,
   getPrimaryDepartmentNav,
   filterDepartmentNav,
+  isFieldModulePath,
   isDepartmentNavItemActive,
   isWorkspaceNavActive,
   isWorkspaceSettingsPath,
@@ -342,7 +344,11 @@ export function AppSidebar() {
   const canWorkspace = canAccessWorkspaceHub(roles);
   const isSuperAdmin = roles.includes("super_admin");
   const activeDepartment = getActiveDepartment(pathname);
-  const primaryDepartment = getPrimaryDepartmentNav(departments);
+  const primaryDepartment = getPrimaryDepartmentNav(departments, roles);
+  const fieldDepartment =
+    isFieldModuleRole(roles)
+      ? departments.find((department) => department.id === "field") ?? null
+      : null;
 
   const filterDepartment = (
     department: NonNullable<ReturnType<typeof getActiveDepartment>>,
@@ -351,9 +357,12 @@ export function AppSidebar() {
   const showWorkspaceSidebar =
     (isWorkspaceHubPath(pathname) && canWorkspace) ||
     (isWorkspaceSettingsPath(pathname) && canWorkspace);
+  const fieldSidebarFallback =
+    fieldDepartment && isFieldModulePath(pathname) ? fieldDepartment : null;
 
   const sidebarDepartmentSource =
     activeDepartment ??
+    fieldSidebarFallback ??
     (isWorkspaceSettingsPath(pathname) && !canWorkspace
       ? primaryDepartment
       : null) ??

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,12 +14,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PermissionGate } from "@/components/auth/permission-gate";
-import { fetchActivities } from "@/lib/api/crm/activities";
-import { fetchFieldDays } from "@/lib/api/crm/field-day";
-import { fetchLeads } from "@/lib/api/crm/leads";
-import { fetchSiteVisits } from "@/lib/api/crm/site-visits";
 import { apiLeadToListRow } from "@/lib/crm-lead-mapper";
-import type { ApiActivity, ApiFieldDay } from "@/lib/api/crm/types";
+import type { CrmHomeSummary } from "@/lib/api/crm/home";
 
 function TableCard({
   title,
@@ -62,37 +58,16 @@ function EmptyRow({ cols }: { cols: number }) {
   );
 }
 
-export function CrmHomeTables() {
-  const [tasks, setTasks] = useState<ApiActivity[]>([]);
-  const [visits, setVisits] = useState<
-    Awaited<ReturnType<typeof fetchSiteVisits>>["data"]
-  >([]);
-  const [recentLeads, setRecentLeads] = useState<
-    ReturnType<typeof apiLeadToListRow>[]
-  >([]);
-  const [fieldDaysToday, setFieldDaysToday] = useState<ApiFieldDay[]>([]);
-
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    Promise.all([
-      fetchActivities({ status: "open", per_page: 5 }),
-      fetchSiteVisits({ per_page: 5 }),
-      fetchLeads({ per_page: 10 }),
-      fetchFieldDays({ field_date: today, per_page: 10 }).catch(() => ({
-        data: [] as ApiFieldDay[],
-      })),
-    ])
-      .then(([activitiesRes, visitsRes, leadsRes, fieldDaysRes]) => {
-        setTasks(activitiesRes.data ?? []);
-        setVisits(visitsRes.data ?? []);
-        setRecentLeads((leadsRes.data ?? []).map(apiLeadToListRow));
-        setFieldDaysToday(fieldDaysRes.data ?? []);
-      })
-      .catch(() => {});
-  }, []);
+export function CrmHomeTables({ summary }: { summary: CrmHomeSummary | null }) {
+  const tasks = summary?.open_tasks ?? [];
+  const visits = summary?.upcoming_visits ?? [];
+  const recentLeads = useMemo(
+    () => (summary?.recent_leads ?? []).map(apiLeadToListRow),
+    [summary?.recent_leads],
+  );
+  const fieldDaysToday = summary?.field_days_today ?? [];
 
   const todaysLeads = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
     return recentLeads.filter((l) => l.statusKey === "new").slice(0, 5);
   }, [recentLeads]);
 

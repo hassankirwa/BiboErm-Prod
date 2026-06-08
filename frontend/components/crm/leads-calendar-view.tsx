@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { LeadViewMode } from "@/lib/leads-list-data";
 import {
@@ -36,7 +36,11 @@ import {
   eventTypeStyles,
   type LeadCalendarEvent,
 } from "@/lib/leads-calendar-data";
-import { apiCardsToCalendarEvents } from "@/lib/crm-lead-mapper";
+import {
+  apiCardsToCalendarEvents,
+  crmCalendarEventsToLeadEvents,
+} from "@/lib/crm-lead-mapper";
+import { fetchCrmCalendarEvents } from "@/lib/api/crm/calendar";
 import type { LeadKanbanCard } from "@/lib/leads-kanban-data";
 
 const weekOpts = { weekStartsOn: 1 as const };
@@ -63,9 +67,15 @@ function CalendarEventChip({
   const tone = getDueDateTone(parseEventDate(event.date));
   const styles = eventTypeStyles[event.type];
 
+  const href =
+    event.href ??
+    (event.leadId
+      ? `/crm/leads/${event.leadId}?view=${returnView}`
+      : `/crm/leads?view=${returnView}`);
+
   return (
     <Link
-      href={`/crm/leads/${event.leadId}?view=${returnView}`}
+      href={href}
       className={cn(
         "block rounded border px-1.5 py-1 text-left transition-colors hover:opacity-90",
         styles.bg,
@@ -106,12 +116,62 @@ export function LeadsCalendarView({
 }) {
   const [viewMode, setViewMode] = useState<CalendarViewMode>("month");
   const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [apiEvents, setApiEvents] = useState<LeadCalendarEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
-  const events = useMemo(
+  const range = useMemo(() => {
+    if (viewMode === "month") {
+      const monthStart = startOfMonth(currentDate);
+      const monthEnd = endOfMonth(currentDate);
+      const gridStart = startOfWeek(monthStart, weekOpts);
+      const gridEnd = endOfWeek(monthEnd, weekOpts);
+      return { from: format(gridStart, "yyyy-MM-dd"), to: format(gridEnd, "yyyy-MM-dd") };
+    }
+    if (viewMode === "week") {
+      const start = startOfWeek(currentDate, weekOpts);
+      const end = endOfWeek(currentDate, weekOpts);
+      return { from: format(start, "yyyy-MM-dd"), to: format(end, "yyyy-MM-dd") };
+    }
+    return {
+      from: format(currentDate, "yyyy-MM-dd"),
+      to: format(currentDate, "yyyy-MM-dd"),
+    };
+  }, [viewMode, currentDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingEvents(true);
+    fetchCrmCalendarEvents(range)
+      .then((res) => {
+        if (!cancelled) {
+          setApiEvents(crmCalendarEventsToLeadEvents(res.data ?? []));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setApiEvents([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingEvents(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [range.from, range.to]);
+
+  const followUpEvents = useMemo(
     () => (cards ? apiCardsToCalendarEvents(cards) : []),
     [cards],
   );
-  const showEmptyHint = events.length === 0;
+
+  const events = useMemo(() => {
+    const merged = new Map<string, LeadCalendarEvent>();
+    for (const event of [...apiEvents, ...followUpEvents]) {
+      merged.set(event.id, event);
+    }
+    return Array.from(merged.values());
+  }, [apiEvents, followUpEvents]);
+
+  const showEmptyHint = !loadingEvents && events.length === 0;
 
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
