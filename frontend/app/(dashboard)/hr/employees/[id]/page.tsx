@@ -80,6 +80,9 @@ function EmployeeDetailContent() {
       : undefined,
     work_location: form.work_location || undefined,
     salary_grade: form.salary_grade || undefined,
+    monthly_gross_salary: form.monthly_gross_salary
+      ? Number(form.monthly_gross_salary)
+      : undefined,
     contract_type: form.contract_type ? form.contract_type : undefined,
     contract_end_date: form.contract_end_date || undefined,
     hr_notes: form.hr_notes || undefined,

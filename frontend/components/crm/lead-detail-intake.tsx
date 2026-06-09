@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CrmDetailField } from "@/components/crm/crm-record-detail-shell";
 import { useMediaImageSrc } from "@/components/media/media-image";
 import { formatKesFull } from "@/lib/leads-kanban-data";
@@ -11,6 +12,8 @@ import {
 } from "@/lib/lead-form-config";
 import { formatDisplayDate } from "@/lib/activity-due-date";
 import type { ApiLeadDetail, CrmLookupItem } from "@/lib/api/crm/types";
+import { contactDisplayName } from "@/lib/api/crm/contacts";
+import { resolvePrimaryLinkedContact } from "@/lib/crm/lead-contact-utils";
 import { cn } from "@/lib/utils";
 
 function formatSlugLabel(
@@ -113,6 +116,7 @@ export function LeadDetailIntake({
   lead: ApiLeadDetail;
   productInterestLookups?: CrmLookupItem[];
 }) {
+  const linkedContact = resolvePrimaryLinkedContact(lead);
   const ownerName =
     lead.lead_owner?.name ?? lead.assigned_sales_user?.name ?? null;
   const fieldOfficerName = lead.assigned_field_officer?.name ?? null;
@@ -153,29 +157,68 @@ export function LeadDetailIntake({
 
       <DetailSection
         title="Contact"
-        description="Optional person details captured at intake"
+        description={
+          linkedContact
+            ? "Linked CRM contact and intake fields"
+            : "Optional person details captured at intake"
+        }
       >
-        <CrmDetailField label="Contact person" value={lead.contact_person_name} />
+        {linkedContact ? (
+          <div className="sm:col-span-2 xl:col-span-3">
+            <Link
+              href={`/crm/contacts/${linkedContact.id}`}
+              className="block rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm hover:bg-muted/40"
+            >
+              <p className="font-medium text-[#1e3a5f]">
+                {contactDisplayName(linkedContact)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {[linkedContact.phone, linkedContact.email]
+                  .filter(Boolean)
+                  .join(" · ") || "View contact record"}
+              </p>
+            </Link>
+          </div>
+        ) : null}
+        <CrmDetailField
+          label="Contact person"
+          value={lead.contact_person_name ?? linkedContact?.name}
+        />
         <CrmDetailField
           label="Phone"
-          value={lead.phone}
-          href={lead.phone ? `tel:${lead.phone.replace(/\s/g, "")}` : undefined}
+          value={lead.phone ?? linkedContact?.phone}
+          href={
+            (lead.phone ?? linkedContact?.phone)
+              ? `tel:${(lead.phone ?? linkedContact?.phone)!.replace(/\s/g, "")}`
+              : undefined
+          }
         />
         <CrmDetailField
           label="WhatsApp"
-          value={lead.whatsapp}
-          href={lead.whatsapp ? `tel:${lead.whatsapp.replace(/\s/g, "")}` : undefined}
+          value={lead.whatsapp ?? linkedContact?.whatsapp}
+          href={
+            (lead.whatsapp ?? linkedContact?.whatsapp)
+              ? `tel:${(lead.whatsapp ?? linkedContact?.whatsapp)!.replace(/\s/g, "")}`
+              : undefined
+          }
         />
         <CrmDetailField
           label="Email"
-          value={lead.email}
-          href={lead.email ? `mailto:${lead.email}` : undefined}
+          value={lead.email ?? linkedContact?.email}
+          href={
+            (lead.email ?? linkedContact?.email)
+              ? `mailto:${lead.email ?? linkedContact?.email}`
+              : undefined
+          }
         />
-        <CrmDetailField label="Job title" value={lead.job_title} />
+        <CrmDetailField
+          label="Job title"
+          value={lead.job_title ?? linkedContact?.job_title}
+        />
         <CrmDetailField
           label="Preferred contact method"
           value={formatSlugLabel(
-            lead.preferred_contact_method,
+            lead.preferred_contact_method ?? linkedContact?.preferred_contact_method,
             preferredContactMethodOptions,
           )}
         />

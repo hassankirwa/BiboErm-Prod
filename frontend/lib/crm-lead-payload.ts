@@ -47,9 +47,7 @@ export function leadFormToCreatePayload(
     priority: values.priority || tagToPriority(values.tag),
     lead_owner_id: values.ownerId,
     assigned_sales_user_id: values.ownerId,
-    assigned_field_officer_id: values.needSiteVisit
-      ? values.assignedFieldOfficerId
-      : null,
+    assigned_field_officer_id: null,
     account_name: values.company.trim() || null,
     site_name: values.siteName.trim() || values.title.trim() || null,
     site_address: siteAddress,
@@ -72,7 +70,7 @@ export function leadFormToCreatePayload(
     estimated_budget: values.estimatedBudget || undefined,
     urgency: values.urgency || null,
     expected_timeline: values.expectedTimeline.trim() || null,
-    need_site_visit: values.needSiteVisit,
+    need_site_visit: false,
     next_action: values.nextAction.trim() || null,
     next_follow_up_at: values.nextActionDate || undefined,
     notes: values.notes.trim() || null,
@@ -100,7 +98,13 @@ export function leadFormToUpdatePayload(
   values: LeadFormValues,
   lookups?: { counties?: CrmLookupItem[] },
 ): Partial<CreateLeadPayload> {
-  return leadFormToCreatePayload(values, lookups);
+  return {
+    ...leadFormToCreatePayload(values, lookups),
+    need_site_visit: values.needSiteVisit,
+    assigned_field_officer_id: values.needSiteVisit
+      ? values.assignedFieldOfficerId
+      : null,
+  };
 }
 
 function tagToPriority(tag: string): string | undefined {

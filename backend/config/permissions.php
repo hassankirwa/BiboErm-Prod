@@ -45,6 +45,7 @@ return [
             'qc.view', 'qc.manage',
             'finance.view', 'finance.manage',
             'hr.view',
+            'payroll.view',
         ],
 
         'sales_rep' => [
@@ -60,6 +61,7 @@ return [
             'activities.view', 'activities.create', 'activities.complete',
             'field_day.view', 'field_day.create',
             'projects.view', 'projects.create', 'projects.advance_stage_sales',
+            'payroll.view',
         ],
 
         'field_officer' => [
@@ -67,6 +69,7 @@ return [
             'leads.view', 'leads.create',
             'site_visits.view', 'site_visits.execute',
             'activities.view', 'activities.create', 'activities.complete',
+            'payroll.view',
         ],
 
         'project_manager' => [
@@ -86,20 +89,25 @@ return [
             'field_installation.view',
             'qc.view',
             'finance.view',
+            'payroll.view',
         ],
 
         'installation_lead' => [
             'field_installation.view', 'field_installation.manage', 'field_installation.log',
             'field_installation.deliver', 'field_installation.tools',
+            'site_visits.view', 'site_visits.execute',
             'warehouse.tools.view', 'warehouse.tools.issue',
             'projects.view',
+            'payroll.view',
         ],
 
         'field_installation_engineer' => [
             'field_installation.view', 'field_installation.log',
             'field_installation.deliver', 'field_installation.tools',
+            'site_visits.view', 'site_visits.execute',
             'warehouse.tools.view', 'warehouse.tools.issue',
             'projects.view',
+            'payroll.view',
         ],
 
         'production_manager' => [
@@ -112,6 +120,7 @@ return [
             'production.view', 'production.manage', 'production.schedule.manage',
             'site_visits.view', 'site_visits.execute',
             'qc.view',
+            'payroll.view',
         ],
 
         'warehouse_manager_accessories' => [
@@ -127,6 +136,7 @@ return [
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view',
             'projects.view', 'projects.material_status.view', 'projects.advance_stage_warehouse',
+            'payroll.view',
         ],
 
         'warehouse_manager_aluminium' => [
@@ -142,6 +152,7 @@ return [
             'warehouse.stocktake.view', 'warehouse.stocktake.run',
             'procurement.view',
             'projects.view', 'projects.material_status.view', 'projects.advance_stage_warehouse',
+            'payroll.view',
         ],
 
         'procurement_officer' => [
@@ -151,12 +162,14 @@ return [
             'warehouse.stock.view',
             'warehouse.locations.view',
             'projects.view', 'projects.material_status.view',
+            'payroll.view',
         ],
 
         'qc_inspector' => [
             'qc.view', 'qc.manage',
             'production.view',
             'projects.view', 'projects.material_status.view',
+            'payroll.view',
         ],
 
         'hr_manager' => [
@@ -164,6 +177,8 @@ return [
             'employees.view', 'employees.update_hr_details', 'employees.approve',
             'users.invite', 'users.view', 'users.update_identity',
             'profile_changes.review',
+            'leave.review', 'hr_documents.manage',
+            'payroll.view', 'payroll.manage',
         ],
 
         'finance_officer' => [
@@ -171,6 +186,7 @@ return [
             'procurement.view',
             'projects.view', 'projects.material_status.view',
             'analytics.view',
+            'payroll.view', 'payroll.approve',
         ],
 
         'it_admin' => [
@@ -188,6 +204,7 @@ return [
             'hr.view',
             'analytics.view',
             'crm.view',
+            'payroll.view',
         ],
 
         'reception' => [
@@ -195,6 +212,7 @@ return [
             'leads.view', 'leads.create', 'leads.update',
             'contacts.view', 'contacts.create',
             'accounts.view',
+            'payroll.view',
         ],
     ],
 

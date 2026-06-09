@@ -16,10 +16,17 @@ import {
   hasSiteAssessmentOperationalData,
   type ProjectDetail,
 } from "@/lib/api/projects";
+import {
+  projectPipelinePath,
+  projectSiteAssessmentPath,
+  projectTabPath,
+  type ProjectViewMode,
+} from "@/lib/projects/paths";
 import { toast } from "sonner";
 
 type ProjectDetailActionBarProps = {
   project: ProjectDetail;
+  mode?: ProjectViewMode;
   onProjectUpdated: (project: ProjectDetail) => void;
 };
 
@@ -34,13 +41,15 @@ const ADVANCE_PERMISSIONS = [
 
 export function ProjectDetailActionBar({
   project,
+  mode = "projects",
   onProjectUpdated,
 }: ProjectDetailActionBarProps) {
+  const isCrmMode = mode === "crm";
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const { permissions, canAny } = usePermissions();
-  const siteAssessmentHref = `/projects/${project.id}/site-assessment`;
-  const designsHref = `/projects/${project.id}?tab=designs`;
-  const bomHref = `/projects/${project.id}?tab=bom`;
+  const siteAssessmentHref = projectSiteAssessmentPath(project.id, mode);
+  const designsHref = projectTabPath(project.id, "designs", mode);
+  const bomHref = projectTabPath(project.id, "bom", mode);
 
   const nextStages = useMemo(
     () => getManualNextStages(project.stage, permissions),
@@ -131,16 +140,19 @@ export function ProjectDetailActionBar({
               ) : (
                 <p className="text-muted-foreground italic">No project manager assigned</p>
               )}
-              <Link
-                href="/projects/pipeline"
-                className="inline-flex items-center gap-1.5 text-primary hover:underline"
-              >
-                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                View in pipeline
-              </Link>
+              {!isCrmMode ? (
+                <Link
+                  href={projectPipelinePath(mode)}
+                  className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  View in pipeline
+                </Link>
+              ) : null}
             </div>
           </div>
 
+          {!isCrmMode ? (
           <div className="flex shrink-0 flex-col gap-2 sm:items-end">
             <p className="text-xs font-medium text-muted-foreground sm:text-right">
               Stage actions
@@ -172,10 +184,11 @@ export function ProjectDetailActionBar({
               </p>
             ) : null}
           </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {canAdvance && nextStages.length > 0 ? (
+      {!isCrmMode && canAdvance && nextStages.length > 0 ? (
         <AdvanceProjectStageDialog
           project={project}
           open={advanceOpen}

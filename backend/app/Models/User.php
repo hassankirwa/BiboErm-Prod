@@ -133,6 +133,30 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<LeaveRequest, User>
+     */
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    /**
+     * @return HasMany<HrDocument, User>
+     */
+    public function hrDocuments(): HasMany
+    {
+        return $this->hasMany(HrDocument::class);
+    }
+
+    /**
+     * @return HasMany<PayrollEntry, User>
+     */
+    public function payrollEntries(): HasMany
+    {
+        return $this->hasMany(PayrollEntry::class);
+    }
+
+    /**
      * @param  string  $token
      */
     public function sendPasswordResetNotification($token): void

@@ -212,8 +212,13 @@ export default function SiteVisitsPage() {
         subtitle="Schedule and track field measurement visits"
         actions={
           <div className="flex gap-2">
+            <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/crm/site-visits/my-visits">My Visits</Link>
+              </Button>
+            </PermissionGate>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/crm/site-visits/today">Field Today</Link>
+              <Link href="/crm/site-visits/today">Today</Link>
             </Button>
             <Button size="sm" variant="outline" asChild>
               <Link href="/crm/field-day">Field Day</Link>

@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Policies\Concerns\ChecksCrmPermissions;
+use App\Support\Crm\SiteVisitAssigneeRoles;
 
 class SiteVisitPolicy
 {
@@ -61,8 +62,13 @@ class SiteVisitPolicy
 
     public function execute(User $user, SiteVisit $siteVisit): bool
     {
-        return ($user->can('site_visits.execute') || $user->can('field_installation.log'))
-            && (int) $siteVisit->assigned_field_officer_id === $user->id;
+        if ((int) $siteVisit->assigned_field_officer_id !== $user->id) {
+            return false;
+        }
+
+        return $user->can('site_visits.execute')
+            || $user->can('field_installation.log')
+            || ($user->can('site_visits.view') && SiteVisitAssigneeRoles::userIsEligible($user));
     }
 
     public function approve(User $user, SiteVisit $siteVisit): bool

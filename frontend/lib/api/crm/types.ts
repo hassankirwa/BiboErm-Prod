@@ -258,6 +258,9 @@ export type ApiLead = {
   building_construction_stage_id?: number | null;
   building_construction_stage?: CrmLookupItem | null;
   lead_source?: CrmLookupItem | null;
+  source_contact?: ApiContact | null;
+  linked_contacts?: ApiContact[];
+  converted_contact?: ApiContact | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -300,6 +303,7 @@ export type ApiLeadDetail = ApiLead & {
   converted_deal_id: number | null;
   converted_contact?: ApiContact | null;
   source_contact?: ApiContact | null;
+  linked_contacts?: ApiContact[];
   converted_account?: ApiAccount | null;
   converted_deal?: ApiDeal | null;
   latest_quotation?: ApiQuotationSummary | null;

@@ -110,13 +110,26 @@ export function resolveActiveUserRedirect(
   return departmentHomeRoute(getPrimaryDepartment(departments), roles);
 }
 
-/** App launcher hub — settings/help are excluded and stay available to all users. */
+/** Self-service pages under /workspace available to all active users. */
+export function isWorkspaceSelfServicePath(pathname: string): boolean {
+  return (
+    pathname === "/workspace/leave" ||
+    pathname.startsWith("/workspace/leave/") ||
+    pathname === "/workspace/documents" ||
+    pathname.startsWith("/workspace/documents/") ||
+    pathname === "/workspace/payslips" ||
+    pathname.startsWith("/workspace/payslips/")
+  );
+}
+
+/** App launcher hub — settings, help, and self-service HR pages stay available to all users. */
 export function isWorkspaceHubPath(pathname: string): boolean {
   if (
     pathname === "/workspace/settings" ||
     pathname.startsWith("/workspace/settings/") ||
     pathname === "/workspace/help" ||
-    pathname.startsWith("/workspace/help/")
+    pathname.startsWith("/workspace/help/") ||
+    isWorkspaceSelfServicePath(pathname)
   ) {
     return false;
   }

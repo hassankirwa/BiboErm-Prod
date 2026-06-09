@@ -94,12 +94,17 @@ export default function SiteVisitsTodayPage() {
           day: "numeric",
         })}
         actions={
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/crm/site-visits">
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              All Visits
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/crm/site-visits/my-visits">My Visits</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/crm/site-visits">
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                All Visits
+              </Link>
+            </Button>
+          </div>
         }
       />
 
@@ -161,7 +166,7 @@ export default function SiteVisitsTodayPage() {
                     </p>
                   )}
 
-                  <PermissionGate permission="site_visits.execute">
+                  <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                     <div className="flex flex-col gap-2 sm:flex-row">
                       {showStart && (
                         <Button

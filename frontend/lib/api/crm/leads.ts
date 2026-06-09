@@ -74,6 +74,13 @@ export type ConvertLeadPayload = {
   estimated_value?: number;
   expected_close_date?: string;
   account_id?: number;
+  quotation_id?: number;
+  payment_reference?: string;
+  payment_date?: string;
+  amount_paid?: number;
+  payment_method?: string;
+  payment_status?: string;
+  notes?: string;
 };
 
 export type ConvertLeadResult = {
@@ -82,6 +89,11 @@ export type ConvertLeadResult = {
     account: ApiAccount | null;
     contact: ApiContact | null;
     deal: ApiDeal | null;
+    payment?: {
+      id: number;
+      payment_reference: string;
+      amount_paid: string | number;
+    } | null;
   };
 };
 
@@ -158,9 +170,13 @@ export async function fetchLeads(params?: {
   };
 }
 
-export async function fetchLead(id: number): Promise<ApiLeadDetail> {
+export async function fetchLead(
+  id: number,
+  options?: { skipCache?: boolean },
+): Promise<ApiLeadDetail> {
   const res = await apiFetch<ApiLeadDetail | { data: ApiLeadDetail }>(
     `/api/v1/crm/leads/${id}`,
+    { skipCache: options?.skipCache },
   );
   return normalizeLead(unwrapResource(res));
 }

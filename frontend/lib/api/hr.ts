@@ -32,6 +32,7 @@ export type EmployeeProfile = {
   employment_type: EmploymentType | null;
   start_date: string | null;
   salary_grade: string | null;
+  monthly_gross_salary: number | null;
   reporting_manager_id: number | null;
   work_location: string | null;
   contract_type: ContractType | null;
@@ -118,6 +119,7 @@ export type HrUpsertPayload = {
   employment_type?: EmploymentType;
   start_date?: string;
   salary_grade?: string;
+  monthly_gross_salary?: number;
   reporting_manager_id?: number;
   work_location?: string;
   contract_type?: ContractType;

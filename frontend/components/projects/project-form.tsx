@@ -29,6 +29,7 @@ import {
   resolvePrimaryContactId,
 } from "@/lib/crm/project-form-linking";
 import { createProject, type CreateProjectPayload } from "@/lib/api/projects";
+import { projectDetailPath, projectPipelinePath, type ProjectViewMode } from "@/lib/projects/paths";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ type ProjectFormProps = {
   defaultDealId?: number | null;
   defaultDealLabel?: string | null;
   redirectTo?: "detail" | "pipeline";
+  mode?: ProjectViewMode;
 };
 
 function mapAccountTypeToProjectType(accountType: string | null | undefined): string {
@@ -88,6 +90,7 @@ export function ProjectForm({
   defaultDealId = null,
   defaultDealLabel = null,
   redirectTo = "detail",
+  mode = "projects",
 }: ProjectFormProps) {
   const router = useRouter();
   const [prefillLoading, setPrefillLoading] = useState(
@@ -414,9 +417,9 @@ export function ProjectForm({
       toast.success("Project created.");
 
       if (redirectTo === "pipeline") {
-        router.push("/projects/pipeline");
+        router.push(projectPipelinePath(mode));
       } else {
-        router.push(`/projects/${response.data.id}`);
+        router.push(projectDetailPath(response.data.id, mode));
       }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to create project.");

@@ -50,6 +50,7 @@ class EmployeeProfile extends Model
         'employment_type',
         'start_date',
         'salary_grade',
+        'monthly_gross_salary',
         'reporting_manager_id',
         'work_location',
         'contract_type',
@@ -62,6 +63,7 @@ class EmployeeProfile extends Model
         return [
             'start_date' => 'date',
             'contract_end_date' => 'date',
+            'monthly_gross_salary' => 'decimal:2',
         ];
     }
 

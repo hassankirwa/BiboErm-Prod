@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Crm\Contacts;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\ContactResource;
 use App\Models\Contact;
+use App\Models\Lead;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
@@ -64,6 +65,13 @@ class ContactController extends Controller
         $user = $request->user();
         $name = $validated['name'];
         $parts = preg_split('/\s+/', trim($name), 2) ?: [];
+
+        if (! empty($validated['source_lead_id']) && empty($validated['account_id'])) {
+            $lead = Lead::query()->find($validated['source_lead_id']);
+            if ($lead?->converted_account_id) {
+                $validated['account_id'] = $lead->converted_account_id;
+            }
+        }
 
         $contact = Contact::query()->create([
             ...$validated,

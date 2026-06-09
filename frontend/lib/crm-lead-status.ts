@@ -58,12 +58,69 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   account_created: "Account Created",
   not_reachable: "Not Reachable",
   unqualified: "Unqualified",
-  qualified: "Qualified",
-  site_visit_required: "Site Visit Required",
-  site_visit_scheduled: "Site Visit Scheduled",
-  measurements_captured: "Measurements Captured",
-  converted: "Converted",
+  qualified: "Qualified (legacy)",
+  site_visit_required: "Site Visit Required (legacy)",
+  site_visit_scheduled: "Site Visit Scheduled (legacy)",
+  measurements_captured: "Measurements Captured (legacy)",
+  converted: "Converted (legacy)",
 };
+
+/** v2 pipeline statuses shown in filters and primary UI */
+export const ACTIVE_LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "interested",
+  "account_created",
+  "not_reachable",
+  "unqualified",
+] as const;
+
+export const LEGACY_LEAD_STATUSES = [
+  "qualified",
+  "site_visit_required",
+  "site_visit_scheduled",
+  "measurements_captured",
+  "converted",
+] as const;
+
+export const LEAD_STATUS_BADGE_CLASS: Record<string, string> = {
+  new: "bg-blue-100 text-blue-800 border-blue-200",
+  contacted: "bg-sky-100 text-sky-800 border-sky-200",
+  interested: "bg-cyan-100 text-cyan-800 border-cyan-200",
+  account_created: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  not_reachable: "bg-slate-100 text-slate-700 border-slate-200",
+  unqualified: "bg-red-100 text-red-800 border-red-200",
+  qualified: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  site_visit_required: "bg-amber-100 text-amber-800 border-amber-200",
+  site_visit_scheduled: "bg-orange-100 text-orange-800 border-orange-200",
+  measurements_captured: "bg-amber-100 text-amber-900 border-amber-200",
+  converted: "bg-emerald-100 text-emerald-800 border-emerald-200",
+};
+
+export function getLeadStatusLabel(status: string | null | undefined): string {
+  const key = (status ?? "new").toLowerCase();
+  return LEAD_STATUS_LABELS[key] ?? key.replace(/_/g, " ");
+}
+
+export function getLeadStatusBadgeClass(status: string | null | undefined): string {
+  const key = (status ?? "new").toLowerCase();
+  return (
+    LEAD_STATUS_BADGE_CLASS[key] ??
+    "bg-muted text-muted-foreground border-border"
+  );
+}
+
+export function isLegacyLeadStatus(status: string | null | undefined): boolean {
+  const key = (status ?? "").toLowerCase();
+  return (LEGACY_LEAD_STATUSES as readonly string[]).includes(key);
+}
+
+/** True when API status differs from the kanban column's primary status (legacy records). */
+export function showLeadStatusOnKanbanCard(statusKey: string): boolean {
+  const status = statusKey.toLowerCase();
+  if (status === "account_created") return false;
+  return statusToKanbanStage(status) === "account_created" && isLegacyLeadStatus(status);
+}
 
 export function statusToKanbanStage(status: string | null | undefined): LeadKanbanStageId {
   const key = (status ?? "new").toLowerCase();
@@ -104,6 +161,58 @@ export function hasProvisionedAccount(status: string | null | undefined): boolea
   return ["account_created", "converted"].includes(normalized);
 }
 
+/** Manual account provisioning — only when interested and account not yet linked. */
+export function canProvisionAccountFromLead(
+  status: string | null | undefined,
+  hasLinkedAccount: boolean,
+): boolean {
+  if (hasLinkedAccount) return false;
+  const normalized = (status ?? "new").toLowerCase();
+  return normalized === "interested" || isLeadQualifiedForAccount(normalized);
+}
+
+const SENT_QUOTATION_STATUSES = new Set([
+  "sent",
+  "revision_requested",
+  "revised",
+  "accepted",
+]);
+
+export function hasApprovedSiteVisit(
+  siteVisits: { status?: string | null }[] | null | undefined,
+): boolean {
+  return (siteVisits ?? []).some(
+    (visit) => (visit.status ?? "").toLowerCase() === "approved",
+  );
+}
+
+export function hasQuotationSentToClient(
+  quotation: { status?: string | null } | null | undefined,
+): boolean {
+  if (!quotation?.status) return false;
+  return SENT_QUOTATION_STATUSES.has(quotation.status.toLowerCase());
+}
+
+export type CommercialConvertInput = {
+  hasLinkedAccount: boolean;
+  hasDeal: boolean;
+  depositMet: boolean;
+  hasApprovedSiteVisit: boolean;
+  hasSentQuotation: boolean;
+};
+
+/**
+ * Record deposit & create deal — only after approved site visit,
+ * project quotation exists, and quotation was sent to the client.
+ */
+export function canCommercialConvertLead(input: CommercialConvertInput): boolean {
+  if (!input.hasLinkedAccount) return false;
+  if (input.hasDeal && input.depositMet) return false;
+  if (!input.hasApprovedSiteVisit) return false;
+  if (!input.hasSentQuotation) return false;
+  return true;
+}
+
 export function canKanbanMove(
   currentStatus: string,
   targetStageId: LeadKanbanStageId,
@@ -112,6 +221,13 @@ export function canKanbanMove(
   const current = currentStatus.toLowerCase();
   if (current === targetStatus) return true;
   if (statusToKanbanStage(current) === targetStageId) return true;
+  // account_created is set automatically after interested + provisioning
+  if (
+    targetStatus === "account_created" &&
+    current !== "account_created"
+  ) {
+    return false;
+  }
   return isValidLeadStatusTransition(current, targetStatus);
 }
 

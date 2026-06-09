@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\Admin\AdminLookupController;
 use App\Http\Controllers\Admin\InviteUserController;
@@ -15,12 +15,10 @@ use App\Http\Controllers\Auth\RecoverEmailController;
 use App\Http\Controllers\Auth\RefreshSessionController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\Auth\TwoFactorLoginController;
-use App\Http\Controllers\Hr\HrDashboardController;
-use App\Http\Controllers\Hr\HrEmployeeController;
-use App\Http\Controllers\Hr\HrEmployeeIdentityController;
-use App\Http\Controllers\Hr\HrEmployeeLookupController;
-use App\Http\Controllers\Hr\HrEmployeeProfileController;
 use App\Http\Controllers\Hr\HrProfileChangeRequestController;
+use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\MyHrDocumentController;
+use App\Http\Controllers\MyPayslipController;
 use App\Http\Controllers\ProfileChangeRequestController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StoredFileController;
@@ -63,6 +61,18 @@ Route::prefix('v1')->group(function () {
         Route::post('profile/change-requests', [ProfileChangeRequestController::class, 'store'])
             ->middleware('device.trusted');
 
+        Route::get('leave-requests', [LeaveRequestController::class, 'index']);
+        Route::post('leave-requests', [LeaveRequestController::class, 'store'])
+            ->middleware('device.trusted');
+        Route::post('leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])
+            ->middleware('device.trusted');
+
+        Route::get('my/hr-documents', [MyHrDocumentController::class, 'index']);
+        Route::get('my/hr-documents/{hrDocument}/download', [MyHrDocumentController::class, 'download']);
+
+        Route::get('my/payslips', [MyPayslipController::class, 'index']);
+        Route::get('my/payslips/{payrollEntry}/download', [MyPayslipController::class, 'download']);
+
         Route::post('profile/two-factor/enable', [TwoFactorSettingsController::class, 'enable'])
             ->middleware('device.trusted');
 
@@ -103,29 +113,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'active', 'device.trusted'])
         ->prefix('hr')
         ->group(function () {
-            Route::middleware('permission:employees.view')->group(function () {
-                Route::get('dashboard/stats', [HrDashboardController::class, 'stats']);
-                Route::get('dashboard/pending-profile-changes', [HrDashboardController::class, 'pendingProfileChanges']);
-                Route::get('employees/suggested-number', [HrEmployeeLookupController::class, 'suggestedEmployeeNumber']);
-                Route::get('employees', [HrEmployeeController::class, 'index']);
-                Route::get('employees/{user}', [HrEmployeeController::class, 'show']);
-            });
-
-            Route::middleware('permission:employees.update_hr_details')
-                ->put('employees/{user}', [HrEmployeeProfileController::class, 'upsert']);
-
-            Route::middleware('permission:employees.approve')
-                ->post('employees/{user}/approve', [HrEmployeeProfileController::class, 'approve']);
-
-            Route::middleware('permission:users.update_identity')->group(function () {
-                Route::patch('employees/{user}/identity', [HrEmployeeIdentityController::class, 'update']);
-                Route::post('employees/{user}/reset-password', [HrEmployeeIdentityController::class, 'resetPassword']);
-            });
-
-            Route::middleware('permission:profile_changes.review')->group(function () {
-                Route::post('profile-change-requests/{profileChangeRequest}/approve', [HrProfileChangeRequestController::class, 'approve']);
-                Route::post('profile-change-requests/{profileChangeRequest}/reject', [HrProfileChangeRequestController::class, 'reject']);
-            });
+            require __DIR__.'/api/hr.php';
         });
 
     Route::middleware(['auth:sanctum', 'active'])

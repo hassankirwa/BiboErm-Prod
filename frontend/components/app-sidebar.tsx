@@ -9,8 +9,6 @@ import {
   Home,
   FileBarChart,
   PieChart,
-  Settings,
-  Headphones,
   LayoutGrid,
 } from "lucide-react";
 import {
@@ -36,6 +34,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/auth-context";
 import { canAccessWorkspaceHub, isFieldModuleRole, isWorkspaceHubPath } from "@/lib/auth/redirect";
+import { canPerformSiteVisitMeasurements } from "@/lib/crm/site-visit-paths";
 import {
   departments,
   getActiveDepartment,
@@ -46,7 +45,7 @@ import {
   isWorkspaceNavActive,
   isWorkspaceSettingsPath,
   workspaceNavItems,
-  workspaceFooterNavItems,
+  filterWorkspaceFooterNavItems,
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +126,8 @@ function SidebarCollapseButton() {
 }
 
 function WorkspaceContent({ pathname }: { pathname: string }) {
+  const footerItems = filterWorkspaceFooterNavItems();
+
   return (
     <>
       <SidebarContent className="flex flex-1 flex-col overflow-hidden px-0 py-0">
@@ -151,9 +152,9 @@ function WorkspaceContent({ pathname }: { pathname: string }) {
         <SidebarGroup className="shrink-0 p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1 px-3">
-              {workspaceFooterNavItems.map((item) => (
+              {footerItems.map((item) => (
                 <NavItem
-                  key={item.name}
+                  key={item.href}
                   href={item.href}
                   name={item.name}
                   icon={item.icon}
@@ -183,6 +184,7 @@ function DepartmentContent({
   pathname: string;
   showWorkspaceLink?: boolean;
 }) {
+  const footerItems = filterWorkspaceFooterNavItems();
   const nav = department.nav;
   const workspaceLink = showWorkspaceLink ? (
     <NavItem
@@ -314,18 +316,15 @@ function DepartmentContent({
         <SidebarGroup className="shrink-0 p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1 px-3">
-              <NavItem
-                href="/workspace/settings"
-                name="Settings"
-                icon={Settings}
-                isActive={pathname === "/workspace/settings"}
-              />
-              <NavItem
-                href="/workspace/help"
-                name="Help Center"
-                icon={Headphones}
-                isActive={pathname === "/workspace/help"}
-              />
+              {footerItems.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  name={item.name}
+                  icon={item.icon}
+                  isActive={isWorkspaceNavActive(pathname, item.href)}
+                />
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -345,10 +344,13 @@ export function AppSidebar() {
   const isSuperAdmin = roles.includes("super_admin");
   const activeDepartment = getActiveDepartment(pathname);
   const primaryDepartment = getPrimaryDepartmentNav(departments, roles);
-  const fieldDepartment =
-    isFieldModuleRole(roles)
-      ? departments.find((department) => department.id === "field") ?? null
-      : null;
+  const canUseFieldSidebar =
+    isFieldModuleRole(roles) ||
+    canPerformSiteVisitMeasurements(permissions, roles);
+
+  const fieldDepartment = canUseFieldSidebar
+    ? departments.find((department) => department.id === "field") ?? null
+    : null;
 
   const filterDepartment = (
     department: NonNullable<ReturnType<typeof getActiveDepartment>>,

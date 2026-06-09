@@ -48,6 +48,13 @@ class LeadResource extends JsonResource
             'assigned_sales_user' => new UserResource($this->whenLoaded('assignedSalesUser')),
             'assigned_field_officer' => new UserResource($this->whenLoaded('assignedFieldOfficer')),
             'assignee' => new UserResource($this->whenLoaded('assignee')),
+            'linked_contacts' => ContactResource::collection(
+                $this->when(
+                    $this->relationLoaded('sourceContacts')
+                        || $this->relationLoaded('convertedContact'),
+                    fn () => $this->resolveLinkedContacts(),
+                ),
+            ),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

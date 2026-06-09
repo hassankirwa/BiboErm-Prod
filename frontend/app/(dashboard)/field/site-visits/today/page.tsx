@@ -113,6 +113,7 @@ export default function FieldTodayVisitsPage() {
             <FieldOpenVisitCard
               key={visit.id}
               visit={visit}
+              workspace="field"
               actionLoading={actionLoading}
               onStartVisit={(id) => void handleStartVisit(id)}
             />

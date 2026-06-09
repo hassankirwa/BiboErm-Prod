@@ -4,20 +4,37 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fetchLead } from "@/lib/api/crm/leads";
-import type { ApiLeadDetail } from "@/lib/api/crm/types";
+import type { ApiActivity, ApiLeadDetail } from "@/lib/api/crm/types";
 import { Spinner } from "@/components/ui/spinner";
+import { ActivityDetailDialog } from "@/components/crm/activity-detail-dialog";
+
+type RelatedItem = {
+  id: string;
+  title: string;
+  meta?: string;
+  href?: string;
+  activity?: ApiActivity;
+};
 
 type RelatedSection = {
   id: string;
   label: string;
   count?: number;
-  items?: { id: string; title: string; meta?: string; href?: string }[];
+  items?: RelatedItem[];
   emptyLabel?: string;
 };
 
-function RelatedSectionBlock({ section }: { section: RelatedSection }) {
+function RelatedSectionBlock({
+  section,
+  onActivityClick,
+}: {
+  section: RelatedSection;
+  onActivityClick?: (activity: ApiActivity) => void;
+}) {
   const [open, setOpen] = useState(
-    section.id === "open-activities" || section.id === "notes",
+    section.id === "open-activities" ||
+      section.id === "notes" ||
+      (section.id === "connected" && (section.count ?? 0) > 0),
   );
   const hasItems = (section.items?.length ?? 0) > 0;
 
@@ -56,6 +73,17 @@ function RelatedSectionBlock({ section }: { section: RelatedSection }) {
                         <p className="text-muted-foreground">{item.meta}</p>
                       )}
                     </Link>
+                  ) : item.activity ? (
+                    <button
+                      type="button"
+                      onClick={() => onActivityClick?.(item.activity!)}
+                      className="block w-full rounded-md px-2 py-1.5 text-left text-xs hover:bg-[#ebf2ff]/50"
+                    >
+                      <p className="font-medium text-[#1e3a5f]">{item.title}</p>
+                      {item.meta && (
+                        <p className="text-muted-foreground">{item.meta}</p>
+                      )}
+                    </button>
                   ) : (
                     <div className="rounded-md px-2 py-1.5 text-left text-xs">
                       <p className="font-medium text-[#1e3a5f]">{item.title}</p>
@@ -79,12 +107,7 @@ function RelatedSectionBlock({ section }: { section: RelatedSection }) {
 }
 
 function buildSections(lead: ApiLeadDetail): RelatedSection[] {
-  const activities = (lead.activities ?? []) as Array<{
-    id: number;
-    subject: string;
-    status: string;
-    due_at?: string | null;
-  }>;
+  const activities = (lead.activities ?? []) as ApiActivity[];
   const openActivities = activities.filter((a) => a.status !== "completed");
   const closedActivities = activities.filter((a) => a.status === "completed");
   const attachments = (lead.attachments ?? []) as Array<{
@@ -94,20 +117,39 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
   }>;
 
   const connected: RelatedSection["items"] = [];
-  if (lead.converted_contact) {
+  const linkedContacts = lead.linked_contacts ?? [];
+  const seenContactIds = new Set<number>();
+
+  for (const contact of linkedContacts) {
+    if (seenContactIds.has(contact.id)) continue;
+    seenContactIds.add(contact.id);
     connected.push({
-      id: `contact-${lead.converted_contact.id}`,
-      title: lead.converted_contact.name ?? "Contact",
-      meta: "Contact",
-      href: `/crm/contacts/${lead.converted_contact.id}`,
+      id: `contact-${contact.id}`,
+      title: contact.name ?? "Contact",
+      meta:
+        contact.id === lead.converted_contact_id
+          ? "Contact"
+          : "Linked contact",
+      href: `/crm/contacts/${contact.id}`,
     });
-  } else if (lead.source_contact) {
-    connected.push({
-      id: `contact-${lead.source_contact.id}`,
-      title: lead.source_contact.name ?? "Contact",
-      meta: "Linked contact",
-      href: `/crm/contacts/${lead.source_contact.id}`,
-    });
+  }
+
+  if (connected.length === 0) {
+    if (lead.converted_contact) {
+      connected.push({
+        id: `contact-${lead.converted_contact.id}`,
+        title: lead.converted_contact.name ?? "Contact",
+        meta: "Contact",
+        href: `/crm/contacts/${lead.converted_contact.id}`,
+      });
+    } else if (lead.source_contact) {
+      connected.push({
+        id: `contact-${lead.source_contact.id}`,
+        title: lead.source_contact.name ?? "Contact",
+        meta: "Linked contact",
+        href: `/crm/contacts/${lead.source_contact.id}`,
+      });
+    }
   }
   if (lead.converted_account) {
     connected.push({
@@ -153,6 +195,7 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
         id: String(a.id),
         title: a.subject,
         meta: a.due_at ? `Due ${a.due_at.slice(0, 10)}` : undefined,
+        activity: a,
       })),
       emptyLabel: "No open activities",
     },
@@ -163,6 +206,7 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
       items: closedActivities.map((a) => ({
         id: String(a.id),
         title: a.subject,
+        activity: a,
       })),
       emptyLabel: "No completed activities",
     },
@@ -196,18 +240,33 @@ function buildSections(lead: ApiLeadDetail): RelatedSection[] {
   ];
 }
 
-export function LeadRelatedLists({ leadId }: { leadId?: number }) {
-  const [lead, setLead] = useState<ApiLeadDetail | null>(null);
-  const [loading, setLoading] = useState(!!leadId);
+export function LeadRelatedLists({
+  leadId,
+  lead: leadProp,
+}: {
+  leadId?: number;
+  /** When provided, sidebar uses live lead detail (avoids stale GET cache). */
+  lead?: ApiLeadDetail | null;
+}) {
+  const [lead, setLead] = useState<ApiLeadDetail | null>(leadProp ?? null);
+  const [loading, setLoading] = useState(!!leadId && !leadProp);
+  const [selectedActivity, setSelectedActivity] = useState<ApiActivity | null>(
+    null,
+  );
 
   useEffect(() => {
+    if (leadProp) {
+      setLead(leadProp);
+      setLoading(false);
+      return;
+    }
     if (!leadId) return;
     setLoading(true);
-    fetchLead(leadId)
+    fetchLead(leadId, { skipCache: true })
       .then(setLead)
       .catch(() => setLead(null))
       .finally(() => setLoading(false));
-  }, [leadId]);
+  }, [leadId, leadProp]);
 
   const sections = useMemo(
     () => (lead ? buildSections(lead) : []),
@@ -227,17 +286,31 @@ export function LeadRelatedLists({ leadId }: { leadId?: number }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="border-b border-border bg-[#ebf2ff]/30 px-3 py-2.5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[#1e3a5f]">
-          Related List
-        </h2>
+    <>
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <div className="border-b border-border bg-[#ebf2ff]/30 px-3 py-2.5">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[#1e3a5f]">
+            Related List
+          </h2>
+        </div>
+        <nav>
+          {sections.map((section) => (
+            <RelatedSectionBlock
+              key={section.id}
+              section={section}
+              onActivityClick={setSelectedActivity}
+            />
+          ))}
+        </nav>
       </div>
-      <nav>
-        {sections.map((section) => (
-          <RelatedSectionBlock key={section.id} section={section} />
-        ))}
-      </nav>
-    </div>
+
+      <ActivityDetailDialog
+        activity={selectedActivity}
+        open={selectedActivity !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedActivity(null);
+        }}
+      />
+    </>
   );
 }

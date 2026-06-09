@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
+import { DealSiteAssessmentForm } from "@/components/crm/deal-site-assessment-form";
 import { SiteVisitLogDetails } from "@/components/crm/site-visit-log-details";
 import { SiteVisitDealContext } from "@/components/crm/site-visit-deal-context";
 import { SiteVisitReviewPanel } from "@/components/crm/site-visit-review-panel";
@@ -28,6 +29,8 @@ import {
   startSiteVisit,
   type ApiSiteVisit,
 } from "@/lib/api/crm/site-visits";
+import { fetchDeal } from "@/lib/api/crm/deals";
+import type { ApiDeal } from "@/lib/api/crm/types";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
@@ -47,6 +50,7 @@ export default function SiteVisitDetailPage() {
   const params = useParams<{ id: string }>();
   const visitId = Number(params.id);
   const [visit, setVisit] = useState<ApiSiteVisit | null>(null);
+  const [deal, setDeal] = useState<ApiDeal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -62,6 +66,17 @@ export default function SiteVisitDetailPage() {
     try {
       const data = await fetchSiteVisit(visitId);
       setVisit(data);
+
+      if (data.deal_id) {
+        try {
+          const dealData = await fetchDeal(data.deal_id);
+          setDeal(dealData);
+        } catch {
+          setDeal(null);
+        }
+      } else {
+        setDeal(null);
+      }
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Failed to load site visit.",
@@ -129,6 +144,7 @@ export default function SiteVisitDetailPage() {
   const status = visit?.status ?? "scheduled";
   const showLogDetails = canExecuteFieldVisit(status);
   const showStart = canStartFieldVisit(status);
+  const useDealAssessment = showLogDetails && deal !== null;
   const awaitingApproval = status === "submitted_for_review";
   const showReviewPanel =
     awaitingApproval ||
@@ -164,10 +180,13 @@ export default function SiteVisitDetailPage() {
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                 <Button size="sm" variant="outline" onClick={scrollToLogDetails}>
                   <ClipboardList className="mr-1 h-4 w-4" />
-                  Log details
+                  {useDealAssessment ? "Site assessment" : "Log details"}
                 </Button>
               </PermissionGate>
             )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/crm/site-visits/my-visits">My visits</Link>
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/crm/site-visits">
                 <ChevronLeft className="mr-1 h-4 w-4" />
@@ -278,7 +297,7 @@ export default function SiteVisitDetailPage() {
 
                 <div className="flex flex-wrap gap-2">
                   {showStart && (
-                    <PermissionGate permission="site_visits.execute">
+                    <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                       <Button
                         size="sm"
                         disabled={actionLoading}
@@ -295,10 +314,10 @@ export default function SiteVisitDetailPage() {
                   )}
 
                   {showLogDetails && (
-                    <PermissionGate permission="site_visits.execute">
+                    <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                       <Button size="sm" variant="default" onClick={scrollToLogDetails}>
                         <ClipboardList className="mr-2 h-4 w-4" />
-                        Log details
+                        {useDealAssessment ? "Site assessment" : "Log details"}
                       </Button>
                     </PermissionGate>
                   )}
@@ -327,12 +346,23 @@ export default function SiteVisitDetailPage() {
 
             {showReviewPanel && <SiteVisitReviewPanel visit={visit} />}
 
-            {showLogDetails && (
-              <SiteVisitLogDetails
-                visit={visit}
-                onVisitUpdated={setVisit}
-                onRefresh={loadVisit}
-              />
+            {useDealAssessment ? (
+              <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
+                <DealSiteAssessmentForm
+                  deal={deal}
+                  visit={visit}
+                  onDealUpdated={setDeal}
+                  onVisitUpdated={setVisit}
+                />
+              </PermissionGate>
+            ) : (
+              showLogDetails && (
+                <SiteVisitLogDetails
+                  visit={visit}
+                  onVisitUpdated={setVisit}
+                  onRefresh={loadVisit}
+                />
+              )
             )}
 
             {status === "submitted_for_review" && (

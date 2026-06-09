@@ -55,6 +55,7 @@ function hasExtractPreviewLines(preview: BomExtractionResult | null): boolean {
 
 type ProjectDetailBomProps = {
   project: ProjectDetail;
+  readOnly?: boolean;
   onProjectUpdated: (project: ProjectDetail) => void;
 };
 
@@ -75,7 +76,11 @@ function resolutionBadgeClass(status: BomResolutionStatus): string {
   }
 }
 
-export function ProjectDetailBom({ project, onProjectUpdated }: ProjectDetailBomProps) {
+export function ProjectDetailBom({
+  project,
+  readOnly = false,
+  onProjectUpdated,
+}: ProjectDetailBomProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bom, setBom] = useState<ProjectBom | null>(null);
   const [extractPreview, setExtractPreview] = useState<BomExtractionResult | null>(null);
@@ -274,6 +279,8 @@ export function ProjectDetailBom({ project, onProjectUpdated }: ProjectDetailBom
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
+          {!readOnly ? (
+          <>
           <PermissionGate anyOf={[...BOM_UPLOAD_PERMISSIONS]}>
             {showUploadDropZone ? (
               <div
@@ -399,6 +406,8 @@ export function ProjectDetailBom({ project, onProjectUpdated }: ProjectDetailBom
               </Button>
             ) : null}
           </PermissionGate>
+          </>
+          ) : null}
         </CardContent>
       </Card>
 

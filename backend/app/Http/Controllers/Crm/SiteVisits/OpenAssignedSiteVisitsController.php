@@ -19,13 +19,14 @@ class OpenAssignedSiteVisitsController extends Controller
             SiteVisitStatus::Scheduled->value,
             SiteVisitStatus::Assigned->value,
             SiteVisitStatus::InProgress->value,
+            SiteVisitStatus::MeasurementsCaptured->value,
         ];
 
         $visits = SiteVisit::query()
             ->where('assigned_field_officer_id', $request->user()->id)
-            ->whereNotNull('deal_id')
             ->whereIn('status', $openStatuses)
             ->with([
+                'lead',
                 'deal.account',
                 'deal.contact',
                 'deal.assignedFieldOfficer',

@@ -38,7 +38,6 @@ export function LeadsActivityModal({
   activityType,
   leadTitle,
   onSave,
-  onMarkDone,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,7 +50,6 @@ export function LeadsActivityModal({
     activity_type?: string;
     assigned_to?: number;
   }) => void | Promise<void>;
-  onMarkDone?: () => void;
 }) {
   const { assignableUsers } = useCrmFormLookups({
     assignableRole: "sales_representative",
@@ -175,7 +173,7 @@ export function LeadsActivityModal({
           </div>
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="ghost"
@@ -184,35 +182,22 @@ export function LeadsActivityModal({
           >
             Discard
           </Button>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                onMarkDone?.();
-                onOpenChange(false);
-              }}
-            >
-              Mark as done
-            </Button>
-            <Button
-              type="button"
-              className="w-full sm:w-auto"
-              onClick={async () => {
-                await onSave?.({
-                  subject: title,
-                  description: note || undefined,
-                  due_at: dueDate ? `${dueDate}T12:00:00` : undefined,
-                  activity_type: activityType ?? undefined,
-                  assigned_to: assigneeId ? Number(assigneeId) : undefined,
-                });
-                onOpenChange(false);
-              }}
-            >
-              Save
-            </Button>
-          </div>
+          <Button
+            type="button"
+            className="w-full sm:w-auto"
+            onClick={async () => {
+              await onSave?.({
+                subject: title,
+                description: note || undefined,
+                due_at: dueDate ? `${dueDate}T12:00:00` : undefined,
+                activity_type: activityType ?? undefined,
+                assigned_to: assigneeId ? Number(assigneeId) : undefined,
+              });
+              onOpenChange(false);
+            }}
+          >
+            Save
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

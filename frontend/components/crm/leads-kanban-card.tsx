@@ -7,10 +7,16 @@ import { cn } from "@/lib/utils";
 import { LeadActivityIcon } from "@/lib/lead-activity-icons";
 import type { LeadViewMode } from "@/lib/leads-list-data";
 import {
+  getLeadStatusBadgeClass,
+  getLeadStatusLabel,
+  showLeadStatusOnKanbanCard,
+} from "@/lib/crm-lead-status";
+import {
   formatKes,
   type LeadActivityType,
   type LeadKanbanCard,
 } from "@/lib/leads-kanban-data";
+import { Badge } from "@/components/ui/badge";
 import { LeadsKanbanActivitiesMenu } from "@/components/crm/leads-kanban-activities-menu";
 
 export function LeadsKanbanCard({
@@ -53,6 +59,19 @@ export function LeadsKanbanCard({
         menuOpen && "z-20"
       )}
     >
+      {showLeadStatusOnKanbanCard(card.statusKey) ? (
+        <Badge
+          variant="outline"
+          className={cn(
+            "w-fit max-w-full truncate px-1.5 py-0 text-[10px] font-medium",
+            getLeadStatusBadgeClass(card.statusKey),
+          )}
+          title={getLeadStatusLabel(card.statusKey)}
+        >
+          {getLeadStatusLabel(card.statusKey)}
+        </Badge>
+      ) : null}
+
       <Link
         href={`/crm/leads/${card.id}?view=${returnView}`}
         className="line-clamp-2 text-xs font-medium leading-snug text-[#1e3a5f] hover:underline"

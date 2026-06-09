@@ -22,12 +22,7 @@ import {
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
 import { createLead, uploadLeadPhoto } from "@/lib/api/crm/leads";
 import { fetchFieldDayPin } from "@/lib/api/crm/field-day";
-import { scheduleSiteVisit } from "@/lib/api/crm/site-visits";
 import { leadFormToCreatePayload } from "@/lib/crm-lead-payload";
-import { usePermissions } from "@/hooks/use-permissions";
-import {
-  buildSiteAddressFromLocation,
-} from "@/lib/kenya-locations";
 import {
   isAdminOnlyLocationLabel,
   resolveKenyaAdminFromCoordinates,
@@ -43,7 +38,6 @@ export function LeadCreateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { can } = usePermissions();
   const { lookups } = useCrmFormLookups({
     assignableRole: "sales_representative",
   });
@@ -155,8 +149,6 @@ export function LeadCreateForm() {
           countySlug: countySlug || current.countySlug,
           subcounty: subcounty || current.subcounty,
           ward: ward || current.ward,
-          assignedFieldOfficerId:
-            pin.fieldDay?.field_officer_id ?? current.assignedFieldOfficerId,
           leadSourceId:
             lookups.lead_sources.find((source) => source.slug === "field_visit")
               ?.id ??
@@ -184,20 +176,6 @@ export function LeadCreateForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    if (form.needSiteVisit && !form.assignedFieldOfficerId) {
-      toast.error("Assign a field officer when a site visit is required.");
-      return;
-    }
-    if (
-      form.needSiteVisit &&
-      form.siteVisitDate &&
-      !can("site_visits.schedule")
-    ) {
-      toast.error(
-        "You cannot schedule site visits. Save without a visit date or ask sales to schedule.",
-      );
-      return;
-    }
     setSubmitting(true);
     try {
       await ensureCsrfCookie();
@@ -222,48 +200,6 @@ export function LeadCreateForm() {
             photoErr instanceof ApiError
               ? photoErr.message
               : "Site photos could not be uploaded.";
-        }
-      }
-
-      if (
-        form.needSiteVisit &&
-        form.siteVisitDate &&
-        form.assignedFieldOfficerId &&
-        can("site_visits.schedule")
-      ) {
-        const siteAddress =
-          buildSiteAddressFromLocation(form) ||
-          form.siteAddress.trim() ||
-          form.location.trim() ||
-          null;
-        try {
-          const visit = await scheduleSiteVisit({
-            title: form.title.trim() || lead.name,
-            lead_id: lead.id,
-            site_address: siteAddress ?? undefined,
-            latitude: form.latitude,
-            longitude: form.longitude,
-            assigned_field_officer_id: form.assignedFieldOfficerId,
-            visit_date: form.siteVisitDate,
-            visit_time: form.siteVisitTime || null,
-            visit_purpose: "assessment",
-            requires_measurements: false,
-            account_id: lead.converted_account_id ?? undefined,
-            notes_for_field_officer:
-              form.siteVisitNotesForOfficer.trim() || null,
-          });
-          toast.success("Lead and site visit scheduled.");
-          if (photoUploadError) {
-            toast.error(photoUploadError);
-          }
-          router.push(`/crm/site-visits/${visit.id}`);
-          return;
-        } catch (scheduleErr) {
-          toast.error(
-            scheduleErr instanceof ApiError
-              ? scheduleErr.message
-              : "Lead saved but site visit could not be scheduled.",
-          );
         }
       }
 
@@ -360,7 +296,11 @@ export function LeadCreateForm() {
         </aside>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <LeadFormFields form={form} update={update} />
+          <LeadFormFields
+            form={form}
+            update={update}
+            showSiteVisitFields={false}
+          />
 
           <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 px-5 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80">
             <p className="text-sm text-muted-foreground">

@@ -8,6 +8,7 @@ import {
   FileText,
   FolderKanban,
   Loader2,
+  Send,
   Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,9 @@ import {
   markDealWon,
   recordPayment,
 } from "@/lib/api/crm/deals";
-import { quotationAmount } from "@/lib/api/crm/quotations";
+import { quotationAmount, sendQuotation } from "@/lib/api/crm/quotations";
 import type { ApiDeal, ApiQuotationSummary } from "@/lib/api/crm/types";
+import { projectDetailPath } from "@/lib/projects/paths";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -57,6 +59,18 @@ const SENT_QUOTATION_STATUSES = new Set([
   "revised",
   "accepted",
 ]);
+
+const SENDABLE_QUOTATION_STATUSES = new Set(["draft", "internal_review", "revised"]);
+
+function quotationViewHref(
+  quotation: ApiQuotationSummary,
+  sent: boolean,
+): string {
+  if (sent) {
+    return `/crm/quotations/${quotation.id}/preview`;
+  }
+  return `/crm/quotations/${quotation.id}`;
+}
 
 function formatCurrency(value: string | number | null | undefined): string {
   if (value == null) return "—";
@@ -178,6 +192,18 @@ export function LeadQuotationActions({
     });
   }
 
+  async function handleSendQuotation() {
+    if (!latestQuotation?.id) return;
+    await runAction("send", async () => {
+      await sendQuotation(latestQuotation.id);
+      toast.success("Quotation sent to client.");
+    });
+  }
+
+  const canSendQuotation =
+    latestQuotation?.status != null &&
+    SENDABLE_QUOTATION_STATUSES.has(latestQuotation.status);
+
   if (!latestQuotation && !showCreateQuotation) {
     return null;
   }
@@ -209,8 +235,8 @@ export function LeadQuotationActions({
             {formatCurrency(quotationAmount(latestQuotation as Parameters<typeof quotationAmount>[0]))}
           </span>
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2 text-xs" asChild>
-            <Link href={`/projects/quotations/${latestQuotation.id}`}>
-              View
+            <Link href={quotationViewHref(latestQuotation, quotationSent)}>
+              {quotationSent ? "Preview" : "View"}
               <ExternalLink className="ml-1 h-3 w-3" />
             </Link>
           </Button>
@@ -218,12 +244,14 @@ export function LeadQuotationActions({
       ) : null}
 
       {showCreateQuotation && linkedAccountId && !latestQuotation ? (
-        <Button size="sm" className="h-9" asChild>
-          <Link href={`/projects/quotations/new?accountId=${linkedAccountId}`}>
-            <FileText className="mr-1.5 h-3.5 w-3.5" />
-            Project Quotation
-          </Link>
-        </Button>
+        <PermissionGate permission="projects.bom.upload">
+          <Button size="sm" className="h-9" asChild>
+            <Link href={`/projects/quotations/new?accountId=${linkedAccountId}`}>
+              <FileText className="mr-1.5 h-3.5 w-3.5" />
+              Project Quotation
+            </Link>
+          </Button>
+        </PermissionGate>
       ) : null}
 
       {latestQuotation && quotationSent && dealId ? (
@@ -285,7 +313,7 @@ export function LeadQuotationActions({
 
           {projectId ? (
             <Button size="sm" variant="outline" className="h-9" asChild>
-              <Link href={`/projects/${projectId}`}>
+              <Link href={projectDetailPath(projectId, "crm")}>
                 <FolderKanban className="mr-1.5 h-3.5 w-3.5" />
                 View Project
               </Link>
@@ -298,13 +326,22 @@ export function LeadQuotationActions({
         </>
       ) : null}
 
-      {latestQuotation && !quotationSent ? (
-        <Button size="sm" variant="outline" className="h-9" asChild>
-          <Link href={`/projects/quotations/${latestQuotation.id}`}>
-            <FileText className="mr-1.5 h-3.5 w-3.5" />
-            Edit Quotation
-          </Link>
-        </Button>
+      {latestQuotation && canSendQuotation ? (
+        <PermissionGate permission="quotations.send">
+          <Button
+            size="sm"
+            className="h-9"
+            disabled={disabled || actionLoading != null}
+            onClick={handleSendQuotation}
+          >
+            {actionLoading === "send" ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Send to Client
+          </Button>
+        </PermissionGate>
       ) : null}
 
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>

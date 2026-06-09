@@ -58,30 +58,15 @@ import { LeadsActivityModal } from "@/components/crm/leads-activity-modal";
 import { LeadComposeEmailDialog } from "@/components/crm/lead-compose-email-dialog";
 import { toast } from "sonner";
 
-const statusColors: Record<string, string> = {
-  new: "bg-info/10 text-info border-info/20",
-  contacted: "bg-primary/10 text-primary border-primary/20",
-  interested: "bg-primary/10 text-primary border-primary/20",
-  qualified: "bg-success/10 text-success border-success/20",
-  site_visit_required: "bg-warning/10 text-warning border-warning/20",
-  site_visit_scheduled: "bg-warning/10 text-warning border-warning/20",
-  measurements_captured: "bg-chart-4/10 text-chart-4 border-chart-4/20",
-  converted: "bg-success/10 text-success border-success/20",
-  quotation_sent: "bg-chart-4/10 text-chart-4 border-chart-4/20",
-  negotiation: "bg-chart-5/10 text-chart-5 border-chart-5/20",
-  won: "bg-success/10 text-success border-success/20",
-  lost: "bg-destructive/10 text-destructive border-destructive/20",
-  not_reachable: "bg-muted text-muted-foreground border-muted",
-  unqualified: "bg-destructive/10 text-destructive border-destructive/20",
-  dormant: "bg-muted text-muted-foreground border-muted",
-};
-
-function formatStatus(status: string): string {
-  return status
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+import {
+  getLeadStatusBadgeClass,
+  getLeadStatusLabel,
+} from "@/lib/crm-lead-status";
+import {
+  resolveLeadListCompany,
+  resolveLeadListEmail,
+  resolveLeadListPhone,
+} from "@/lib/crm/lead-contact-utils";
 
 type LeadsTableProps = {
   filters: LeadsFilterState;
@@ -224,6 +209,9 @@ export function LeadsTable({ filters, refreshKey = 0 }: LeadsTableProps) {
           <TableBody>
             {leads.map((lead) => {
               const name = leadDisplayName(lead);
+              const phone = resolveLeadListPhone(lead);
+              const email = resolveLeadListEmail(lead);
+              const company = resolveLeadListCompany(lead);
               const assignee =
                 lead.assignee ??
                 lead.assigned_sales_user ??
@@ -254,18 +242,21 @@ export function LeadsTable({ filters, refreshKey = 0 }: LeadsTableProps) {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      {lead.phone && (
+                      {phone !== "—" ? (
                         <div className="flex items-center gap-1.5 text-sm">
                           <Phone className="h-3 w-3 text-muted-foreground" />
-                          {lead.phone}
+                          {phone}
                         </div>
-                      )}
-                      {lead.email && (
+                      ) : null}
+                      {email !== "—" ? (
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Mail className="h-3 w-3" />
-                          {lead.email}
+                          {email}
                         </div>
-                      )}
+                      ) : null}
+                      {phone === "—" && email === "—" ? (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -274,14 +265,14 @@ export function LeadsTable({ filters, refreshKey = 0 }: LeadsTableProps) {
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={statusColors[lead.status] ?? ""}
+                      className={getLeadStatusBadgeClass(lead.status)}
                     >
-                      {formatStatus(lead.status)}
+                      {getLeadStatusLabel(lead.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground">
-                      {lead.account_name ?? lead.company ?? "-"}
+                      {company !== "—" ? company : "-"}
                     </span>
                   </TableCell>
                   <TableCell>

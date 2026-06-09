@@ -43,18 +43,25 @@ export const leadActivityTypes: {
   { id: "schedule_call", label: "Schedule a call" },
 ];
 
-export const leadKanbanStages: {
+export type LeadKanbanStageConfig = {
   id: LeadKanbanStageId;
   label: string;
+  description: string;
   headerBg: string;
   headerBorder: string;
   countBadge: string;
   tagClass: string;
   addBtnClass: string;
-}[] = [
+  /** Closed / terminal columns — no new leads added here */
+  terminal?: boolean;
+};
+
+/** v2 lead pipeline: new → contacted → interested → account_created */
+export const leadKanbanStages: LeadKanbanStageConfig[] = [
   {
     id: "new",
     label: "New Lead",
+    description: "Captured, not yet contacted",
     headerBg: "bg-blue-50",
     headerBorder: "border-blue-200",
     countBadge: "bg-blue-600 text-white",
@@ -64,6 +71,7 @@ export const leadKanbanStages: {
   {
     id: "contacted",
     label: "Contacted",
+    description: "Outreach started — log engagement",
     headerBg: "bg-sky-50",
     headerBorder: "border-sky-200",
     countBadge: "bg-sky-600 text-white",
@@ -73,6 +81,7 @@ export const leadKanbanStages: {
   {
     id: "interested",
     label: "Interested",
+    description: "Client confirmed interest — account provisioning",
     headerBg: "bg-cyan-50",
     headerBorder: "border-cyan-200",
     countBadge: "bg-cyan-600 text-white",
@@ -82,6 +91,7 @@ export const leadKanbanStages: {
   {
     id: "account_created",
     label: "Account Created",
+    description: "Work continues on the account record",
     headerBg: "bg-emerald-50",
     headerBorder: "border-emerald-200",
     countBadge: "bg-emerald-600 text-white",
@@ -91,20 +101,24 @@ export const leadKanbanStages: {
   {
     id: "not_reachable",
     label: "Not Reachable",
+    description: "Could not reach after attempts",
     headerBg: "bg-slate-50",
     headerBorder: "border-slate-200",
     countBadge: "bg-slate-600 text-white",
     tagClass: "bg-slate-100 text-slate-800",
     addBtnClass: "text-slate-700 hover:bg-slate-50",
+    terminal: true,
   },
   {
     id: "unqualified",
     label: "Unqualified",
+    description: "Not worth pursuing",
     headerBg: "bg-red-50",
     headerBorder: "border-red-200",
     countBadge: "bg-red-600 text-white",
     tagClass: "bg-red-100 text-red-800",
     addBtnClass: "text-red-700 hover:bg-red-50",
+    terminal: true,
   },
 ];
 

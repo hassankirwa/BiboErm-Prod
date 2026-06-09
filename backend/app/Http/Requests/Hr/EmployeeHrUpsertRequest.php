@@ -33,6 +33,7 @@ class EmployeeHrUpsertRequest extends FormRequest
             'employment_type' => ['nullable', 'string', Rule::in(EmployeeProfile::EMPLOYMENT_TYPES)],
             'start_date' => ['nullable', 'date'],
             'salary_grade' => ['nullable', 'string', 'max:50'],
+            'monthly_gross_salary' => ['nullable', 'numeric', 'min:0'],
             'reporting_manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'work_location' => ['nullable', 'string', 'max:255'],
             'contract_type' => ['nullable', 'string', Rule::in(EmployeeProfile::CONTRACT_TYPES)],

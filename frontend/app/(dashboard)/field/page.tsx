@@ -19,6 +19,10 @@ import {
 } from "@/lib/api/crm/site-visits";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import {
+  siteVisitOpenVisitsPath,
+  siteVisitWorkspaceForRoles,
+} from "@/lib/crm/site-visit-paths";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -103,6 +107,8 @@ function canLoadOpenVisits(permissions: string[], roles: string[]): boolean {
 
 export default function FieldHomePage() {
   const { permissions, roles } = useAuth();
+  const workspace = siteVisitWorkspaceForRoles(roles);
+  const openVisitsPath = siteVisitOpenVisitsPath(workspace);
   const links = FIELD_LINKS.filter((link) =>
     canSeeLink(link, permissions, roles),
   );
@@ -182,7 +188,7 @@ export default function FieldHomePage() {
               Your open deal visits
             </h2>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/field/open-visits">View all</Link>
+              <Link href={openVisitsPath}>View all</Link>
             </Button>
           </div>
 
@@ -206,6 +212,7 @@ export default function FieldHomePage() {
                 <FieldOpenVisitCard
                   key={visit.id}
                   visit={visit}
+                  workspace={workspace}
                   actionLoading={actionLoading}
                   onStartVisit={(id) => void handleStartVisit(id)}
                 />
@@ -214,7 +221,7 @@ export default function FieldHomePage() {
                 <p className="text-center text-sm text-muted-foreground">
                   Showing 5 of {visits.length} visits.{" "}
                   <Link
-                    href="/field/open-visits"
+                    href={openVisitsPath}
                     className="font-medium text-primary hover:underline"
                   >
                     See all open visits

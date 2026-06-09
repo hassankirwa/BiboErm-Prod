@@ -4,11 +4,13 @@ namespace Tests\Feature\Crm;
 
 use App\Enums\Crm\DealStage;
 use App\Enums\Crm\QuotationStatus;
+use App\Enums\Crm\SiteVisitStatus;
 use App\Enums\ProjectStage;
 use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Quotation;
+use App\Models\SiteVisit;
 use App\Models\User;
 use Database\Seeders\CrmLookupSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -260,5 +262,100 @@ class QuotationNegotiationTest extends TestCase
             ->assertJsonPath('data.latest_quotation.status', QuotationStatus::Sent->value)
             ->assertJsonPath('data.sales_deal.id', $quotation->deal_id)
             ->assertJsonPath('data.sales_deal.stage', DealStage::QuotationSent->value);
+    }
+
+    public function test_sales_rep_can_view_and_preview_quotation(): void
+    {
+        $quotation = $this->createDraftQuotation();
+
+        $this->getJson("/api/v1/crm/quotations/{$quotation->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $quotation->id);
+
+        $this->getJson("/api/v1/projects/quotations/{$quotation->id}/preview")
+            ->assertOk()
+            ->assertJsonPath('data.quotation.id', $quotation->id);
+    }
+
+    public function test_sales_rep_can_record_deposit_after_send_without_mark_won(): void
+    {
+        $quotation = $this->createDraftQuotation();
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+
+        $quotation->refresh();
+        $deal = Deal::query()->findOrFail($quotation->deal_id);
+        $deal->update(['deposit_required_amount' => 250000]);
+
+        $response = $this->postJson("/api/v1/crm/deals/{$deal->id}/payments", [
+            'payment_reference' => 'MPESA-SALES-001',
+            'payment_date' => now()->toDateString(),
+            'amount_paid' => 250000,
+            'payment_method' => 'mpesa',
+            'quotation_id' => $quotation->id,
+        ]);
+
+        $response->assertCreated();
+
+        $deal->refresh();
+        $this->assertSame('deposit_met', $deal->payment_status);
+    }
+
+    public function test_lead_convert_records_deposit_on_existing_sent_deal(): void
+    {
+        $lead = \App\Models\Lead::query()->create([
+            'reference' => 'LD-NEG-CONV',
+            'lead_number' => 'LD-NEG-CONV',
+            'name' => 'Convert Deposit Lead',
+            'first_name' => 'Convert',
+            'status' => \App\Enums\Crm\LeadStatus::AccountCreated->value,
+            'converted_account_id' => $this->account->id,
+            'lead_owner_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->account->update(['source_lead_id' => $lead->id]);
+
+        SiteVisit::query()->create([
+            'visit_number' => 'SV-NEG-CONV-001',
+            'title' => 'Negotiation site visit',
+            'lead_id' => $lead->id,
+            'account_id' => $this->account->id,
+            'assigned_field_officer_id' => $this->user->id,
+            'scheduled_by' => $this->user->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Approved->value,
+        ]);
+
+        $quotation = $this->createDraftQuotation();
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $quotation->refresh();
+
+        $response = $this->postJson("/api/v1/crm/leads/{$lead->id}/convert", [
+            'quotation_id' => $quotation->id,
+            'payment_reference' => 'MPESA-CONV-001',
+            'payment_date' => now()->toDateString(),
+            'amount_paid' => 200000,
+            'payment_method' => 'mpesa',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.deal.id', $quotation->deal_id);
+
+        $lead->refresh();
+        $quotation->refresh();
+        $this->assertSame($quotation->deal_id, $lead->converted_deal_id);
+        $this->assertSame(QuotationStatus::Accepted->value, $quotation->status->value);
+
+        $deal = Deal::query()->findOrFail($quotation->deal_id);
+        $this->assertSame('won', $deal->status);
+        $this->assertContains(
+            $deal->stage->value,
+            [DealStage::Won->value, DealStage::ProjectCreated->value],
+        );
+
+        $this->assertDatabaseHas('deal_payments', [
+            'deal_id' => $quotation->deal_id,
+            'payment_reference' => 'MPESA-CONV-001',
+        ]);
     }
 }

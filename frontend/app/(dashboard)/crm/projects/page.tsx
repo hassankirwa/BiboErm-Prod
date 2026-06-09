@@ -21,6 +21,7 @@ import {
   listProjects,
   type ProjectSummary,
 } from "@/lib/api/projects";
+import { projectDetailPath } from "@/lib/projects/paths";
 import { Plus } from "lucide-react";
 
 export default function CrmProjectsPage() {
@@ -98,7 +99,7 @@ export default function CrmProjectsPage() {
                       <TableRow key={project.id}>
                         <TableCell>
                           <Link
-                            href={`/projects/${project.id}`}
+                            href={projectDetailPath(project.id, "crm")}
                             className="font-medium text-primary hover:underline"
                           >
                             {project.name}
@@ -114,7 +115,7 @@ export default function CrmProjectsPage() {
                         <TableCell>{project.completion_percent}%</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/projects/${project.id}`}>Open</Link>
+                            <Link href={projectDetailPath(project.id, "crm")}>Open</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

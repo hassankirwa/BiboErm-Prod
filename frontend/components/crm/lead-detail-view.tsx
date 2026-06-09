@@ -146,7 +146,10 @@ import {
 } from "@/components/crm/lead-notes-canvas";
 
 import {
-  isLeadQualifiedForAccount,
+  canCommercialConvertLead,
+  canProvisionAccountFromLead,
+  hasApprovedSiteVisit,
+  hasQuotationSentToClient,
   statusToKanbanStage,
 } from "@/lib/crm-lead-status";
 
@@ -276,7 +279,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
     if (!Number.isFinite(id) || id <= 0) return;
 
-    const data = await fetchLead(id);
+    const data = await fetchLead(id, { skipCache: true });
 
     setOverride({ lead: data, card: apiLeadToKanbanCard(data) });
 
@@ -1141,7 +1144,38 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
   const convertHref = `/crm/leads/${leadId}/convert${view ? `?view=${view}` : ""}`;
 
-  const canConvert = isLeadQualifiedForAccount(status);
+  const headerAccountId =
+    lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
+  const headerSalesDeal = lead?.sales_deal ?? lead?.converted_deal ?? null;
+  const headerDepositMet =
+    headerSalesDeal?.payment_status === "deposit_met" ||
+    (() => {
+      const required =
+        parseFloat(String(headerSalesDeal?.deposit_required_amount ?? 0)) || 0;
+      const paid =
+        parseFloat(
+          String(
+            headerSalesDeal?.deposit_paid_amount ??
+              headerSalesDeal?.deposit_amount ??
+              0,
+          ),
+        ) || 0;
+      return required > 0 && paid >= required;
+    })();
+  const showCommercialConvert = canCommercialConvertLead({
+    hasLinkedAccount: Boolean(headerAccountId),
+    hasDeal: Boolean(headerSalesDeal?.id ?? lead?.converted_deal_id),
+    depositMet: headerDepositMet,
+    hasApprovedSiteVisit: hasApprovedSiteVisit(lead?.site_visits),
+    hasSentQuotation: hasQuotationSentToClient(lead?.latest_quotation),
+  });
+  const showProvisionConvert = canProvisionAccountFromLead(
+    status,
+    Boolean(headerAccountId),
+  );
+  const convertLabel = showCommercialConvert
+    ? "Record Deposit & Create Deal"
+    : "Convert Lead";
 
   const editHref = `/crm/leads/${leadId}/edit${view ? `?view=${view}` : ""}`;
 
@@ -1217,7 +1251,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <PermissionGate permission="leads.convert">
 
-              {canConvert ? (
+              {showCommercialConvert || showProvisionConvert ? (
 
                 <Button
 
@@ -1235,7 +1269,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                     <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
 
-                    Convert Lead
+                    {convertLabel}
 
                   </Link>
 
@@ -1261,7 +1295,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         }
 
-        sidebar={<LeadRelatedLists leadId={Number(leadId)} />}
+        sidebar={<LeadRelatedLists leadId={Number(leadId)} lead={lead} />}
 
       >
 

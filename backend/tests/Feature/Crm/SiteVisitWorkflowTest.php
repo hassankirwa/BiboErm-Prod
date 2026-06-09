@@ -13,6 +13,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -195,6 +196,51 @@ class SiteVisitWorkflowTest extends TestCase
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['assigned_field_officer_id']);
+    }
+
+    public function test_eligible_assignee_can_start_visit_with_site_visits_view_only(): void
+    {
+        $guard = config('permission.defaults.guard', 'web');
+        Role::findByName('production_manager', $guard)?->syncPermissions(['site_visits.view']);
+
+        $productionManager = User::factory()->create(['status' => User::STATUS_ACTIVE]);
+        $productionManager->assignRole('production_manager');
+
+        $visit = SiteVisit::query()->create([
+            'visit_number' => 'SV-VIEW-ONLY-001',
+            'title' => 'Production manager measurement',
+            'assigned_field_officer_id' => $productionManager->id,
+            'scheduled_by' => $this->salesRep->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Scheduled->value,
+        ]);
+
+        Sanctum::actingAs($productionManager);
+
+        $this->postJson("/api/v1/crm/site-visits/{$visit->id}/start")
+            ->assertOk()
+            ->assertJsonPath('data.status', SiteVisitStatus::InProgress->value);
+    }
+
+    public function test_installation_engineer_can_execute_assigned_visit(): void
+    {
+        $engineer = User::factory()->create(['status' => User::STATUS_ACTIVE]);
+        $engineer->assignRole('field_installation_engineer');
+
+        $visit = SiteVisit::query()->create([
+            'visit_number' => 'SV-INSTALL-001',
+            'title' => 'Installation-led measurement',
+            'assigned_field_officer_id' => $engineer->id,
+            'scheduled_by' => $this->salesRep->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Scheduled->value,
+        ]);
+
+        Sanctum::actingAs($engineer);
+
+        $this->postJson("/api/v1/crm/site-visits/{$visit->id}/start")
+            ->assertOk()
+            ->assertJsonPath('data.status', SiteVisitStatus::InProgress->value);
     }
 
     public function test_site_visit_assignee_lookup_includes_sales_and_field_roles(): void

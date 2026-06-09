@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { canKanbanMove } from "@/lib/crm-lead-status";
 import {
   leadKanbanStages,
   type LeadActivityType,
@@ -77,6 +78,12 @@ export function LeadsKanbanView({
 
   const handleDrop = async (stageId: LeadKanbanStageId, leadId: string) => {
     if (!leadId) return;
+    const card = cards.find((c) => c.id === leadId);
+    if (card && !canKanbanMove(card.statusKey, stageId)) {
+      setDraggingId(null);
+      setDropTargetStage(null);
+      return;
+    }
     if (onStageChange) {
       await onStageChange(leadId, stageId);
     } else {
@@ -133,22 +140,28 @@ export function LeadsKanbanView({
               >
                 <header
                   className={cn(
-                    "flex items-center justify-between gap-2 rounded-t-lg border-b px-3 py-2.5",
+                    "rounded-t-lg border-b px-3 py-2.5",
                     stage.headerBg,
-                    stage.headerBorder
+                    stage.headerBorder,
+                    stage.terminal && "opacity-90",
                   )}
                 >
-                  <h2 className="truncate text-sm font-semibold text-[#1e3a5f]">
-                    {stage.label}
-                  </h2>
-                  <span
-                    className={cn(
-                      "flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
-                      stage.countBadge
-                    )}
-                  >
-                    {stageCards.length}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="truncate text-sm font-semibold text-[#1e3a5f]">
+                      {stage.label}
+                    </h2>
+                    <span
+                      className={cn(
+                        "flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
+                        stage.countBadge,
+                      )}
+                    >
+                      {stageCards.length}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
+                    {stage.description}
+                  </p>
                 </header>
 
                 <div className="flex-1 space-y-1.5 overflow-visible p-2 pb-4">
@@ -168,19 +181,21 @@ export function LeadsKanbanView({
                   ))}
                 </div>
 
-                <footer className="border-t border-border/60 p-2">
-                  <button
-                    type="button"
-                    onClick={() => setAddLeadStage(stage.id)}
-                    className={cn(
-                      "flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
-                      stage.addBtnClass
-                    )}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Lead
-                  </button>
-                </footer>
+                {!stage.terminal ? (
+                  <footer className="border-t border-border/60 p-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddLeadStage(stage.id)}
+                      className={cn(
+                        "flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors",
+                        stage.addBtnClass,
+                      )}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Lead
+                    </button>
+                  </footer>
+                ) : null}
               </section>
             );
           })}

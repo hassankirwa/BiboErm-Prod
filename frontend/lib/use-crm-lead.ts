@@ -25,7 +25,7 @@ export function useCrmLead(leadId: string) {
     setLoading(true);
     setError(null);
 
-    fetchLead(id)
+    fetchLead(id, { skipCache: true })
       .then((data) => {
         if (cancelled) return;
         setLead(data);

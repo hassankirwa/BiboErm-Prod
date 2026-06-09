@@ -32,13 +32,24 @@ import { useMediaImageSrc } from "@/components/media/media-image";
 import { ProjectDetailProcurement } from "@/components/projects/project-detail-procurement";
 import { ProjectMaterialReserveAction } from "@/components/projects/project-material-reserve-action";
 import { ProjectMaterialReleaseAction } from "@/components/projects/project-material-release-action";
+import {
+  projectSiteAssessmentPath,
+  projectTabPath,
+  type ProjectViewMode,
+} from "@/lib/projects/paths";
 
 type ProjectDetailOverviewProps = {
   project: ProjectDetail;
+  mode?: ProjectViewMode;
   onProjectUpdated?: () => void;
 };
 
-export function ProjectDetailOverview({ project, onProjectUpdated }: ProjectDetailOverviewProps) {
+export function ProjectDetailOverview({
+  project,
+  mode = "projects",
+  onProjectUpdated,
+}: ProjectDetailOverviewProps) {
+  const isCrmMode = mode === "crm";
   const [materialStatus, setMaterialStatus] = useState<ProjectMaterialStatus | null>(null);
   const stageData = project.stage_data ?? null;
 
@@ -138,14 +149,15 @@ export function ProjectDetailOverview({ project, onProjectUpdated }: ProjectDeta
           </CardContent>
         </Card>
 
-        {project.stage === "final_design_approval" ? (
-          <StageReadinessChecklist project={project} />
+        {project.stage === "final_design_approval" && !isCrmMode ? (
+          <StageReadinessChecklist project={project} mode={mode} />
         ) : null}
 
         <StageDataCards
           stageData={stageData}
           projectId={project.id}
           projectStage={project.stage}
+          mode={mode}
         />
 
         {materialStatus ? (
@@ -189,16 +201,20 @@ export function ProjectDetailOverview({ project, onProjectUpdated }: ProjectDeta
                 <MaterialCheckResults check={project.stage_data.material_check} />
               ) : null}
 
-              <ProjectMaterialReserveAction
-                project={project}
-                materialStatus={materialStatus}
-                onReserved={onProjectUpdated}
-              />
+              {!isCrmMode ? (
+                <>
+                  <ProjectMaterialReserveAction
+                    project={project}
+                    materialStatus={materialStatus}
+                    onReserved={onProjectUpdated}
+                  />
 
-              <ProjectMaterialReleaseAction
-                project={project}
-                onReleased={onProjectUpdated}
-              />
+                  <ProjectMaterialReleaseAction
+                    project={project}
+                    onReleased={onProjectUpdated}
+                  />
+                </>
+              ) : null}
 
               {materialStatus.lines.some((line) => Number(line.shortage_qty) > 0) ? (
                 <div className="space-y-2">
@@ -275,7 +291,13 @@ function MaterialCheckResults({ check }: { check: ProjectStageMaterialCheck }) {
   );
 }
 
-function StageReadinessChecklist({ project }: { project: ProjectDetail }) {
+function StageReadinessChecklist({
+  project,
+  mode,
+}: {
+  project: ProjectDetail;
+  mode: ProjectViewMode;
+}) {
   const hasDesign = projectHasDesignDocument(project);
   const hasBom = projectHasBomUploaded(project);
   const bomFinalized = projectHasBomFinalized(project);
@@ -286,16 +308,20 @@ function StageReadinessChecklist({ project }: { project: ProjectDetail }) {
         <CardTitle className="text-base">Stage requirements</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <ReadinessRow label="Design document" complete={hasDesign} href={`/projects/${project.id}?tab=designs`} />
+        <ReadinessRow
+          label="Design document"
+          complete={hasDesign}
+          href={projectTabPath(project.id, "designs", mode)}
+        />
         <ReadinessRow
           label="BOM uploaded"
           complete={hasBom}
-          href={`/projects/${project.id}?tab=bom`}
+          href={projectTabPath(project.id, "bom", mode)}
         />
         <ReadinessRow
           label="BOM finalized"
           complete={bomFinalized}
-          href={`/projects/${project.id}?tab=bom`}
+          href={projectTabPath(project.id, "bom", mode)}
         />
       </CardContent>
     </Card>
@@ -334,11 +360,14 @@ function StageDataCards({
   stageData,
   projectId,
   projectStage,
+  mode,
 }: {
   stageData: ProjectStageData | null;
   projectId: number;
   projectStage: string;
+  mode: ProjectViewMode;
 }) {
+  const isCrmMode = mode === "crm";
   if (!stageData) return null;
 
   const deposit = stageData.deposit_received;
@@ -461,13 +490,15 @@ function StageDataCards({
                 Last updated {assessment.operational_recorded_at}
               </p>
             ) : null}
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/projects/${projectId}/site-assessment`}>
-                {projectStage === "site_assessment"
-                  ? "Edit site assessment"
-                  : "View site assessment"}
-              </Link>
-            </Button>
+            {!isCrmMode ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={projectSiteAssessmentPath(projectId, mode)}>
+                  {projectStage === "site_assessment"
+                    ? "Edit site assessment"
+                    : "View site assessment"}
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

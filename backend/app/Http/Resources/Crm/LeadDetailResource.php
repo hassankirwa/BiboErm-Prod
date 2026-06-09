@@ -53,6 +53,14 @@ class LeadDetailResource extends LeadResource
             'notes' => $this->notes,
             'source' => $this->source,
             'source_contact' => new ContactResource($this->whenLoaded('sourceContact')),
+            'linked_contacts' => ContactResource::collection(
+                $this->when(
+                    $this->relationLoaded('sourceContacts')
+                        || ($this->relationLoaded('convertedAccount') && $this->convertedAccount?->relationLoaded('contacts'))
+                        || $this->relationLoaded('convertedContact'),
+                    fn () => $this->resolveLinkedContacts(),
+                ),
+            ),
             'converted_at' => $this->converted_at?->toIso8601String(),
             'converted_contact_id' => $this->converted_contact_id,
             'converted_account_id' => $this->converted_account_id,

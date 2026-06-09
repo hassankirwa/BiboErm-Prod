@@ -570,6 +570,41 @@ class CrmSalesFlowTest extends TestCase
         ]);
     }
 
+    public function test_manual_contact_linked_to_lead_appears_in_lead_linked_contacts(): void
+    {
+        Sanctum::actingAs($this->salesRep);
+
+        $leadSourceId = DB::table('crm_lead_sources')->where('slug', 'website')->value('id');
+
+        $leadResponse = $this->postJson('/api/v1/crm/leads', [
+            'name' => 'Karen Tower',
+            'contact_person_name' => 'Jane Wanjiku',
+            'phone' => '+254712345679',
+            'email' => 'jane@example.co.ke',
+            'lead_source_id' => $leadSourceId,
+            'account_name' => 'Company XYZ',
+        ]);
+
+        $leadResponse->assertCreated();
+        $leadId = $leadResponse->json('data.id');
+
+        $contactResponse = $this->postJson('/api/v1/crm/contacts', [
+            'name' => 'Peter Kamau',
+            'email' => 'peter@example.co.ke',
+            'phone' => '+254700111222',
+            'source_lead_id' => $leadId,
+        ]);
+
+        $contactResponse->assertCreated()
+            ->assertJsonPath('data.source_lead_id', $leadId);
+
+        $this->getJson("/api/v1/crm/leads/{$leadId}")
+            ->assertOk()
+            ->assertJsonPath('data.linked_contacts.0.name', 'Jane Wanjiku')
+            ->assertJsonPath('data.linked_contacts.1.name', 'Peter Kamau')
+            ->assertJsonCount(2, 'data.linked_contacts');
+    }
+
     public function test_site_only_lead_does_not_split_name_into_first_and_last(): void
     {
         Sanctum::actingAs($this->salesRep);
@@ -649,5 +684,57 @@ class CrmSalesFlowTest extends TestCase
             'name' => 'Qualified Account Ltd',
             'source_lead_id' => $leadIdQualified,
         ])->assertCreated();
+    }
+
+    public function test_lead_index_includes_linked_contact_fields_when_lead_contact_empty(): void
+    {
+        Sanctum::actingAs($this->salesRep);
+
+        $lead = Lead::query()->create([
+            'reference' => 'LD-LINKED-001',
+            'lead_number' => 'LD-LINKED-001',
+            'name' => 'Jambo Apartments',
+            'first_name' => 'Jambo',
+            'last_name' => 'Apartments',
+            'product_interests' => ['blinds'],
+            'requirement_description' => 'Test',
+            'need_site_visit' => false,
+            'status' => LeadStatus::New->value,
+            'lead_owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
+        $account = Account::query()->create([
+            'account_number' => 'AC-LINKED-001',
+            'name' => 'Tarus Designs',
+            'status' => 'active',
+            'account_owner_id' => $this->salesRep->id,
+            'owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
+        Contact::query()->create([
+            'contact_number' => 'CT-LINKED-001',
+            'name' => 'Tarus Contact',
+            'first_name' => 'Tarus',
+            'last_name' => 'Contact',
+            'email' => 'tarus@example.com',
+            'phone' => '+254711111111',
+            'status' => 'new_contact',
+            'account_id' => $account->id,
+            'source_lead_id' => $lead->id,
+            'contact_owner_id' => $this->salesRep->id,
+            'owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
+        $this->getJson('/api/v1/crm/leads')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $lead->id)
+            ->assertJsonPath('data.0.email', null)
+            ->assertJsonPath('data.0.phone', null)
+            ->assertJsonPath('data.0.linked_contacts.0.email', 'tarus@example.com')
+            ->assertJsonPath('data.0.linked_contacts.0.phone', '+254711111111')
+            ->assertJsonPath('data.0.linked_contacts.0.account.name', 'Tarus Designs');
     }
 }

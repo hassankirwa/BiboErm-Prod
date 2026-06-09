@@ -1,12 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { isFieldModuleRole } from "@/lib/auth/redirect";
+import { isFieldModuleRole, isWorkspaceSelfServicePath } from "@/lib/auth/redirect";
+import { SITE_VISIT_MEASUREMENT_ROLES } from "@/lib/crm/site-visit-paths";
 import {
   LayoutGrid,
   Star,
   Clock,
   Pin,
-  Settings,
-  Headphones,
   Users,
   FolderKanban,
   Calculator,
@@ -39,7 +38,6 @@ import {
   MapPin,
   ClipboardList,
   Megaphone,
-  Banknote,
   FileBarChart,
   CheckSquare,
   AlertCircle,
@@ -49,7 +47,6 @@ import {
   Building,
   UserCheck,
   CalendarDays,
-  FileStack,
   Shield,
   HardDrive,
   ScrollText,
@@ -99,6 +96,11 @@ export const departments: Department[] = [
       { name: "Deals", path: "/crm/deals" },
       { name: "Projects", path: "/crm/projects", permission: "projects.view" },
       { name: "Site Visits", path: "/crm/site-visits" },
+      {
+        name: "My Visits",
+        path: "/crm/site-visits/my-visits",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
       { name: "Field Day", path: "/crm/field-day", permission: "field_day.view" },
       {
         name: "Field Day Reports",
@@ -124,6 +126,11 @@ export const departments: Department[] = [
             { name: "Deals", path: "/crm/deals" },
             { name: "Projects", path: "/crm/projects", permission: "projects.view" },
             { name: "Site Visits", path: "/crm/site-visits" },
+            {
+              name: "My Visits",
+              path: "/crm/site-visits/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
             { name: "Today", path: "/crm/site-visits/today" },
             {
               name: "Field Day",
@@ -283,6 +290,16 @@ export const departments: Department[] = [
       { name: "Orders", path: "/production/orders", permission: "production.view" },
       { name: "Cutting", path: "/production/cutting", permission: "production.view" },
       { name: "Assembly", path: "/production/assembly", permission: "production.view" },
+      {
+        name: "My Visits",
+        path: "/crm/site-visits/my-visits",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
+      {
+        name: "Site Visits Today",
+        path: "/crm/site-visits/today",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
     ],
     nav: {
       topItems: [
@@ -299,6 +316,22 @@ export const departments: Department[] = [
             { name: "Orders", path: "/production/orders" },
             { name: "Cutting", path: "/production/cutting" },
             { name: "Assembly", path: "/production/assembly" },
+          ],
+        },
+        {
+          label: "Measurements",
+          icon: ClipboardList,
+          items: [
+            {
+              name: "My Visits",
+              path: "/crm/site-visits/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today",
+              path: "/crm/site-visits/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
           ],
         },
       ],
@@ -431,10 +464,10 @@ export const departments: Department[] = [
     icon: UserCog,
     path: "/hr",
     subModules: [
-      { name: "Employees", path: "/hr/employees" },
-      { name: "Payroll", path: "/hr/payroll" },
-      { name: "Leave", path: "/hr/leave" },
-      { name: "Documents", path: "/hr/documents" },
+      { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+      { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+      { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+      { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
     ],
     nav: {
       topItems: [
@@ -447,10 +480,10 @@ export const departments: Department[] = [
           label: "HR",
           icon: UserCog,
           items: [
-            { name: "Employees", path: "/hr/employees" },
-            { name: "Payroll", path: "/hr/payroll" },
-            { name: "Leave", path: "/hr/leave" },
-            { name: "Documents", path: "/hr/documents" },
+            { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+            { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+            { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+            { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
           ],
         },
       ],
@@ -720,9 +753,14 @@ function hasNavPermission(
   if (roles.includes("super_admin")) return true;
   if (permissions.includes("*")) return true;
   if (
-    roles.includes("field_officer") &&
+    roles.some((role) =>
+      SITE_VISIT_MEASUREMENT_ROLES.includes(
+        role as (typeof SITE_VISIT_MEASUREMENT_ROLES)[number],
+      ),
+    ) &&
     (permission === "site_visits.execute" ||
-      anyPermissions?.includes("site_visits.execute"))
+      anyPermissions?.includes("site_visits.execute") ||
+      anyPermissions?.includes("field_installation.log"))
   ) {
     return true;
   }
@@ -803,10 +841,14 @@ export const workspaceNavItems = [
   { name: "Pinned", href: "/workspace/pinned", icon: Pin },
 ] as const;
 
+/** Self-service leave link shown in every department sidebar footer. */
 export const workspaceFooterNavItems = [
-  { name: "Settings", href: "/workspace/settings", icon: Settings },
-  { name: "Help Center", href: "/workspace/help", icon: Headphones },
+  { name: "Leave", href: "/workspace/leave", icon: CalendarDays },
 ] as const;
+
+export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems {
+  return workspaceFooterNavItems;
+}
 
 export function isWorkspaceNavActive(pathname: string, href: string): boolean {
   if (href === "/workspace") {
@@ -861,12 +903,15 @@ export function getPrimaryDepartmentNav(
 
 export function isWorkspaceSettingsPath(pathname: string): boolean {
   return (
+    isWorkspaceSelfServicePath(pathname) ||
     pathname === "/workspace/settings" ||
     pathname.startsWith("/workspace/settings/") ||
     pathname === "/workspace/help" ||
     pathname.startsWith("/workspace/help/")
   );
 }
+
+export { isWorkspaceSelfServicePath };
 
 export function getActiveDepartment(pathname: string): Department | null {
   if (isProjectsModulePath(pathname)) {

@@ -31,6 +31,7 @@ export type HrFormState = {
   reporting_manager_id: string;
   work_location: string;
   salary_grade: string;
+  monthly_gross_salary: string;
   contract_type: ContractType | "";
   contract_end_date: string;
   hr_notes: string;
@@ -44,6 +45,7 @@ export const emptyHrForm = (): HrFormState => ({
   reporting_manager_id: "",
   work_location: "",
   salary_grade: "",
+  monthly_gross_salary: "",
   contract_type: "",
   contract_end_date: "",
   hr_notes: "",
@@ -62,6 +64,10 @@ export function hrFormFromEmployee(
       : "",
     work_location: employee?.work_location ?? "",
     salary_grade: employee?.salary_grade ?? "",
+    monthly_gross_salary:
+      employee?.monthly_gross_salary != null
+        ? String(employee.monthly_gross_salary)
+        : "",
     contract_type: employee?.contract_type ?? "",
     contract_end_date: employee?.contract_end_date?.slice(0, 10) ?? "",
     hr_notes: employee?.hr_notes ?? "",
@@ -216,6 +222,21 @@ export function EmployeeHrForm({
             disabled={disabled}
           />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="monthly-gross">Monthly gross salary (KES)</Label>
+          <Input
+            id="monthly-gross"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.monthly_gross_salary}
+            onChange={(e) => set({ monthly_gross_salary: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label>Contract type</Label>
           <Select

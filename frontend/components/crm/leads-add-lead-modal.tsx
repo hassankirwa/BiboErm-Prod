@@ -19,7 +19,6 @@ import {
 import { LeadFormFields } from "@/components/crm/lead-form-ui";
 import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
 import { useAuth } from "@/contexts/auth-context";
-import { toast } from "sonner";
 
 /** @deprecated Use LeadFormValues from @/lib/lead-form-config */
 export type AddLeadFormValues = LeadFormValues;
@@ -66,10 +65,6 @@ export function LeadsAddLeadModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    if (form.needSiteVisit && !form.assignedFieldOfficerId) {
-      toast.error("Assign a field officer when a site visit is required.");
-      return;
-    }
     setSubmitting(true);
     Promise.resolve(onSubmit(form))
       .then(() => onOpenChange(false))
@@ -99,7 +94,12 @@ export function LeadsAddLeadModal({
             {error ? (
               <p className="text-xs text-destructive">{error}</p>
             ) : null}
-            <LeadFormFields form={form} update={update} variant="modal" />
+            <LeadFormFields
+              form={form}
+              update={update}
+              variant="modal"
+              showSiteVisitFields={false}
+            />
             <DialogFooter className="gap-2 pt-2 sm:justify-end">
               <Button
                 type="button"

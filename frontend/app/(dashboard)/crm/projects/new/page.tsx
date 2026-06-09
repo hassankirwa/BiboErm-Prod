@@ -40,6 +40,7 @@ export default function NewCrmProjectPage() {
             </CardHeader>
             <CardContent>
               <ProjectForm
+                mode="crm"
                 defaultAccountId={
                   defaultAccountId && Number.isFinite(defaultAccountId)
                     ? defaultAccountId

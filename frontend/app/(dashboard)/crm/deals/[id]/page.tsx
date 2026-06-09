@@ -74,6 +74,7 @@ import type { ApiDealPayment } from "@/lib/api/crm/types";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { projectDetailPath } from "@/lib/projects/paths";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { AccountPicker } from "@/components/crm/account-picker";
 import { ScheduleSiteVisitFieldOfficerTag } from "@/components/crm/schedule-site-visit-field-officer-tag";
@@ -120,6 +121,14 @@ function formatCurrency(value: string | number | null | undefined): string {
 
 function dealTitle(deal: ApiDeal): string {
   return deal.name ?? deal.title ?? deal.reference;
+}
+
+function depositMet(deal: ApiDeal): boolean {
+  if (deal.payment_status === "deposit_met") return true;
+  const required = parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
+  const paid =
+    parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) || 0;
+  return required > 0 && paid >= required;
 }
 
 export default function DealDetailPage({
@@ -504,6 +513,7 @@ export default function DealDetailPage({
                 handleSendQuotation,
                 "default",
                 <Send className="mr-2 h-4 w-4" />,
+                "quotations.send",
               )}
             {btn(
               "prepare",
@@ -517,6 +527,16 @@ export default function DealDetailPage({
       case "quotation_sent":
         return (
           <>
+            {!depositMet(deal)
+              ? btn(
+                  "deposit",
+                  "Record Deposit",
+                  () => setPaymentDialogOpen(true),
+                  "default",
+                  <Banknote className="mr-2 h-4 w-4" />,
+                  "deal_payments.record",
+                )
+              : null}
             {btn("accept", "Mark Accepted", handleAcceptQuotation, "default")}
             {latestQuotation &&
               btn(
@@ -538,18 +558,32 @@ export default function DealDetailPage({
           </>
         );
       case "negotiation_revision":
-        return btn(
-          "revise-quote",
-          "Create Revised Quotation",
-          () => {
-            if (latestQuotation) {
-              setQuotationDialogOpen(true);
-            } else {
-              toast.error("No quotation to revise.");
-            }
-          },
-          "default",
-          <FileText className="mr-2 h-4 w-4" />,
+        return (
+          <>
+            {!depositMet(deal)
+              ? btn(
+                  "deposit",
+                  "Record Deposit",
+                  () => setPaymentDialogOpen(true),
+                  "default",
+                  <Banknote className="mr-2 h-4 w-4" />,
+                  "deal_payments.record",
+                )
+              : null}
+            {btn(
+              "revise-quote",
+              "Create Revised Quotation",
+              () => {
+                if (latestQuotation) {
+                  setQuotationDialogOpen(true);
+                } else {
+                  toast.error("No quotation to revise.");
+                }
+              },
+              "default",
+              <FileText className="mr-2 h-4 w-4" />,
+            )}
+          </>
         );
       case "accepted":
       case "deposit_pending":
@@ -573,7 +607,7 @@ export default function DealDetailPage({
       case "won":
         return deal.project_id ? (
           <Button size="sm" asChild>
-            <Link href={`/projects/${deal.project_id}`}>
+            <Link href={projectDetailPath(deal.project_id, "crm")}>
               <ExternalLink className="mr-2 h-4 w-4" />
               View Project
             </Link>
@@ -591,7 +625,7 @@ export default function DealDetailPage({
       case "project_created":
         return deal.project_id ? (
           <Button size="sm" asChild>
-            <Link href={`/projects/${deal.project_id}`}>
+            <Link href={projectDetailPath(deal.project_id, "crm")}>
               <ExternalLink className="mr-2 h-4 w-4" />
               View Project
             </Link>

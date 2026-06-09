@@ -31,7 +31,7 @@ export function HrHomePendingActions() {
   }, []);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-3">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Pending HR approvals</CardTitle>
@@ -44,6 +44,23 @@ export function HrHomePendingActions() {
           <Button variant="secondary" size="sm" asChild>
             <Link href="/hr/employees?status=pending_hr_review">
               Review pending HR queue
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Pending leave requests</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Review employee leave requests awaiting HR approval.
+          </p>
+          <Button variant="secondary" size="sm" asChild>
+            <Link href="/hr/leave">
+              Review leave queue
               <ArrowRight className="size-4" />
             </Link>
           </Button>

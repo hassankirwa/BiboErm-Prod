@@ -35,7 +35,15 @@ class LeadController extends Controller
 
         $query = Lead::query()
             ->visibleTo($request->user())
-            ->with(['leadOwner', 'assignedSalesUser', 'assignedFieldOfficer', 'assignee', 'leadSource'])
+            ->with([
+                'leadOwner',
+                'assignedSalesUser',
+                'assignedFieldOfficer',
+                'assignee',
+                'leadSource',
+                'sourceContacts.account',
+                'convertedContact.account',
+            ])
             ->latest();
 
         if ($status = $request->query('status')) {
@@ -184,7 +192,9 @@ class LeadController extends Controller
                 'buildingConstructionStage',
                 'photos',
                 'sourceContact',
+                'sourceContacts',
                 'convertedContact',
+                'convertedAccount.contacts',
                 'convertedAccount',
                 'convertedDeal',
                 'siteVisits',

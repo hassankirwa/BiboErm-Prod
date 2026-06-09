@@ -10,13 +10,14 @@ const stageLabelToId: Record<string, LeadKanbanStageId> = {
   "New Lead": "new",
   Contacted: "contacted",
   Interested: "interested",
+  "Account Created": "account_created",
   "Not Reachable": "not_reachable",
   Unqualified: "unqualified",
-  Qualified: "qualified",
-  "Site Visit Required": "site_visit_required",
-  "Site Visit Scheduled": "site_visit_scheduled",
-  "Measurements Captured": "measurements_captured",
-  Converted: "converted",
+  "Qualified (legacy)": "account_created",
+  "Site Visit Required (legacy)": "account_created",
+  "Site Visit Scheduled (legacy)": "account_created",
+  "Measurements Captured (legacy)": "account_created",
+  "Converted (legacy)": "account_created",
 };
 
 function listRowToCard(row: LeadListRow): LeadKanbanCard {

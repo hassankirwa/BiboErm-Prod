@@ -60,6 +60,7 @@ function designDocumentCount(documents: ProjectDocument[]): number {
 type ProjectDetailDesignsProps = {
   projectId: number;
   projectStage?: string;
+  readOnly?: boolean;
   onProjectUpdated?: (project: ProjectDetail) => void;
   uploadTrigger?: number;
 };
@@ -67,6 +68,7 @@ type ProjectDetailDesignsProps = {
 export function ProjectDetailDesigns({
   projectId,
   projectStage,
+  readOnly = false,
   onProjectUpdated,
   uploadTrigger = 0,
 }: ProjectDetailDesignsProps) {
@@ -171,6 +173,7 @@ export function ProjectDetailDesigns({
         ) : null
       ) : null}
 
+      {!readOnly ? (
       <PermissionGate permission="projects.documents.upload">
         <Card>
           <CardHeader>
@@ -249,6 +252,7 @@ export function ProjectDetailDesigns({
           </CardContent>
         </Card>
       </PermissionGate>
+      ) : null}
 
       <Card>
         <CardHeader>

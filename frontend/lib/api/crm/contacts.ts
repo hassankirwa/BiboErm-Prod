@@ -1,4 +1,6 @@
-import { apiFetch } from "../client";
+import { apiFetch, invalidateApiCache } from "../client";
+import { API_URL } from "../config";
+import { buildCacheKey } from "../request-cache";
 import type { ApiContact, PaginatedResponse } from "./types";
 import { unwrapResource } from "./types";
 
@@ -67,7 +69,16 @@ export async function createContact(
       json: payload,
     },
   );
-  return unwrapResource(res);
+  const contact = unwrapResource(res);
+  if (payload.source_lead_id) {
+    invalidateApiCache(
+      buildCacheKey(
+        "GET",
+        `${API_URL}/api/v1/crm/leads/${payload.source_lead_id}`,
+      ),
+    );
+  }
+  return contact;
 }
 
 /**

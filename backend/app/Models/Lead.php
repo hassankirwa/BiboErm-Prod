@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Lead extends Model
 {
@@ -81,6 +82,34 @@ class Lead extends Model
     public function sourceContact(): HasOne
     {
         return $this->hasOne(Contact::class, 'source_lead_id');
+    }
+
+    public function sourceContacts(): HasMany
+    {
+        return $this->hasMany(Contact::class, 'source_lead_id');
+    }
+
+    /** @return Collection<int, Contact> */
+    public function resolveLinkedContacts(): Collection
+    {
+        $contacts = collect();
+
+        if ($this->relationLoaded('sourceContacts')) {
+            $contacts = $contacts->merge($this->sourceContacts);
+        }
+
+        if ($this->relationLoaded('convertedContact') && $this->convertedContact) {
+            $contacts->push($this->convertedContact);
+        }
+
+        if (
+            $this->relationLoaded('convertedAccount')
+            && $this->convertedAccount?->relationLoaded('contacts')
+        ) {
+            $contacts = $contacts->merge($this->convertedAccount->contacts);
+        }
+
+        return $contacts->unique('id')->values();
     }
 
     public function convertedContact(): BelongsTo

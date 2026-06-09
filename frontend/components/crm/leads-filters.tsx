@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/select";
 import { Search, Filter, Download, RefreshCw } from "lucide-react";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
+import {
+  ACTIVE_LEAD_STATUSES,
+  getLeadStatusLabel,
+  LEGACY_LEAD_STATUSES,
+} from "@/lib/crm-lead-status";
 
 export type LeadsFilterState = {
   search: string;
@@ -68,15 +73,16 @@ export function LeadsFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="interested">Interested</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="site_visit_scheduled">Site Visit Scheduled</SelectItem>
-            <SelectItem value="measurements_captured">Measurements Captured</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
-            <SelectItem value="not_reachable">Not Reachable</SelectItem>
-            <SelectItem value="unqualified">Unqualified</SelectItem>
+            {ACTIVE_LEAD_STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {getLeadStatusLabel(status)}
+              </SelectItem>
+            ))}
+            {LEGACY_LEAD_STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {getLeadStatusLabel(status)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select

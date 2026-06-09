@@ -18,6 +18,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { dealDisplayName } from "@/lib/api/crm/deals";
 import type { ApiSiteVisit } from "@/lib/api/crm/site-visits";
 import {
+  siteVisitDetailPath,
+  type SiteVisitWorkspace,
+} from "@/lib/crm/site-visit-paths";
+import {
   canStartFieldVisit,
   formatMeasurementLineSummary,
   resolveFieldOfficerName,
@@ -25,25 +29,30 @@ import {
 
 type FieldOpenVisitCardProps = {
   visit: ApiSiteVisit;
+  workspace?: SiteVisitWorkspace;
   onStartVisit?: (visitId: number) => void;
   actionLoading?: number | null;
 };
 
-function dealLabel(visit: ApiSiteVisit): string | null {
-  if (!visit.deal) return null;
-  return dealDisplayName(visit.deal);
+function visitContextLabel(visit: ApiSiteVisit): string | null {
+  if (visit.deal) return dealDisplayName(visit.deal);
+  if (visit.lead?.name?.trim()) return visit.lead.name.trim();
+  if (visit.lead?.lead_number) return visit.lead.lead_number;
+  return null;
 }
 
 export function FieldOpenVisitCard({
   visit,
+  workspace = "field",
   onStartVisit,
   actionLoading = null,
 }: FieldOpenVisitCardProps) {
+  const detailPath = (visitId: number) => siteVisitDetailPath(visitId, workspace);
   const status = visit.status ?? "scheduled";
   const showStart = canStartFieldVisit(status) && onStartVisit != null;
   // Check raw visit.status so null/undefined never silently falls through to "scheduled"
   const showLog = visit.status === "in_progress" || visit.status === "measurements_captured";
-  const dealName = dealLabel(visit);
+  const contextLabel = visitContextLabel(visit);
   const officerName = resolveFieldOfficerName(
     visit.assigned_field_officer,
     visit.assigned_field_officer_id,
@@ -61,10 +70,10 @@ export function FieldOpenVisitCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <CardTitle className="text-base">{visit.title}</CardTitle>
-            {dealName && (
+            {contextLabel && (
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                {dealName}
+                {contextLabel}
                 {visit.deal?.account?.name ? ` · ${visit.deal.account.name}` : ""}
               </p>
             )}
@@ -141,7 +150,7 @@ export function FieldOpenVisitCard({
         <div className="flex flex-wrap gap-2 pt-1">
           {showLog && (
             <Button size="sm" variant="default" asChild>
-              <Link href={`/field/site-visits/${visit.id}#log-details`}>
+              <Link href={`${detailPath(visit.id)}#log-details`}>
                 <ClipboardList className="mr-2 h-4 w-4" />
                 {measurementLabel}
               </Link>
@@ -166,7 +175,7 @@ export function FieldOpenVisitCard({
           )}
 
           <Button size="sm" variant="outline" asChild>
-            <Link href={`/field/site-visits/${visit.id}`}>
+            <Link href={detailPath(visit.id)}>
               <ClipboardList className="mr-2 h-4 w-4" />
               View visit
             </Link>

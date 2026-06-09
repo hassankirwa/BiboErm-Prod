@@ -84,10 +84,14 @@ export async function fetchSiteVisit(id: number): Promise<ApiSiteVisit> {
 export async function scheduleSiteVisit(
   payload: ScheduleSiteVisitPayload,
 ): Promise<ApiSiteVisit> {
-  return apiFetch<ApiSiteVisit>("/api/v1/crm/site-visits", {
-    method: "POST",
-    json: payload,
-  });
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    "/api/v1/crm/site-visits",
+    {
+      method: "POST",
+      json: payload,
+    },
+  );
+  return unwrapResource(res);
 }
 
 export async function startSiteVisit(

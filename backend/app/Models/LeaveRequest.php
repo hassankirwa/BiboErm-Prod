@@ -13,6 +13,29 @@ class LeaveRequest extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const TYPE_ANNUAL = 'annual';
+
+    public const TYPE_SICK = 'sick';
+
+    public const TYPE_UNPAID = 'unpaid';
+
+    public const TYPE_COMPASSIONATE = 'compassionate';
+
+    public const TYPE_OTHER = 'other';
+
+    /**
+     * @var list<string>
+     */
+    public const LEAVE_TYPES = [
+        self::TYPE_ANNUAL,
+        self::TYPE_SICK,
+        self::TYPE_UNPAID,
+        self::TYPE_COMPASSIONATE,
+        self::TYPE_OTHER,
+    ];
+
     protected $fillable = [
         'user_id',
         'leave_type',

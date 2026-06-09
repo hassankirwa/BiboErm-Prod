@@ -157,6 +157,7 @@ export function LeadFormFields({
   form,
   update,
   variant = "page",
+  showSiteVisitFields = true,
 }: {
   form: LeadFormValues;
   update: <K extends keyof LeadFormValues>(
@@ -164,6 +165,8 @@ export function LeadFormFields({
     value: LeadFormValues[K],
   ) => void;
   variant?: "page" | "modal";
+  /** Hidden on create — site visits are scheduled from lead detail after contact/interested stages. */
+  showSiteVisitFields?: boolean;
 }) {
   const { user } = useAuth();
   const { lookups, assignableUsers, loading, error } = useCrmFormLookups({
@@ -518,76 +521,80 @@ export function LeadFormFields({
         />
       </Field>
 
-      <div className="flex items-start gap-3 rounded-lg border border-border/80 bg-muted/20 p-3">
-        <Checkbox
-          id="need-site-visit"
-          checked={form.needSiteVisit}
-          onCheckedChange={(checked) => {
-            const enabled = checked === true;
-            update("needSiteVisit", enabled);
-            if (enabled && !form.assignedFieldOfficerId && user?.id) {
-              update("assignedFieldOfficerId", user.id);
-            }
-          }}
-        />
-        <div className="grid gap-1">
-          <Label htmlFor="need-site-visit" className="text-sm font-medium">
-            Site visit required
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Flag early if measurements or inspection will be needed.
-          </p>
-        </div>
-      </div>
-
-      {form.needSiteVisit ? (
+      {showSiteVisitFields ? (
         <>
-          <Field label="Assigned to">
-            <SiteVisitAssigneeSelect
-              value={
-                form.assignedFieldOfficerId
-                  ? String(form.assignedFieldOfficerId)
-                  : ""
-              }
-              onValueChange={(v) =>
-                update("assignedFieldOfficerId", v ? Number(v) : null)
-              }
-              currentUserId={user?.id}
-              currentUserName={user?.name}
-              placeholder="Select assignee"
+          <div className="flex items-start gap-3 rounded-lg border border-border/80 bg-muted/20 p-3">
+            <Checkbox
+              id="need-site-visit"
+              checked={form.needSiteVisit}
+              onCheckedChange={(checked) => {
+                const enabled = checked === true;
+                update("needSiteVisit", enabled);
+                if (enabled && !form.assignedFieldOfficerId && user?.id) {
+                  update("assignedFieldOfficerId", user.id);
+                }
+              }}
             />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Visit date"
-              hint="Optional — schedules a measurement visit when the lead is saved"
-            >
-              <Input
-                type="date"
-                className="h-9"
-                value={form.siteVisitDate}
-                onChange={(e) => update("siteVisitDate", e.target.value)}
-              />
-            </Field>
-            <Field label="Visit time">
-              <Input
-                type="time"
-                className="h-9"
-                value={form.siteVisitTime}
-                onChange={(e) => update("siteVisitTime", e.target.value)}
-              />
-            </Field>
+            <div className="grid gap-1">
+              <Label htmlFor="need-site-visit" className="text-sm font-medium">
+                Site visit required
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Flag early if measurements or inspection will be needed.
+              </p>
+            </div>
           </div>
-          <Field label="Notes for assignee">
-            <Textarea
-              rows={2}
-              value={form.siteVisitNotesForOfficer}
-              onChange={(e) =>
-                update("siteVisitNotesForOfficer", e.target.value)
-              }
-              placeholder="Access instructions, contact on site, scope of measurement…"
-            />
-          </Field>
+
+          {form.needSiteVisit ? (
+            <>
+              <Field label="Assigned to">
+                <SiteVisitAssigneeSelect
+                  value={
+                    form.assignedFieldOfficerId
+                      ? String(form.assignedFieldOfficerId)
+                      : ""
+                  }
+                  onValueChange={(v) =>
+                    update("assignedFieldOfficerId", v ? Number(v) : null)
+                  }
+                  currentUserId={user?.id}
+                  currentUserName={user?.name}
+                  placeholder="Select assignee"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Visit date"
+                  hint="Optional — schedules a measurement visit when the lead is saved"
+                >
+                  <Input
+                    type="date"
+                    className="h-9"
+                    value={form.siteVisitDate}
+                    onChange={(e) => update("siteVisitDate", e.target.value)}
+                  />
+                </Field>
+                <Field label="Visit time">
+                  <Input
+                    type="time"
+                    className="h-9"
+                    value={form.siteVisitTime}
+                    onChange={(e) => update("siteVisitTime", e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="Notes for assignee">
+                <Textarea
+                  rows={2}
+                  value={form.siteVisitNotesForOfficer}
+                  onChange={(e) =>
+                    update("siteVisitNotesForOfficer", e.target.value)
+                  }
+                  placeholder="Access instructions, contact on site, scope of measurement…"
+                />
+              </Field>
+            </>
+          ) : null}
         </>
       ) : null}
     </div>
