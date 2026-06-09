@@ -54,6 +54,7 @@ class Deal extends Model
         'final_agreed_amount',
         'competitor',
         'created_by',
+        'site_assessment',
     ];
 
     protected function casts(): array
@@ -61,6 +62,7 @@ class Deal extends Model
         return [
             'stage' => DealStage::class,
             'product_interests' => 'array',
+            'site_assessment' => 'array',
             'amount' => 'decimal:2',
             'estimated_value' => 'decimal:2',
             'deposit_amount' => 'decimal:2',

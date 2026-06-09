@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Crm\Leads;
 
+use App\Enums\Crm\LeadStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\Leads\StoreLeadRequest;
 use App\Http\Requests\Crm\Leads\UpdateLeadRequest;
@@ -11,6 +12,8 @@ use App\Models\CrmActivity;
 use App\Models\FieldDayPin;
 use App\Models\Lead;
 use App\Models\LeadSource;
+use App\Services\Crm\Leads\AccountProvisioningService;
+use App\Services\Crm\Leads\LeadSalesContextService;
 use App\Services\Crm\Leads\LeadContactService;
 use App\Services\Crm\Leads\LeadNumberGenerator;
 use Illuminate\Http\Request;
@@ -22,6 +25,8 @@ class LeadController extends Controller
     public function __construct(
         protected LeadNumberGenerator $leadNumberGenerator,
         protected LeadContactService $leadContactService,
+        protected AccountProvisioningService $accountProvisioning,
+        protected LeadSalesContextService $leadSalesContext,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -140,9 +145,35 @@ class LeadController extends Controller
         ))->response()->setStatusCode(201);
     }
 
-    public function show(Lead $lead): LeadDetailResource
+    public function show(Request $request, Lead $lead): LeadDetailResource
     {
         $this->authorize('view', $lead);
+
+        if (! $lead->converted_account_id) {
+            $reconciled = $this->accountProvisioning->reconcileLeadAccount($lead, $request->user());
+
+            if (! $reconciled) {
+                $status = $lead->status instanceof LeadStatus
+                    ? $lead->status->value
+                    : (string) $lead->status;
+
+                if ($status === LeadStatus::Interested->value) {
+                    try {
+                        $this->accountProvisioning->provisionFromLead($lead, $request->user());
+                    } catch (\Throwable) {
+                        // Leave lead unchanged; UI keeps polling until provisioning succeeds.
+                    }
+                }
+            }
+
+            $lead->refresh();
+        }
+
+        $this->leadSalesContext->reconcileLeadDealLink($lead);
+        $lead->refresh();
+
+        $salesContext = $this->leadSalesContext->resolve($lead);
+        $lead->sales_context = $salesContext;
 
         return new LeadDetailResource(
             $lead->load([
@@ -150,6 +181,8 @@ class LeadController extends Controller
                 'assignedSalesUser',
                 'assignedFieldOfficer',
                 'leadSource',
+                'buildingConstructionStage',
+                'photos',
                 'sourceContact',
                 'convertedContact',
                 'convertedAccount',

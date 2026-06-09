@@ -3,17 +3,18 @@
 namespace App\Listeners\Projects;
 
 use App\Events\Crm\DealProjectCreated;
-use App\Enums\ProjectStage;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
+use App\Services\Projects\ProjectDealSyncService;
 use App\Services\Projects\ProjectStageService;
 
 class OnDealProjectCreated
 {
     public function __construct(
         protected ProjectStageService $stages,
+        protected ProjectDealSyncService $dealSync,
     ) {}
 
     public function handle(DealProjectCreated $event): void
@@ -31,14 +32,7 @@ class OnDealProjectCreated
             }
         }
 
-        if ($this->dealDepositSatisfied($event->deal) && $project->stage !== ProjectStage::DepositReceived) {
-            $this->stages->transition(
-                $project,
-                ProjectStage::DepositReceived,
-                null,
-                ['reason' => 'crm_deposit_satisfied']
-            );
-        }
+        $this->dealSync->syncFromDeal($project);
     }
 
     protected function nextProjectManagerId(): ?int
@@ -60,15 +54,4 @@ class OnDealProjectCreated
             ->value('user_department_roles.user_id');
     }
 
-    protected function dealDepositSatisfied(mixed $deal): bool
-    {
-        $paid = (float) ($deal->deposit_paid_amount ?? $deal->deposit_amount ?? 0);
-        $required = (float) ($deal->deposit_required_amount ?? 0);
-
-        if ($required > 0) {
-            return $paid >= $required;
-        }
-
-        return $paid > 0;
-    }
 }

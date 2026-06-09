@@ -24,6 +24,7 @@ class Account extends Model
         'billing_address',
         'physical_address',
         'county_id',
+        'building_construction_stage_id',
         'status',
         'owner_id',
         'account_owner_id',
@@ -70,6 +71,21 @@ class Account extends Model
     public function deals(): HasMany
     {
         return $this->hasMany(Deal::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(AccountDocument::class);
+    }
+
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(Quotation::class);
+    }
+
+    public function buildingConstructionStage(): BelongsTo
+    {
+        return $this->belongsTo(BuildingConstructionStage::class, 'building_construction_stage_id');
     }
 
     public function scopeVisibleTo($query, User $user)

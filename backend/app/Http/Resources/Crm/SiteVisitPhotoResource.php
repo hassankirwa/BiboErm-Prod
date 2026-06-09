@@ -10,10 +10,12 @@ class SiteVisitPhotoResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $url = $this->firebase_url;
-        if (! $url && $this->file_path) {
-            $url = BiboStorage::resolvePublicUrl($this->file_path)
-                ?? BiboStorage::resolvePrivateApiUrl($this->file_path);
+        $url = null;
+        if ($this->file_path) {
+            $url = BiboStorage::resolveStoredUrl($this->file_path);
+        }
+        if (! $url) {
+            $url = $this->firebase_url;
         }
 
         return [

@@ -46,12 +46,13 @@ class DealStageService
 
     public function markWon(Deal $deal, User $user, bool $overrideDeposit = false): Deal
     {
-        $depositRequired = (float) ($deal->deposit_required_amount ?? $deal->deposit_amount ?? 0);
-        $depositPaid = (float) ($deal->deposit_paid_amount ?? 0);
+        $hasAcceptedQuotation = $deal->quotations()
+            ->where('status', QuotationStatus::Accepted->value)
+            ->exists();
 
-        if ($depositRequired > 0 && $depositPaid < $depositRequired && ! $overrideDeposit) {
+        if (! $hasAcceptedQuotation) {
             throw ValidationException::withMessages([
-                'deposit' => ['Deposit must be recorded before marking deal as won.'],
+                'quotation' => ['An accepted quotation is required before marking the deal as won.'],
             ]);
         }
 

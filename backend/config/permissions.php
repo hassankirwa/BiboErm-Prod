@@ -54,7 +54,7 @@ return [
             'contacts.view', 'contacts.create', 'contacts.update',
             'accounts.view', 'accounts.create', 'accounts.update',
             'deals.view', 'deals.create', 'deals.update', 'deals.mark_won', 'deals.mark_lost', 'deals.create_project',
-            'site_visits.view', 'site_visits.schedule', 'site_visits.approve',
+            'site_visits.view', 'site_visits.schedule', 'site_visits.execute', 'site_visits.approve',
             'quotations.view', 'quotations.create', 'quotations.send',
             'deal_payments.record', 'deal_payments.view',
             'activities.view', 'activities.create', 'activities.complete',
@@ -67,13 +67,14 @@ return [
             'leads.view', 'leads.create',
             'site_visits.view', 'site_visits.execute',
             'activities.view', 'activities.create', 'activities.complete',
-            'field_day.view', 'field_day.create',
         ],
 
         'project_manager' => [
             'analytics.view',
             'crm.view',
             'deals.view',
+            'quotations.view', 'quotations.create', 'quotations.send',
+            'accounts.view',
             'projects.view', 'projects.manage', 'projects.update', 'projects.assign_pm',
             'projects.assign_engineers', 'projects.advance_stage', 'projects.site_assessment_notes', 'projects.log_delay',
             'projects.update_timeline', 'projects.bom.view', 'projects.bom.upload',
@@ -109,6 +110,7 @@ return [
             'warehouse.reservations.view',
             'warehouse.reservations.release',
             'production.view', 'production.manage', 'production.schedule.manage',
+            'site_visits.view', 'site_visits.execute',
             'qc.view',
         ],
 

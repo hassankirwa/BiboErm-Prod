@@ -23,7 +23,7 @@ class Lead extends Model
         'preferred_contact_method', 'preferred_contact_time',
         'account_name', 'account_type', 'industry', 'company_phone', 'company_email',
         'website', 'kra_pin', 'billing_address',
-        'product_interests', 'requirement_description', 'property_site_type',
+        'product_interests', 'requirement_description', 'property_site_type', 'building_construction_stage_id',
         'estimated_scope', 'estimated_budget', 'estimated_value', 'expected_timeline', 'urgency',
         'site_name', 'site_address', 'county_id', 'subcounty', 'ward', 'area_estate', 'latitude', 'longitude',
         'landmark', 'site_contact_name', 'site_contact_phone',
@@ -111,6 +111,16 @@ class Lead extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(LeadAttachment::class);
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(LeadPhoto::class);
+    }
+
+    public function buildingConstructionStage(): BelongsTo
+    {
+        return $this->belongsTo(BuildingConstructionStage::class, 'building_construction_stage_id');
     }
 
     public function isQualifiedForAccount(): bool

@@ -9,6 +9,8 @@ use App\Models\Deal;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Projects\ProjectActivationService;
+use App\Services\Projects\ProjectDealSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +19,8 @@ class DealToProjectService
 {
     public function __construct(
         protected CrmAuditLogger $crmAudit,
+        protected ProjectActivationService $projectActivation,
+        protected ProjectDealSyncService $projectDealSync,
     ) {}
 
     public function createFromDeal(Deal $deal, User $user): array
@@ -42,6 +46,22 @@ class DealToProjectService
         }
 
         return DB::transaction(function () use ($deal, $user) {
+            $hasActiveProject = $this->projectActivation->accountHasActiveInFlightProject((int) $deal->account_id);
+            $depositSatisfied = $this->projectDealSync->dealDepositSatisfied($deal);
+
+            $isActive = ! $hasActiveProject;
+            $projectStage = ($isActive && $depositSatisfied)
+                ? ProjectStage::DepositReceived->value
+                : ProjectStage::AwaitingDeposit->value;
+
+            $stageData = [];
+            $account = $deal->account;
+            if ($account?->building_construction_stage_id) {
+                $stageData['intake'] = [
+                    'building_construction_stage_id' => $account->building_construction_stage_id,
+                ];
+            }
+
             $project = Project::query()->create([
                 'reference' => 'PR-'.strtoupper(Str::random(8)),
                 'name' => $deal->name ?? $deal->title,
@@ -50,9 +70,11 @@ class DealToProjectService
                 'account_id' => $deal->account_id,
                 'site_address' => $deal->site_address,
                 'quoted_amount' => $deal->final_agreed_amount ?? $deal->estimated_value ?? $deal->amount,
-                'deposit_received' => $deal->deposit_paid_amount ?? $deal->deposit_amount,
+                'deposit_received' => $this->projectDealSync->dealDepositPaid($deal),
                 'sales_rep_id' => $deal->deal_owner_id ?? $deal->owner_id ?? $user->id,
-                'stage' => ProjectStage::AwaitingDeposit->value,
+                'stage' => $projectStage,
+                'is_active' => $isActive,
+                'stage_data' => $stageData !== [] ? $stageData : null,
             ]);
 
             $deal->update([
@@ -62,8 +84,17 @@ class DealToProjectService
 
             $deal = $deal->fresh();
 
+            if (! $isActive && $depositSatisfied) {
+                $project = $this->projectActivation->tryActivateFromDeposit($project, $deal, $user);
+            } elseif ($isActive && ! $depositSatisfied) {
+                $project = $project->fresh();
+            } else {
+                $project = $this->projectDealSync->syncFromDeal($project, $user);
+            }
+
             $this->crmAudit->dealProjectCreated($deal, [
                 'project_id' => $project->id,
+                'is_active' => $project->is_active,
             ], $user);
 
             DealProjectCreated::dispatch($deal, $project);

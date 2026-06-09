@@ -1,0 +1,8 @@
+Project No.	202604211407
+Project Name	BEATRICE
+No.	Seris	Code	Glass Type	Width (mm)	Height (mm)	Sqm/Pcs	Qty (Pcs)	Total Sqm	Price (Kes/Pcs)	Total Price
+1	S90 Sliding 推拉门	SD-1	Bronze Reflective glass 6mm	1450	2100	3.05	1	3.05	50991.26	50991.26
+2	S90 Sliding 推拉门	SD-2	Bronze Reflective glass 6mm	2370	2235	5.30	1	5.30	88750.00	88750.00
+合计 Total							2	8.35			139741.26
+VAT 16%							22358.60
+Grand Total							162099.86

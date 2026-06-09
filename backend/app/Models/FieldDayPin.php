@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FieldDayPin extends Model
 {
@@ -44,6 +45,11 @@ class FieldDayPin extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(FieldDayPinPhoto::class);
     }
 
     public function county(): BelongsTo

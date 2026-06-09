@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\ProjectDelay;
 use App\Models\User;
 use App\Services\Projects\ProjectDashboardService;
+use App\Services\Projects\ProjectDealSyncService;
 use App\Services\Projects\ProjectStageService;
 use App\Support\BiboStorage;
 use App\Support\ProjectStageAdvance;
@@ -35,6 +36,7 @@ class ProjectController extends Controller
     public function __construct(
         protected ProjectStageService $stages,
         protected ProjectDashboardService $dashboard,
+        protected ProjectDealSyncService $dealSync,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -117,6 +119,8 @@ class ProjectController extends Controller
     public function show(Project $project): ProjectResource
     {
         $this->authorize('view', $project);
+
+        $project = $this->dealSync->syncFromDeal($project, request()->user());
 
         return new ProjectResource(
             $project->load([

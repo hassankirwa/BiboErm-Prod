@@ -12,7 +12,7 @@ class SiteVisit extends Model
     protected $fillable = [
         'visit_number', 'title', 'lead_id', 'deal_id', 'account_id', 'contact_id',
         'site_address', 'latitude', 'longitude', 'assigned_field_officer_id', 'scheduled_by',
-        'visit_date', 'visit_time', 'visit_purpose', 'status', 'notes_for_field_officer',
+        'visit_date', 'visit_time', 'visit_purpose', 'requires_measurements', 'status', 'notes_for_field_officer',
         'actual_latitude', 'actual_longitude', 'arrival_at', 'completion_at',
         'client_present', 'visit_outcome', 'follow_up_required', 'field_officer_notes',
         'approved_by', 'approved_at',
@@ -25,6 +25,7 @@ class SiteVisit extends Model
             'visit_date' => 'date',
             'client_present' => 'boolean',
             'follow_up_required' => 'boolean',
+            'requires_measurements' => 'boolean',
             'arrival_at' => 'datetime',
             'completion_at' => 'datetime',
             'approved_at' => 'datetime',

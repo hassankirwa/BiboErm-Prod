@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Crm\Activities;
 
 use App\Http\Controllers\Controller;
 use App\Models\CrmActivity;
+use App\Support\Crm\CrmActivityTypeGroups;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -35,9 +36,10 @@ class CrmActivityController extends Controller
         }
 
         if ($activityType = $request->query('activity_type')) {
-            $query->where(function ($q) use ($activityType) {
-                $q->where('activity_type', $activityType)
-                    ->orWhere('type', $activityType);
+            $types = CrmActivityTypeGroups::resolveFilterTypes($activityType);
+            $query->where(function ($q) use ($types) {
+                $q->whereIn('activity_type', $types)
+                    ->orWhereIn('type', $types);
             });
         }
 
@@ -58,7 +60,7 @@ class CrmActivityController extends Controller
     {
         $this->authorize('create', CrmActivity::class);
 
-        $activityTypes = ['task', 'call', 'email', 'meeting', 'schedule_call'];
+        $activityTypes = CrmActivityTypeGroups::allTypes();
 
         $validated = $request->validate([
             'activity_type' => [
@@ -79,10 +81,18 @@ class CrmActivityController extends Controller
             'description' => ['nullable', 'string'],
             'body' => ['nullable', 'string'],
             'due_at' => ['nullable', 'date'],
+            'scheduled_start_at' => ['nullable', 'date'],
+            'scheduled_end_at' => ['nullable', 'date', 'after_or_equal:scheduled_start_at'],
             'priority' => ['nullable', 'string', 'max:20'],
-            'lead_id' => ['nullable', 'exists:leads,id', 'required_without_all:contact_id,deal_id'],
-            'contact_id' => ['nullable', 'exists:contacts,id', 'required_without_all:lead_id,deal_id'],
-            'deal_id' => ['nullable', 'exists:deals,id', 'required_without_all:lead_id,contact_id'],
+            'location' => ['nullable', 'string', 'max:500'],
+            'outcome' => ['nullable', 'string', 'max:50'],
+            'duration_minutes' => ['nullable', 'integer', 'min:0'],
+            'recipient' => ['nullable', 'string', 'max:255'],
+            'reminder_minutes_before' => ['nullable', 'integer', 'min:0'],
+            'lead_id' => ['nullable', 'exists:leads,id', 'required_without_all:contact_id,deal_id,account_id'],
+            'contact_id' => ['nullable', 'exists:contacts,id', 'required_without_all:lead_id,deal_id,account_id'],
+            'deal_id' => ['nullable', 'exists:deals,id', 'required_without_all:lead_id,contact_id,account_id'],
+            'account_id' => ['nullable', 'exists:accounts,id', 'required_without_all:lead_id,contact_id,deal_id'],
             'assigned_to' => ['nullable', 'exists:users,id'],
         ]);
 
@@ -90,7 +100,10 @@ class CrmActivityController extends Controller
         $relatedType = null;
         $relatedId = null;
 
-        if (! empty($validated['lead_id'])) {
+        if (! empty($validated['account_id'])) {
+            $relatedType = \App\Models\Account::class;
+            $relatedId = $validated['account_id'];
+        } elseif (! empty($validated['lead_id'])) {
             $relatedType = \App\Models\Lead::class;
             $relatedId = $validated['lead_id'];
         } elseif (! empty($validated['deal_id'])) {

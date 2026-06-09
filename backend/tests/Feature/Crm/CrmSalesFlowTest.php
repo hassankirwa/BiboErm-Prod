@@ -18,6 +18,9 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use App\Jobs\Crm\CreateAccountFromLead;
+use App\Services\Crm\Leads\AccountProvisioningService;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -80,15 +83,25 @@ class CrmSalesFlowTest extends TestCase
             'phone' => '+254712345678',
         ]);
 
-        foreach ([LeadStatus::Contacted, LeadStatus::Interested, LeadStatus::Qualified] as $status) {
+        Queue::fake();
+
+        foreach ([LeadStatus::Contacted, LeadStatus::Interested] as $status) {
             $this->patchJson("/api/v1/crm/leads/{$leadId}/status", [
                 'status' => $status->value,
             ])->assertOk();
         }
 
+        (new CreateAccountFromLead($leadId, $this->salesRep->id))
+            ->handle(app(AccountProvisioningService::class));
+
+        $lead = Lead::query()->findOrFail($leadId);
+        $accountId = $lead->converted_account_id;
+        $this->assertNotNull($accountId);
+
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Prime Offices measurement',
             'lead_id' => $leadId,
+            'account_id' => $accountId,
             'assigned_field_officer_id' => $this->fieldOfficer->id,
             'visit_date' => now()->addDay()->toDateString(),
             'site_address' => 'Westlands, Nairobi',
@@ -124,30 +137,13 @@ class CrmSalesFlowTest extends TestCase
 
         $this->postJson("/api/v1/crm/site-visits/{$visitId}/approve")->assertOk();
 
-        $convert = $this->postJson("/api/v1/crm/leads/{$leadId}/convert", [
-            'deal_name' => 'Prime Offices Roller Blinds Project',
-            'estimated_value' => 850000,
-            'expected_close_date' => now()->addMonths(2)->toDateString(),
-        ]);
-
-        $convert->assertOk();
-        $dealId = $convert->json('data.deal.id');
-        $accountId = $convert->json('data.account.id');
-
-        $this->assertDatabaseHas('deals', [
-            'id' => $dealId,
-            'account_id' => $accountId,
-        ]);
-
-        $this->assertDatabaseCount('contacts', 1);
-
         $this->assertDatabaseHas('site_visits', [
             'id' => $visitId,
-            'deal_id' => $dealId,
+            'account_id' => $accountId,
             'lead_id' => $leadId,
         ]);
 
-        $quotation = $this->postJson("/api/v1/crm/deals/{$dealId}/quotations", [
+        $quotation = $this->postJson("/api/v1/crm/accounts/{$accountId}/quotations", [
             'lines' => [
                 [
                     'description' => 'Roller blinds package',
@@ -161,6 +157,15 @@ class CrmSalesFlowTest extends TestCase
         $quotationId = $quotation->json('data.id');
 
         $this->postJson("/api/v1/crm/quotations/{$quotationId}/send")->assertOk();
+
+        $dealId = \App\Models\Quotation::query()->findOrFail($quotationId)->deal_id;
+        $this->assertNotNull($dealId);
+
+        $this->assertDatabaseHas('deals', [
+            'id' => $dealId,
+            'account_id' => $accountId,
+            'stage' => DealStage::QuotationSent->value,
+        ]);
 
         $this->postJson("/api/v1/crm/quotations/{$quotationId}/accept")->assertOk();
 
@@ -209,7 +214,7 @@ class CrmSalesFlowTest extends TestCase
 
         $lead = Lead::query()->findOrFail($leadId);
         $this->assertSame(
-            LeadStatus::Converted->value,
+            LeadStatus::AccountCreated->value,
             $lead->status instanceof LeadStatus ? $lead->status->value : $lead->status
         );
     }
@@ -604,15 +609,11 @@ class CrmSalesFlowTest extends TestCase
 
         $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
             'status' => LeadStatus::Qualified->value,
-        ])->assertOk();
+        ])->assertStatus(422);
 
         $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
             'status' => LeadStatus::SiteVisitScheduled->value,
         ])->assertStatus(422);
-
-        $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
-            'status' => LeadStatus::SiteVisitRequired->value,
-        ])->assertOk();
     }
 
     public function test_account_creation_rejected_for_unqualified_lead(): void

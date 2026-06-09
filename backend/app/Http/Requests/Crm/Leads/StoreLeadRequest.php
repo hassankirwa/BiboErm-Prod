@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Crm\Leads;
 
+use App\Models\User;
+use App\Support\Crm\SiteVisitAssigneeRoles;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,6 +29,16 @@ class StoreLeadRequest extends FormRequest
                 Rule::requiredIf(fn () => $this->boolean('need_site_visit')),
                 'nullable',
                 'exists:users,id',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+
+                    $assignee = User::query()->find($value);
+                    if (! $assignee || ! SiteVisitAssigneeRoles::userIsEligible($assignee)) {
+                        $fail('The selected assignee cannot perform site visits.');
+                    }
+                },
             ],
             'contact_person_name' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -47,6 +59,7 @@ class StoreLeadRequest extends FormRequest
             'product_interests.*' => ['string', 'max:64'],
             'requirement_description' => ['nullable', 'string'],
             'property_site_type' => ['nullable', 'string', 'max:50'],
+            'building_construction_stage_id' => ['nullable', 'exists:crm_building_construction_stages,id'],
             'estimated_scope' => ['nullable', 'string', 'max:255'],
             'estimated_budget' => ['nullable', 'numeric', 'min:0'],
             'estimated_value' => ['nullable', 'numeric', 'min:0'],

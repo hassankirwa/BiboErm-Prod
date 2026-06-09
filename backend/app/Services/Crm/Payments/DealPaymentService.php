@@ -5,14 +5,21 @@ namespace App\Services\Crm\Payments;
 use App\Enums\Crm\DealStage;
 use App\Models\Deal;
 use App\Models\DealPayment;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Crm\Deals\DealToProjectService;
+use App\Services\Projects\ProjectActivationService;
+use App\Services\Projects\ProjectDealSyncService;
 use Illuminate\Support\Facades\DB;
 
 class DealPaymentService
 {
     public function __construct(
         protected CrmAuditLogger $crmAudit,
+        protected ProjectDealSyncService $projectDealSync,
+        protected ProjectActivationService $projectActivation,
+        protected DealToProjectService $dealToProject,
     ) {}
 
     public function record(Deal $deal, User $user, array $data): DealPayment
@@ -45,17 +52,38 @@ class DealPaymentService
                 'payment_status' => $paymentStatus,
             ];
 
-            if ($depositRequired > 0 && $totalPaid >= $depositRequired) {
-                $updates['stage'] = DealStage::DepositRecorded->value;
-            } else {
-                $updates['stage'] = DealStage::DepositPending->value;
-            }
-
             $deal->update($updates);
+            $deal = $deal->fresh();
+
+            if ($deal->project_id) {
+                $project = Project::query()->find($deal->project_id);
+                if ($project) {
+                    $project = $this->projectActivation->tryActivateFromDeposit($project, $deal, $user);
+                    $this->projectDealSync->syncFromDeal($project, $user);
+                }
+            } elseif ($this->shouldCreateProjectFromDeposit($deal)) {
+                $this->dealToProject->createFromDeal($deal, $user);
+                $deal = $deal->fresh();
+            }
 
             $this->crmAudit->dealPaymentRecorded($payment, $user);
 
             return $payment->load(['deal', 'receivedBy']);
         });
+    }
+
+    protected function shouldCreateProjectFromDeposit(Deal $deal): bool
+    {
+        if ($deal->project_id) {
+            return false;
+        }
+
+        if (! $this->projectDealSync->dealDepositSatisfied($deal)) {
+            return false;
+        }
+
+        $stage = $deal->stage instanceof DealStage ? $deal->stage->value : (string) $deal->stage;
+
+        return $stage === DealStage::Won->value || $deal->status === 'won';
     }
 }

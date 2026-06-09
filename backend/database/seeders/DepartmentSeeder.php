@@ -22,7 +22,8 @@ class DepartmentSeeder extends Seeder
         ['name' => 'Project Management', 'slug' => 'project_management', 'default_module' => 'projects'],
         ['name' => 'Operations / Admin', 'slug' => 'operations', 'default_module' => 'workspace'],
         ['name' => 'Reception', 'slug' => 'reception', 'default_module' => 'crm'],
-        ['name' => 'Field Installation', 'slug' => 'field_installation', 'default_module' => 'field_installation'],
+        ['name' => 'Field Operations', 'slug' => 'field', 'default_module' => 'field'],
+        ['name' => 'Field Installation', 'slug' => 'field_installation', 'default_module' => 'field'],
     ];
 
     public function run(): void

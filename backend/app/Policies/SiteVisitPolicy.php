@@ -14,7 +14,14 @@ class SiteVisitPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->canAny($user, ['site_visits.view', 'site_visits.view_all', 'crm.view']);
+        return $this->canAny($user, [
+            'site_visits.view',
+            'site_visits.view_all',
+            'site_visits.execute',
+            'field_installation.view',
+            'field_installation.log',
+            'crm.view',
+        ]);
     }
 
     public function view(User $user, SiteVisit $siteVisit): bool
@@ -54,7 +61,7 @@ class SiteVisitPolicy
 
     public function execute(User $user, SiteVisit $siteVisit): bool
     {
-        return $user->can('site_visits.execute')
+        return ($user->can('site_visits.execute') || $user->can('field_installation.log'))
             && (int) $siteVisit->assigned_field_officer_id === $user->id;
     }
 

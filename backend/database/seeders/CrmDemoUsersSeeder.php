@@ -32,11 +32,14 @@ class CrmDemoUsersSeeder extends Seeder
             role: $salesRole,
         );
 
+        $fieldDept = Department::query()->where('slug', 'field')->first()
+            ?? $salesDept;
+
         $this->seedUser(
             email: 'field@bibo.local',
             name: 'Field Officer',
             password: 'password',
-            department: $salesDept,
+            department: $fieldDept,
             role: $fieldRole,
         );
     }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Crm\Leads\BulkImportLeadsController;
 use App\Http\Controllers\Crm\Leads\ConvertLeadController;
 use App\Http\Controllers\Crm\Leads\LeadController;
 use App\Http\Controllers\Crm\Leads\StoreLeadAttachmentController;
+use App\Http\Controllers\Crm\Leads\StoreLeadPhotoController;
 use App\Http\Controllers\Crm\Leads\UpdateLeadStatusController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,3 +17,4 @@ Route::middleware('permission:leads.delete')->delete('leads/{lead}', [LeadContro
 Route::middleware('permission:leads.update')->patch('leads/{lead}/status', UpdateLeadStatusController::class);
 Route::middleware('permission:leads.convert')->post('leads/{lead}/convert', ConvertLeadController::class);
 Route::middleware('permission:leads.update')->post('leads/{lead}/attachments', StoreLeadAttachmentController::class);
+Route::middleware('permission:leads.create|leads.update')->post('leads/{lead}/photos', StoreLeadPhotoController::class);

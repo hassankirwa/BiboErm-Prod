@@ -23,6 +23,13 @@ class LeadDetailResource extends LeadResource
             'billing_address' => $this->billing_address,
             'requirement_description' => $this->requirement_description,
             'property_site_type' => $this->property_site_type,
+            'building_construction_stage_id' => $this->building_construction_stage_id,
+            'building_construction_stage' => $this->whenLoaded('buildingConstructionStage', fn () => [
+                'id' => $this->buildingConstructionStage->id,
+                'slug' => $this->buildingConstructionStage->slug,
+                'label' => $this->buildingConstructionStage->label,
+            ]),
+            'photos' => LeadPhotoResource::collection($this->whenLoaded('photos')),
             'estimated_scope' => $this->estimated_scope,
             'expected_timeline' => $this->expected_timeline,
             'urgency' => $this->urgency,
@@ -53,6 +60,14 @@ class LeadDetailResource extends LeadResource
             'converted_contact' => new ContactResource($this->whenLoaded('convertedContact')),
             'converted_account' => new AccountResource($this->whenLoaded('convertedAccount')),
             'converted_deal' => new DealResource($this->whenLoaded('convertedDeal')),
+            'latest_quotation' => $this->when(
+                isset($this->sales_context['latest_quotation']) && $this->sales_context['latest_quotation'],
+                fn () => new QuotationSummaryResource($this->sales_context['latest_quotation']),
+            ),
+            'sales_deal' => $this->when(
+                isset($this->sales_context['sales_deal']) && $this->sales_context['sales_deal'],
+                fn () => new DealResource($this->sales_context['sales_deal']),
+            ),
             'site_visits' => SiteVisitResource::collection($this->whenLoaded('siteVisits')),
             'attachments' => $this->whenLoaded('attachments'),
             'activities' => $this->whenLoaded('activities'),

@@ -38,13 +38,20 @@ class QuotationController extends Controller
         return new QuotationResource($quotation);
     }
 
-    public function show(Quotation $quotation): QuotationResource
+    public function show(Request $request, Quotation $quotation): QuotationResource
     {
         $this->authorize('view', $quotation);
 
-        return new QuotationResource(
-            $quotation->load(['lines', 'deal', 'account', 'contact', 'preparedBy'])
-        );
+        $quotation->load(['lines', 'deal', 'account', 'contact', 'preparedBy', 'deal.project']);
+
+        if ($request->query('include') === 'history') {
+            $quotation->setRelation(
+                'revisionHistory',
+                $this->quotationService->revisionHistory($quotation),
+            );
+        }
+
+        return new QuotationResource($quotation);
     }
 
     public function update(Request $request, Quotation $quotation): QuotationResource

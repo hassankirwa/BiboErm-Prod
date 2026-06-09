@@ -12,7 +12,9 @@ class CrmActivity extends Model
 
     protected $fillable = [
         'type', 'activity_type', 'subject', 'body', 'description', 'status', 'priority',
-        'due_at', 'completed_at', 'lead_id', 'contact_id', 'deal_id',
+        'due_at', 'scheduled_start_at', 'scheduled_end_at', 'completed_at', 'cancelled_at',
+        'lead_id', 'contact_id', 'deal_id', 'account_id', 'site_visit_id',
+        'location', 'reminder_minutes_before', 'outcome', 'duration_minutes', 'recipient',
         'activitable_type', 'activitable_id', 'assigned_to', 'created_by',
     ];
 
@@ -20,7 +22,10 @@ class CrmActivity extends Model
     {
         return [
             'due_at' => 'datetime',
+            'scheduled_start_at' => 'datetime',
+            'scheduled_end_at' => 'datetime',
             'completed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -42,6 +47,11 @@ class CrmActivity extends Model
     public function deal(): BelongsTo
     {
         return $this->belongsTo(Deal::class);
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
     }
 
     public function assignee(): BelongsTo

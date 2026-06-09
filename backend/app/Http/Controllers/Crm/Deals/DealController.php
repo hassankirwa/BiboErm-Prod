@@ -97,7 +97,7 @@ class DealController extends Controller
             'created_by' => $user->id,
         ]);
 
-        return new DealResource($deal->load(['contact', 'account', 'owner']));
+        return new DealResource($deal->load(['contact', 'account', 'owner', 'assignedFieldOfficer']));
     }
 
     public function show(Deal $deal): DealResource
@@ -105,7 +105,16 @@ class DealController extends Controller
         $this->authorize('view', $deal);
 
         return new DealResource(
-            $deal->load(['contact', 'account', 'owner', 'project', 'quotations.lines', 'payments.receivedBy', 'siteVisits'])
+            $deal->load([
+                'contact',
+                'account',
+                'owner',
+                'assignedFieldOfficer',
+                'project',
+                'quotations.lines',
+                'payments.receivedBy',
+                'siteVisits',
+            ])
         );
     }
 
@@ -145,6 +154,6 @@ class DealController extends Controller
 
         $deal->update($validated);
 
-        return new DealResource($deal->fresh()->load(['contact', 'account', 'owner']));
+        return new DealResource($deal->fresh()->load(['contact', 'account', 'owner', 'assignedFieldOfficer']));
     }
 }

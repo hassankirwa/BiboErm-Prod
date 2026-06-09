@@ -37,6 +37,12 @@ class LeadPolicy
             && $this->canAny($user, ['leads.update', 'crm.manage']);
     }
 
+    public function uploadPhotos(User $user, Lead $lead): bool
+    {
+        return $this->view($user, $lead)
+            && $this->canAny($user, ['leads.create', 'leads.update', 'crm.manage']);
+    }
+
     public function delete(User $user, Lead $lead): bool
     {
         return $this->update($user, $lead)

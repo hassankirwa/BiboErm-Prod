@@ -1,0 +1,159 @@
+门 窗 单 窗 组 装 清 单 表Aluminum W&D Fabrication Details													
+									Project Name：		BEATRICE		
+									Order No：		202604211407		
+									W&D Series:		S90 Sliding 推拉门		
+									W&D Code：		SD-1		
+									Quantity：		1		
+									W&D Colour：		深灰色深灰色		
+									Project Add：				
+									Installation site：				
+									Delivery date：		2026年05月21日		
+									Sill height：		0		
+									Sqm：		3.02		
+									Weight：		14.26		
+													
+													
+													
+													
+框主材尺寸表 Frame profile Size specification							五金配件表 Hardware details						
+No.	Name	Code No	Length	QTY	Corner	Mark	No.	Name	Specification	Unit	QTY	Purpose	Mark
+1	Side frame 边封	PY08	2090	2	9090		1	Roller 90 SD	90推拉门 双轮 2pcs	套set	2	车间	
+2	Top rail 平上滑	PY06	1408	1	9090		2	Lock 90 SD	90推拉门 一字勾锁 双面钩锁 1locks	套set	2	车间	
+3	Bottom track 下滑	PY43	1408	1	9090		3	Cilicom玻璃胶	玻璃胶570g	pcs	2	车间	
+扇主材尺寸表 Sash profile size specification							玻璃清单 All glass details						
+No.	Name	Code No	Lenght	QTY	Corner	Mark	No.	Name	玻璃宽 W	玻璃高 H	QTY	Specification	Mark
+1	Lock profile 单玻光企	PY24	2040.5	2	9090		1	Reflective glass 	633	1961	2	6mm brown 镀膜棕玻	否
+2	Interlock Profile 单玻勾企	PY25	2040.5	2	9090								
+3	Sash Frame 单玻上下方	PY52	642.8	4	9090								
+纱窗尺寸表 Screens size specification							纱网尺寸表 Mesh size specification						
+No.	Type	Opening	宽 W	高 H	QTY	Mark	No.	Name	Specification	Mark	QTY	W	H
+开启扇 Sash Specification													
+No.	Type	Opening	宽 W	高 H	QTY	Mark							
+1	右推拉	右	728.8	2040.5	1	1020.3							
+2	左推拉	左	728.8	2040.5	1	1020.3							
+包装说明：		　	　	　	　	　		　	　	　	　		　
+1：散件包装			框料散件		纸皮包裹			捆扎包装		入木箱包装		2026年05月12日	　
+2：木箱包装			扇料拼装		扇入玻璃			注胶		入木箱包装		第1页,共4页	　
+3：其它包装		　	　	　	　	　							
+设计：			审核：			批准：				切料：			
+门 窗 单 窗 组 装 清 单 表Aluminum W&D Fabrication Details													
+									Project Name：		BEATRICE		
+									Order No：		202604211407		
+									W&D Series:		S90 Sliding 推拉门		
+									W&D Code：		SD-2		
+									Quantity：		1		
+									W&D Colour：		深灰色深灰色		
+									Project Add：				
+									Installation site：				
+									Delivery date：		2026年05月21日		
+									Sill height：		0		
+									Sqm：		5.28		
+									Weight：		23.99		
+													
+													
+													
+													
+框主材尺寸表 Frame profile Size specification							五金配件表 Hardware details						
+No.	Name	Code No	Length	QTY	Corner	Mark	No.	Name	Specification	Unit	QTY	Purpose	Mark
+1	Side frame 边封	PY08	1816	2	9090		1	Roller 90 SD	90推拉门 双轮 2pcs	套set	4	车间	
+2	Top rail 平上滑	PY06	2868	1	9090		2	Lock 90 SD	90推拉门 一字勾锁 双面钩锁 1locks	套set	4	车间	
+3	Bottom track 下滑	PY43	2868	1	9090		3	Cilicom玻璃胶	玻璃胶570g	pcs	4	车间	
+扇主材尺寸表 Sash profile size specification							玻璃清单 All glass details						
+No.	Name	Code No	Lenght	QTY	Corner	Mark	No.	Name	玻璃宽 W	玻璃高 H	QTY	Specification	Mark
+1	Lock profile 单玻光企	PY24	1766.5	4	9090		1	Reflective glass 	646	1687	4	6mm brown 镀膜棕玻	否
+2	Interlock Profile 单玻勾企	PY25	1766.5	4	9090								
+3	Inter seal 收口	PY35	1766.5	1	9090								
+4	Sash Frame 单玻上下方	PY52	656.4	8	9090								
+纱窗尺寸表 Screens size specification							纱网尺寸表 Mesh size specification						
+No.	Type	Opening	宽 W	高 H	QTY	Mark	No.	Name	Specification	Mark	QTY	W	H
+开启扇 Sash Specification													
+No.	Type	Opening	宽 W	高 H	QTY	Mark							
+1	右推拉	右	742.4	1766.5	2	883.3							
+2	左推拉	左	742.4	1766.5	2	883.3							
+包装说明：		　	　	　	　	　		　	　	　	　		　
+1：散件包装			框料散件		纸皮包裹			捆扎包装		入木箱包装		2026年05月12日	　
+2：木箱包装			扇料拼装		扇入玻璃			注胶		入木箱包装		第2页,共4页	　
+3：其它包装		　	　	　	　	　							
+设计：			审核：			批准：				切料：			
+门 窗 单 窗 组 装 清 单 表Aluminum W&D Fabrication Details													
+									Project Name：		BEATRICE		
+									Order No：		202604211407		
+									W&D Series:		S90 Sliding 推拉门		
+									W&D Code：		SD-3		
+									Quantity：		1		
+									W&D Colour：		深灰色深灰色		
+									Project Add：				
+									Installation site：				
+									Delivery date：		2026年05月21日		
+									Sill height：		0		
+									Sqm：		11.53		
+									Weight：		38.37		
+													
+													
+													
+													
+框主材尺寸表 Frame profile Size specification							五金配件表 Hardware details						
+No.	Name	Code No	Length	QTY	Corner	Mark	No.	Name	Specification	Unit	QTY	Purpose	Mark
+1	Side frame 边封	PY08	2090	2	9090		1	Roller 90 SD	90推拉门 双轮 2pcs	套set	4	车间	
+2	Top frame 上固定	PY10	2090	4	9090		2	Lock 90 SD	90推拉门 一字勾锁 双面钩锁 1locks	套set	4	车间	
+3	Top frame 上固定	PY10	848	4	9090		3	Cilicom玻璃胶	玻璃胶570g	pcs	4	车间	
+4	Top rail 平上滑	PY06	3683	1	9090								
+5	Bottom track 下滑	PY43	3683	1	9090								
+6	Bead 单玻压线	WY-82827	2035	4	9090								
+7	Bead 单玻压线	WY-82827	848	4	9090								
+扇主材尺寸表 Sash profile size specification							玻璃清单 All glass details						
+No.	Name	Code No	Lenght	QTY	Corner	Mark	No.	Name	玻璃宽 W	玻璃高 H	QTY	Specification	Mark
+1	Lock profile 单玻光企	PY24	2040.5	4	9090		1	Reflective glass 	842	2032	2	6mm brown 镀膜棕玻	否
+2	Interlock Profile 单玻勾企	PY25	2040.5	4	9090		2	Reflective glass 	850	1961	4	6mm brown 镀膜棕玻	否
+3	Inter seal 收口	PY35	2040.5	1	9090								
+4	Sash Frame 单玻上下方	PY52	860.1	8	9090								
+纱窗尺寸表 Screens size specification							纱网尺寸表 Mesh size specification						
+No.	Type	Opening	宽 W	高 H	QTY	Mark	No.	Name	Specification	Mark	QTY	W	H
+开启扇 Sash Specification													
+No.	Type	Opening	宽 W	高 H	QTY	Mark							
+1	右推拉	右	946.1	2040.5	2	1020.3							
+2	左推拉	左	946.1	2040.5	2	1020.3							
+包装说明：		　	　	　	　	　		　	　	　	　		　
+1：散件包装			框料散件		纸皮包裹			捆扎包装		入木箱包装		2026年05月12日	　
+2：木箱包装			扇料拼装		扇入玻璃			注胶		入木箱包装		第3页,共4页	　
+3：其它包装		　	　	　	　	　							
+设计：			审核：			批准：				切料：			
+门 窗 单 窗 组 装 清 单 表Aluminum W&D Fabrication Details													
+									Project Name：		BEATRICE		
+									Order No：		202604211407		
+									W&D Series:		S90 Sliding 推拉门		
+									W&D Code：		SD-4		
+									Quantity：		1		
+									W&D Colour：		深灰色深灰色		
+									Project Add：				
+									Installation site：				
+									Delivery date：		2026年05月21日		
+									Sill height：		0		
+									Sqm：		5.23		
+									Weight：		23.62		
+													
+													
+													
+													
+框主材尺寸表 Frame profile Size specification							五金配件表 Hardware details						
+No.	Name	Code No	Length	QTY	Corner	Mark	No.	Name	Specification	Unit	QTY	Purpose	Mark
+1	Side frame 边封	PY08	1825	2	9090		1	Roller 90 SD	90推拉门 双轮 2pcs	套set	4	车间	
+2	Top rail 平上滑	PY06	2828	1	9090		2	Lock 90 SD	90推拉门 一字勾锁 双面钩锁 1locks	套set	4	车间	
+3	Bottom flat track 平下轨	PY51	2828	1	9090		3	Cilicom玻璃胶	玻璃胶570g	pcs	4	车间	
+扇主材尺寸表 Sash profile size specification							玻璃清单 All glass details						
+No.	Name	Code No	Lenght	QTY	Corner	Mark	No.	Name	玻璃宽 W	玻璃高 H	QTY	Specification	Mark
+1	Lock profile 单玻光企	PY24	1790.5	4	9090		1	Reflective glass 	636	1711	4	6mm brown 镀膜棕玻	否
+2	Interlock Profile 单玻勾企	PY25	1790.5	4	9090								
+3	Inter seal 收口	PY35	1790.5	1	9090								
+4	Sash Frame 单玻上下方	PY52	646.4	8	9090								
+纱窗尺寸表 Screens size specification							纱网尺寸表 Mesh size specification						
+No.	Type	Opening	宽 W	高 H	QTY	Mark	No.	Name	Specification	Mark	QTY	W	H
+开启扇 Sash Specification													
+No.	Type	Opening	宽 W	高 H	QTY	Mark							
+1	右推拉	右	732.4	1790.5	2	895.3							
+2	左推拉	左	732.4	1790.5	2	895.3							
+包装说明：		　	　	　	　	　		　	　	　	　		　
+1：散件包装			框料散件		纸皮包裹			捆扎包装		入木箱包装		2026年05月12日	　
+2：木箱包装			扇料拼装		扇入玻璃			注胶		入木箱包装		第4页,共4页	　
+3：其它包装		　	　	　	　	　							
+设计：			审核：			批准：				切料：			

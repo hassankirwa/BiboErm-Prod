@@ -6,12 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\AccountResource;
 use App\Http\Resources\Crm\DealResource;
 use App\Models\Account;
+use App\Models\Lead;
+use App\Services\Crm\Leads\AccountProvisioningService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
 
 class AccountController extends Controller
 {
+    public function __construct(
+        protected AccountProvisioningService $accountProvisioning,
+    ) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Account::class);
@@ -58,9 +64,11 @@ class AccountController extends Controller
             'source_lead_id' => ['nullable', 'exists:leads,id'],
         ]);
 
+        $sourceLead = null;
+
         if (! empty($validated['source_lead_id'])) {
-            $lead = \App\Models\Lead::query()->findOrFail($validated['source_lead_id']);
-            if (! $lead->isQualifiedForAccount()) {
+            $sourceLead = Lead::query()->findOrFail($validated['source_lead_id']);
+            if (! $sourceLead->isQualifiedForAccount()) {
                 abort(422, 'Account can only be created from a qualified lead.');
             }
         }
@@ -75,6 +83,10 @@ class AccountController extends Controller
             'owner_id' => $validated['account_owner_id'] ?? $user->id,
             'created_by' => $user->id,
         ]);
+
+        if ($sourceLead) {
+            $this->accountProvisioning->linkLeadToExistingAccount($sourceLead, $account, $user);
+        }
 
         return new AccountResource($account->load(['owner', 'primaryContact']));
     }

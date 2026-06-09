@@ -5,6 +5,7 @@ namespace App\Services\Crm\FieldDay;
 use App\Enums\Crm\LeadStatus;
 use App\Models\FieldDayPin;
 use App\Models\Lead;
+use App\Models\LeadPhoto;
 use App\Models\User;
 use App\Services\Crm\Leads\LeadContactService;
 use App\Services\Crm\Leads\LeadNumberGenerator;
@@ -26,7 +27,13 @@ class FieldDayPinLeadConversionService
             ]);
         }
 
-        $pin->loadMissing(['fieldDay', 'county']);
+        $pin->loadMissing(['fieldDay', 'county', 'photos']);
+
+        if ($pin->photos->isEmpty() && ! $user->can('field_day.manage')) {
+            throw ValidationException::withMessages([
+                'photos' => ['At least one site image is required before converting to a lead.'],
+            ]);
+        }
         $fieldDay = $pin->fieldDay;
 
         $leadSourceId = DB::table('crm_lead_sources')
@@ -67,7 +74,19 @@ class FieldDayPinLeadConversionService
 
         $this->leadContactService->createFromLead($lead, $user);
 
-        return $lead->fresh(['leadOwner', 'assignedFieldOfficer']);
+        foreach ($pin->photos as $index => $pinPhoto) {
+            LeadPhoto::query()->create([
+                'lead_id' => $lead->id,
+                'file_path' => $pinPhoto->file_path,
+                'firebase_url' => $pinPhoto->firebase_url,
+                'caption' => $pinPhoto->caption,
+                'sort_order' => $pinPhoto->sort_order ?? $index,
+                'uploaded_by' => $pinPhoto->uploaded_by ?? $user->id,
+                'source_field_day_pin_photo_id' => $pinPhoto->id,
+            ]);
+        }
+
+        return $lead->fresh(['leadOwner', 'assignedFieldOfficer', 'photos']);
     }
 
     protected function composeSiteAddress(FieldDayPin $pin): ?string

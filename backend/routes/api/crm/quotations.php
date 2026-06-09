@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Crm\Quotations\AcceptQuotationController;
+use App\Http\Controllers\Crm\Quotations\AppendQuotationNegotiationNoteController;
 use App\Http\Controllers\Crm\Quotations\DownloadQuotationPdfController;
 use App\Http\Controllers\Crm\Quotations\QuotationController;
 use App\Http\Controllers\Crm\Quotations\ReviseQuotationController;
@@ -12,5 +13,6 @@ Route::middleware('permission:quotations.view')->get('quotations/{quotation}', [
 Route::middleware('permission:quotations.create')->patch('quotations/{quotation}', [QuotationController::class, 'update']);
 Route::middleware('permission:quotations.view')->get('quotations/{quotation}/pdf', DownloadQuotationPdfController::class);
 Route::middleware('permission:quotations.send')->post('quotations/{quotation}/send', SendQuotationController::class);
+Route::middleware('permission:quotations.create')->post('quotations/{quotation}/negotiation-notes', AppendQuotationNegotiationNoteController::class);
 Route::middleware('permission:quotations.create')->post('quotations/{quotation}/revise', ReviseQuotationController::class);
 Route::middleware('permission:deals.update')->post('quotations/{quotation}/accept', AcceptQuotationController::class);

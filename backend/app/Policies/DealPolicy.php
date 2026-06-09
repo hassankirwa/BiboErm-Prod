@@ -27,6 +27,7 @@ class DealPolicy
             'deal_owner_id',
             'owner_id',
             'created_by',
+            'assigned_field_officer_id',
         ]);
     }
 
@@ -52,5 +53,14 @@ class DealPolicy
     {
         return $this->view($user, $deal)
             && $this->canAny($user, ['deals.create_project', 'crm.manage']);
+    }
+
+    public function manageSiteAssessment(User $user, Deal $deal): bool
+    {
+        return $this->view($user, $deal)
+            && $this->canAny($user, [
+                'deals.update', 'crm.manage',
+                'site_visits.execute', 'field_installation.log',
+            ]);
     }
 }

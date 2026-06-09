@@ -1,0 +1,162 @@
+										
+										
+										
+BEATRICE-W&D Cost-SD-1										
+			SERIS:	S90 Sliding 推拉门						
+			CODE:	SD-1	QTY:	1				
+			SQM:	3.05	TOTAL SQM:	3.05				
+			IN COLOUR:	深灰色	OUT COLOUR:	深灰色				
+			LOCATION:							
+			MARK:		PRICE:	392.24				
+										
+										
+										
+			USD/SQM	128.60	Total Price 	392.24				
+一、DIRECT COST										
+Aluminum Profile Cost										
+Name	Specification	Weight	Unit	Price	Total Price 	MARK				
+粉末喷涂铝型材		14.32	KG	7.00	100.24					
+										
+1.Total Cost:					100.24					
+Glass ＆ Mesh Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Reflective glass (6mm brown 镀膜棕玻)	非钢化	2.50	㎡	21.00	52.50					
+2.Total Cost:					52.50					
+Hardware Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Cilicom玻璃胶(玻璃胶570g)		2.00	pcs	3.80	7.60					
+Lock 90 SD(90推拉门 一字勾锁 双面钩锁 1locks)		2.00	套set	3.90	7.80					
+Roller 90 SD(90推拉门 双轮 2pcs)		2.00	套set	1.70	3.40					
+										
+3.Total Cost:					18.80					
+Materials Total Cost：	1+2+3				171.54					
+二、LABOR COST										
+Name		Qty	Unit	Price	Total Price	Mark				
+Fabrication Cost		3.05	USD/SQM	8.00	24.40					
+Installation Cost		3.05	USD/SQM	8.00	24.40					
+Machinery Depreciation		3.05	USD/SQM	2.00	6.10					
+4.Total Cost					54.90					
+一、DIRECT COST TOTAL:	1+2+3+4				226.44					
+三、INDIRECT COST										
+Management Cost	（一）*10%				22.64					
+Wastage cost	(一）*12%				27.17					
+					49.8168					
+四、其他										
+三、Profit	（（一）+（二））*20%				55.25					
+四、VAT	（（一）+（二）+（三））*16%				53.04					
+五、Commission	（（一）+（二）+（三）+（四））*2%				7.69					
+Total Cost					392.24					
+
+										
+										
+										
+BEATRICE-W&D Cost-SD-2										
+			SERIS:	S90 Sliding 推拉门						
+			CODE:	SD-2	QTY:	1				
+			SQM:	5.3	TOTAL SQM:	5.30				
+			IN COLOUR:	深灰色	OUT COLOUR:	深灰色				
+			LOCATION:							
+			MARK:		PRICE:	681.93				
+										
+										
+										
+			USD/SQM	128.67	Total Price 	681.93				
+一、DIRECT COST										
+Aluminum Profile Cost										
+Name	Specification	Weight	Unit	Price	Total Price 	MARK				
+粉末喷涂铝型材		24.04	KG	7.00	168.28					
+										
+1.Total Cost:					168.28					
+Glass ＆ Mesh Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Reflective glass (6mm brown 镀膜棕玻)	非钢化	4.40	㎡	21.00	92.40					
+2.Total Cost:					92.40					
+Hardware Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Cilicom玻璃胶(玻璃胶570g)		4.00	pcs	3.80	15.20					
+Lock 90 SD(90推拉门 一字勾锁 双面钩锁 1locks)		4.00	套set	3.90	15.60					
+Roller 90 SD(90推拉门 双轮 2pcs)		4.00	套set	1.70	6.80					
+										
+3.Total Cost:					37.60					
+Materials Total Cost：	1+2+3				298.28					
+二、LABOR COST										
+Name		Qty	Unit	Price	Total Price	Mark				
+Fabrication Cost		5.30	USD/SQM	8.00	42.40					
+Installation Cost		5.30	USD/SQM	8.00	42.40					
+Machinery Depreciation		5.30	USD/SQM	2.00	10.60					
+4.Total Cost					95.40					
+一、DIRECT COST TOTAL:	1+2+3+4				393.68					
+三、INDIRECT COST										
+Management Cost	（一）*10%				39.37					
+Wastage cost	(一）*12%				47.24					
+					86.6096					
+四、其他										
+三、Profit	（（一）+（二））*20%				96.06					
+四、VAT	（（一）+（二）+（三））*16%				92.22					
+五、Commission	（（一）+（二）+（三）+（四））*2%				13.37					
+Total Cost					681.93					
+
+										
+										
+										
+BEATRICE-W&D Cost-SD-3										
+			SERIS:	S90 Sliding 推拉门						
+			CODE:	SD-3	QTY:	1				
+			SQM:	11.59	TOTAL SQM:	11.59				
+			IN COLOUR:	深灰色	OUT COLOUR:	深灰色				
+			LOCATION:							
+			MARK:		PRICE:	1,262.67				
+										
+										
+										
+			USD/SQM	108.95	Total Price 	1,262.67				
+一、DIRECT COST										
+Aluminum Profile Cost										
+Name	Specification	Weight	Unit	Price	Total Price 	MARK				
+粉末喷涂铝型材		38.48	KG	7.00	269.36					
+										
+1.Total Cost:					269.36					
+Glass ＆ Mesh Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Reflective glass (6mm brown 镀膜棕玻)	非钢化	10.16	㎡	21.00	213.36					
+2.Total Cost:					213.36					
+Hardware Cost										
+Name	Specification	Qty	Unit	Price	Total Price	MARK 				
+Cilicom玻璃胶(玻璃胶570g)		4.00	pcs	3.80	15.20					
+Lock 90 SD(90推拉门 一字勾锁 双面钩锁 1locks)		4.00	套set	3.90	15.60					
+Roller 90 SD(90推拉门 双轮 2pcs)		4.00	套set	1.70	6.80					
+										
+3.Total Cost:					37.60					
+Materials Total Cost：	1+2+3				520.32					
+二、LABOR COST										
+Name		Qty	Unit	Price	Total Price	Mark				
+Fabrication Cost		11.59	USD/SQM	8.00	92.72					
+Installation Cost		11.59	USD/SQM	8.00	92.72					
+Machinery Depreciation		11.59	USD/SQM	2.00	23.18					
+4.Total Cost					208.62					
+一、DIRECT COST TOTAL:	1+2+3+4				728.94					
+三、INDIRECT COST										
+Management Cost	（一）*10%				72.89					
+Wastage cost	(一）*12%				87.47					
+					160.3668					
+四、其他										
+三、Profit	（（一）+（二））*20%				177.86					
+四、VAT	（（一）+（二）+（三））*16%				170.75					
+五、Commission	（（一）+（二）+（三）+（四））*2%				24.76					
+Total Cost					1,262.67					
+
+BEATRICE-W&D Cost-SD-4							
+			SERIS:	S90 Sliding 推拉门			
+			CODE:	SD-4	QTY:	1	
+			SQM:	5.22	TOTAL SQM:	5.22	
+			IN COLOUR:	深灰色	OUT COLOUR:	深灰色	
+			LOCATION:				
+			MARK:		PRICE:	672.53	
+							
+							
+							
+			USD/SQM	128.84	Total Price 	672.53	
+一、DIRECT COST							
+Aluminum Profile Cost							
+Name	Specification	Weight	Unit	Price	Total Price 	MARK	
+粉末喷涂铝型材		23.59	KG	7.00	165.13		

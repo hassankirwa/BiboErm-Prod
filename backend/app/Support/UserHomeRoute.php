@@ -11,12 +11,27 @@ final class UserHomeRoute
      */
     private const WORKSPACE_HUB_ROLES = ['super_admin', 'it_admin'];
 
+    /**
+     * Field measurements and installation — land on Field module, not CRM.
+     *
+     * @var list<string>
+     */
+    private const FIELD_MODULE_ROLES = [
+        'field_officer',
+        'installation_lead',
+        'field_installation_engineer',
+    ];
+
     public static function forUser(User $user): string
     {
         $user->loadMissing(['departmentRoles.department', 'roles']);
 
         if ($user->hasAnyRole(self::WORKSPACE_HUB_ROLES)) {
             return '/workspace';
+        }
+
+        if ($user->hasAnyRole(self::FIELD_MODULE_ROLES)) {
+            return '/field';
         }
 
         $primary = $user->departmentRoles->firstWhere('is_primary', true)
@@ -33,8 +48,14 @@ final class UserHomeRoute
             $module = 'crm';
         }
 
+        return self::moduleToRoute($module);
+    }
+
+    private static function moduleToRoute(string $module): string
+    {
         return match ($module) {
             'crm' => '/crm',
+            'field' => '/field',
             'production' => '/production/schedule',
             'warehouse' => '/warehouse/inventory',
             'procurement' => '/procurement/orders',
@@ -52,6 +73,7 @@ final class UserHomeRoute
     {
         return match ($slug) {
             'sales_marketing', 'reception' => 'crm',
+            'field', 'field_installation' => 'field',
             'production' => 'production',
             'warehouse' => 'warehouse',
             'procurement' => 'procurement',

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Crm\Lookups;
 
 use App\Http\Controllers\Controller;
+use App\Models\BuildingConstructionStage;
 use App\Models\CrmCounty;
 use App\Models\CrmLossReason;
 use App\Models\LeadSource;
@@ -10,6 +11,7 @@ use App\Models\LeadType;
 use App\Models\ProductInterest;
 use App\Models\User;
 use App\Models\VisitPurpose;
+use App\Support\Crm\SiteVisitAssigneeRoles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,21 +34,36 @@ class CrmLookupController extends Controller
                 'counties' => $query(CrmCounty::class),
                 'loss_reasons' => $query(CrmLossReason::class),
                 'visit_purposes' => $query(VisitPurpose::class),
+                'building_construction_stages' => $query(BuildingConstructionStage::class),
             ],
         ]);
     }
 
     public function users(Request $request): JsonResponse
     {
-        $role = $request->string('role')->toString();
-        $spatieRole = match ($role) {
-            'sales_rep' => 'sales_representative',
-            default => $role,
-        };
+        $context = $request->string('context')->toString();
+        $roles = array_values(array_filter(
+            (array) $request->input('roles', []),
+            fn ($value) => is_string($value) && $value !== '',
+        ));
+
+        if ($context === 'site_visits' || $roles !== []) {
+            $rolePool = $roles !== [] ? $roles : SiteVisitAssigneeRoles::all();
+        } else {
+            $role = $request->string('role')->toString();
+            $spatieRole = match ($role) {
+                'sales_rep' => 'sales_representative',
+                default => $role,
+            };
+            $rolePool = match ($spatieRole) {
+                'field_officer' => ['field_officer', 'installation_lead', 'field_installation_engineer'],
+                default => [$spatieRole],
+            };
+        }
 
         $users = User::query()
             ->where('status', User::STATUS_ACTIVE)
-            ->when($spatieRole !== '', fn ($q) => $q->role($spatieRole))
+            ->when($rolePool !== [], fn ($q) => $q->role($rolePool))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 

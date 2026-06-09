@@ -279,6 +279,33 @@ return [
                 'department_slug' => 'field_installation',
                 'role' => 'installation_lead',
             ],
+            'field' => [
+                'name' => 'Field Officer',
+                'email' => 'field@bibo.com',
+                'department_slug' => 'field',
+                'role' => 'field_officer',
+            ],
+        ],
+    ],
+
+    'quotation' => [
+        'usd_to_kes_rate' => (float) env('BIBO_USD_TO_KES_RATE', 129.0),
+        'exchange_rate_cache_minutes' => (int) env('BIBO_EXCHANGE_RATE_CACHE_MINUTES', 60),
+        'default_tax_rate' => (float) env('BIBO_QUOTATION_TAX_RATE', 16),
+        'default_terms' => <<<'TEXT'
+1. Throughout the quotation: All measurements in mm.
+2. Any changes to above scope may alter price.
+3. The above items remain a property of Bibo Windows & Doors until fully paid for, or shall be repossessed and auctioned for recovery.
+4. Quote is firm for 7 days as per the scope above.
+5. Terms of Payment: 100% On Placement of Order.
+6. The above quotation does not allow for scaffolding or transportation outside of Nairobi.
+TEXT,
+        'bank_details' => [
+            'account_name' => 'BIBO BUILDING MATERIALS LIMITED',
+            'account_number_kes' => '0300154801',
+            'account_number_usd' => '0300154802',
+            'bank_name' => 'GULF AFRICAN BANK',
+            'branch' => 'UPPER HILL',
         ],
     ],
 

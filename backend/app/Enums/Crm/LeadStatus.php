@@ -7,6 +7,7 @@ enum LeadStatus: string
     case New = 'new';
     case Contacted = 'contacted';
     case Interested = 'interested';
+    case AccountCreated = 'account_created';
     case NotReachable = 'not_reachable';
     case Unqualified = 'unqualified';
     case Qualified = 'qualified';

@@ -1,9 +1,14 @@
 <?php
 
+use App\Http\Controllers\Crm\Quotations\AppendQuotationNegotiationNoteController;
+use App\Http\Controllers\Crm\Quotations\ReviseQuotationController;
+use App\Http\Controllers\Crm\Quotations\SendQuotationController;
 use App\Http\Controllers\Projects\ProjectBomController;
 use App\Http\Controllers\Projects\ProjectController;
+use App\Http\Controllers\Projects\ProjectDesignController;
 use App\Http\Controllers\Projects\ProjectDocumentController;
 use App\Http\Controllers\Projects\ProjectOperationsController;
+use App\Http\Controllers\Projects\ProjectQuotationWorkspaceController;
 use App\Http\Controllers\Projects\ProjectSiteAssessmentController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +17,24 @@ Route::get('pipeline', [ProjectController::class, 'pipeline']);
 Route::get('material-shortages', [ProjectOperationsController::class, 'materialShortages']);
 Route::get('/', [ProjectController::class, 'index']);
 Route::post('/', [ProjectController::class, 'store']);
+
+Route::prefix('design')->group(function () {
+    Route::get('pending', [ProjectDesignController::class, 'pending']);
+    Route::post('extract', [ProjectDesignController::class, 'extract']);
+});
+
+Route::prefix('quotations')->group(function () {
+    Route::get('pending', [ProjectQuotationWorkspaceController::class, 'pending']);
+    Route::post('extract', [ProjectQuotationWorkspaceController::class, 'extract']);
+    Route::get('/', [ProjectQuotationWorkspaceController::class, 'index']);
+    Route::post('/', [ProjectQuotationWorkspaceController::class, 'store']);
+    Route::get('{quotation}', [ProjectQuotationWorkspaceController::class, 'show']);
+    Route::patch('{quotation}', [ProjectQuotationWorkspaceController::class, 'update']);
+    Route::get('{quotation}/preview', [ProjectQuotationWorkspaceController::class, 'preview']);
+    Route::middleware('permission:quotations.send')->post('{quotation}/send', SendQuotationController::class);
+    Route::middleware('permission:quotations.create')->post('{quotation}/negotiation-notes', AppendQuotationNegotiationNoteController::class);
+    Route::middleware('permission:quotations.create')->post('{quotation}/revise', ReviseQuotationController::class);
+});
 
 Route::prefix('{project}')->group(function () {
     Route::get('/', [ProjectController::class, 'show']);

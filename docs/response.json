@@ -1,0 +1,577 @@
+{
+    "data": {
+        "project": {
+            "name": "BEATRICE",
+            "number": null,
+            "order_no": null
+        },
+        "project_name": "BEATRICE",
+        "project_number": null,
+        "lines": [
+            {
+                "series": "S90 Sliding \u63a8\u62c9\u95e8",
+                "code": "SD-1",
+                "glass_type": "Bronze Reflective glass 6mm",
+                "width_mm": 1450,
+                "height_mm": 2100,
+                "sqm_per_pcs": 3.05,
+                "quantity": 1,
+                "total_sqm": 3.05,
+                "unit_price": 392.24,
+                "line_total": 392.24,
+                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-1 \u2014 Bronze Reflective glass 6mm",
+                "metadata": {
+                    "accounting": {
+                        "layout": "tabular",
+                        "currency": "USD",
+                        "usd_per_sqm": 128.60342784000002,
+                        "line_total_usd": 392.24,
+                        "unit_price_usd": 392.24,
+                        "material_cost_usd": 100.245,
+                        "glass_cost_usd": 52.567,
+                        "hardware_cost_usd": 18.8,
+                        "in_colour": "\u6df1\u7070\u8272",
+                        "out_colour": "\u6df1\u7070\u8272",
+                        "mark": "392.24045491200002",
+                        "source_price": 392.240454912,
+                        "vat_amount": 53.041305600000015,
+                        "commission_amount": 7.690989312,
+                        "profit_amount": 55.25136000000001,
+                        "cost_breakdown": {
+                            "direct_cost": {
+                                "aluminum_profile": {
+                                    "items": [
+                                        {
+                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
+                                            "specification": "",
+                                            "weight": 14.32,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 7
+                                        }
+                                    ],
+                                    "subtotal": 100.24000000000001
+                                },
+                                "glass_mesh": {
+                                    "items": [
+                                        {
+                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
+                                            "specification": "\u975e\u94a2\u5316",
+                                            "qty": 2.5,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 21
+                                        }
+                                    ],
+                                    "subtotal": 52.5
+                                },
+                                "hardware": {
+                                    "items": [
+                                        {
+                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
+                                            "specification": "",
+                                            "qty": 2,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.8
+                                        },
+                                        {
+                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
+                                            "specification": "",
+                                            "qty": 2,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.9
+                                        },
+                                        {
+                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
+                                            "specification": "",
+                                            "qty": 2,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 1.7
+                                        }
+                                    ],
+                                    "subtotal": 18.8
+                                },
+                                "materials_total": 171.54000000000002,
+                                "labor": {
+                                    "items": [],
+                                    "subtotal": 54.9
+                                },
+                                "subtotal": 226.44000000000003
+                            },
+                            "indirect_cost": {
+                                "items": [
+                                    {
+                                        "name": "Management Cost",
+                                        "note": "\uff08\u4e00\uff09*10%",
+                                        "total_price": 22.64400000000001
+                                    },
+                                    {
+                                        "name": "Wastage cost",
+                                        "note": "(\u4e00\uff09*12%",
+                                        "total_price": 27.1728
+                                    },
+                                    {
+                                        "name": "\u56db\u3001\u5176\u4ed6",
+                                        "note": "",
+                                        "total_price": null
+                                    }
+                                ],
+                                "subtotal": 49.8168
+                            },
+                            "profit": 55.25136000000001,
+                            "vat": 53.041305600000015,
+                            "commission": 7.690989312,
+                            "total_cost": 392.240454912
+                        },
+                        "drawing": {
+                            "elevation": {
+                                "width_mm": 1450,
+                                "height_mm": 2100,
+                                "source": "accounting"
+                            },
+                            "embedded_media": {
+                                "status": "extracted",
+                                "files": [
+                                    "image1.jpg"
+                                ],
+                                "mime_type": "image\/jpeg",
+                                "note": null,
+                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg",
+                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg"
+                            }
+                        }
+                    }
+                },
+                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg"
+            },
+            {
+                "series": "S90 Sliding \u63a8\u62c9\u95e8",
+                "code": "SD-2",
+                "glass_type": "Bronze Reflective glass 6mm",
+                "width_mm": 2910,
+                "height_mm": 1820,
+                "sqm_per_pcs": 5.3,
+                "quantity": 1,
+                "total_sqm": 5.3,
+                "unit_price": 681.93,
+                "line_total": 681.93,
+                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-2 \u2014 Bronze Reflective glass 6mm",
+                "metadata": {
+                    "accounting": {
+                        "layout": "tabular",
+                        "currency": "USD",
+                        "usd_per_sqm": 128.66686521962262,
+                        "line_total_usd": 681.93,
+                        "unit_price_usd": 681.93,
+                        "material_cost_usd": 168.273,
+                        "glass_cost_usd": 92.045,
+                        "hardware_cost_usd": 37.6,
+                        "in_colour": "\u6df1\u7070\u8272",
+                        "out_colour": "\u6df1\u7070\u8272",
+                        "mark": "681.93438566399993",
+                        "source_price": 681.9343856639999,
+                        "vat_amount": 92.21560319999999,
+                        "commission_amount": 13.371262464,
+                        "profit_amount": 96.05792,
+                        "cost_breakdown": {
+                            "direct_cost": {
+                                "aluminum_profile": {
+                                    "items": [
+                                        {
+                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
+                                            "specification": "",
+                                            "weight": 24.04,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 7
+                                        }
+                                    ],
+                                    "subtotal": 168.28
+                                },
+                                "glass_mesh": {
+                                    "items": [
+                                        {
+                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
+                                            "specification": "\u975e\u94a2\u5316",
+                                            "qty": 4.4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 21
+                                        }
+                                    ],
+                                    "subtotal": 92.4
+                                },
+                                "hardware": {
+                                    "items": [
+                                        {
+                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.8
+                                        },
+                                        {
+                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.9
+                                        },
+                                        {
+                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 1.7
+                                        }
+                                    ],
+                                    "subtotal": 37.59999999999999
+                                },
+                                "materials_total": 298.28,
+                                "labor": {
+                                    "items": [],
+                                    "subtotal": 95.39999999999999
+                                },
+                                "subtotal": 393.67999999999995
+                            },
+                            "indirect_cost": {
+                                "items": [
+                                    {
+                                        "name": "Management Cost",
+                                        "note": "\uff08\u4e00\uff09*10%",
+                                        "total_price": 39.36799999999999
+                                    },
+                                    {
+                                        "name": "Wastage cost",
+                                        "note": "(\u4e00\uff09*12%",
+                                        "total_price": 47.24159999999999
+                                    },
+                                    {
+                                        "name": "\u56db\u3001\u5176\u4ed6",
+                                        "note": "",
+                                        "total_price": null
+                                    }
+                                ],
+                                "subtotal": 86.6096
+                            },
+                            "profit": 96.05792,
+                            "vat": 92.21560319999999,
+                            "commission": 13.371262464,
+                            "total_cost": 681.9343856639999
+                        },
+                        "drawing": {
+                            "elevation": {
+                                "width_mm": 2910,
+                                "height_mm": 1820,
+                                "source": "accounting"
+                            },
+                            "embedded_media": {
+                                "status": "extracted",
+                                "files": [
+                                    "image2.jpg"
+                                ],
+                                "mime_type": "image\/jpeg",
+                                "note": null,
+                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg",
+                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg"
+                            }
+                        }
+                    }
+                },
+                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg"
+            },
+            {
+                "series": "S90 Sliding \u63a8\u62c9\u95e8",
+                "code": "SD-3",
+                "glass_type": "Bronze Reflective glass 6mm",
+                "width_mm": 5520,
+                "height_mm": 2100,
+                "sqm_per_pcs": 11.59,
+                "quantity": 1,
+                "total_sqm": 11.59,
+                "unit_price": 1262.67,
+                "line_total": 1262.67,
+                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-3 \u2014 Bronze Reflective glass 6mm",
+                "metadata": {
+                    "accounting": {
+                        "layout": "tabular",
+                        "currency": "USD",
+                        "usd_per_sqm": 108.94507048421052,
+                        "line_total_usd": 1262.67,
+                        "unit_price_usd": 1262.67,
+                        "material_cost_usd": 269.399,
+                        "glass_cost_usd": 212.943,
+                        "hardware_cost_usd": 37.6,
+                        "in_colour": "\u6df1\u7070\u8272",
+                        "out_colour": "\u6df1\u7070\u8272",
+                        "mark": "1262.67336691199989",
+                        "source_price": 1262.673366912,
+                        "vat_amount": 170.7469056,
+                        "commission_amount": 24.758301312,
+                        "profit_amount": 177.86136,
+                        "cost_breakdown": {
+                            "direct_cost": {
+                                "aluminum_profile": {
+                                    "items": [
+                                        {
+                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
+                                            "specification": "",
+                                            "weight": 38.48,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 7
+                                        }
+                                    ],
+                                    "subtotal": 269.35999999999996
+                                },
+                                "glass_mesh": {
+                                    "items": [
+                                        {
+                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
+                                            "specification": "\u975e\u94a2\u5316",
+                                            "qty": 10.16,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 21
+                                        }
+                                    ],
+                                    "subtotal": 213.36
+                                },
+                                "hardware": {
+                                    "items": [
+                                        {
+                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.8
+                                        },
+                                        {
+                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.9
+                                        },
+                                        {
+                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 1.7
+                                        }
+                                    ],
+                                    "subtotal": 37.59999999999999
+                                },
+                                "materials_total": 520.3199999999999,
+                                "labor": {
+                                    "items": [],
+                                    "subtotal": 208.62
+                                },
+                                "subtotal": 728.9399999999999
+                            },
+                            "indirect_cost": {
+                                "items": [
+                                    {
+                                        "name": "Management Cost",
+                                        "note": "\uff08\u4e00\uff09*10%",
+                                        "total_price": 72.89399999999999
+                                    },
+                                    {
+                                        "name": "Wastage cost",
+                                        "note": "(\u4e00\uff09*12%",
+                                        "total_price": 87.47279999999999
+                                    },
+                                    {
+                                        "name": "\u56db\u3001\u5176\u4ed6",
+                                        "note": "",
+                                        "total_price": null
+                                    }
+                                ],
+                                "subtotal": 160.3668
+                            },
+                            "profit": 177.86136,
+                            "vat": 170.7469056,
+                            "commission": 24.758301312,
+                            "total_cost": 1262.673366912
+                        },
+                        "drawing": {
+                            "elevation": {
+                                "width_mm": 5520,
+                                "height_mm": 2100,
+                                "source": "accounting"
+                            },
+                            "embedded_media": {
+                                "status": "extracted",
+                                "files": [
+                                    "image3.jpg"
+                                ],
+                                "mime_type": "image\/jpeg",
+                                "note": null,
+                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg",
+                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg"
+                            }
+                        }
+                    }
+                },
+                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg"
+            },
+            {
+                "series": "S90 Sliding \u63a8\u62c9\u95e8",
+                "code": "SD-4",
+                "glass_type": "Bronze Reflective glass 6mm",
+                "width_mm": 2870,
+                "height_mm": 1820,
+                "sqm_per_pcs": 5.22,
+                "quantity": 1,
+                "total_sqm": 5.22,
+                "unit_price": 672.53,
+                "line_total": 672.53,
+                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-4 \u2014 Bronze Reflective glass 6mm",
+                "metadata": {
+                    "accounting": {
+                        "layout": "tabular",
+                        "currency": "USD",
+                        "usd_per_sqm": 128.83688,
+                        "line_total_usd": 672.53,
+                        "unit_price_usd": 672.53,
+                        "material_cost_usd": 165.126,
+                        "glass_cost_usd": 91.428,
+                        "hardware_cost_usd": 37.6,
+                        "in_colour": "\u6df1\u7070\u8272",
+                        "out_colour": "\u6df1\u7070\u8272",
+                        "mark": "672.5285136",
+                        "source_price": 672.5285136,
+                        "vat_amount": 90.94367999999999,
+                        "commission_amount": 13.1868336,
+                        "profit_amount": 94.733,
+                        "cost_breakdown": {
+                            "direct_cost": {
+                                "aluminum_profile": {
+                                    "items": [
+                                        {
+                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
+                                            "specification": "",
+                                            "weight": 23.59,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 7
+                                        }
+                                    ],
+                                    "subtotal": 165.13
+                                },
+                                "glass_mesh": {
+                                    "items": [
+                                        {
+                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
+                                            "specification": "\u975e\u94a2\u5316",
+                                            "qty": 4.36,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 21
+                                        }
+                                    ],
+                                    "subtotal": 91.56
+                                },
+                                "hardware": {
+                                    "items": [
+                                        {
+                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.8
+                                        },
+                                        {
+                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 3.9
+                                        },
+                                        {
+                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
+                                            "specification": "",
+                                            "qty": 4,
+                                            "unit": "1.00",
+                                            "unit_price": null,
+                                            "total_price": 1.7
+                                        }
+                                    ],
+                                    "subtotal": 37.59999999999999
+                                },
+                                "materials_total": 294.28999999999996,
+                                "labor": {
+                                    "items": [],
+                                    "subtotal": 93.96
+                                },
+                                "subtotal": 388.24999999999994
+                            },
+                            "indirect_cost": {
+                                "items": [
+                                    {
+                                        "name": "Management Cost",
+                                        "note": "\uff08\u4e00\uff09*10%",
+                                        "total_price": 38.825
+                                    },
+                                    {
+                                        "name": "Wastage cost",
+                                        "note": "(\u4e00\uff09*12%",
+                                        "total_price": 46.58999999999999
+                                    },
+                                    {
+                                        "name": "\u56db\u3001\u5176\u4ed6",
+                                        "note": "",
+                                        "total_price": null
+                                    }
+                                ],
+                                "subtotal": 85.415
+                            },
+                            "profit": 94.733,
+                            "vat": 90.94367999999999,
+                            "commission": 13.1868336,
+                            "total_cost": 672.5285136
+                        },
+                        "drawing": {
+                            "elevation": {
+                                "width_mm": 2870,
+                                "height_mm": 1820,
+                                "source": "accounting"
+                            },
+                            "embedded_media": {
+                                "status": "extracted",
+                                "files": [
+                                    "image4.jpg"
+                                ],
+                                "mime_type": "image\/jpeg",
+                                "note": null,
+                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg",
+                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg"
+                            }
+                        }
+                    }
+                },
+                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg"
+            }
+        ],
+        "summary": {
+            "total_items": 4,
+            "subtotal": 672.5285136,
+            "tax": 406.9474944,
+            "grand_total": 1079.48,
+            "source_filename": "BEATRICE20260423.xlsx"
+        },
+        "extract_session_id": "01ktmnb3h5hk5d1h4nheee47nh"
+    }
+}

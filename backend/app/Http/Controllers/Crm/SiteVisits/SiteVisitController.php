@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Crm\SiteVisits;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\SiteVisitResource;
 use App\Models\SiteVisit;
+use App\Models\User;
 use App\Services\Crm\SiteVisits\SiteVisitWorkflowService;
+use App\Support\Crm\SiteVisitAssigneeRoles;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -50,7 +52,16 @@ class SiteVisitController extends Controller
             'site_address' => ['nullable', 'string'],
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],
-            'assigned_field_officer_id' => ['required', 'exists:users,id'],
+            'assigned_field_officer_id' => [
+                'required',
+                'exists:users,id',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $assignee = User::query()->find($value);
+                    if (! $assignee || ! SiteVisitAssigneeRoles::userIsEligible($assignee)) {
+                        $fail('The selected assignee cannot perform site visits.');
+                    }
+                },
+            ],
             'visit_date' => ['required', 'date'],
             'visit_time' => ['nullable', 'date_format:H:i'],
             'visit_purpose' => ['nullable', 'string', 'max:50'],
@@ -67,7 +78,15 @@ class SiteVisitController extends Controller
         $this->authorize('view', $siteVisit);
 
         return new SiteVisitResource(
-            $siteVisit->load(['lead', 'deal', 'assignedFieldOfficer', 'measurementLines', 'photos'])
+            $siteVisit->load([
+                'lead',
+                'deal.account',
+                'deal.contact',
+                'deal.assignedFieldOfficer',
+                'assignedFieldOfficer',
+                'measurementLines',
+                'photos',
+            ])
         );
     }
 }

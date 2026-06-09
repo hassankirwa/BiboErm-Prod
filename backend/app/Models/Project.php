@@ -27,6 +27,7 @@ class Project extends Model
         'install_mode',
         'site_address',
         'stage',
+        'is_active',
         'completion_percent',
         'priority',
         'quoted_amount',
@@ -47,6 +48,7 @@ class Project extends Model
     {
         return [
             'stage' => ProjectStage::class,
+            'is_active' => 'boolean',
             'install_mode' => InstallMode::class,
             'quoted_amount' => 'decimal:2',
             'deposit_received' => 'decimal:2',

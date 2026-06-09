@@ -11,7 +11,9 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -20,7 +22,7 @@ class FieldDayFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $fieldOfficer;
+    protected User $salesRep;
 
     protected function setUp(): void
     {
@@ -35,13 +37,13 @@ class FieldDayFlowTest extends TestCase
             CrmLookupSeeder::class,
         ]);
 
-        $this->fieldOfficer = User::factory()->create(['status' => User::STATUS_ACTIVE]);
-        $this->fieldOfficer->assignRole('field_officer');
+        $this->salesRep = User::factory()->create(['status' => User::STATUS_ACTIVE]);
+        $this->salesRep->assignRole('sales_representative');
     }
 
-    public function test_field_officer_can_start_field_day_add_pin_and_convert_to_lead(): void
+    public function test_sales_rep_can_start_field_day_add_pin_and_convert_to_lead(): void
     {
-        Sanctum::actingAs($this->fieldOfficer);
+        Sanctum::actingAs($this->salesRep);
 
         $today = now()->toDateString();
 
@@ -54,7 +56,7 @@ class FieldDayFlowTest extends TestCase
 
         $this->assertDatabaseHas('field_days', [
             'id' => $fieldDayId,
-            'field_officer_id' => $this->fieldOfficer->id,
+            'field_officer_id' => $this->salesRep->id,
         ]);
         $this->assertEquals($today, FieldDay::query()->find($fieldDayId)?->field_date?->toDateString());
 
@@ -90,6 +92,11 @@ class FieldDayFlowTest extends TestCase
             'location_address' => 'Ring Road Parklands, Westlands, Nairobi, Kenya',
         ]);
 
+        Storage::fake('local');
+        $this->postJson("/api/v1/crm/field-day-pins/{$pinId}/photos", [
+            'file' => UploadedFile::fake()->create('site.jpg', 100, 'image/jpeg'),
+        ])->assertCreated();
+
         $convert = $this->postJson("/api/v1/crm/field-day-pins/{$pinId}/convert-to-lead");
 
         $convert->assertCreated();
@@ -101,7 +108,7 @@ class FieldDayFlowTest extends TestCase
             'id' => $leadId,
             'lead_source_id' => $fieldVisitSourceId,
             'status' => 'new',
-            'assigned_field_officer_id' => $this->fieldOfficer->id,
+            'assigned_field_officer_id' => $this->salesRep->id,
             'site_name' => 'Westlands office block',
             'site_address' => 'Ring Road Parklands, Westlands, Nairobi, Kenya',
             'requirement_description' => 'Needs roller blinds on 12 windows',
@@ -119,7 +126,7 @@ class FieldDayFlowTest extends TestCase
 
     public function test_field_day_pin_with_kasarani_admin_metadata_converts_with_subcounty(): void
     {
-        Sanctum::actingAs($this->fieldOfficer);
+        Sanctum::actingAs($this->salesRep);
 
         $start = $this->postJson('/api/v1/crm/field-days/start');
         $start->assertCreated();
@@ -143,6 +150,11 @@ class FieldDayFlowTest extends TestCase
         $pinResponse->assertCreated();
         $pinId = $pinResponse->json('data.id');
 
+        Storage::fake('local');
+        $this->postJson("/api/v1/crm/field-day-pins/{$pinId}/photos", [
+            'file' => UploadedFile::fake()->create('kasarani.jpg', 100, 'image/jpeg'),
+        ])->assertCreated();
+
         $convert = $this->postJson("/api/v1/crm/field-day-pins/{$pinId}/convert-to-lead");
         $convert->assertCreated();
 
@@ -156,7 +168,7 @@ class FieldDayFlowTest extends TestCase
 
     public function test_field_day_pin_requires_live_gps_metadata(): void
     {
-        Sanctum::actingAs($this->fieldOfficer);
+        Sanctum::actingAs($this->salesRep);
 
         $start = $this->postJson('/api/v1/crm/field-days/start');
         $start->assertCreated();
@@ -183,7 +195,7 @@ class FieldDayFlowTest extends TestCase
 
     public function test_manager_can_view_all_field_days_for_date(): void
     {
-        Sanctum::actingAs($this->fieldOfficer);
+        Sanctum::actingAs($this->salesRep);
 
         $today = now()->toDateString();
 
