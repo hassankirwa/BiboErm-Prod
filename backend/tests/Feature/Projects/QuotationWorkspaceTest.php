@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Projects;
 
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\SiteVisitStatus;
+use App\Enums\Design\DesignJobStatus;
 use App\Models\Account;
 use App\Models\Contact;
+use App\Models\DesignJob;
+use App\Models\Lead;
+use App\Models\MeasurementReport;
+use App\Models\QuotationRequest;
 use App\Models\SiteVisit;
 use App\Models\User;
 use Database\Seeders\CrmLookupSeeder;
@@ -60,12 +66,30 @@ class QuotationWorkspaceTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        SiteVisit::query()->create([
+        $lead = Lead::query()->create([
+            'reference' => 'LD-QW-001',
+            'lead_number' => 'LD-QW-001',
+            'name' => 'Beatrice Residence',
+            'first_name' => 'Beatrice',
+            'phone' => '+254700000001',
+            'contact_person_name' => 'Beatrice Client',
+            'status' => 'interested',
+            'pipeline_stage' => LeadPipelineStage::ReadyForQuotation->value,
+            'converted_account_id' => $account->id,
+            'lead_owner_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $account->update(['source_lead_id' => $lead->id]);
+
+        $visit = SiteVisit::query()->create([
             'visit_number' => 'SV-TEST001',
             'title' => 'Beatrice measurement visit',
+            'lead_id' => $lead->id,
             'account_id' => $account->id,
             'contact_id' => $contact->id,
             'assigned_field_officer_id' => $this->user->id,
+            'assigned_to_user_id' => $this->user->id,
             'scheduled_by' => $this->user->id,
             'visit_date' => now()->toDateString(),
             'status' => SiteVisitStatus::Approved->value,
@@ -73,10 +97,35 @@ class QuotationWorkspaceTest extends TestCase
             'approved_at' => now(),
         ]);
 
+        $report = MeasurementReport::query()->create([
+            'site_visit_id' => $visit->id,
+            'lead_id' => $lead->id,
+            'report_number' => 'MR-TEST001',
+            'status' => 'approved',
+            'approved_at' => now(),
+        ]);
+
+        $designJob = DesignJob::query()->create([
+            'design_job_number' => 'DJ-TEST001',
+            'lead_id' => $lead->id,
+            'site_visit_id' => $visit->id,
+            'measurement_report_id' => $report->id,
+            'status' => DesignJobStatus::ReadyForQuotation->value,
+            'approved_at' => now(),
+        ]);
+
+        QuotationRequest::query()->create([
+            'request_number' => 'QR-TEST001',
+            'lead_id' => $lead->id,
+            'design_job_id' => $designJob->id,
+            'measurement_report_id' => $report->id,
+            'status' => 'ready_for_quotation',
+        ]);
+
         return $account;
     }
 
-    public function test_pending_list_includes_account_with_approved_visit_and_no_quotation(): void
+    public function test_pending_list_includes_account_with_ready_design_job_and_no_quotation(): void
     {
         Sanctum::actingAs($this->user);
         $account = $this->createAccountWithApprovedVisit();
@@ -136,7 +185,7 @@ class QuotationWorkspaceTest extends TestCase
             true,
         );
 
-        $response = $this->post('/api/v1/projects/design/extract', [
+        $response = $this->post('/api/v1/design/extract', [
             'file' => $file,
         ], ['Accept' => 'application/json']);
 

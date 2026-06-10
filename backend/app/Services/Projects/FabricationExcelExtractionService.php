@@ -1117,13 +1117,53 @@ class FabricationExcelExtractionService
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(true);
             $spreadsheet = $reader->load($path);
+
+            return $this->spreadsheetToRows($spreadsheet);
         } catch (\Throwable $exception) {
+            if ($extension === 'xls') {
+                $fallbackRows = $this->parseLegacyXlsWithSimpleXls($path);
+                if ($fallbackRows !== []) {
+                    return $fallbackRows;
+                }
+            }
+
             throw ValidationException::withMessages([
                 'file' => [$this->unreadableSpreadsheetMessage($extension, $exception)],
             ]);
         }
+    }
 
-        return $this->spreadsheetToRows($spreadsheet);
+    /**
+     * @return array<int, array<int, string>>
+     */
+    protected function parseLegacyXlsWithSimpleXls(string $path): array
+    {
+        if (! class_exists(\Shuchkin\SimpleXLS::class)) {
+            return [];
+        }
+
+        $workbook = \Shuchkin\SimpleXLS::parse($path);
+        if ($workbook === false) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($workbook->rows() as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $normalized = array_map(
+                fn (mixed $cell): string => $this->normalizeSpreadsheetCell($cell),
+                $row,
+            );
+
+            if ($this->rowHasContent($normalized)) {
+                $rows[] = $normalized;
+            }
+        }
+
+        return $rows;
     }
 
     /**

@@ -75,8 +75,6 @@ export type LeadFormValues = {
   propertySiteType: string;
   buildingConstructionStageId: number | null;
   sitePhotoFiles: File[];
-  estimatedValue: number;
-  estimatedBudget: number;
   urgency: string;
   expectedTimeline: string;
   nextActionDate: string;
@@ -85,7 +83,7 @@ export type LeadFormValues = {
 };
 
 export function emptyLeadForm(
-  stageId: LeadKanbanStageId = "new",
+  stageId: LeadKanbanStageId = "new_lead",
   defaults?: {
     ownerId?: number | null;
     leadSourceId?: number | null;
@@ -128,8 +126,6 @@ export function emptyLeadForm(
     propertySiteType: "",
     buildingConstructionStageId: null,
     sitePhotoFiles: [],
-    estimatedValue: 0,
-    estimatedBudget: 0,
     urgency: "",
     expectedTimeline: "",
     nextActionDate: new Date().toISOString().slice(0, 10),
@@ -164,7 +160,6 @@ export function leadFormValuesToKanbanCard(values: LeadFormValues): LeadKanbanCa
     ownerId: values.ownerId,
     leadSourceId: values.leadSourceId,
     nextActionDate: values.nextActionDate,
-    estimatedValue: values.estimatedValue,
     tag: values.tag,
     company: values.company.trim() || undefined,
     phone: values.phone.trim() || undefined,
@@ -184,7 +179,6 @@ export const LEAD_IMPORT_TEMPLATE_HEADERS = [
   "Lead Source",
   "Stage",
   "Owner",
-  "Estimated Value (KES)",
   "Next Action Date",
   "Tag",
   "Notes",
@@ -199,7 +193,6 @@ export const LEAD_IMPORT_TEMPLATE_SAMPLE_ROW = [
   "Website",
   "New Lead",
   "Brian Otieno",
-  "950000",
   "2026-05-22",
   "High Priority",
   "Optional notes",
@@ -279,11 +272,6 @@ export function parseLeadImportCsv(text: string): import("@/lib/api/crm/leads").
     }
 
     const phone = row.phone?.trim();
-    const estimatedRaw =
-      row["estimated value (kes)"] || row["estimated value"] || "";
-    const estimated = estimatedRaw
-      ? Number(estimatedRaw.replace(/[^\d.]/g, ""))
-      : undefined;
 
     rows.push({
       name: name.trim(),
@@ -293,8 +281,6 @@ export function parseLeadImportCsv(text: string): import("@/lib/api/crm/leads").
       account_name: row.company?.trim() || null,
       site_address: row.location?.trim() || null,
       source: row["lead source"]?.trim() || row.source?.trim() || null,
-      estimated_value:
-        estimated != null && !Number.isNaN(estimated) ? estimated : null,
     });
   }
 

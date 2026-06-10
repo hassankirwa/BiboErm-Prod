@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { CrmDetailField } from "@/components/crm/crm-record-detail-shell";
 import { useMediaImageSrc } from "@/components/media/media-image";
-import { formatKesFull } from "@/lib/leads-kanban-data";
 import {
   propertySiteTypeOptions,
   urgencyOptions,
@@ -248,7 +247,7 @@ export function LeadDetailIntake({
 
       <DetailSection
         title="Project info & requirements"
-        description="Scope, construction stage, and commercial estimates"
+        description="Scope, construction stage, and requirements"
       >
         <CrmDetailField
           label="Product interests"
@@ -270,22 +269,6 @@ export function LeadDetailIntake({
           label="Requirement description"
           value={lead.requirement_description}
           className="sm:col-span-2 xl:col-span-3"
-        />
-        <CrmDetailField
-          label="Estimated value"
-          value={
-            lead.estimated_value != null
-              ? formatKesFull(Number(lead.estimated_value))
-              : null
-          }
-        />
-        <CrmDetailField
-          label="Estimated budget"
-          value={
-            lead.estimated_budget != null
-              ? formatKesFull(Number(lead.estimated_budget))
-              : null
-          }
         />
         <CrmDetailField
           label="Urgency"

@@ -89,15 +89,16 @@ class QuotationAccountingExcelExtractionService
      */
     protected function buildTabularPayload(array $rows, ?string $sourceFilename): array
     {
-        $projectName = $this->findDocumentLabelValue($rows, ['Project Name', '项目名称']);
-        $projectNumber = $this->findDocumentLabelValue($rows, ['Project No', 'Project No.', 'Order No', '项目编号']);
-
         $headerIndex = $this->findTabularHeaderRowIndex($rows);
         if ($headerIndex === null) {
             throw ValidationException::withMessages([
                 'file' => ['Accounting table headers were not found. Expected columns such as SERIS, CODE, and GLASS TYPE.'],
             ]);
         }
+
+        $projectName = $this->findDocumentLabelValue($rows, ['Project Name', '项目名称'])
+            ?? $this->inferProjectNameFromTitleRow($rows, $headerIndex);
+        $projectNumber = $this->findDocumentLabelValue($rows, ['Project No', 'Project No.', 'Order No', '项目编号']);
 
         $columns = $this->mapTabularColumns($rows[$headerIndex]);
         $lines = [];
@@ -277,6 +278,29 @@ class QuotationAccountingExcelExtractionService
             $columns = $this->mapTabularColumns($row);
             if (($columns['code'] ?? null) !== null && ($columns['series'] ?? null) !== null) {
                 return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $rows
+     */
+    protected function inferProjectNameFromTitleRow(array $rows, int $headerIndex): ?string
+    {
+        for ($i = 0; $i < $headerIndex; $i++) {
+            $cell = trim($rows[$i][0] ?? '');
+            if ($cell === '') {
+                continue;
+            }
+
+            if (preg_match('/^([A-Za-z][A-Za-z0-9 _-]*)[\s\-–—]/u', $cell, $matches)) {
+                return trim($matches[1]);
+            }
+
+            if (preg_match('/^([A-Z][A-Z0-9]+)/u', $cell, $matches)) {
+                return $matches[1];
             }
         }
 
@@ -1303,7 +1327,23 @@ class QuotationAccountingExcelExtractionService
             $reader = IOFactory::createReaderForFile($path);
             $reader->setReadDataOnly(true);
             $spreadsheet = $reader->load($path);
+
+            return $this->spreadsheetToRows($spreadsheet);
         } catch (\Throwable $exception) {
+            if ($extension === 'xls') {
+                $fallbackRows = $this->parseLegacyXlsWithSimpleXls($path);
+                if ($fallbackRows !== []) {
+                    return $fallbackRows;
+                }
+            }
+
+            if ($extension === 'xlsx') {
+                $fallbackRows = $this->parseXlsxWithSimpleXlsx($path);
+                if ($fallbackRows !== []) {
+                    return $fallbackRows;
+                }
+            }
+
             throw ValidationException::withMessages([
                 'file' => [sprintf(
                     'Unable to read the uploaded %s accounting workbook.',
@@ -1311,8 +1351,66 @@ class QuotationAccountingExcelExtractionService
                 )],
             ]);
         }
+    }
 
-        return $this->spreadsheetToRows($spreadsheet);
+    /**
+     * @return array<int, array<int, string>>
+     */
+    protected function parseLegacyXlsWithSimpleXls(string $path): array
+    {
+        if (! class_exists(\Shuchkin\SimpleXLS::class)) {
+            return [];
+        }
+
+        $workbook = \Shuchkin\SimpleXLS::parse($path);
+        if ($workbook === false) {
+            return [];
+        }
+
+        return $this->rowsFromSimpleWorkbook($workbook->rows());
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    protected function parseXlsxWithSimpleXlsx(string $path): array
+    {
+        if (! class_exists(\Shuchkin\SimpleXLSX::class)) {
+            return [];
+        }
+
+        $workbook = \Shuchkin\SimpleXLSX::parse($path);
+        if ($workbook === false) {
+            return [];
+        }
+
+        return $this->rowsFromSimpleWorkbook($workbook->rows());
+    }
+
+    /**
+     * @param  iterable<int, mixed>  $workbookRows
+     * @return array<int, array<int, string>>
+     */
+    protected function rowsFromSimpleWorkbook(iterable $workbookRows): array
+    {
+        $rows = [];
+
+        foreach ($workbookRows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $normalized = array_map(
+                fn (mixed $cell): string => $this->normalizeSpreadsheetCell($cell),
+                $row,
+            );
+
+            if ($this->rowHasContent($normalized)) {
+                $rows[] = $normalized;
+            }
+        }
+
+        return $rows;
     }
 
     /**

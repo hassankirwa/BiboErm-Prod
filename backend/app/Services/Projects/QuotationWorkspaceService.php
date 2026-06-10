@@ -3,11 +3,12 @@
 namespace App\Services\Projects;
 
 use App\Enums\Crm\QuotationStatus;
-use App\Enums\Crm\SiteVisitStatus;
+use App\Enums\Design\DesignJobStatus;
 use App\Models\Account;
 use App\Models\AccountDocument;
+use App\Models\DesignJob;
 use App\Models\Quotation;
-use App\Models\SiteVisit;
+use App\Models\QuotationRequest;
 use App\Models\User;
 use App\Services\Crm\Quotations\QuotationCalculatorService;
 use App\Services\Media\FileStorageService;
@@ -63,10 +64,33 @@ class QuotationWorkspaceService
 
     public function pendingAccountsQuery(?User $user = null): Builder
     {
-        $approvedAccountIds = SiteVisit::query()
-            ->where('status', SiteVisitStatus::Approved->value)
-            ->whereNotNull('account_id')
-            ->pluck('account_id')
+        $readyLeadIds = DesignJob::query()
+            ->where('status', DesignJobStatus::ReadyForQuotation->value)
+            ->whereNotNull('lead_id')
+            ->pluck('lead_id')
+            ->unique()
+            ->values();
+
+        $requestLeadIds = QuotationRequest::query()
+            ->where('status', 'ready_for_quotation')
+            ->whereNotNull('lead_id')
+            ->pluck('lead_id')
+            ->unique()
+            ->values();
+
+        $eligibleLeadIds = $readyLeadIds->merge($requestLeadIds)->unique()->values();
+
+        $accountIdsFromLeads = \App\Models\Lead::query()
+            ->whereIn('id', $eligibleLeadIds)
+            ->whereNotNull('converted_account_id')
+            ->pluck('converted_account_id');
+
+        $accountIdsFromSource = Account::query()
+            ->whereIn('source_lead_id', $eligibleLeadIds)
+            ->pluck('id');
+
+        $eligibleAccountIds = $accountIdsFromLeads
+            ->merge($accountIdsFromSource)
             ->unique()
             ->values();
 
@@ -82,7 +106,7 @@ class QuotationWorkspaceService
             ->unique();
 
         $query = Account::query()
-            ->whereIn('id', $approvedAccountIds)
+            ->whereIn('id', $eligibleAccountIds)
             ->whereNotIn('id', $quotedAccountIds);
 
         if ($user && ! $user->can('accounts.view_all')) {
@@ -174,9 +198,10 @@ class QuotationWorkspaceService
      */
     protected function serializePendingAccount(Account $account): array
     {
-        $latestVisit = SiteVisit::query()
-            ->where('account_id', $account->id)
-            ->where('status', SiteVisitStatus::Approved->value)
+        $latestDesignJob = DesignJob::query()
+            ->where('status', DesignJobStatus::ReadyForQuotation->value)
+            ->whereHas('lead', fn ($q) => $q->where('converted_account_id', $account->id)
+                ->orWhere('id', $account->source_lead_id))
             ->latest('approved_at')
             ->first();
 
@@ -194,10 +219,10 @@ class QuotationWorkspaceService
                 'name' => $account->primaryContact->name,
             ] : null,
             'source_lead_id' => $account->source_lead_id,
-            'latest_approved_visit' => $latestVisit ? [
-                'id' => $latestVisit->id,
-                'visit_number' => $latestVisit->visit_number,
-                'approved_at' => $latestVisit->approved_at?->toIso8601String(),
+            'latest_design_job' => $latestDesignJob ? [
+                'id' => $latestDesignJob->id,
+                'design_job_number' => $latestDesignJob->design_job_number,
+                'approved_at' => $latestDesignJob->approved_at?->toIso8601String(),
             ] : null,
             'has_design_document' => $documents->contains('document_type', 'design'),
             'has_accounting_document' => $documents->contains('document_type', 'accounting'),

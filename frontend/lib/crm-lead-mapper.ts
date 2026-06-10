@@ -5,19 +5,44 @@ import {
   resolveLeadListEmail,
   resolveLeadListPhone,
 } from "@/lib/crm/lead-contact-utils";
+import { getKanbanStageLabel } from "@/lib/crm-lead-pipeline";
 import { getUserInitials } from "@/lib/api/auth";
 import {
   getLeadStatusBadgeClass,
   getLeadStatusLabel,
+  getPipelineStageDisplayLabel,
+  resolvePipelineStage,
   statusToKanbanStage,
 } from "@/lib/crm-lead-status";
 import type { LeadKanbanCard, LeadKanbanStageId } from "@/lib/leads-kanban-data";
 import type { LeadListRow } from "@/lib/leads-list-data";
 import type { LeadMapMarker } from "@/lib/leads-map-data";
 import { resolveCoordsForLocation } from "@/lib/leads-map-data";
+import { KENYA_COUNTIES } from "@/lib/kenya-locations";
 
 function pickOptional(value: string): string | undefined {
   return value === "—" ? undefined : value;
+}
+
+function resolveCountySlugFromLead(lead: ApiLead): string {
+  if (lead.subcounty) {
+    const normalizedSubcounty = lead.subcounty.trim().toLowerCase();
+    for (const county of KENYA_COUNTIES) {
+      if (
+        county.subCounties.some(
+          (subcounty) => subcounty.toLowerCase() === normalizedSubcounty,
+        )
+      ) {
+        return county.slug;
+      }
+    }
+  }
+
+  const address = `${lead.site_address ?? ""} ${lead.area_estate ?? ""} ${lead.subcounty ?? ""}`.toLowerCase();
+  const match = KENYA_COUNTIES.find((county) =>
+    address.includes(county.label.toLowerCase()),
+  );
+  return match?.slug ?? "";
 }
 
 export function apiLeadToListRow(lead: ApiLead): LeadListRow {
@@ -31,7 +56,10 @@ export function apiLeadToListRow(lead: ApiLead): LeadListRow {
     company: resolveLeadListCompany(lead),
     email: resolveLeadListEmail(lead),
     phone: resolveLeadListPhone(lead),
-    stage: getLeadStatusLabel(status),
+    stage: getPipelineStageDisplayLabel({
+      pipeline_stage: lead.pipeline_stage,
+      status,
+    }),
     stageClassName: getLeadStatusBadgeClass(status),
     source: lead.lead_source?.label ?? lead.source ?? "—",
     owner: ownerName,
@@ -43,6 +71,11 @@ export function apiLeadToListRow(lead: ApiLead): LeadListRow {
 
 export function apiLeadToKanbanCard(lead: ApiLead): LeadKanbanCard {
   const status = (lead.status ?? "new").toLowerCase();
+  const pipelineStage = resolvePipelineStage({
+    pipeline_stage: lead.pipeline_stage,
+    status,
+  });
+  const stageId = statusToKanbanStage(status, lead.pipeline_stage);
   const ownerName =
     lead.lead_owner?.name ?? lead.assigned_sales_user?.name ?? "Unassigned";
   const ownerId =
@@ -50,8 +83,9 @@ export function apiLeadToKanbanCard(lead: ApiLead): LeadKanbanCard {
 
   return {
     id: String(lead.id),
-    stageId: statusToKanbanStage(status),
+    stageId,
     statusKey: status,
+    pipelineStageKey: pipelineStage,
     title: leadDisplayName(lead),
     location: lead.site_address ?? lead.area_estate ?? "—",
     owner: ownerName,
@@ -60,15 +94,22 @@ export function apiLeadToKanbanCard(lead: ApiLead): LeadKanbanCard {
     nextActionDate:
       lead.next_follow_up_at?.slice(0, 10) ??
       new Date().toISOString().slice(0, 10),
-    estimatedValue: Number(lead.estimated_value ?? lead.estimated_budget ?? 0),
-    tag: getLeadStatusLabel(status),
+    tag: getPipelineStageDisplayLabel({
+      pipeline_stage: lead.pipeline_stage,
+      status,
+    }),
     company: pickOptional(resolveLeadListCompany(lead)),
     phone: pickOptional(resolveLeadListPhone(lead)),
     email: pickOptional(resolveLeadListEmail(lead)),
     source: lead.lead_source?.label ?? lead.source ?? undefined,
-    notes: lead.notes ?? (lead as import("@/lib/api/crm/types").ApiLeadDetail).requirement_description ?? undefined,
+    notes:
+      lead.notes ??
+      (lead as import("@/lib/api/crm/types").ApiLeadDetail).requirement_description ??
+      undefined,
     latitude: lead.latitude ?? null,
     longitude: lead.longitude ?? null,
+    countySlug: resolveCountySlugFromLead(lead),
+    subcounty: lead.subcounty ?? undefined,
   };
 }
 
@@ -78,31 +119,37 @@ export function apiLeadToMapMarkers(leads: ApiLead[]): LeadMapMarker[] {
 }
 
 export function apiCardsToMapMarkers(cards: LeadKanbanCard[]): LeadMapMarker[] {
-  const defaultNairobi: [number, number] = [-1.2864, 36.8172];
-
-  return cards.map((card) => {
+  return cards.flatMap((card) => {
     const hasCoords =
       card.latitude != null &&
       card.longitude != null &&
       !Number.isNaN(card.latitude) &&
       !Number.isNaN(card.longitude);
 
-    const coords: [number, number] = hasCoords
+    const coords: [number, number] | null = hasCoords
       ? [Number(card.latitude), Number(card.longitude)]
-      : resolveCoordsForLocation(card.location) ??
-        resolveCoordsForLocation(card.title) ??
-        defaultNairobi;
-    return {
-      id: card.id,
-      title: card.title,
-      location: card.location,
-      lat: coords[0],
-      lng: coords[1],
-      stage: card.tag,
-      stageClassName: "",
-      owner: card.owner,
-      company: card.company ?? "—",
-    };
+      : resolveCoordsForLocation(card.location, {
+          countySlug: card.countySlug,
+          subcounty: card.subcounty,
+          latitude: card.latitude,
+          longitude: card.longitude,
+        }) ?? resolveCoordsForLocation(card.title);
+
+    if (!coords) return [];
+
+    return [
+      {
+        id: card.id,
+        title: card.title,
+        location: card.location,
+        lat: coords[0],
+        lng: coords[1],
+        stage: card.tag,
+        stageClassName: getLeadStatusBadgeClass(card.statusKey),
+        owner: card.owner,
+        company: card.company ?? "—",
+      },
+    ];
   });
 }
 
@@ -174,5 +221,5 @@ export function crmCalendarEventsToLeadEvents(
 }
 
 export function getLeadStageLabel(stageId: LeadKanbanStageId): string {
-  return getLeadStatusLabel(stageId);
+  return getKanbanStageLabel(stageId);
 }

@@ -357,8 +357,12 @@ export function AppSidebar() {
   ) => filterDepartmentNav(department, permissions, roles);
 
   const showWorkspaceSidebar =
-    (isWorkspaceHubPath(pathname) && canWorkspace) ||
-    (isWorkspaceSettingsPath(pathname) && canWorkspace);
+    (isWorkspaceHubPath(pathname) &&
+      canWorkspace &&
+      activeDepartment?.id !== "workspace") ||
+    (isWorkspaceSettingsPath(pathname) &&
+      canWorkspace &&
+      activeDepartment?.id !== "workspace");
   const fieldSidebarFallback =
     fieldDepartment && isFieldModulePath(pathname) ? fieldDepartment : null;
 

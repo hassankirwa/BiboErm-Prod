@@ -247,7 +247,7 @@ export default function NewProjectQuotationPage() {
         },
         uploadFile,
       );
-      toast.success("Quotation draft saved.");
+      toast.success("Proforma quotation draft saved.");
       router.push(`/projects/quotations/${quotation.id}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to save quotation.");
@@ -283,7 +283,7 @@ export default function NewProjectQuotationPage() {
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
-        title="New Quotation"
+        title="New Proforma Quotation"
         subtitle="Upload the accounting Excel sheet, review priced lines, and save a draft"
         actions={
           <div className="flex gap-2">
@@ -588,7 +588,7 @@ export default function NewProjectQuotationPage() {
 
         <div className="w-full min-w-0">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">Quotation Preview</h2>
+            <h2 className="text-base font-semibold">Proforma Quotation Preview</h2>
             {lines.length > 0 ? (
               <QuotationPdfDownloadButton targetRef={previewRef} quotation={previewQuotation} />
             ) : null}
@@ -603,7 +603,7 @@ export default function NewProjectQuotationPage() {
           ) : (
             <Card className="flex min-h-[360px] items-center justify-center">
               <CardContent className="text-center text-sm text-muted-foreground">
-                Upload an accounting Excel sheet to preview the BIBO quotation layout.
+                Upload an accounting Excel sheet to preview the BIBO proforma quotation layout.
               </CardContent>
             </Card>
           )}

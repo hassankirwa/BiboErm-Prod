@@ -24,7 +24,7 @@ import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
 import {
   canKanbanMove,
-  kanbanStageToStatus,
+  kanbanStageToApiStatus,
 } from "@/lib/crm-lead-status";
 import { leadFormToCreatePayload } from "@/lib/crm-lead-payload";
 import type { LeadKanbanStageId } from "@/lib/leads-kanban-data";
@@ -99,13 +99,11 @@ export function LeadsPageClient() {
     async (leadId: string, stageId: LeadKanbanStageId) => {
       const card = kanbanCards.find((c) => c.id === leadId);
       const currentStatus = card?.statusKey ?? "new";
-      if (!canKanbanMove(currentStatus, stageId)) {
-        toast.error(
-          `Cannot move lead from ${currentStatus.replace(/_/g, " ")} to ${kanbanStageToStatus(stageId).replace(/_/g, " ")}.`,
-        );
+      if (!canKanbanMove(currentStatus, stageId, card?.pipelineStageKey)) {
+        toast.error("This lead cannot be moved to that pipeline stage.");
         return;
       }
-      const targetStatus = kanbanStageToStatus(stageId);
+      const targetStatus = kanbanStageToApiStatus(stageId);
       if (currentStatus === targetStatus) return;
       try {
         await ensureCsrfCookie();

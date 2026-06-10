@@ -26,7 +26,11 @@ export function isFieldModuleRole(roles: string[]): boolean {
 export const MODULE_HOME_ROUTES: Record<string, string> = {
   workspace: "/workspace",
   crm: "/crm",
-  field: "/field",
+  site_ops: "/site-ops/visits",
+  site_operations: "/site-ops/visits",
+  design: "/design/jobs",
+  quotation: "/quotation/proforma",
+  field: "/site-ops/my-visits",
   production: "/production/schedule",
   warehouse: "/warehouse/inventory",
   procurement: "/procurement/orders",
@@ -40,6 +44,10 @@ export const MODULE_HOME_ROUTES: Record<string, string> = {
 /** Slug fallbacks when `default_module` is missing on the payload. */
 const SLUG_MODULE_FALLBACK: Record<string, string> = {
   sales_marketing: "crm",
+  site_operations: "site_ops",
+  site_ops: "site_ops",
+  design: "design",
+  quotation: "quotation",
   field: "field",
   field_installation: "field",
   production: "production",
@@ -146,7 +154,7 @@ export function resolveHomeRoute(
   }
 
   if (isFieldModuleRole(roles)) {
-    return "/field";
+    return "/site-ops/my-visits";
   }
 
   return resolveActiveUserRedirect(departments, roles);
