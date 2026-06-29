@@ -4,14 +4,19 @@ import { useAuth } from "@/contexts/auth-context";
 import { useMemo } from "react";
 
 export function usePermissions() {
-  const { permissions, hasPermission, hasAnyPermission } = useAuth();
+  const { permissions, roles, hasPermission, hasAnyPermission } = useAuth();
+
+  const isSuperAdmin = roles.includes("super_admin");
 
   const can = (permission: string) => {
-    if (permissions.includes("*")) return true;
+    if (isSuperAdmin || permissions.includes("*")) return true;
     return hasPermission(permission);
   };
 
-  const canAny = (...perms: string[]) => hasAnyPermission(...perms);
+  const canAny = (...perms: string[]) => {
+    if (isSuperAdmin || permissions.includes("*")) return true;
+    return hasAnyPermission(...perms);
+  };
 
   const canManageUsers = () => can("users.manage") || can("it.manage");
   const canViewUsers = () =>

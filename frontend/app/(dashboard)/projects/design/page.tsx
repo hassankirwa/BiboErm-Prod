@@ -15,21 +15,58 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fetchDesignPendingAccounts } from "@/lib/api/projects/design";
-import type { PendingQuotationAccount } from "@/lib/api/projects/quotations";
+import {
+  fetchDesignQueueProjects,
+  type DesignQueueProject,
+} from "@/lib/api/projects/design";
 import { ApiError } from "@/lib/api/errors";
-import { Layers, Upload } from "lucide-react";
+import { projectSiteAssessmentPath, projectTabPath } from "@/lib/projects/paths";
+import { cn } from "@/lib/utils";
+import { ExternalLink, Layers, PencilRuler, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+const STAGE_BADGE_CLASS: Record<string, string> = {
+  deposit_received: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+  site_assessment: "bg-warning/10 text-warning border-warning/20",
+  final_design_approval: "bg-primary/10 text-primary border-primary/20",
+};
+
+function formatKes(value: string | number | null | undefined): string {
+  if (value == null) return "—";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (Number.isNaN(num)) return "—";
+  return `KES ${num.toLocaleString("en-KE")}`;
+}
+
+function primaryAction(project: DesignQueueProject): {
+  label: string;
+  href: string;
+  icon: typeof PencilRuler;
+} {
+  if (project.stage === "final_design_approval") {
+    return {
+      label: "Upload designs",
+      href: projectTabPath(project.id, "designs", "projects"),
+      icon: Upload,
+    };
+  }
+
+  return {
+    label: project.has_production_measurement ? "View measurements" : "Production measurements",
+    href: projectSiteAssessmentPath(project.id, "projects"),
+    icon: PencilRuler,
+  };
+}
+
 export default function ProjectDesignPage() {
-  const [accounts, setAccounts] = useState<PendingQuotationAccount[]>([]);
+  const [projects, setProjects] = useState<DesignQueueProject[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
       setLoading(true);
       try {
-        setAccounts(await fetchDesignPendingAccounts());
+        setProjects(await fetchDesignQueueProjects());
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Failed to load design queue.");
       } finally {
@@ -42,14 +79,14 @@ export default function ProjectDesignPage() {
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Design"
-        subtitle="Accounts with approved measurements awaiting design and accounting files"
+        subtitle="Active projects awaiting production measurements and design files"
       />
       <div className="space-y-6 p-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Layers className="h-4 w-4" />
-              Design & Accounting Queue
+              Design Queue
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -57,53 +94,88 @@ export default function ProjectDesignPage() {
               <div className="flex justify-center py-10">
                 <Spinner />
               </div>
-            ) : accounts.length === 0 ? (
+            ) : projects.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                No accounts are waiting for design work.
+                No projects are in the design phase. Projects appear here after deposit is
+                received.
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Project</TableHead>
                     <TableHead>Account</TableHead>
-                    <TableHead>Visit</TableHead>
-                    <TableHead>Design File</TableHead>
-                    <TableHead>Accounting File</TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead>Measurements</TableHead>
+                    <TableHead>Design files</TableHead>
+                    <TableHead>PM</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accounts.map((account) => (
-                    <TableRow key={account.id}>
-                      <TableCell>
-                        <div className="font-medium">{account.name}</div>
-                      </TableCell>
-                      <TableCell>{account.latest_approved_visit?.visit_number ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={account.has_design_document ? "default" : "outline"}>
-                          {account.has_design_document ? "Uploaded" : "Missing"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={account.has_accounting_document ? "default" : "outline"}>
-                          {account.has_accounting_document ? "Uploaded" : "Missing"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/crm/accounts/${account.id}`}>
-                            <Upload className="mr-1.5 h-3.5 w-3.5" />
-                            Upload Docs
-                          </Link>
-                        </Button>
-                        <Button size="sm" asChild>
-                          <Link href={`/projects/quotations/new?accountId=${account.id}`}>
-                            Start Quotation
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {projects.map((project) => {
+                    const action = primaryAction(project);
+                    const ActionIcon = action.icon;
+
+                    return (
+                      <TableRow key={project.id}>
+                        <TableCell>
+                          <div className="font-medium">{project.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {project.reference} · {formatKes(project.quoted_amount)}
+                          </div>
+                        </TableCell>
+                        <TableCell>{project.account?.name ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "font-normal",
+                              STAGE_BADGE_CLASS[project.stage] ??
+                                "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {project.stage_label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              project.has_production_measurement ? "default" : "outline"
+                            }
+                          >
+                            {project.has_production_measurement ? "Done" : "Pending"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={project.has_design_document ? "default" : "outline"}
+                          >
+                            {project.has_design_document ? "Uploaded" : "Missing"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {project.project_manager?.name ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={projectTabPath(project.id, "overview", "projects")}>
+                                View
+                                <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                            <Button size="sm" asChild>
+                              <Link href={action.href}>
+                                <ActionIcon className="mr-1.5 h-3.5 w-3.5" />
+                                {action.label}
+                              </Link>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

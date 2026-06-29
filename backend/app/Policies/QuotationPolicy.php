@@ -25,9 +25,22 @@ class QuotationPolicy
         return $this->canAny($user, ['quotations.create', 'crm.manage']);
     }
 
+    public function approve(User $user, Quotation $quotation): bool
+    {
+        return $this->canAny($user, [
+            'quotations.approve',
+            'quotations.send',
+            'crm.manage',
+        ]) || $this->hasLegacyCrmAccess($user);
+    }
+
     public function send(User $user, Quotation $quotation): bool
     {
-        return $user->can('quotations.send') || $this->hasLegacyCrmAccess($user);
+        return $this->canAny($user, [
+            'quotations.send',
+            'quotations.approve',
+            'crm.manage',
+        ]) || $this->hasLegacyCrmAccess($user);
     }
 
     public function accept(User $user, Quotation $quotation): bool

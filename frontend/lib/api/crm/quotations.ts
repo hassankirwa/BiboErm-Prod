@@ -71,6 +71,22 @@ export async function updateQuotation(
   return normalizeQuotation(res);
 }
 
+export async function approveQuotation(id: number): Promise<ApiQuotation> {
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}/approve`,
+    { method: "POST", json: {} },
+  );
+  return normalizeQuotation(res);
+}
+
+export async function submitQuotationForReview(id: number): Promise<ApiQuotation> {
+  const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
+    `/api/v1/crm/quotations/${id}/submit-for-review`,
+    { method: "POST", json: {} },
+  );
+  return normalizeQuotation(res);
+}
+
 export async function sendQuotation(id: number): Promise<ApiQuotation> {
   const res = await apiFetch<ApiQuotation | { data: ApiQuotation }>(
     `/api/v1/crm/quotations/${id}/send`,

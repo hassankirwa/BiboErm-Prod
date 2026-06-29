@@ -183,6 +183,64 @@ class QuotationCalculatorService
         });
     }
 
+    public function submitForReview(Quotation $quotation, ?User $user = null): Quotation
+    {
+        if ($quotation->is_reference_copy) {
+            throw ValidationException::withMessages([
+                'quotation' => ['Reference copies cannot be submitted for review.'],
+            ]);
+        }
+
+        $status = $quotation->status instanceof QuotationStatus
+            ? $quotation->status
+            : QuotationStatus::tryFrom((string) $quotation->status);
+
+        if ($status !== QuotationStatus::Draft) {
+            throw ValidationException::withMessages([
+                'status' => ['Only draft quotations can be submitted for approval.'],
+            ]);
+        }
+
+        if ($quotation->lines()->count() === 0) {
+            throw ValidationException::withMessages([
+                'lines' => ['Add at least one line item before submitting for approval.'],
+            ]);
+        }
+
+        $quotation->update([
+            'status' => QuotationStatus::InternalReview->value,
+        ]);
+
+        return $quotation->fresh()->load(['lines', 'deal', 'account']);
+    }
+
+    public function approve(Quotation $quotation, ?User $user = null): Quotation
+    {
+        if ($quotation->is_reference_copy) {
+            throw ValidationException::withMessages([
+                'quotation' => ['Reference copies cannot be approved.'],
+            ]);
+        }
+
+        $status = $quotation->status instanceof QuotationStatus
+            ? $quotation->status
+            : QuotationStatus::tryFrom((string) $quotation->status);
+
+        if ($status !== QuotationStatus::InternalReview) {
+            throw ValidationException::withMessages([
+                'status' => ['Only quotations pending approval can be approved.'],
+            ]);
+        }
+
+        $quotation->update([
+            'status' => QuotationStatus::Approved->value,
+            'approved_at' => now(),
+            'approved_by' => $user?->id,
+        ]);
+
+        return $quotation->fresh()->load(['lines', 'deal', 'account']);
+    }
+
     public function send(Quotation $quotation, ?User $user = null): Quotation
     {
         if ($quotation->is_reference_copy) {
@@ -195,9 +253,9 @@ class QuotationCalculatorService
             ? $quotation->status
             : QuotationStatus::tryFrom((string) $quotation->status);
 
-        if (! in_array($status, [QuotationStatus::Draft, QuotationStatus::Revised], true)) {
+        if (! in_array($status, [QuotationStatus::Approved, QuotationStatus::Revised], true)) {
             throw ValidationException::withMessages([
-                'status' => ['Only draft or revised quotations can be sent.'],
+                'status' => ['Approve the quotation before sending it to the client.'],
             ]);
         }
 

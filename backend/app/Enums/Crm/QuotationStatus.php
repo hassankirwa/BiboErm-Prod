@@ -6,6 +6,7 @@ enum QuotationStatus: string
 {
     case Draft = 'draft';
     case InternalReview = 'internal_review';
+    case Approved = 'approved';
     case Sent = 'sent';
     case RevisionRequested = 'revision_requested';
     case Revised = 'revised';

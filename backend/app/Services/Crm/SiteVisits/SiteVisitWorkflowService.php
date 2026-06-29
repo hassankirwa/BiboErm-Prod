@@ -4,14 +4,18 @@ namespace App\Services\Crm\SiteVisits;
 
 use App\Enums\Crm\DealStage;
 use App\Enums\Crm\LeadStatus;
+use App\Enums\Crm\MeasurementContext;
+use App\Enums\Crm\MeasurementFormStatus;
 use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Deal;
 use App\Models\Lead;
-use App\Models\MeasurementLine;
+use App\Models\Project;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Crm\Leads\LeadStageService;
+use App\Support\ProjectSiteLocation;
+use App\Support\SiteMeasurementFormData;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -26,11 +30,28 @@ class SiteVisitWorkflowService
     public function schedule(User $user, array $data): SiteVisit
     {
         return DB::transaction(function () use ($user, $data) {
+            $context = MeasurementContext::tryFrom((string) ($data['measurement_context'] ?? 'quotation'))
+                ?? MeasurementContext::Quotation;
+
+            $this->assertValidScheduleContext($data, $context);
+
             if (empty($data['assigned_field_officer_id']) && ! empty($data['deal_id'])) {
                 $deal = Deal::query()->find($data['deal_id']);
                 if ($deal?->assigned_field_officer_id) {
                     $data['assigned_field_officer_id'] = $deal->assigned_field_officer_id;
                 }
+            }
+
+            if ($context === MeasurementContext::Production && ! empty($data['project_id'])) {
+                $project = Project::query()->find($data['project_id']);
+                $data['account_id'] = $data['account_id'] ?? $project?->account_id;
+                $data['deal_id'] = $data['deal_id'] ?? $project?->deal_id;
+                $resolved = $project ? ProjectSiteLocation::resolve($project) : ['site_address' => null, 'latitude' => null, 'longitude' => null];
+                $data['site_address'] = trim((string) ($data['site_address'] ?? '')) !== ''
+                    ? $data['site_address']
+                    : $resolved['site_address'];
+                $data['latitude'] = $data['latitude'] ?? $resolved['latitude'];
+                $data['longitude'] = $data['longitude'] ?? $resolved['longitude'];
             }
 
             $visit = SiteVisit::query()->create([
@@ -39,6 +60,7 @@ class SiteVisitWorkflowService
                 'lead_id' => $data['lead_id'] ?? null,
                 'deal_id' => $data['deal_id'] ?? null,
                 'account_id' => $data['account_id'] ?? null,
+                'project_id' => $data['project_id'] ?? null,
                 'contact_id' => $data['contact_id'] ?? null,
                 'site_address' => $data['site_address'] ?? null,
                 'latitude' => $data['latitude'] ?? null,
@@ -47,13 +69,16 @@ class SiteVisitWorkflowService
                 'scheduled_by' => $user->id,
                 'visit_date' => $data['visit_date'],
                 'visit_time' => $data['visit_time'] ?? null,
-                'visit_purpose' => $data['visit_purpose'] ?? null,
-                'requires_measurements' => $data['requires_measurements'] ?? $this->purposeRequiresMeasurements($data['visit_purpose'] ?? null),
+                'visit_purpose' => $data['visit_purpose'] ?? ($context === MeasurementContext::Production ? 'measurement' : null),
+                'measurement_context' => $context->value,
+                'requires_measurements' => $data['requires_measurements'] ?? true,
                 'status' => SiteVisitStatus::Scheduled->value,
+                'measurement_form_status' => MeasurementFormStatus::Draft->value,
                 'notes_for_field_officer' => $data['notes_for_field_officer'] ?? null,
+                'measurement_form_data' => $this->buildDefaultFormData($data, $user),
             ]);
 
-            if ($visit->lead_id) {
+            if ($visit->lead_id && $context === MeasurementContext::Quotation) {
                 $lead = Lead::query()->find($visit->lead_id);
                 $leadStatus = $lead?->status instanceof LeadStatus
                     ? $lead->status->value
@@ -69,7 +94,7 @@ class SiteVisitWorkflowService
                 }
             }
 
-            return $visit->load(['lead', 'deal', 'assignedFieldOfficer']);
+            return $visit->load(['lead', 'deal', 'project', 'assignedFieldOfficer']);
         });
     }
 
@@ -90,7 +115,7 @@ class SiteVisitWorkflowService
         }
 
         if ($current === SiteVisitStatus::InProgress->value) {
-            return $visit->fresh()->load(['measurementLines', 'assignedFieldOfficer']);
+            return $visit->fresh()->load(['assignedFieldOfficer', 'photos', 'project']);
         }
 
         $visit->update([
@@ -100,12 +125,17 @@ class SiteVisitWorkflowService
             'arrival_at' => now(),
         ]);
 
-        return $visit->fresh()->load(['measurementLines', 'assignedFieldOfficer']);
+        return $visit->fresh()->load(['assignedFieldOfficer', 'photos', 'project']);
     }
 
-    public function storeMeasurements(SiteVisit $visit, User $user, array $lines): SiteVisit
-    {
+    public function saveMeasurementForm(
+        SiteVisit $visit,
+        User $user,
+        array $formData,
+        bool $allowPartial = false,
+    ): SiteVisit {
         $this->assertAssignedFieldOfficer($visit, $user);
+        $this->assertFormEditable($visit);
 
         $current = $this->visitStatusValue($visit);
 
@@ -118,28 +148,36 @@ class SiteVisitWorkflowService
             ]);
         }
 
-        DB::transaction(function () use ($visit, $lines) {
-            $visit->measurementLines()->delete();
+        $normalized = SiteMeasurementFormData::normalize($formData);
 
-            foreach ($lines as $index => $line) {
-                MeasurementLine::query()->create([
-                    'site_visit_id' => $visit->id,
-                    'room_area_name' => $line['room_area_name'],
-                    'width' => $line['width'] ?? null,
-                    'height' => $line['height'] ?? null,
-                    'quantity' => $line['quantity'] ?? 1,
-                    'material_preference' => $line['material_preference'] ?? null,
-                    'installation_notes' => $line['installation_notes'] ?? null,
-                    'obstacles_notes' => $line['obstacles_notes'] ?? null,
-                    'client_comments' => $line['client_comments'] ?? null,
-                    'sort_order' => $line['sort_order'] ?? $index,
-                ]);
-            }
+        if (! $allowPartial && ! SiteMeasurementFormData::hasOperationalData($normalized)) {
+            throw ValidationException::withMessages([
+                'form' => ['Add at least one measurement line or operational note.'],
+            ]);
+        }
 
-            $visit->update(['status' => SiteVisitStatus::MeasurementsCaptured->value]);
-        });
+        $update = [
+            'measurement_form_data' => $normalized,
+            'measurement_form_status' => MeasurementFormStatus::Draft->value,
+        ];
 
-        return $visit->fresh()->load('measurementLines');
+        if (SiteMeasurementFormData::hasOperationalData($normalized)) {
+            $update['status'] = SiteVisitStatus::MeasurementsCaptured->value;
+        }
+
+        $visit->update($update);
+
+        return $visit->fresh()->load(['assignedFieldOfficer', 'photos', 'project']);
+    }
+
+    public function storeSketchPath(SiteVisit $visit, User $user, string $path): SiteVisit
+    {
+        $this->assertAssignedFieldOfficer($visit, $user);
+        $this->assertFormEditable($visit);
+
+        $visit->update(['rough_sketch_path' => $path]);
+
+        return $visit->fresh();
     }
 
     public function submit(SiteVisit $visit, User $user, array $data): SiteVisit
@@ -147,18 +185,9 @@ class SiteVisitWorkflowService
         $this->assertAssignedFieldOfficer($visit, $user);
 
         $current = $this->visitStatusValue($visit);
-
         $assessmentOnly = ! $this->visitRequiresMeasurements($visit);
 
         if ($current !== SiteVisitStatus::MeasurementsCaptured->value) {
-            if ($visit->deal_id) {
-                $deal = Deal::query()->find($visit->deal_id);
-                if ($deal?->site_assessment && $this->assessmentHasMeasurableData($deal->site_assessment)) {
-                    $visit = $this->syncDealAssessmentToVisit($visit, $user, $deal->site_assessment);
-                    $current = $this->visitStatusValue($visit);
-                }
-            }
-
             if (
                 $current !== SiteVisitStatus::MeasurementsCaptured->value
                 && ! ($assessmentOnly && $current === SiteVisitStatus::InProgress->value)
@@ -169,14 +198,15 @@ class SiteVisitWorkflowService
             }
         }
 
-        if ($this->visitRequiresMeasurements($visit) && $visit->measurementLines()->count() === 0) {
+        if ($this->visitRequiresMeasurements($visit) && ! SiteMeasurementFormData::hasOperationalData($visit->measurement_form_data)) {
             throw ValidationException::withMessages([
-                'lines' => ['At least one measurement line is required before submitting the visit.'],
+                'form' => ['Complete the measurement form before submitting the visit.'],
             ]);
         }
 
         $visit->update([
             'status' => SiteVisitStatus::SubmittedForReview->value,
+            'measurement_form_status' => MeasurementFormStatus::Submitted->value,
             'completion_at' => now(),
             'client_present' => $data['client_present'] ?? null,
             'visit_outcome' => $data['visit_outcome'] ?? null,
@@ -184,7 +214,7 @@ class SiteVisitWorkflowService
             'field_officer_notes' => $data['field_officer_notes'] ?? null,
         ]);
 
-        if ($visit->lead_id && $this->visitRequiresMeasurements($visit)) {
+        if ($visit->lead_id && $this->visitRequiresMeasurements($visit) && $this->isQuotationContext($visit)) {
             $lead = Lead::query()->find($visit->lead_id);
             $leadStatus = $lead?->status instanceof LeadStatus
                 ? $lead->status->value
@@ -202,7 +232,7 @@ class SiteVisitWorkflowService
             }
         }
 
-        return $visit->fresh()->load('measurementLines');
+        return $visit->fresh()->load(['assignedFieldOfficer', 'photos', 'project']);
     }
 
     public function approve(SiteVisit $visit, User $user): SiteVisit
@@ -217,143 +247,159 @@ class SiteVisitWorkflowService
 
         $visit->update([
             'status' => SiteVisitStatus::Approved->value,
+            'measurement_form_status' => MeasurementFormStatus::Locked->value,
             'approved_by' => $user->id,
             'approved_at' => now(),
         ]);
 
-        if ($visit->deal_id) {
-            Deal::query()->whereKey($visit->deal_id)->update([
-                'stage' => DealStage::MeasurementsCompleted->value,
-            ]);
+        if ($this->isQuotationContext($visit)) {
+            if ($visit->deal_id) {
+                Deal::query()->whereKey($visit->deal_id)->update([
+                    'stage' => DealStage::MeasurementsCompleted->value,
+                ]);
+            }
+
+            if ($visit->account_id) {
+                \App\Models\Account::query()->whereKey($visit->account_id)->update([
+                    'status' => 'awaiting_quotation',
+                ]);
+            }
         }
 
-        if ($visit->account_id) {
-            \App\Models\Account::query()->whereKey($visit->account_id)->update([
-                'status' => 'awaiting_quotation',
-            ]);
+        if ($this->isProductionContext($visit) && $visit->project_id) {
+            $this->syncProductionMeasurementToProject($visit, $user);
         }
 
-        $visit = $visit->fresh()->load(['measurementLines', 'approvedBy']);
+        $visit = $visit->fresh()->load(['assignedFieldOfficer', 'approvedBy', 'photos', 'project']);
 
         $this->crmAudit->siteVisitApproved($visit, $user);
 
         return $visit;
     }
 
-    /**
-     * @param  array<string, mixed>  $assessment
-     */
-    public function syncDealAssessmentToVisit(SiteVisit $visit, User $user, array $assessment): SiteVisit
+    protected function syncProductionMeasurementToProject(SiteVisit $visit, User $user): void
     {
-        $lines = $this->measurementLinesFromDealAssessment($assessment);
-        if ($lines === []) {
-            return $visit->fresh()->load('measurementLines');
+        $project = Project::query()->find($visit->project_id);
+        if (! $project) {
+            return;
         }
 
-        $current = $this->visitStatusValue($visit);
-        if (in_array($current, [
-            SiteVisitStatus::Scheduled->value,
-            SiteVisitStatus::Assigned->value,
-        ], true)) {
-            $visit->update([
-                'status' => SiteVisitStatus::InProgress->value,
-                'arrival_at' => $visit->arrival_at ?? now(),
+        $stageData = is_array($project->stage_data) ? $project->stage_data : [];
+        $formData = is_array($visit->measurement_form_data) ? $visit->measurement_form_data : [];
+
+        $stageData['site_measurement'] = array_merge($formData, [
+            'approved_visit_id' => $visit->id,
+            'rough_sketch_path' => $visit->rough_sketch_path,
+            'recorded_by' => $user->id,
+            'recorded_at' => now()->toIso8601String(),
+        ]);
+
+        $project->update(['stage_data' => $stageData]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function assertValidScheduleContext(array $data, MeasurementContext $context): void
+    {
+        if ($context === MeasurementContext::Production) {
+            if (empty($data['project_id'])) {
+                throw ValidationException::withMessages([
+                    'project_id' => ['A project is required for production measurement visits.'],
+                ]);
+            }
+
+            return;
+        }
+
+        if (
+            empty($data['lead_id'])
+            && empty($data['deal_id'])
+            && empty($data['account_id'])
+        ) {
+            throw ValidationException::withMessages([
+                'lead_id' => ['A lead, deal, or account is required for quotation measurement visits.'],
             ]);
-            $visit = $visit->fresh();
         }
-
-        return $this->storeMeasurements($visit, $user, $lines);
     }
 
     /**
-     * @param  array<string, mixed>  $assessment
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
      */
-    public function assessmentHasMeasurableData(array $assessment): bool
+    protected function buildDefaultFormData(array $data, User $user): array
     {
-        if (($assessment['doors_count'] ?? 0) > 0 || ($assessment['windows_count'] ?? 0) > 0) {
-            return true;
-        }
+        $defaults = [
+            'measured_at' => now()->toDateString(),
+            'measured_by' => $user->name,
+            'site_rep' => $user->name,
+            'lines' => [],
+        ];
 
-        if (($assessment['balconies_count'] ?? 0) > 0 || ($assessment['bathrooms_count'] ?? 0) > 0) {
-            return true;
-        }
-
-        foreach (['doors', 'windows', 'balconies', 'bathrooms'] as $key) {
-            foreach ($assessment[$key] ?? [] as $item) {
-                if (! empty($item['label'])) {
-                    return true;
-                }
+        if (! empty($data['project_id'])) {
+            $project = Project::query()->with(['account', 'contact'])->find($data['project_id']);
+            if ($project) {
+                $location = ProjectSiteLocation::resolve($project);
+                $defaults['project_name'] = $project->name;
+                $defaults['project_address'] = $location['site_address'] ?? $project->site_address;
+                $defaults['client_name'] = $project->account?->name;
+                $defaults['client_contact'] = $project->contact?->name;
+                $defaults['phone'] = $project->contact?->phone;
             }
         }
 
-        return trim((string) ($assessment['operational_notes'] ?? '')) !== ''
-            || trim((string) ($assessment['access_constraints'] ?? '')) !== ''
-            || trim((string) ($assessment['fabrication_concerns'] ?? '')) !== '';
+        if (! empty($data['lead_id'])) {
+            $lead = Lead::query()->find($data['lead_id']);
+            if ($lead) {
+                $defaults['client_name'] = $defaults['client_name'] ?? $lead->name ?? $lead->account_name;
+                $defaults['project_address'] = $defaults['project_address'] ?? $lead->site_address;
+                $defaults['phone'] = $defaults['phone'] ?? $lead->phone;
+            }
+        }
+
+        if (! empty($data['account_id'])) {
+            $account = \App\Models\Account::query()->with('primaryContact')->find($data['account_id']);
+            if ($account) {
+                $defaults['client_name'] = $defaults['client_name'] ?? $account->name;
+                $defaults['client_contact'] = $defaults['client_contact'] ?? $account->primaryContact?->name;
+                $defaults['phone'] = $defaults['phone'] ?? $account->primaryContact?->phone;
+            }
+        }
+
+        $defaults['project_address'] = $defaults['project_address'] ?? ($data['site_address'] ?? null);
+
+        return SiteMeasurementFormData::normalize($defaults);
     }
 
-    /**
-     * @param  array<string, mixed>  $assessment
-     * @return list<array<string, mixed>>
-     */
-    protected function measurementLinesFromDealAssessment(array $assessment): array
+    protected function assertFormEditable(SiteVisit $visit): void
     {
-        $lines = [];
-        $order = 0;
+        $status = $visit->measurement_form_status instanceof MeasurementFormStatus
+            ? $visit->measurement_form_status->value
+            : (string) ($visit->measurement_form_status ?? MeasurementFormStatus::Draft->value);
 
-        foreach ($assessment['doors'] ?? [] as $door) {
-            $label = trim((string) ($door['label'] ?? ''));
-            if ($label === '') {
-                continue;
-            }
-            $lines[] = [
-                'room_area_name' => $label,
-                'width' => $door['width_ft'] ?? null,
-                'height' => $door['height_ft'] ?? null,
-                'quantity' => 1,
-                'material_preference' => $door['material_preference'] ?? null,
-                'installation_notes' => $door['notes'] ?? null,
-                'sort_order' => $order++,
-            ];
+        if (in_array($status, [
+            MeasurementFormStatus::Submitted->value,
+            MeasurementFormStatus::Approved->value,
+            MeasurementFormStatus::Locked->value,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'form' => ['This measurement form is read-only.'],
+            ]);
         }
+    }
 
-        foreach ($assessment['windows'] ?? [] as $window) {
-            $label = trim((string) ($window['label'] ?? ''));
-            if ($label === '') {
-                continue;
-            }
-            $lines[] = [
-                'room_area_name' => $label,
-                'width' => $window['width_ft'] ?? null,
-                'height' => $window['height_ft'] ?? null,
-                'quantity' => 1,
-                'material_preference' => $window['material_preference'] ?? null,
-                'installation_notes' => $window['notes'] ?? null,
-                'sort_order' => $order++,
-            ];
-        }
+    protected function isQuotationContext(SiteVisit $visit): bool
+    {
+        $context = $visit->measurement_context instanceof MeasurementContext
+            ? $visit->measurement_context->value
+            : (string) ($visit->measurement_context ?? MeasurementContext::Quotation->value);
 
-        foreach (['balconies' => 'Balcony', 'bathrooms' => 'Bathroom'] as $key => $prefix) {
-            foreach ($assessment[$key] ?? [] as $item) {
-                $label = trim((string) ($item['label'] ?? ''));
-                if ($label === '') {
-                    continue;
-                }
-                $notes = trim(implode("\n", array_filter([
-                    $item['notes'] ?? null,
-                    $item['dimensions_description'] ?? null,
-                ])));
-                $lines[] = [
-                    'room_area_name' => str_starts_with($label, $prefix) ? $label : "{$prefix}: {$label}",
-                    'width' => $item['width_ft'] ?? null,
-                    'height' => $item['height_ft'] ?? null,
-                    'quantity' => 1,
-                    'installation_notes' => $notes !== '' ? $notes : null,
-                    'sort_order' => $order++,
-                ];
-            }
-        }
+        return $context === MeasurementContext::Quotation->value;
+    }
 
-        return $lines;
+    protected function isProductionContext(SiteVisit $visit): bool
+    {
+        return ! $this->isQuotationContext($visit);
     }
 
     protected function assertAssignedFieldOfficer(SiteVisit $visit, User $user): void

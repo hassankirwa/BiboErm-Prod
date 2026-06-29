@@ -33,10 +33,30 @@ trait SendsAuthResponses
                 'avatar_url' => $user->profile?->avatar_url,
             ],
             'roles' => $user->getRoleNames()->values()->all(),
-            'permissions' => $user->getAllPermissions()->pluck('name')->values()->all(),
+            'permissions' => $this->resolveAuthPermissions($user),
             'departments' => $departments,
             'redirect' => $this->suggestedRedirect($user),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function resolveAuthPermissions(User $user): array
+    {
+        if ($user->hasRole('super_admin')) {
+            return ['*'];
+        }
+
+        $hasDepartmentSuperAdmin = $user->departmentRoles()
+            ->whereHas('role', fn ($query) => $query->where('name', 'super_admin'))
+            ->exists();
+
+        if ($hasDepartmentSuperAdmin) {
+            return ['*'];
+        }
+
+        return $user->getAllPermissions()->pluck('name')->values()->all();
     }
 
     protected function suggestedRedirect(User $user): string

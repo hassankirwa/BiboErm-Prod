@@ -20,6 +20,36 @@ export function formatSiteVisitStatus(status: string | null): string {
     .join(" ");
 }
 
+/** Human-readable progress label for lead detail header / stage actions. */
+export function leadSiteVisitProgressLabel(
+  visit: { status?: string | null } | null | undefined,
+): string | null {
+  if (!visit?.status) return null;
+
+  switch (visit.status) {
+    case "scheduled":
+    case "assigned":
+      return "Site visit scheduled";
+    case "in_progress":
+      return "Visit in progress";
+    case "measurements_captured":
+      return "Measurements captured";
+    case "submitted_for_review":
+      return "Awaiting visit approval";
+    case "approved":
+      return "Visit approved";
+    default:
+      return formatSiteVisitStatus(visit.status);
+  }
+}
+
+export function canScheduleLeadSiteVisit(
+  visit: { status?: string | null } | null | undefined,
+): boolean {
+  if (!visit?.status) return true;
+  return visit.status === "approved" || visit.status === "cancelled";
+}
+
 export function canExecuteFieldVisit(status: string | null): boolean {
   return status === "in_progress" || status === "measurements_captured";
 }

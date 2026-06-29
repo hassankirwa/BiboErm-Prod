@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\ProjectStageGate;
+use App\Support\ProjectSiteLocation;
 use App\Support\SiteAssessmentImages;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -21,6 +22,7 @@ class ProjectResource extends JsonResource
             'type' => $this->type,
             'location_type' => $this->location_type,
             'site_address' => $this->site_address,
+            'resolved_site_address' => ProjectSiteLocation::resolve($this->resource)['site_address'],
             'stage' => $this->stage?->value ?? $this->stage,
             'completion_percent' => $this->completion_percent,
             'priority' => $this->priority,

@@ -113,7 +113,11 @@ import {
 
 import { useAuth } from "@/contexts/auth-context";
 
-import { resolveFieldOfficerName } from "@/lib/crm/site-visit-utils";
+import {
+  canScheduleLeadSiteVisit,
+  leadSiteVisitProgressLabel,
+  resolveFieldOfficerName,
+} from "@/lib/crm/site-visit-utils";
 
 import type { ApiLeadDetail } from "@/lib/api/crm/types";
 
@@ -146,10 +150,13 @@ import {
 } from "@/components/crm/lead-notes-canvas";
 
 import {
-  canCommercialConvertLead,
+  canCreateDealAfterDeposit,
   canProvisionAccountFromLead,
+  canRecordDepositAndCreateDeal,
+  dealIsWon,
   hasApprovedSiteVisit,
   hasQuotationSentToClient,
+  hasRecordedDeposit,
   statusToKanbanStage,
 } from "@/lib/crm-lead-status";
 
@@ -369,6 +376,9 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     return visits[visits.length - 1] ?? null;
   }, [lead?.site_visits]);
 
+  const siteVisitProgressLabel = leadSiteVisitProgressLabel(latestSiteVisit);
+  const canScheduleVisit = canScheduleLeadSiteVisit(latestSiteVisit);
+
   const linkedAccountId =
     lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
 
@@ -583,11 +593,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         visit_date: visitForm.visit_date,
 
         visit_time: visitForm.visit_time || undefined,
-
-        visit_purpose: "assessment",
-
-        requires_measurements: false,
-
+        measurement_context: "quotation",
+        requires_measurements: true,
         notes_for_field_officer: visitForm.notes_for_field_officer || undefined,
 
       });
@@ -946,7 +953,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             {accountHref ? (
 
-              <Button size="sm" className="h-9" asChild>
+              <Button size="sm" variant="outline" className="h-9" asChild>
 
                 <Link href={accountHref}>Open Account</Link>
 
@@ -954,13 +961,14 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             ) : null}
 
+            {canScheduleVisit ? (
             <PermissionGate permission="site_visits.schedule">
 
               <Button
 
                 size="sm"
 
-                variant="outline"
+                variant={latestSiteVisitId ? "outline" : "default"}
 
                 className="h-9"
 
@@ -1002,19 +1010,22 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                 <Calendar className="mr-1.5 h-3.5 w-3.5" />
 
-                Schedule Site Visit
+                {latestSiteVisitId ? "Schedule follow-up visit" : "Schedule Site Visit"}
 
               </Button>
 
             </PermissionGate>
+            ) : null}
 
             {latestSiteVisitId ? (
 
-              <Button size="sm" variant="outline" className="h-9" asChild>
+              <Button size="sm" className="h-9" asChild>
 
                 <Link href={`/crm/site-visits/${latestSiteVisitId}`}>
 
                   View Visit
+
+                  {siteVisitProgressLabel ? ` · ${siteVisitProgressLabel}` : ""}
 
                 </Link>
 
@@ -1028,7 +1039,6 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
               <LeadQuotationActions
                 latestQuotation={lead?.latest_quotation}
                 salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
-                linkedAccountId={linkedAccountId}
                 showCreateQuotation={
                   latestSiteVisit?.status === "approved" && !lead?.latest_quotation
                 }
@@ -1071,6 +1081,10 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     latestSiteVisitId,
 
     latestSiteVisit,
+
+    canScheduleVisit,
+
+    siteVisitProgressLabel,
 
     linkedAccountId,
 
@@ -1147,35 +1161,29 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
   const headerAccountId =
     lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
   const headerSalesDeal = lead?.sales_deal ?? lead?.converted_deal ?? null;
-  const headerDepositMet =
-    headerSalesDeal?.payment_status === "deposit_met" ||
-    (() => {
-      const required =
-        parseFloat(String(headerSalesDeal?.deposit_required_amount ?? 0)) || 0;
-      const paid =
-        parseFloat(
-          String(
-            headerSalesDeal?.deposit_paid_amount ??
-              headerSalesDeal?.deposit_amount ??
-              0,
-          ),
-        ) || 0;
-      return required > 0 && paid >= required;
-    })();
-  const showCommercialConvert = canCommercialConvertLead({
+  const commercialInput = {
     hasLinkedAccount: Boolean(headerAccountId),
     hasDeal: Boolean(headerSalesDeal?.id ?? lead?.converted_deal_id),
-    depositMet: headerDepositMet,
+    hasRecordedDeposit: hasRecordedDeposit(headerSalesDeal),
     hasApprovedSiteVisit: hasApprovedSiteVisit(lead?.site_visits),
     hasSentQuotation: hasQuotationSentToClient(lead?.latest_quotation),
-  });
+    dealWon: dealIsWon(headerSalesDeal),
+  };
+  const showRecordDepositAndCreateDeal =
+    canRecordDepositAndCreateDeal(commercialInput);
+  const showCreateDealAfterDeposit =
+    canCreateDealAfterDeposit(commercialInput);
   const showProvisionConvert = canProvisionAccountFromLead(
     status,
     Boolean(headerAccountId),
   );
-  const convertLabel = showCommercialConvert
-    ? "Record Deposit & Create Deal"
-    : "Convert Lead";
+  const convertLabel = showCreateDealAfterDeposit
+    ? "Create Deal"
+    : showRecordDepositAndCreateDeal
+      ? "Record Deposit & Create Deal"
+      : "Convert Lead";
+  const showCommercialConvert =
+    showRecordDepositAndCreateDeal || showCreateDealAfterDeposit;
 
   const editHref = `/crm/leads/${leadId}/edit${view ? `?view=${view}` : ""}`;
 
@@ -1205,11 +1213,23 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             )}
 
-            <Badge variant="outline" className="font-normal text-[#1e3a5f]">
+            {siteVisitProgressLabel ? (
 
-              {card.tag}
+              <Badge variant="outline" className="font-normal text-[#1e3a5f]">
 
-            </Badge>
+                {siteVisitProgressLabel}
+
+              </Badge>
+
+            ) : card.tag !== stage?.label ? (
+
+              <Badge variant="outline" className="font-normal text-[#1e3a5f]">
+
+                {card.tag}
+
+              </Badge>
+
+            ) : null}
 
           </div>
 

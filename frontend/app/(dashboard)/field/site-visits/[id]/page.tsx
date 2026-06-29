@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
-import { DealSiteAssessmentForm } from "@/components/crm/deal-site-assessment-form";
-import { SiteVisitLogDetails } from "@/components/crm/site-visit-log-details";
+import { UnifiedSiteMeasurementForm } from "@/components/measurements/unified-site-measurement-form";
 import { SiteVisitStatusBadge } from "@/components/crm/site-visit-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,15 +26,15 @@ import {
   startSiteVisit,
   type ApiSiteVisit,
 } from "@/lib/api/crm/site-visits";
-import { fetchDeal } from "@/lib/api/crm/deals";
+import { getProject, type ProjectDetail } from "@/lib/api/projects";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
   canExecuteFieldVisit,
   canStartFieldVisit,
 } from "@/lib/crm/site-visit-utils";
+import { contextLabel, resolveMeasurementContext } from "@/lib/measurements/adapters";
 import { toast } from "sonner";
-import type { ApiDeal } from "@/lib/api/crm/types";
 
 function scrollToLogDetails() {
   document.getElementById("log-details")?.scrollIntoView({
@@ -48,7 +47,7 @@ export default function FieldSiteVisitDetailPage() {
   const params = useParams<{ id: string }>();
   const visitId = Number(params.id);
   const [visit, setVisit] = useState<ApiSiteVisit | null>(null);
-  const [deal, setDeal] = useState<ApiDeal | null>(null);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -65,16 +64,15 @@ export default function FieldSiteVisitDetailPage() {
       const data = await fetchSiteVisit(visitId);
       setVisit(data);
 
-      if (data.deal_id) {
+      if (data.project_id) {
         try {
-          const dealData = await fetchDeal(data.deal_id);
-          setDeal(dealData);
+          const projectResponse = await getProject(data.project_id);
+          setProject(projectResponse.data);
         } catch {
-          // Non-fatal: fall back to basic log form if deal can't be loaded.
-          setDeal(null);
+          setProject(null);
         }
       } else {
-        setDeal(null);
+        setProject(null);
       }
     } catch (err) {
       setError(
@@ -143,7 +141,7 @@ export default function FieldSiteVisitDetailPage() {
   const status = visit?.status ?? "scheduled";
   const showLogDetails = canExecuteFieldVisit(status);
   const showStart = canStartFieldVisit(status);
-  const useDealAssessment = showLogDetails && deal !== null;
+  const context = visit ? resolveMeasurementContext(visit) : "quotation";
 
   return (
     <div className="flex h-full flex-col">
@@ -156,7 +154,7 @@ export default function FieldSiteVisitDetailPage() {
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                 <Button size="sm" onClick={scrollToLogDetails}>
                   <ClipboardList className="mr-1 h-4 w-4" />
-                  {useDealAssessment ? "Site assessment" : "Log measurements"}
+                  Log measurements
                 </Button>
               </PermissionGate>
             )}
@@ -186,7 +184,7 @@ export default function FieldSiteVisitDetailPage() {
             {error ?? "Site visit not found."}
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div className="mx-auto max-w-6xl space-y-4">
             <Card className="border-border">
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -204,6 +202,9 @@ export default function FieldSiteVisitDetailPage() {
                         <span>Officer: {visit.assigned_field_officer.name}</span>
                       )}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {contextLabel(context)}
+                    </p>
                   </div>
                   <SiteVisitStatusBadge status={status} />
                 </div>
@@ -216,6 +217,9 @@ export default function FieldSiteVisitDetailPage() {
                   </p>
                 )}
 
+                {visit.project_id && (
+                  <p className="text-sm">Project: #{visit.project_id}</p>
+                )}
                 {visit.lead_id && <p className="text-sm">Lead: #{visit.lead_id}</p>}
                 {visit.deal_id && <p className="text-sm">Deal: #{visit.deal_id}</p>}
 
@@ -275,7 +279,7 @@ export default function FieldSiteVisitDetailPage() {
                     <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
                       <Button size="sm" variant="default" onClick={scrollToLogDetails}>
                         <ClipboardList className="mr-2 h-4 w-4" />
-                        {useDealAssessment ? "Site assessment" : "Log measurements"}
+                        Log measurements
                       </Button>
                     </PermissionGate>
                   )}
@@ -300,32 +304,25 @@ export default function FieldSiteVisitDetailPage() {
               </CardContent>
             </Card>
 
-            {useDealAssessment ? (
+            {showLogDetails && (
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
-                <DealSiteAssessmentForm
-                  deal={deal}
+                <UnifiedSiteMeasurementForm
                   visit={visit}
-                  onDealUpdated={setDeal}
+                  project={project}
                   onVisitUpdated={setVisit}
                 />
               </PermissionGate>
-            ) : (
-              <SiteVisitLogDetails
-                visit={visit}
-                onVisitUpdated={setVisit}
-                onRefresh={loadVisit}
-              />
             )}
 
             {status === "submitted_for_review" && (
               <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
-                Field visit complete - awaiting sales approval.
+                Field visit complete — awaiting approval.
               </div>
             )}
 
             {status === "approved" && (
               <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
-                Visit approved. Linked lead or deal has moved to the next stage.
+                Visit approved.
               </div>
             )}
           </div>

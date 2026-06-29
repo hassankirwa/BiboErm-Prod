@@ -30,8 +30,8 @@ class OpenAssignedSiteVisitsController extends Controller
                 'deal.account',
                 'deal.contact',
                 'deal.assignedFieldOfficer',
+                'project',
                 'assignedFieldOfficer',
-                'measurementLines',
             ])
             ->orderBy('visit_date')
             ->orderBy('visit_time')

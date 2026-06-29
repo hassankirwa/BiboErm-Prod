@@ -165,6 +165,7 @@ export type ApiSiteVisit = {
   lead_id: number | null;
   deal_id: number | null;
   account_id: number | null;
+  project_id: number | null;
   contact_id: number | null;
   site_address: string | null;
   latitude: number | null;
@@ -174,6 +175,7 @@ export type ApiSiteVisit = {
   visit_date: string | null;
   visit_time: string | null;
   visit_purpose: string | null;
+  measurement_context?: "quotation" | "production" | null;
   status: string | null;
   notes_for_field_officer: string | null;
   actual_latitude: number | null;
@@ -184,10 +186,21 @@ export type ApiSiteVisit = {
   visit_outcome: string | null;
   follow_up_required: boolean | null;
   field_officer_notes: string | null;
+  measurement_form_data?: import("@/lib/measurements/types").SiteMeasurementFormData | null;
+  measurement_form_status?: "draft" | "submitted" | "approved" | "locked" | null;
+  rough_sketch_path?: string | null;
+  rough_sketch_url?: string | null;
   approved_by: number | null;
   approved_at: string | null;
   lead?: ApiLead | null;
   deal?: ApiDeal | null;
+  project?: {
+    id: number;
+    name: string;
+    reference?: string | null;
+    site_address?: string | null;
+    stage?: string | null;
+  } | null;
   assigned_field_officer?: ApiUser | null;
   photos?: ApiSiteVisitPhoto[];
   measurement_lines?: ApiMeasurementLine[];

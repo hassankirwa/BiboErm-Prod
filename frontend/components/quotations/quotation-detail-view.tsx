@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { recordPayment } from "@/lib/api/crm/deals";
-import { sendQuotation } from "@/lib/api/crm/quotations";
+import { approveQuotation, sendQuotation, submitQuotationForReview } from "@/lib/api/crm/quotations";
 import type { ApiQuotation, ApiQuotationLine } from "@/lib/api/crm/types";
 import { ApiError } from "@/lib/api/errors";
 import {
@@ -51,9 +51,20 @@ import {
   quotationPreviewPath,
   type QuotationViewMode,
 } from "@/lib/quotations/paths";
+import {
+  APPROVABLE_QUOTATION_STATUSES,
+  formatQuotationStatus,
+  QUOTATION_APPROVE_PERMISSIONS,
+  QUOTATION_RELEASE_PERMISSIONS,
+  quotationStatusDescription,
+  SENDABLE_QUOTATION_STATUSES,
+  SUBMITTABLE_QUOTATION_STATUSES,
+} from "@/lib/quotations/status";
+import { hasRecordedDeposit } from "@/lib/crm-lead-status";
 import { cn } from "@/lib/utils";
 import {
   Banknote,
+  CheckCircle2,
   ChevronLeft,
   Eye,
   ExternalLink,
@@ -118,14 +129,6 @@ function quotationPanelLabel(quotation: ApiQuotation, role: "reference" | "curre
     return `Current draft · ${label}`;
   }
   return `Current quotation · ${label}`;
-}
-
-function depositMet(deal: ApiQuotation["deal"]): boolean {
-  if (!deal) return false;
-  if (deal.payment_status === "deposit_met") return true;
-  const required = parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
-  const paid = parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) || 0;
-  return required > 0 && paid >= required;
 }
 
 function QuotationLinesPanel({
@@ -246,6 +249,9 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   const [quotation, setQuotation] = useState<ApiQuotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [revising, setRevising] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [noteBody, setNoteBody] = useState("");
@@ -315,11 +321,40 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
     return quotationListPath(mode);
   }, [isCrmMode, mode, quotation?.deal_id]);
 
+  async function handleSubmitForReview() {
+    setSubmitting(true);
+    try {
+      await submitQuotationForReview(quotationId);
+      toast.success("Quotation submitted for approval.");
+      await load();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to submit quotation for approval.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleApprove() {
+    setApproving(true);
+    try {
+      await approveQuotation(quotationId);
+      toast.success("Quotation approved.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to approve quotation.");
+    } finally {
+      setApproving(false);
+    }
+  }
+
   async function handleSend() {
     setSending(true);
     try {
       await sendQuotation(quotationId);
       toast.success("Quotation sent to client.");
+      setSendConfirmOpen(false);
       await load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to send quotation.");
@@ -409,7 +444,14 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   const canRevise = !isCrmMode && canNegotiate && !quotation.is_reference_copy && quotation.status !== "draft";
   const showComparison = !isCrmMode && referenceQuotation != null;
   const showDepositAction =
-    isCrmMode && canNegotiate && quotation.deal_id && !depositMet(quotation.deal);
+    isCrmMode && canNegotiate && quotation.deal_id && !hasRecordedDeposit(quotation.deal);
+  const canSubmitForReview =
+    quotation.status != null && SUBMITTABLE_QUOTATION_STATUSES.has(quotation.status);
+  const canApprove =
+    quotation.status != null && APPROVABLE_QUOTATION_STATUSES.has(quotation.status);
+  const canSendToClient =
+    quotation.status != null && SENDABLE_QUOTATION_STATUSES.has(quotation.status);
+  const statusHelp = quotationStatusDescription(quotation.status);
 
   return (
     <div className="flex min-w-0 w-full flex-col">
@@ -438,15 +480,39 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
                 Preview / Print
               </Link>
             </Button>
-            {quotation.status === "draft" ? (
-              <PermissionGate permission="quotations.send">
-                <Button onClick={() => void handleSend()} disabled={sending}>
+            {canSubmitForReview ? (
+              <PermissionGate permission="quotations.create">
+                <Button onClick={() => void handleSubmitForReview()} disabled={submitting}>
+                  {submitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Submit for approval
+                </Button>
+              </PermissionGate>
+            ) : null}
+            {canApprove ? (
+              <PermissionGate anyOf={[...QUOTATION_APPROVE_PERMISSIONS]}>
+                <Button onClick={() => void handleApprove()} disabled={approving}>
+                  {approving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Approve quotation
+                </Button>
+              </PermissionGate>
+            ) : null}
+            {canSendToClient ? (
+              <PermissionGate anyOf={[...QUOTATION_RELEASE_PERMISSIONS]}>
+                <Button onClick={() => setSendConfirmOpen(true)} disabled={sending}>
                   {sending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Send Quotation
+                  Send to client
                 </Button>
               </PermissionGate>
             ) : null}
@@ -479,8 +545,17 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
       />
 
       <div className="space-y-6 p-6">
+        {statusHelp ? (
+          <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {formatQuotationStatus(quotation.status)}.
+            </span>{" "}
+            {statusHelp}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-2">
-          <Badge>{quotation.status ?? "draft"}</Badge>
+          <Badge>{formatQuotationStatus(quotation.status)}</Badge>
           {quotation.revision_label ? (
             <Badge variant="outline">{quotation.revision_label}</Badge>
           ) : null}
@@ -741,6 +816,27 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
             <Button onClick={() => void handleRecordDeposit()} disabled={recordingDeposit}>
               {recordingDeposit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Record payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send quotation to client?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This releases the quotation to sales and marks it as sent to the client. The
+            linked deal will move to the quotation-sent stage.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSend()} disabled={sending}>
+              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Send to client
             </Button>
           </DialogFooter>
         </DialogContent>

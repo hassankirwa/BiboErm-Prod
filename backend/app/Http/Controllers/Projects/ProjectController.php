@@ -139,6 +139,19 @@ class ProjectController extends Controller
         );
     }
 
+    public function measurementVisits(Project $project): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        $this->authorize('view', $project);
+
+        $visits = $project->siteVisits()
+            ->where('measurement_context', 'production')
+            ->with(['assignedFieldOfficer', 'approvedBy'])
+            ->latest()
+            ->get();
+
+        return \App\Http\Resources\Crm\SiteVisitResource::collection($visits);
+    }
+
     public function update(Request $request, Project $project): ProjectResource
     {
         $this->authorize('update', $project);
@@ -561,14 +574,11 @@ class ProjectController extends Controller
 
         if ($fromStage === ProjectStage::SiteAssessment && $target === ProjectStage::FinalDesignApproval) {
             $stageData = is_array($project->stage_data) ? $project->stage_data : [];
-            $assessment = is_array($stageData['site_assessment'] ?? null)
-                ? $stageData['site_assessment']
-                : null;
 
-            if (! SiteAssessmentData::hasOperationalData($assessment)) {
+            if (! SiteAssessmentData::hasProductionMeasurement($stageData)) {
                 throw ValidationException::withMessages([
-                    'site_assessment' => [
-                        'Complete the site assessment on the dedicated page before advancing.',
+                    'site_measurement' => [
+                        'Complete and approve a production measurement visit before advancing.',
                     ],
                 ]);
             }

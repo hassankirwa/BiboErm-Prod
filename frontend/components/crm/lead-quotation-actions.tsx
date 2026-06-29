@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Banknote,
+  Clock,
   ExternalLink,
   FileText,
   FolderKanban,
@@ -36,9 +37,18 @@ import {
   markDealWon,
   recordPayment,
 } from "@/lib/api/crm/deals";
-import { quotationAmount, sendQuotation } from "@/lib/api/crm/quotations";
+import { quotationAmount, sendQuotation, submitQuotationForReview } from "@/lib/api/crm/quotations";
 import type { ApiDeal, ApiQuotationSummary } from "@/lib/api/crm/types";
 import { projectDetailPath } from "@/lib/projects/paths";
+import {
+  dealIsWon,
+  hasRecordedDeposit,
+} from "@/lib/crm-lead-status";
+import {
+  formatQuotationStatus,
+  QUOTATION_RELEASE_PERMISSIONS,
+  SENDABLE_QUOTATION_STATUSES,
+} from "@/lib/quotations/status";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -60,7 +70,7 @@ const SENT_QUOTATION_STATUSES = new Set([
   "accepted",
 ]);
 
-const SENDABLE_QUOTATION_STATUSES = new Set(["draft", "internal_review", "revised"]);
+const SENDABLE_QUOTATION_STATUSES_FOR_CLIENT = SENDABLE_QUOTATION_STATUSES;
 
 function quotationViewHref(
   quotation: ApiQuotationSummary,
@@ -79,31 +89,13 @@ function formatCurrency(value: string | number | null | undefined): string {
   return `KES ${num.toLocaleString("en-KE")}`;
 }
 
-function formatQuotationStatus(status: string | null | undefined): string {
-  if (!status) return "Unknown";
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function dealIsWon(deal: ApiDeal | null | undefined): boolean {
-  if (!deal) return false;
-  return deal.status === "won" || deal.stage === "won" || deal.stage === "project_created";
-}
-
-function depositMet(deal: ApiDeal | null | undefined): boolean {
-  if (!deal) return false;
-  if (deal.payment_status === "deposit_met") return true;
-  const required = parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
-  const paid = parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) || 0;
-  return required > 0 && paid >= required;
+function formatQuotationStatusLabel(status: string | null | undefined): string {
+  return formatQuotationStatus(status);
 }
 
 type LeadQuotationActionsProps = {
   latestQuotation: ApiQuotationSummary | null | undefined;
   salesDeal: ApiDeal | null | undefined;
-  linkedAccountId: number | null;
   showCreateQuotation: boolean;
   disabled?: boolean;
   onRefresh: () => Promise<void>;
@@ -112,7 +104,6 @@ type LeadQuotationActionsProps = {
 export function LeadQuotationActions({
   latestQuotation,
   salesDeal,
-  linkedAccountId,
   showCreateQuotation,
   disabled = false,
   onRefresh,
@@ -133,7 +124,7 @@ export function LeadQuotationActions({
     latestQuotation?.status != null &&
     SENT_QUOTATION_STATUSES.has(latestQuotation.status);
   const won = dealIsWon(salesDeal);
-  const hasDeposit = depositMet(salesDeal);
+  const hasDeposit = hasRecordedDeposit(salesDeal);
 
   async function runAction(key: string, fn: () => Promise<void>) {
     setActionLoading(key);
@@ -202,7 +193,7 @@ export function LeadQuotationActions({
 
   const canSendQuotation =
     latestQuotation?.status != null &&
-    SENDABLE_QUOTATION_STATUSES.has(latestQuotation.status);
+    SENDABLE_QUOTATION_STATUSES_FOR_CLIENT.has(latestQuotation.status);
 
   if (!latestQuotation && !showCreateQuotation) {
     return null;
@@ -224,7 +215,7 @@ export function LeadQuotationActions({
                 "bg-muted text-muted-foreground",
             )}
           >
-            {formatQuotationStatus(latestQuotation.status)}
+            {formatQuotationStatusLabel(latestQuotation.status)}
           </Badge>
           {latestQuotation.revision_label ? (
             <Badge variant="secondary" className="h-6 px-2 text-[11px] font-normal">
@@ -236,22 +227,18 @@ export function LeadQuotationActions({
           </span>
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2 text-xs" asChild>
             <Link href={quotationViewHref(latestQuotation, quotationSent)}>
-              {quotationSent ? "Preview" : "View"}
+              {quotationSent ? "Preview quotation" : "View quotation"}
               <ExternalLink className="ml-1 h-3 w-3" />
             </Link>
           </Button>
         </div>
       ) : null}
 
-      {showCreateQuotation && linkedAccountId && !latestQuotation ? (
-        <PermissionGate permission="projects.bom.upload">
-          <Button size="sm" className="h-9" asChild>
-            <Link href={`/projects/quotations/new?accountId=${linkedAccountId}`}>
-              <FileText className="mr-1.5 h-3.5 w-3.5" />
-              Project Quotation
-            </Link>
-          </Button>
-        </PermissionGate>
+      {showCreateQuotation && !latestQuotation ? (
+        <Badge variant="secondary" className="h-9 gap-1.5 px-3 font-normal">
+          <Clock className="h-3.5 w-3.5" />
+          Quotation in progress
+        </Badge>
       ) : null}
 
       {latestQuotation && quotationSent && dealId ? (
@@ -327,7 +314,7 @@ export function LeadQuotationActions({
       ) : null}
 
       {latestQuotation && canSendQuotation ? (
-        <PermissionGate permission="quotations.send">
+        <PermissionGate anyOf={[...QUOTATION_RELEASE_PERMISSIONS]}>
           <Button
             size="sm"
             className="h-9"
@@ -339,7 +326,7 @@ export function LeadQuotationActions({
             ) : (
               <Send className="mr-1.5 h-3.5 w-3.5" />
             )}
-            Send to Client
+            Send to client
           </Button>
         </PermissionGate>
       ) : null}

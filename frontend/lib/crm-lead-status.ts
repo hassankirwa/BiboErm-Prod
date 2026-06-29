@@ -193,24 +193,103 @@ export function hasQuotationSentToClient(
   return SENT_QUOTATION_STATUSES.has(quotation.status.toLowerCase());
 }
 
+export type DealDepositFields = {
+  payment_status?: string | null;
+  deposit_required_amount?: string | number | null;
+  deposit_paid_amount?: string | number | null;
+  deposit_amount?: string | number | null;
+};
+
+export function hasRecordedDeposit(
+  deal: DealDepositFields | null | undefined,
+): boolean {
+  if (!deal) return false;
+  if (
+    deal.payment_status === "deposit_met" ||
+    deal.payment_status === "partial"
+  ) {
+    return true;
+  }
+  const paid =
+    parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) ||
+    0;
+  return paid > 0;
+}
+
+export function depositRequirementMet(
+  deal: DealDepositFields | null | undefined,
+): boolean {
+  if (!deal) return false;
+  if (deal.payment_status === "deposit_met") return true;
+  const required =
+    parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
+  const paid =
+    parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) ||
+    0;
+  if (required <= 0) return paid > 0;
+  return paid >= required;
+}
+
+export function dealIsWon(
+  deal: { status?: string | null; stage?: string | null } | null | undefined,
+): boolean {
+  if (!deal) return false;
+  return (
+    deal.status === "won" ||
+    deal.stage === "won" ||
+    deal.stage === "project_created"
+  );
+}
+
 export type CommercialConvertInput = {
   hasLinkedAccount: boolean;
   hasDeal: boolean;
-  depositMet: boolean;
+  hasRecordedDeposit: boolean;
   hasApprovedSiteVisit: boolean;
   hasSentQuotation: boolean;
+  dealWon?: boolean;
 };
 
+function commercialPrerequisitesMet(input: CommercialConvertInput): boolean {
+  return (
+    input.hasLinkedAccount &&
+    input.hasApprovedSiteVisit &&
+    input.hasSentQuotation
+  );
+}
+
 /**
- * Record deposit & create deal — only after approved site visit,
- * project quotation exists, and quotation was sent to the client.
+ * Header / convert flow: record deposit and create the deal in one step.
+ * Only when no deal exists yet and no deposit has been recorded.
  */
-export function canCommercialConvertLead(input: CommercialConvertInput): boolean {
-  if (!input.hasLinkedAccount) return false;
-  if (input.hasDeal && input.depositMet) return false;
-  if (!input.hasApprovedSiteVisit) return false;
-  if (!input.hasSentQuotation) return false;
+export function canRecordDepositAndCreateDeal(
+  input: CommercialConvertInput,
+): boolean {
+  if (!commercialPrerequisitesMet(input)) return false;
+  if (input.hasRecordedDeposit) return false;
+  if (input.hasDeal) return false;
   return true;
+}
+
+/**
+ * After deposit was recorded on the quotation deal, finalize conversion
+ * (accept quotation, mark won, link lead) without recording payment again.
+ */
+export function canCreateDealAfterDeposit(
+  input: CommercialConvertInput,
+): boolean {
+  if (!commercialPrerequisitesMet(input)) return false;
+  if (!input.hasRecordedDeposit) return false;
+  if (!input.hasDeal) return false;
+  if (input.dealWon) return false;
+  return true;
+}
+
+/** @deprecated Use canRecordDepositAndCreateDeal or canCreateDealAfterDeposit */
+export function canCommercialConvertLead(input: CommercialConvertInput): boolean {
+  return (
+    canRecordDepositAndCreateDeal(input) || canCreateDealAfterDeposit(input)
+  );
 }
 
 export function canKanbanMove(

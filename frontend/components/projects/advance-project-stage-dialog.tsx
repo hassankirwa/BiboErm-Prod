@@ -25,7 +25,7 @@ import {
   advanceProjectStage,
   canAdvanceFromFinalDesignApproval,
   formatProjectStage,
-  hasSiteAssessmentOperationalData,
+  hasProductionMeasurementData,
   projectHasBomFinalized,
   projectHasDesignDocument,
   type ProjectDetail,
@@ -60,9 +60,7 @@ export function AdvanceProjectStageDialog({
   const [depositConfirmation, setDepositConfirmation] = useState(EMPTY_DEPOSIT);
   const [advancing, setAdvancing] = useState(false);
 
-  const siteAssessmentComplete = hasSiteAssessmentOperationalData(
-    project.stage_data?.site_assessment,
-  );
+  const siteAssessmentComplete = hasProductionMeasurementData(project);
 
   const designsHref = `/projects/${project.id}?tab=designs`;
   const bomHref = `/projects/${project.id}?tab=bom`;

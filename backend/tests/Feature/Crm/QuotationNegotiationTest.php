@@ -82,11 +82,104 @@ class QuotationNegotiationTest extends TestCase
         return Quotation::query()->findOrFail($response->json('data.id'));
     }
 
+    protected function submitQuotationForReview(Quotation $quotation): Quotation
+    {
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/submit-for-review")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuotationStatus::InternalReview->value);
+
+        return $quotation->fresh();
+    }
+
+    protected function approveQuotation(Quotation $quotation): Quotation
+    {
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuotationStatus::Approved->value);
+
+        return $quotation->fresh();
+    }
+
+    protected function sendPreparedQuotation(Quotation $quotation): \Illuminate\Testing\TestResponse
+    {
+        $status = $quotation->status instanceof QuotationStatus
+            ? $quotation->status
+            : QuotationStatus::tryFrom((string) $quotation->status);
+
+        if ($status === QuotationStatus::Draft) {
+            $quotation = $this->submitQuotationForReview($quotation);
+        }
+
+        $status = $quotation->status instanceof QuotationStatus
+            ? $quotation->status
+            : QuotationStatus::tryFrom((string) $quotation->status);
+
+        if ($status === QuotationStatus::InternalReview) {
+            $quotation = $this->approveQuotation($quotation);
+        }
+
+        return $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send");
+    }
+
+    public function test_submit_for_review_moves_draft_to_internal_review(): void
+    {
+        $quotation = $this->createDraftQuotation();
+
+        $this->submitQuotationForReview($quotation);
+
+        $this->assertDatabaseHas('quotations', [
+            'id' => $quotation->id,
+            'status' => QuotationStatus::InternalReview->value,
+        ]);
+    }
+
+    public function test_cannot_send_draft_without_submitting_for_review(): void
+    {
+        $quotation = $this->createDraftQuotation();
+
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_cannot_send_internal_review_without_approval(): void
+    {
+        $quotation = $this->createDraftQuotation();
+        $quotation = $this->submitQuotationForReview($quotation);
+
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_super_admin_can_approve_and_send_pending_quotation(): void
+    {
+        $quotation = $this->createDraftQuotation();
+
+        $superAdmin = User::factory()->create(['status' => User::STATUS_ACTIVE]);
+        $superAdmin->assignRole('super_admin');
+        $superAdmin->syncPermissions([]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/submit-for-review")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuotationStatus::InternalReview->value);
+
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuotationStatus::Approved->value);
+
+        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")
+            ->assertOk()
+            ->assertJsonPath('data.status', QuotationStatus::Sent->value);
+    }
+
     public function test_send_marks_quotation_sent_and_creates_deal(): void
     {
         $quotation = $this->createDraftQuotation();
 
-        $response = $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send");
+        $response = $this->sendPreparedQuotation($quotation);
 
         $response->assertOk()
             ->assertJsonPath('data.status', QuotationStatus::Sent->value)
@@ -107,7 +200,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_negotiation_notes_append_after_sent(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
 
         $response = $this->postJson("/api/v1/crm/quotations/{$quotation->id}/negotiation-notes", [
             'body' => 'Client requested 10% discount on total.',
@@ -133,7 +226,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_revise_creates_new_revision_and_preserves_reference_copy(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
         $this->postJson("/api/v1/crm/quotations/{$quotation->id}/negotiation-notes", [
             'body' => 'Needs revision',
         ])->assertOk();
@@ -169,7 +262,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_index_excludes_reference_copies(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
         $this->postJson("/api/v1/crm/quotations/{$quotation->id}/revise")->assertOk();
 
         $response = $this->getJson('/api/v1/projects/quotations');
@@ -182,7 +275,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_show_with_history_includes_reference_copies(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
         $revise = $this->postJson("/api/v1/crm/quotations/{$quotation->id}/revise")->assertOk();
         $newId = $revise->json('data.id');
 
@@ -199,7 +292,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_deposit_payment_on_won_deal_creates_project_with_deposit_received(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
         $this->postJson("/api/v1/crm/quotations/{$quotation->id}/accept")->assertOk();
 
         $quotation->refresh();
@@ -248,7 +341,7 @@ class QuotationNegotiationTest extends TestCase
 
         $quotation = $this->createDraftQuotation();
 
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
 
         $lead->refresh();
         $quotation->refresh();
@@ -280,7 +373,7 @@ class QuotationNegotiationTest extends TestCase
     public function test_sales_rep_can_record_deposit_after_send_without_mark_won(): void
     {
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
 
         $quotation->refresh();
         $deal = Deal::query()->findOrFail($quotation->deal_id);
@@ -327,7 +420,7 @@ class QuotationNegotiationTest extends TestCase
         ]);
 
         $quotation = $this->createDraftQuotation();
-        $this->postJson("/api/v1/crm/quotations/{$quotation->id}/send")->assertOk();
+        $this->sendPreparedQuotation($quotation)->assertOk();
         $quotation->refresh();
 
         $response = $this->postJson("/api/v1/crm/leads/{$lead->id}/convert", [
@@ -356,6 +449,66 @@ class QuotationNegotiationTest extends TestCase
         $this->assertDatabaseHas('deal_payments', [
             'deal_id' => $quotation->deal_id,
             'payment_reference' => 'MPESA-CONV-001',
+        ]);
+    }
+
+    public function test_lead_convert_finalize_after_deposit_recorded_without_payment_payload(): void
+    {
+        $lead = \App\Models\Lead::query()->create([
+            'reference' => 'LD-NEG-FIN',
+            'lead_number' => 'LD-NEG-FIN',
+            'name' => 'Finalize Deal Lead',
+            'first_name' => 'Finalize',
+            'status' => \App\Enums\Crm\LeadStatus::AccountCreated->value,
+            'converted_account_id' => $this->account->id,
+            'lead_owner_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->account->update(['source_lead_id' => $lead->id]);
+
+        SiteVisit::query()->create([
+            'visit_number' => 'SV-NEG-FIN-001',
+            'title' => 'Finalize site visit',
+            'lead_id' => $lead->id,
+            'account_id' => $this->account->id,
+            'assigned_field_officer_id' => $this->user->id,
+            'scheduled_by' => $this->user->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Approved->value,
+        ]);
+
+        $quotation = $this->createDraftQuotation();
+        $this->sendPreparedQuotation($quotation)->assertOk();
+        $quotation->refresh();
+
+        $this->postJson("/api/v1/crm/deals/{$quotation->deal_id}/payments", [
+            'payment_reference' => 'MPESA-INLINE-001',
+            'payment_date' => now()->toDateString(),
+            'amount_paid' => 200000,
+            'payment_method' => 'mpesa',
+            'quotation_id' => $quotation->id,
+        ])->assertCreated();
+
+        $response = $this->postJson("/api/v1/crm/leads/{$lead->id}/convert", [
+            'quotation_id' => $quotation->id,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.deal.id', $quotation->deal_id);
+
+        $lead->refresh();
+        $quotation->refresh();
+        $this->assertSame($quotation->deal_id, $lead->converted_deal_id);
+        $this->assertSame(QuotationStatus::Accepted->value, $quotation->status->value);
+
+        $deal = Deal::query()->findOrFail($quotation->deal_id);
+        $this->assertSame('won', $deal->status);
+        $this->assertSame('deposit_met', $deal->payment_status);
+
+        $this->assertDatabaseHas('deal_payments', [
+            'deal_id' => $quotation->deal_id,
+            'payment_reference' => 'MPESA-INLINE-001',
         ]);
     }
 }

@@ -10,7 +10,6 @@ import {
   contextualProjectStageLabel,
   formatProjectStage,
   getProjectMaterialStatus,
-  hasSiteAssessmentOperationalData,
   normalizeSiteAssessmentMeasurementItem,
   normalizeSiteAssessmentSpatialItem,
   projectHasBomFinalized,
@@ -25,11 +24,13 @@ import {
   type SiteAssessmentMeasurementItem,
   type SiteAssessmentSpatialItem,
 } from "@/lib/api/projects";
+import { hasSiteMeasurementFormData } from "@/lib/measurements/types";
 import Link from "next/link";
 import { useEffect } from "react";
 import { Calendar, Check, MapPin, X } from "lucide-react";
 import { useMediaImageSrc } from "@/components/media/media-image";
 import { ProjectDetailProcurement } from "@/components/projects/project-detail-procurement";
+import { ProjectProductionMeasurementsPanel } from "@/components/projects/project-production-measurements-panel";
 import { ProjectMaterialReserveAction } from "@/components/projects/project-material-reserve-action";
 import { ProjectMaterialReleaseAction } from "@/components/projects/project-material-release-action";
 import {
@@ -159,6 +160,8 @@ export function ProjectDetailOverview({
           projectStage={project.stage}
           mode={mode}
         />
+
+        <ProjectProductionMeasurementsPanel project={project} mode={mode} />
 
         {materialStatus ? (
           <Card>
@@ -367,10 +370,10 @@ function StageDataCards({
   projectStage: string;
   mode: ProjectViewMode;
 }) {
-  const isCrmMode = mode === "crm";
   if (!stageData) return null;
 
   const deposit = stageData.deposit_received;
+  const siteMeasurement = stageData.site_measurement;
   const assessment = stageData.site_assessment;
 
   const hasSalesAssessment =
@@ -382,10 +385,18 @@ function StageDataCards({
       assessment.measurements ||
       assessment.findings_notes);
 
-  const hasOperationalNotes =
-    assessment && hasSiteAssessmentOperationalData(assessment);
+  const hasProductionMeasurement = hasSiteMeasurementFormData(siteMeasurement);
 
-  if (!deposit && !hasSalesAssessment && !hasOperationalNotes) return null;
+  const hasOperationalNotes =
+    hasProductionMeasurement ||
+    (assessment &&
+      ((assessment.operational_notes?.trim() ?? "") !== "" ||
+        (assessment.access_constraints?.trim() ?? "") !== "" ||
+        (assessment.fabrication_concerns?.trim() ?? "") !== ""));
+
+  if (!deposit && !hasSalesAssessment && !hasOperationalNotes && !hasProductionMeasurement) {
+    return null;
+  }
 
   return (
     <>
@@ -429,6 +440,39 @@ function StageDataCards({
                 <p className="whitespace-pre-wrap">{assessment.findings_notes}</p>
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {hasProductionMeasurement && siteMeasurement ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Production measurements (approved)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AssessmentStat
+                label="Lines"
+                value={siteMeasurement.lines?.length ?? 0}
+              />
+              {siteMeasurement.measured_by ? (
+                <div>
+                  <p className="text-xs text-muted-foreground">Measured by</p>
+                  <p className="font-medium">{siteMeasurement.measured_by}</p>
+                </div>
+              ) : null}
+            </div>
+            {siteMeasurement.operational_notes ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Operational notes</p>
+                <p className="whitespace-pre-wrap">{siteMeasurement.operational_notes}</p>
+              </div>
+            ) : null}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={projectSiteAssessmentPath(projectId, mode)}>
+                View production measurements
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : null}
@@ -490,15 +534,13 @@ function StageDataCards({
                 Last updated {assessment.operational_recorded_at}
               </p>
             ) : null}
-            {!isCrmMode ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={projectSiteAssessmentPath(projectId, mode)}>
-                  {projectStage === "site_assessment"
-                    ? "Edit site assessment"
-                    : "View site assessment"}
-                </Link>
-              </Button>
-            ) : null}
+            <Button variant="outline" size="sm" asChild>
+              <Link href={projectSiteAssessmentPath(projectId, mode)}>
+                {projectStage === "site_assessment"
+                  ? "Edit site assessment"
+                  : "View site assessment"}
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : null}

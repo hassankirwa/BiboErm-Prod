@@ -65,6 +65,9 @@ class SiteVisitController extends Controller
             'visit_date' => ['required', 'date'],
             'visit_time' => ['nullable', 'date_format:H:i'],
             'visit_purpose' => ['nullable', 'string', 'max:50'],
+            'measurement_context' => ['nullable', 'string', 'in:quotation,production'],
+            'project_id' => ['nullable', 'exists:projects,id'],
+            'requires_measurements' => ['nullable', 'boolean'],
             'notes_for_field_officer' => ['nullable', 'string'],
         ]);
 
@@ -83,8 +86,9 @@ class SiteVisitController extends Controller
                 'deal.account',
                 'deal.contact',
                 'deal.assignedFieldOfficer',
+                'project.account',
+                'project.contact',
                 'assignedFieldOfficer',
-                'measurementLines',
                 'photos',
             ])
         );

@@ -15,6 +15,10 @@ final class SiteAssessmentData
             return false;
         }
 
+        if (isset($assessment['lines']) && is_array($assessment['lines'])) {
+            return SiteMeasurementFormData::hasOperationalData($assessment);
+        }
+
         $hasCounts = collect([
             $assessment['doors_count'] ?? null,
             $assessment['windows_count'] ?? null,
@@ -30,6 +34,25 @@ final class SiteAssessmentData
             || trim((string) ($assessment['fabrication_concerns'] ?? '')) !== '';
 
         return $hasCounts || $hasItems || $hasNotes || self::hasImages($assessment);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $stageData
+     */
+    public static function hasProductionMeasurement(?array $stageData): bool
+    {
+        if ($stageData === null) {
+            return false;
+        }
+
+        $siteMeasurement = $stageData['site_measurement'] ?? null;
+        if (is_array($siteMeasurement) && SiteMeasurementFormData::hasOperationalData($siteMeasurement)) {
+            return true;
+        }
+
+        $legacy = $stageData['site_assessment'] ?? null;
+
+        return self::hasOperationalData(is_array($legacy) ? $legacy : null);
     }
 
     /**

@@ -29,6 +29,8 @@ class QuotationResource extends JsonResource
             'terms_conditions' => $this->terms_conditions,
             'source_excel_path' => $this->source_excel_path,
             'sent_at' => $this->sent_at?->toIso8601String(),
+            'approved_at' => $this->approved_at?->toIso8601String(),
+            'approved_by' => $this->approved_by,
             'accepted_at' => $this->accepted_at?->toIso8601String(),
             'revision_of_id' => $this->revision_of_id,
             'revision_number' => $this->revision_number ?? 1,

@@ -177,6 +177,7 @@ export default function SiteVisitsPage() {
         site_address: form.site_address || undefined,
         deal_id: selectedDealId ?? undefined,
         lead_id: selectedLeadId ?? undefined,
+        measurement_context: "quotation",
         notes_for_field_officer: form.notes_for_field_officer || undefined,
       });
       setDialogOpen(false);

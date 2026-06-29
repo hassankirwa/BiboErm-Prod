@@ -23,7 +23,6 @@ import {
 } from "@/lib/crm/site-visit-paths";
 import {
   canStartFieldVisit,
-  formatMeasurementLineSummary,
   resolveFieldOfficerName,
 } from "@/lib/crm/site-visit-utils";
 
@@ -58,8 +57,10 @@ export function FieldOpenVisitCard({
     visit.assigned_field_officer_id,
     [],
   );
-  const measurementLines = visit.measurement_lines ?? [];
+  const measurementLines = visit.measurement_form_data?.lines ?? [];
   const hasMeasurements = measurementLines.length > 0;
+  const measurementContext =
+    visit.measurement_context === "production" ? "Production" : "Quotation";
   const measurementLabel = hasMeasurements
     ? "Continue measurements"
     : "Log measurements";
@@ -77,6 +78,7 @@ export function FieldOpenVisitCard({
                 {visit.deal?.account?.name ? ` · ${visit.deal.account.name}` : ""}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">{measurementContext} measurement</p>
             <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5" />
@@ -130,12 +132,18 @@ export function FieldOpenVisitCard({
           {measurementLines.length > 0 ? (
             <ul className="space-y-1.5 rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-sm">
               {measurementLines.map((line, index) => (
-                <li key={line.id ?? index} className="text-muted-foreground">
-                  {formatMeasurementLineSummary(line)}
-                  {line.installation_notes?.trim() && (
-                    <span className="block text-xs">
-                      Notes: {line.installation_notes}
+                <li key={index} className="text-muted-foreground">
+                  {[line.ref, line.room_location, line.product_type]
+                    .filter(Boolean)
+                    .join(" · ") || `Line ${index + 1}`}
+                  {(line.width_centre_mm || line.height_centre_mm) && (
+                    <span>
+                      {" "}
+                      — {line.width_centre_mm ?? "—"} × {line.height_centre_mm ?? "—"} mm
                     </span>
+                  )}
+                  {line.remarks?.trim() && (
+                    <span className="block text-xs">Remarks: {line.remarks}</span>
                   )}
                 </li>
               ))}

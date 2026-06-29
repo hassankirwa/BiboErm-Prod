@@ -111,6 +111,23 @@ class ProjectPolicy
         ]);
     }
 
+    public function scheduleMeasurementVisit(User $user, Project $project): bool
+    {
+        if (! $this->view($user, $project)) {
+            return false;
+        }
+
+        return $this->canAny($user, [
+            'projects.update',
+            'projects.manage',
+            'projects.view_all',
+            'site_visits.schedule',
+            'projects.site_assessment_notes',
+            'projects.advance_stage',
+            'projects.advance_stage_production',
+        ]);
+    }
+
     public function logDelay(User $user, Project $project): bool
     {
         return $this->view($user, $project)

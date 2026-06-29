@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Deal;
 use App\Models\Lead;
+use App\Models\Project;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Policies\Concerns\ChecksCrmPermissions;
@@ -44,6 +45,10 @@ class SiteVisitPolicy
         }
 
         if ($siteVisit->deal_id && Deal::query()->visibleTo($user)->whereKey($siteVisit->deal_id)->exists()) {
+            return true;
+        }
+
+        if ($siteVisit->project_id && Project::query()->visibleTo($user)->whereKey($siteVisit->project_id)->exists()) {
             return true;
         }
 

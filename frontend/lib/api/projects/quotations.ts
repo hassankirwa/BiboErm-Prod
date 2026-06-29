@@ -1,5 +1,6 @@
 import { apiFetch } from "../client";
-import type { ApiQuotation, ApiQuotationLine } from "../crm/types";
+import type { ApiQuotation } from "../crm/types";
+import type { PaginatedResponse } from "../crm/types";
 import { unwrapResource } from "../crm/types";
 import type { ExchangeRateInfo } from "@/lib/currency/usd-to-kes";
 
@@ -272,13 +273,17 @@ export async function fetchPendingQuotationAccounts(): Promise<PendingQuotationA
 export async function fetchWorkspaceQuotations(params?: {
   status?: string;
   page?: number;
-}): Promise<{ data: ApiQuotation[]; meta?: Record<string, unknown> }> {
+  per_page?: number;
+}): Promise<PaginatedResponse<ApiQuotation>> {
   const search = new URLSearchParams();
   if (params?.status) search.set("status", params.status);
   if (params?.page) search.set("page", String(params.page));
+  if (params?.per_page) search.set("per_page", String(params.per_page));
   const q = search.toString();
 
-  return apiFetch(`/api/v1/projects/quotations${q ? `?${q}` : ""}`);
+  return apiFetch<PaginatedResponse<ApiQuotation>>(
+    `/api/v1/projects/quotations${q ? `?${q}` : ""}`,
+  );
 }
 
 export async function extractQuotationExcel(

@@ -224,4 +224,43 @@ class QuotationWorkspaceTest extends TestCase
             'project_number' => '2026040613',
         ]);
     }
+
+    public function test_index_lists_generated_quotations_with_status_filter(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+
+        $create = $this->postJson('/api/v1/projects/quotations', [
+            'account_id' => $account->id,
+            'project_name' => 'List test quote',
+            'project_number' => '2026040614',
+            'lines' => [
+                [
+                    'description' => 'Test line',
+                    'quantity' => 1,
+                    'unit_price' => 1000,
+                ],
+            ],
+        ]);
+
+        $create->assertCreated();
+        $quotationId = $create->json('data.id');
+
+        $this->postJson("/api/v1/crm/quotations/{$quotationId}/submit-for-review")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'internal_review');
+
+        $this->getJson('/api/v1/projects/quotations')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $quotationId)
+            ->assertJsonPath('data.0.status', 'internal_review');
+
+        $this->getJson('/api/v1/projects/quotations?status=internal_review')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/v1/projects/quotations?status=draft')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
 }

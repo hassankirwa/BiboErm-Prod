@@ -255,6 +255,10 @@ class CrmFlowV2Test extends TestCase
         ]);
 
         $this->actingAs($this->salesUser)
+            ->postJson("/api/v1/crm/quotations/{$quotation->id}/submit-for-review")
+            ->assertOk();
+
+        $this->actingAs($this->salesUser)
             ->postJson("/api/v1/crm/quotations/{$quotation->id}/send")
             ->assertOk();
 

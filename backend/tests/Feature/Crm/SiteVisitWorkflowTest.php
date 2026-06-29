@@ -92,21 +92,25 @@ class SiteVisitWorkflowTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('data.status', SiteVisitStatus::InProgress->value);
 
-        $this->postJson("/api/v1/crm/site-visits/{$visitId}/measurements", [
-            'lines' => [
-                [
-                    'room_area_name' => 'Master bedroom',
-                    'width' => 1.8,
-                    'height' => 2.1,
-                    'quantity' => 1,
+        $this->patchJson("/api/v1/crm/site-visits/{$visitId}/measurement-form", [
+            'form' => [
+                'lines' => [
+                    [
+                        'ref' => '1',
+                        'room_location' => 'Master bedroom',
+                        'product_type' => 'Window',
+                        'quantity' => 1,
+                        'width_centre_mm' => 1800,
+                        'height_centre_mm' => 2100,
+                    ],
                 ],
             ],
         ])->assertOk()
             ->assertJsonPath('data.status', SiteVisitStatus::MeasurementsCaptured->value);
 
-        $this->assertDatabaseHas('measurement_lines', [
-            'site_visit_id' => $visitId,
-            'room_area_name' => 'Master bedroom',
+        $this->assertDatabaseHas('site_visits', [
+            'id' => $visitId,
+            'status' => SiteVisitStatus::MeasurementsCaptured->value,
         ]);
 
         $this->postJson("/api/v1/crm/site-visits/{$visitId}/submit", [
@@ -126,6 +130,31 @@ class SiteVisitWorkflowTest extends TestCase
             'id' => $lead->id,
             'status' => LeadStatus::MeasurementsCaptured->value,
         ]);
+    }
+
+    public function test_draft_measurement_form_save_allows_partial_data(): void
+    {
+        $visit = SiteVisit::query()->create([
+            'visit_number' => 'SV-DRAFT-001',
+            'title' => 'Draft save visit',
+            'assigned_field_officer_id' => $this->fieldOfficer->id,
+            'scheduled_by' => $this->salesRep->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::InProgress->value,
+            'requires_measurements' => true,
+        ]);
+
+        Sanctum::actingAs($this->fieldOfficer);
+
+        $this->patchJson("/api/v1/crm/site-visits/{$visit->id}/measurement-form", [
+            'draft' => true,
+            'form' => [
+                'client_name' => 'Partial save client',
+                'lines' => [],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.status', SiteVisitStatus::InProgress->value)
+            ->assertJsonPath('data.measurement_form_data.client_name', 'Partial save client');
     }
 
     public function test_field_officer_cannot_execute_visit_assigned_to_another_officer(): void
@@ -153,25 +182,38 @@ class SiteVisitWorkflowTest extends TestCase
             'assigned_field_officer_id' => $this->fieldOfficer->id,
             'scheduled_by' => $this->salesRep->id,
             'visit_date' => now()->toDateString(),
-            'status' => SiteVisitStatus::InProgress->value,
+            'status' => SiteVisitStatus::MeasurementsCaptured->value,
+            'requires_measurements' => true,
         ]);
 
         Sanctum::actingAs($this->fieldOfficer);
 
         $this->postJson("/api/v1/crm/site-visits/{$visit->id}/submit")
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['visit']);
+            ->assertJsonValidationErrors(['form']);
     }
 
     public function test_sales_rep_can_self_assign_and_execute_visit(): void
     {
         Sanctum::actingAs($this->salesRep);
 
+        $lead = Lead::query()->create([
+            'reference' => 'LD-SELF-001',
+            'lead_number' => 'LD-SELF-001',
+            'name' => 'Self assign lead',
+            'first_name' => 'Self',
+            'status' => LeadStatus::Qualified,
+            'lead_owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Sales-led measurement',
+            'lead_id' => $lead->id,
             'assigned_field_officer_id' => $this->salesRep->id,
             'visit_date' => now()->toDateString(),
             'site_address' => 'Kilimani, Nairobi',
+            'measurement_context' => 'quotation',
         ]);
 
         $visitResponse->assertCreated();
@@ -189,8 +231,19 @@ class SiteVisitWorkflowTest extends TestCase
 
         Sanctum::actingAs($this->salesRep);
 
+        $lead = Lead::query()->create([
+            'reference' => 'LD-INVALID-001',
+            'lead_number' => 'LD-INVALID-001',
+            'name' => 'Invalid assignee lead',
+            'first_name' => 'Invalid',
+            'status' => LeadStatus::Qualified,
+            'lead_owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
         $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Invalid assignee visit',
+            'lead_id' => $lead->id,
             'assigned_field_officer_id' => $financeOfficer->id,
             'visit_date' => now()->toDateString(),
         ])

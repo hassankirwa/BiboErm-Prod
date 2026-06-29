@@ -67,14 +67,17 @@ import {
   quotationAmount,
   reviseQuotation,
   sendQuotation,
+  submitQuotationForReview,
   type ApiQuotation,
 } from "@/lib/api/crm/quotations";
+import { QUOTATION_RELEASE_PERMISSIONS, SENDABLE_QUOTATION_STATUSES, SUBMITTABLE_QUOTATION_STATUSES } from "@/lib/quotations/status";
 import { scheduleSiteVisit } from "@/lib/api/crm/site-visits";
 import type { ApiDealPayment } from "@/lib/api/crm/types";
 import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { projectDetailPath } from "@/lib/projects/paths";
+import { hasRecordedDeposit } from "@/lib/crm-lead-status";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { AccountPicker } from "@/components/crm/account-picker";
 import { ScheduleSiteVisitFieldOfficerTag } from "@/components/crm/schedule-site-visit-field-officer-tag";
@@ -121,14 +124,6 @@ function formatCurrency(value: string | number | null | undefined): string {
 
 function dealTitle(deal: ApiDeal): string {
   return deal.name ?? deal.title ?? deal.reference;
-}
-
-function depositMet(deal: ApiDeal): boolean {
-  if (deal.payment_status === "deposit_met") return true;
-  const required = parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
-  const paid =
-    parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) || 0;
-  return required > 0 && paid >= required;
 }
 
 export default function DealDetailPage({
@@ -290,6 +285,7 @@ export default function DealDetailPage({
         assigned_field_officer_id: Number(visitForm.assigned_field_officer_id),
         visit_date: visitForm.visit_date,
         visit_time: visitForm.visit_time || undefined,
+        measurement_context: "quotation",
         notes_for_field_officer: visitForm.notes_for_field_officer || undefined,
       });
       const updated = await updateDealStage(dealId, "site_visit_pending");
@@ -329,6 +325,17 @@ export default function DealDetailPage({
     });
   }
 
+  async function handleSubmitQuotationForReview() {
+    if (!latestQuotation) return;
+    await runAction("submit-quotation", async () => {
+      const updated = await submitQuotationForReview(latestQuotation.id);
+      setQuotations((prev) =>
+        prev.map((q) => (q.id === updated.id ? updated : q)),
+      );
+      toast.success("Quotation submitted for approval.");
+    });
+  }
+
   async function handleSendQuotation() {
     if (!latestQuotation) return;
     await runAction("send-quotation", async () => {
@@ -337,7 +344,7 @@ export default function DealDetailPage({
         prev.map((q) => (q.id === updated.id ? updated : q)),
       );
       if (updated.deal) setDeal(updated.deal);
-      toast.success("Quotation sent.");
+      toast.success("Quotation sent to client.");
     });
   }
 
@@ -446,6 +453,7 @@ export default function DealDetailPage({
       variant: "default" | "outline" | "secondary" | "destructive" = "default",
       icon?: React.ReactNode,
       permission?: string,
+      anyOf?: string[],
     ) => {
       const button = (
         <Button
@@ -463,6 +471,13 @@ export default function DealDetailPage({
           {label}
         </Button>
       );
+      if (anyOf?.length) {
+        return (
+          <PermissionGate key={key} anyOf={anyOf}>
+            {button}
+          </PermissionGate>
+        );
+      }
       if (!permission) return button;
       return (
         <PermissionGate key={key} permission={permission}>
@@ -507,14 +522,26 @@ export default function DealDetailPage({
         return (
           <>
             {latestQuotation &&
+            SUBMITTABLE_QUOTATION_STATUSES.has(latestQuotation.status ?? "") ?
+              btn(
+                "submit-quotation",
+                "Submit for approval",
+                handleSubmitQuotationForReview,
+                "default",
+                <FileText className="mr-2 h-4 w-4" />,
+                "quotations.create",
+              ) : null}
+            {latestQuotation &&
+            SENDABLE_QUOTATION_STATUSES.has(latestQuotation.status ?? "") ?
               btn(
                 "send",
-                "Send Quotation",
+                "Send to client",
                 handleSendQuotation,
                 "default",
                 <Send className="mr-2 h-4 w-4" />,
-                "quotations.send",
-              )}
+                undefined,
+                [...QUOTATION_RELEASE_PERMISSIONS],
+              ) : null}
             {btn(
               "prepare",
               "Prepare Quotation",
@@ -527,7 +554,7 @@ export default function DealDetailPage({
       case "quotation_sent":
         return (
           <>
-            {!depositMet(deal)
+            {!hasRecordedDeposit(deal)
               ? btn(
                   "deposit",
                   "Record Deposit",
@@ -560,7 +587,7 @@ export default function DealDetailPage({
       case "negotiation_revision":
         return (
           <>
-            {!depositMet(deal)
+            {!hasRecordedDeposit(deal)
               ? btn(
                   "deposit",
                   "Record Deposit",

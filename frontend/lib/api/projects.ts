@@ -17,6 +17,7 @@ export type ProjectSummary = {
   type: string;
   location_type: string;
   site_address: string | null;
+  resolved_site_address?: string | null;
   stage: string;
   completion_percent: number;
   priority: string;
@@ -299,6 +300,12 @@ export type ProjectStageMaterialCheck = {
 export type ProjectStageData = {
   deposit_received?: ProjectStageDepositConfirmation;
   site_assessment?: ProjectStageSiteAssessment;
+  site_measurement?: import("@/lib/measurements/types").SiteMeasurementFormData & {
+    approved_visit_id?: number;
+    rough_sketch_path?: string | null;
+    recorded_by?: number;
+    recorded_at?: string;
+  };
   material_check?: ProjectStageMaterialCheck;
 };
 
@@ -564,6 +571,43 @@ export async function updateProjectSiteAssessmentNotes(
     method: "PATCH",
     body: payload,
   });
+}
+
+export type ScheduleProjectMeasurementVisitPayload = {
+  title?: string;
+  assigned_field_officer_id: number;
+  visit_date: string;
+  visit_time?: string;
+  site_address?: string;
+  notes_for_field_officer?: string;
+};
+
+export async function fetchProjectMeasurementVisits(projectId: number) {
+  return apiRequest<{ data: import("@/lib/api/crm/types").ApiSiteVisit[] }>(
+    `/projects/${projectId}/measurement-visits`,
+  );
+}
+
+export async function scheduleProjectMeasurementVisit(
+  projectId: number,
+  payload: ScheduleProjectMeasurementVisitPayload,
+) {
+  return apiRequest<{ data: import("@/lib/api/crm/types").ApiSiteVisit }>(
+    `/projects/${projectId}/measurement-visits`,
+    {
+      method: "POST",
+      body: payload,
+    },
+  );
+}
+
+export function hasProductionMeasurementData(project: ProjectDetail): boolean {
+  const siteMeasurement = project.stage_data?.site_measurement;
+  if (siteMeasurement && (siteMeasurement.lines?.length ?? 0) > 0) {
+    return true;
+  }
+
+  return hasSiteAssessmentOperationalData(project.stage_data?.site_assessment);
 }
 
 export async function uploadSiteAssessmentImage(projectId: number, file: File) {

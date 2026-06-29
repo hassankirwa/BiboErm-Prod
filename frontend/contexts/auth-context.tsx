@@ -142,13 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearAuth]);
 
   const hasPermission = useCallback(
-    (permission: string) => permissions.includes(permission),
-    [permissions]
+    (permission: string) =>
+      roles.includes("super_admin") ||
+      permissions.includes("*") ||
+      permissions.includes(permission),
+    [permissions, roles],
   );
 
   const hasAnyPermission = useCallback(
-    (...perms: string[]) => perms.some((p) => permissions.includes(p)),
-    [permissions]
+    (...perms: string[]) =>
+      roles.includes("super_admin") ||
+      permissions.includes("*") ||
+      perms.some((p) => permissions.includes(p)),
+    [permissions, roles],
   );
 
   const homeRoute = useMemo(

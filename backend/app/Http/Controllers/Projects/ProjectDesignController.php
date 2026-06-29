@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Projects;
 
 use App\Http\Controllers\Controller;
-use App\Models\Account;
+use App\Http\Resources\Projects\ProjectDesignQueueResource;
+use App\Services\Projects\ProjectDesignService;
 use App\Services\Projects\QuotationExcelExtractionService;
 use App\Services\Projects\QuotationWorkspaceService;
 use Illuminate\Http\JsonResponse;
@@ -14,7 +15,19 @@ class ProjectDesignController extends Controller
     public function __construct(
         protected QuotationWorkspaceService $workspace,
         protected QuotationExcelExtractionService $fabricationExcel,
+        protected ProjectDesignService $designService,
     ) {}
+
+    public function queue(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('projects.view'), 403);
+
+        return response()->json([
+            'data' => ProjectDesignQueueResource::collection(
+                $this->designService->listDesignQueue($request->user()),
+            ),
+        ]);
+    }
 
     public function pending(Request $request): JsonResponse
     {

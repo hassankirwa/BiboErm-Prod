@@ -13,7 +13,7 @@ import {
   formatProjectStage,
   getManualNextStages,
   getStageWaitingMessage,
-  hasSiteAssessmentOperationalData,
+  hasProductionMeasurementData,
   type ProjectDetail,
 } from "@/lib/api/projects";
 import {
@@ -63,7 +63,7 @@ export function ProjectDetailActionBar({
   function handleAdvanceClick() {
     if (
       project.stage === "site_assessment" &&
-      !hasSiteAssessmentOperationalData(project.stage_data?.site_assessment)
+      !hasProductionMeasurementData(project)
     ) {
       toast.error("Complete the site assessment on the dedicated page first.", {
         action: {

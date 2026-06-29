@@ -156,6 +156,7 @@ class CrmSalesFlowTest extends TestCase
         $quotation->assertCreated();
         $quotationId = $quotation->json('data.id');
 
+        $this->postJson("/api/v1/crm/quotations/{$quotationId}/submit-for-review")->assertOk();
         $this->postJson("/api/v1/crm/quotations/{$quotationId}/send")->assertOk();
 
         $dealId = \App\Models\Quotation::query()->findOrFail($quotationId)->deal_id;

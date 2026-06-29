@@ -26,11 +26,14 @@ import { CrmRecordDetailShell } from "@/components/crm/crm-record-detail-shell";
 import { Spinner } from "@/components/ui/spinner";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
-  canCommercialConvertLead,
+  canCreateDealAfterDeposit,
   canProvisionAccountFromLead,
+  canRecordDepositAndCreateDeal,
+  dealIsWon,
   hasApprovedSiteVisit,
   hasProvisionedAccount,
   hasQuotationSentToClient,
+  hasRecordedDeposit,
 } from "@/lib/crm-lead-status";
 import { toast } from "sonner";
 
@@ -39,17 +42,6 @@ function leadsBackHref(view: string | null, leadId: string) {
     view && ["list", "kanban", "calendar", "map"].includes(view) ? view : "list";
   const q = v ? `?view=${v}` : "";
   return `/crm/leads/${leadId}${q}`;
-}
-
-function depositMetFromDeal(
-  deal: { payment_status?: string | null; deposit_required_amount?: string | number | null; deposit_paid_amount?: string | number | null; deposit_amount?: string | number | null } | null | undefined,
-): boolean {
-  if (!deal) return false;
-  if (deal.payment_status === "deposit_met") return true;
-  const required = parseFloat(String(deal.deposit_required_amount ?? 0)) || 0;
-  const paid =
-    parseFloat(String(deal.deposit_paid_amount ?? deal.deposit_amount ?? 0)) || 0;
-  return required > 0 && paid >= required;
 }
 
 type ProvisionForm = {
@@ -84,14 +76,18 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
     lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
   const salesDeal = lead?.sales_deal ?? lead?.converted_deal ?? null;
   const hasDeal = Boolean(salesDeal?.id ?? lead?.converted_deal_id);
-  const depositMet = depositMetFromDeal(salesDeal);
-  const commercialMode = canCommercialConvertLead({
+  const depositRecorded = hasRecordedDeposit(salesDeal);
+  const commercialInput = {
     hasLinkedAccount: Boolean(linkedAccountId),
     hasDeal,
-    depositMet,
+    hasRecordedDeposit: depositRecorded,
     hasApprovedSiteVisit: hasApprovedSiteVisit(lead?.site_visits),
     hasSentQuotation: hasQuotationSentToClient(lead?.latest_quotation),
-  });
+    dealWon: dealIsWon(salesDeal),
+  };
+  const depositAndDealMode = canRecordDepositAndCreateDeal(commercialInput);
+  const finalizeDealMode = canCreateDealAfterDeposit(commercialInput);
+  const commercialMode = depositAndDealMode || finalizeDealMode;
   const provisionMode =
     !commercialMode &&
     canProvisionAccountFromLead(lead?.status, Boolean(linkedAccountId));
@@ -147,7 +143,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
 
   if (!commercialMode && !provisionMode) {
     const readinessBlockers: string[] = [];
-    if (linkedAccountId && !depositMet) {
+    if (linkedAccountId && !depositRecorded) {
       if (!hasApprovedSiteVisit(lead.site_visits)) {
         readinessBlockers.push(
           "Complete and approve a site visit with measurements first.",
@@ -161,7 +157,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
 
     return (
       <div className="py-12 text-center text-sm text-muted-foreground">
-        {hasProvisionedAccount(lead.status) && depositMet
+        {hasProvisionedAccount(lead.status) && depositRecorded
           ? "This lead has already been converted with a deposit recorded."
           : readinessBlockers[0] ??
             "This lead cannot be converted in its current state."}
@@ -199,15 +195,33 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
 
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(depositForm.amount_paid);
-    if (!depositForm.payment_reference.trim() || Number.isNaN(amount) || amount <= 0) {
-      toast.error("Enter a valid payment reference and amount.");
-      return;
-    }
-
     setConverting(true);
     try {
       await ensureCsrfCookie();
+
+      if (finalizeDealMode) {
+        const result = await convertLead(Number(leadId), {
+          quotation_id: lead.latest_quotation?.id,
+        });
+        toast.success("Deal created from recorded deposit.");
+        const dealId = result.data.deal?.id;
+        router.push(
+          dealId ? `/crm/deals/${dealId}` : leadsBackHref(view, leadId),
+        );
+        return;
+      }
+
+      const amount = parseFloat(depositForm.amount_paid);
+      if (
+        !depositForm.payment_reference.trim() ||
+        Number.isNaN(amount) ||
+        amount <= 0
+      ) {
+        toast.error("Enter a valid payment reference and amount.");
+        setConverting(false);
+        return;
+      }
+
       const result = await convertLead(Number(leadId), {
         quotation_id: lead.latest_quotation?.id,
         payment_reference: depositForm.payment_reference.trim(),
@@ -224,7 +238,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
       );
     } catch (err) {
       toast.error(
-        err instanceof ApiError ? err.message : "Failed to record deposit.",
+        err instanceof ApiError ? err.message : "Failed to complete conversion.",
       );
       setConverting(false);
     }
@@ -235,13 +249,17 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
       <CrmRecordDetailShell
         backHref={leadsBackHref(view, leadId)}
         backLabel="Back to lead"
-        recordTitle={`Record deposit — ${card?.title ?? leadId}`}
+        recordTitle={
+          finalizeDealMode
+            ? `Create deal — ${card?.title ?? leadId}`
+            : `Record deposit — ${card?.title ?? leadId}`
+        }
         headerBadges={
           <Badge
             variant="outline"
             className="border-[#1e3a5f]/20 bg-[#ebf2ff]/40 font-normal text-[#1e3a5f]"
           >
-            Deposit & deal
+            {finalizeDealMode ? "Create deal" : "Deposit & deal"}
           </Badge>
         }
         recordMeta={
@@ -264,9 +282,9 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
                 v2 flow
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Account already exists. This step creates a deal from the latest
-                quotation (sending it if still draft) and records the client
-                deposit.
+                {finalizeDealMode
+                  ? "Deposit is already recorded. This step accepts the quotation, marks the deal won, and links it to the lead."
+                  : "Account already exists. This step creates a deal from the latest quotation and records the client deposit."}
               </p>
             </div>
             {linkedAccountId ? (
@@ -279,15 +297,22 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
       >
         <form onSubmit={handleDepositSubmit} className="space-y-5">
           <FormSection
-            title="Deposit payment"
-            description="Record the client deposit and create the sales deal"
+            title={finalizeDealMode ? "Finalize deal" : "Deposit payment"}
+            description={
+              finalizeDealMode
+                ? "Confirm deal creation from the recorded deposit"
+                : "Record the client deposit and create the sales deal"
+            }
           >
             <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm">
               <Banknote className="h-4 w-4 text-[#1e3a5f]" />
-              {hasDeal
-                ? "Deal exists — deposit will be recorded on the linked deal."
-                : "A deal will be created from the latest quotation when you submit."}
+              {finalizeDealMode
+                ? `Deposit recorded (${salesDeal?.deposit_paid_amount ?? salesDeal?.deposit_amount ?? "—"} KES). No additional payment is required.`
+                : hasDeal
+                  ? "Deal exists — deposit will be recorded on the linked deal."
+                  : "A deal will be created from the latest quotation when you submit."}
             </div>
+            {!finalizeDealMode ? (
             <div className="grid gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="convert-payment-ref">Payment reference</Label>
@@ -361,12 +386,25 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
                 />
               </div>
             </div>
+            ) : null}
           </FormSection>
 
-          <Button type="submit" disabled={converting || !can("deal_payments.record")}>
-            {converting ? "Recording…" : "Record deposit & create deal"}
+          <Button
+            type="submit"
+            disabled={
+              converting ||
+              (!finalizeDealMode && !can("deal_payments.record"))
+            }
+          >
+            {converting
+              ? finalizeDealMode
+                ? "Creating…"
+                : "Recording…"
+              : finalizeDealMode
+                ? "Create deal"
+                : "Record deposit & create deal"}
           </Button>
-          {!can("deal_payments.record") ? (
+          {!finalizeDealMode && !can("deal_payments.record") ? (
             <p className="text-xs text-muted-foreground">
               You need deal payment permission to complete this step.
             </p>

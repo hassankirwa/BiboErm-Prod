@@ -1,5 +1,6 @@
 import { apiFetch } from "../client";
 import { unwrapResource } from "./types";
+import type { SiteMeasurementFormData } from "@/lib/measurements/types";
 import type { ApiSiteVisit, PaginatedResponse } from "./types";
 
 export type { ApiSiteVisit } from "./types";
@@ -9,6 +10,7 @@ export type ScheduleSiteVisitPayload = {
   lead_id?: number | null;
   deal_id?: number | null;
   account_id?: number | null;
+  project_id?: number | null;
   contact_id?: number | null;
   site_address?: string | null;
   latitude?: number | null;
@@ -17,6 +19,7 @@ export type ScheduleSiteVisitPayload = {
   visit_date: string;
   visit_time?: string | null;
   visit_purpose?: string | null;
+  measurement_context?: "quotation" | "production";
   requires_measurements?: boolean;
   notes_for_field_officer?: string | null;
 };
@@ -105,6 +108,32 @@ export async function startSiteVisit(
   return unwrapResource(res);
 }
 
+export async function saveSiteMeasurementForm(
+  id: number,
+  form: SiteMeasurementFormData,
+  options?: { draft?: boolean },
+): Promise<ApiSiteVisit> {
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/measurement-form`,
+    { method: "PATCH", json: { form, draft: options?.draft ?? false } },
+  );
+  return unwrapResource(res);
+}
+
+export async function uploadSiteMeasurementSketch(
+  visitId: number,
+  file: File,
+): Promise<ApiSiteVisit> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${visitId}/measurement-form/sketch`,
+    { method: "POST", body: form },
+  );
+  return unwrapResource(res);
+}
+
 export async function submitSiteVisitMeasurements(
   id: number,
   payload: SubmitSiteVisitMeasurementsPayload,
@@ -135,18 +164,27 @@ export async function approveSiteVisit(id: number): Promise<ApiSiteVisit> {
   return unwrapResource(res);
 }
 
-/** Upload visit photo when backend exposes POST /api/v1/crm/site-visits/{id}/photos */
+export type SiteVisitPhotoUpload = {
+  id: number;
+  file_path: string | null;
+  url: string | null;
+};
+
+/** Upload visit photo (also used for per-line measurement photos). */
 export async function uploadSiteVisitPhoto(
   visitId: number,
   file: File,
   caption?: string,
-): Promise<unknown> {
+): Promise<SiteVisitPhotoUpload> {
   const form = new FormData();
   form.append("file", file);
   if (caption) form.append("caption", caption);
 
-  return apiFetch(`/api/v1/crm/site-visits/${visitId}/photos`, {
+  const res = await apiFetch<
+    SiteVisitPhotoUpload | { data: SiteVisitPhotoUpload }
+  >(`/api/v1/crm/site-visits/${visitId}/photos`, {
     method: "POST",
     body: form,
   });
+  return unwrapResource(res);
 }

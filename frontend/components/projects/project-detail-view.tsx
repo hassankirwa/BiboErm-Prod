@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatProjectStage,
   getProject,
-  hasSiteAssessmentOperationalData,
+  hasProductionMeasurementData,
   type ProjectDetail,
 } from "@/lib/api/projects";
 import { ApiError } from "@/lib/api/errors";
@@ -165,10 +165,18 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
     );
   }
 
+  const DESIGN_MEASUREMENT_STAGES = new Set([
+    "deposit_received",
+    "site_assessment",
+    "final_design_approval",
+  ]);
+
   const showSiteAssessmentLink =
-    !isCrmMode &&
-    (project.stage === "site_assessment" ||
-      hasSiteAssessmentOperationalData(project.stage_data?.site_assessment));
+    project.stage !== "awaiting_deposit" &&
+    (hasProductionMeasurementData(project) ||
+      (isCrmMode
+        ? DESIGN_MEASUREMENT_STAGES.has(project.stage)
+        : project.stage === "site_assessment"));
 
   return (
     <div className="flex min-w-0 w-full flex-col">
@@ -197,9 +205,7 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
                 <Button variant="default" size="sm" asChild>
                   <Link href={projectSiteAssessmentPath(project.id, mode)}>
                     <ClipboardList className="mr-1 h-4 w-4" />
-                    {project.stage === "site_assessment"
-                      ? "Site Assessment"
-                      : "View Site Assessment"}
+                    Production measurements
                   </Link>
                 </Button>
               </PermissionGate>

@@ -135,6 +135,11 @@ class Project extends Model
         return $this->hasMany(ProjectFloor::class)->orderBy('sort_order');
     }
 
+    public function siteVisits(): HasMany
+    {
+        return $this->hasMany(SiteVisit::class);
+    }
+
     public function scopeVisibleTo($query, User $user)
     {
         if ($user->can('projects.view_all') || $user->can('projects.manage') || $user->can('projects.material_status.view')) {

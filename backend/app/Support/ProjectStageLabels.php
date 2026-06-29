@@ -63,4 +63,19 @@ class ProjectStageLabels
 
         return config("bibo.pm.stage_waiting_messages.{$value}");
     }
+
+    /**
+     * Labels for the /projects/design queue (post-deposit production design work).
+     */
+    public static function designQueue(ProjectStage|string $stage): string
+    {
+        $value = $stage instanceof ProjectStage ? $stage->value : $stage;
+
+        return match ($value) {
+            ProjectStage::DepositReceived->value => 'Awaiting design',
+            ProjectStage::SiteAssessment->value => 'Production measurements',
+            ProjectStage::FinalDesignApproval->value => 'Design upload',
+            default => self::for($value),
+        };
+    }
 }

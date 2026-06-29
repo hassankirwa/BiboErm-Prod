@@ -90,33 +90,46 @@ class LeadConversionService
 
     protected function convertWithDeposit(Lead $lead, User $user, array $data): array
     {
-        $this->assertPaymentPayload($data);
-
         return DB::transaction(function () use ($lead, $user, $data) {
             $account = Account::query()->findOrFail($lead->converted_account_id);
             $this->assertCommercialReadiness($lead, $account, $data['quotation_id'] ?? null);
             $quotation = $this->resolveQuotation($account->id, $data['quotation_id'] ?? null);
             $deal = $this->resolveDeal($lead, $account, $quotation, $user);
 
-            if (! $deal->deposit_required_amount && ! $deal->deposit_amount) {
-                $deal->update(['deposit_required_amount' => $data['amount_paid']]);
-                $deal = $deal->fresh();
+            $recordingPayment = $this->hasPaymentPayload($data);
+
+            if ($recordingPayment) {
+                $this->assertPaymentPayload($data);
+
+                if (! $deal->deposit_required_amount && ! $deal->deposit_amount) {
+                    $deal->update(['deposit_required_amount' => $data['amount_paid']]);
+                    $deal = $deal->fresh();
+                }
+            } else {
+                $this->assertExistingDeposit($deal);
             }
 
             if ($quotation) {
                 $quotation = $this->acceptQuotationIfNeeded($quotation);
-                $deal = $this->markDealWonIfNeeded($deal->fresh(), $user);
             }
 
-            $payment = $this->dealPaymentService->record($deal, $user, [
-                'payment_reference' => $data['payment_reference'],
-                'payment_date' => $data['payment_date'],
-                'amount_paid' => $data['amount_paid'],
-                'payment_method' => $data['payment_method'],
-                'payment_status' => $data['payment_status'] ?? 'confirmed',
-                'quotation_id' => $quotation?->id,
-                'notes' => $data['notes'] ?? null,
-            ]);
+            $payment = null;
+            if ($recordingPayment) {
+                $payment = $this->dealPaymentService->record($deal, $user, [
+                    'payment_reference' => $data['payment_reference'],
+                    'payment_date' => $data['payment_date'],
+                    'amount_paid' => $data['amount_paid'],
+                    'payment_method' => $data['payment_method'],
+                    'payment_status' => $data['payment_status'] ?? 'confirmed',
+                    'quotation_id' => $quotation?->id,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+                $deal = $deal->fresh();
+            }
+
+            if ($quotation) {
+                $deal = $this->markDealWonIfNeeded($deal->fresh(), $user);
+            }
 
             $lead->update([
                 'converted_deal_id' => $deal->id,
@@ -128,7 +141,7 @@ class LeadConversionService
             $this->crmAudit->leadConverted($lead->fresh(), [
                 'account_id' => $account->id,
                 'deal_id' => $deal->id,
-                'payment_id' => $payment->id,
+                'payment_id' => $payment?->id,
             ], $user);
 
             return [
@@ -139,6 +152,25 @@ class LeadConversionService
                 'payment' => $payment,
             ];
         });
+    }
+
+    protected function hasPaymentPayload(array $data): bool
+    {
+        return array_key_exists('amount_paid', $data)
+            && $data['amount_paid'] !== null
+            && $data['amount_paid'] !== ''
+            && (float) $data['amount_paid'] > 0;
+    }
+
+    protected function assertExistingDeposit(Deal $deal): void
+    {
+        $paid = (float) ($deal->deposit_paid_amount ?? $deal->deposit_amount ?? 0);
+
+        if ($paid <= 0) {
+            throw ValidationException::withMessages([
+                'amount_paid' => ['Record the client deposit first, or include payment details on this form.'],
+            ]);
+        }
     }
 
     protected function assertCommercialReadiness(Lead $lead, Account $account, mixed $quotationId): void

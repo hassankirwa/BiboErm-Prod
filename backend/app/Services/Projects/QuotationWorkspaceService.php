@@ -3,6 +3,7 @@
 namespace App\Services\Projects;
 
 use App\Enums\Crm\QuotationStatus;
+use App\Enums\Crm\MeasurementContext;
 use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Account;
 use App\Models\AccountDocument;
@@ -65,7 +66,12 @@ class QuotationWorkspaceService
     {
         $approvedAccountIds = SiteVisit::query()
             ->where('status', SiteVisitStatus::Approved->value)
+            ->where('measurement_context', MeasurementContext::Quotation->value)
             ->whereNotNull('account_id')
+            ->where(function ($query) {
+                $query->whereNotNull('measurement_form_data')
+                    ->orWhereHas('measurementLines');
+            })
             ->pluck('account_id')
             ->unique()
             ->values();

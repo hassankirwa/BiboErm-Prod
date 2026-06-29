@@ -14,7 +14,7 @@ class Quotation extends Model
         'quotation_number', 'deal_id', 'account_id', 'contact_id', 'prepared_by',
         'project_name', 'project_number',
         'status', 'subtotal', 'discount_amount', 'tax_amount', 'tax_rate', 'total_amount',
-        'valid_until', 'terms_conditions', 'source_excel_path', 'sent_at', 'accepted_at',
+        'valid_until', 'terms_conditions', 'source_excel_path', 'sent_at', 'approved_at', 'approved_by', 'accepted_at',
         'revision_of_id', 'revision_number', 'is_reference_copy', 'root_quotation_id', 'negotiation_notes',
     ];
 
@@ -29,6 +29,7 @@ class Quotation extends Model
             'total_amount' => 'decimal:2',
             'valid_until' => 'date',
             'sent_at' => 'datetime',
+            'approved_at' => 'datetime',
             'accepted_at' => 'datetime',
             'revision_number' => 'integer',
             'is_reference_copy' => 'boolean',

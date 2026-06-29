@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\Crm\MeasurementContext;
+use App\Enums\Crm\MeasurementFormStatus;
 use App\Enums\Crm\SiteVisitStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,11 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SiteVisit extends Model
 {
     protected $fillable = [
-        'visit_number', 'title', 'lead_id', 'deal_id', 'account_id', 'contact_id',
+        'visit_number', 'title', 'lead_id', 'deal_id', 'account_id', 'project_id', 'contact_id',
         'site_address', 'latitude', 'longitude', 'assigned_field_officer_id', 'scheduled_by',
-        'visit_date', 'visit_time', 'visit_purpose', 'requires_measurements', 'status', 'notes_for_field_officer',
+        'visit_date', 'visit_time', 'visit_purpose', 'measurement_context', 'requires_measurements', 'status', 'notes_for_field_officer',
         'actual_latitude', 'actual_longitude', 'arrival_at', 'completion_at',
         'client_present', 'visit_outcome', 'follow_up_required', 'field_officer_notes',
+        'measurement_form_data', 'measurement_form_status', 'rough_sketch_path',
         'approved_by', 'approved_at',
     ];
 
@@ -22,6 +25,9 @@ class SiteVisit extends Model
     {
         return [
             'status' => SiteVisitStatus::class,
+            'measurement_context' => MeasurementContext::class,
+            'measurement_form_status' => MeasurementFormStatus::class,
+            'measurement_form_data' => 'array',
             'visit_date' => 'date',
             'client_present' => 'boolean',
             'follow_up_required' => 'boolean',
@@ -45,6 +51,11 @@ class SiteVisit extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function contact(): BelongsTo

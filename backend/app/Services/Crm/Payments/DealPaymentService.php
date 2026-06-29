@@ -44,7 +44,13 @@ class DealPaymentService
                 ->sum('amount_paid');
 
             $depositRequired = (float) ($deal->deposit_required_amount ?? $deal->deposit_amount ?? 0);
-            $paymentStatus = $totalPaid <= 0 ? 'not_paid' : ($totalPaid >= $depositRequired && $depositRequired > 0 ? 'deposit_met' : 'partial');
+            if ($totalPaid <= 0) {
+                $paymentStatus = 'not_paid';
+            } elseif ($depositRequired <= 0 || $totalPaid >= $depositRequired) {
+                $paymentStatus = 'deposit_met';
+            } else {
+                $paymentStatus = 'partial';
+            }
 
             $updates = [
                 'deposit_paid_amount' => $totalPaid,
