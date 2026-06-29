@@ -86,6 +86,8 @@ import { useCrmLead } from "@/lib/use-crm-lead";
 
 import { fetchActivities, createActivity } from "@/lib/api/crm/activities";
 
+import { fetchDesignJobs } from "@/lib/api/design/jobs";
+
 import {
 
   fetchLead,
@@ -128,6 +130,8 @@ import { ApiError } from "@/lib/api/errors";
 import { CrmRecordDetailShell } from "@/components/crm/crm-record-detail-shell";
 
 import { LeadRelatedLists } from "@/components/crm/lead-related-lists";
+import { LeadRelatedRecords } from "@/components/crm/lead-related-records";
+import { LeadPipelineTracker } from "@/components/crm/lead-pipeline-tracker";
 import { LeadDetailIntake } from "@/components/crm/lead-detail-intake";
 import { LeadQuotationActions } from "@/components/crm/lead-quotation-actions";
 import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
@@ -150,8 +154,14 @@ import {
   canProvisionAccountFromLead,
   hasApprovedSiteVisit,
   hasQuotationSentToClient,
+  resolvePipelineStage,
   statusToKanbanStage,
 } from "@/lib/crm-lead-status";
+
+import {
+  getNextPipelineAction,
+  getPipelineStageLabel,
+} from "@/lib/crm-lead-pipeline";
 
 import type { LeadActivityType } from "@/lib/leads-kanban-data";
 
@@ -269,6 +279,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
   const [notesSaving, setNotesSaving] = useState(false);
 
+  const [designJobsCount, setDesignJobsCount] = useState(0);
+
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -324,6 +336,22 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
 
   const status = (lead?.status ?? card?.statusKey ?? "new").toLowerCase();
+
+  const pipelineStage = resolvePipelineStage({
+    pipeline_stage: lead?.pipeline_stage,
+    status,
+  });
+
+  const nextPipelineAction = getNextPipelineAction(pipelineStage);
+
+  useEffect(() => {
+    const id = Number(leadId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    fetchDesignJobs({ lead_id: id, per_page: 1 })
+      .then((res) => setDesignJobsCount(res.meta?.total ?? res.data.length))
+      .catch(() => setDesignJobsCount(0));
+  }, [leadId, lead?.pipeline_stage, lead?.status]);
 
   useEffect(() => {
     const id = Number(leadId);
@@ -750,9 +778,9 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
       lead?.converted_account_id ?? lead?.converted_account?.id ?? null;
     const accountHref = accountId ? `/crm/accounts/${accountId}` : null;
 
-    switch (statusToKanbanStage(status)) {
+    switch (statusToKanbanStage(status, lead?.pipeline_stage)) {
 
-      case "new":
+      case "new_lead":
 
         return (
 
@@ -800,7 +828,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         );
 
-      case "contacted":
+      case "contact_confirmed":
 
         return (
 
@@ -809,6 +837,58 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
             <div className="flex flex-wrap gap-2">
 
               {activityButtons}
+
+              <PermissionGate permission="site_visits.schedule">
+
+                <Button
+
+                  size="sm"
+
+                  className="h-9"
+
+                  disabled={disabled}
+
+                  onClick={() => {
+
+                    setVisitForm((f) => ({
+
+                      ...f,
+
+                      title: card?.title ?? "",
+
+                      site_address: lead?.site_address ?? "",
+
+                      visit_date: new Date().toISOString().slice(0, 10),
+
+                      assigned_field_officer_id: defaultSiteVisitAssigneeId(
+
+                        user?.id,
+
+                        lead?.assigned_field_officer_id ??
+
+                          (f.assigned_field_officer_id
+
+                            ? Number(f.assigned_field_officer_id)
+
+                            : null),
+
+                      ),
+
+                    }));
+
+                    setVisitDialogOpen(true);
+
+                  }}
+
+                >
+
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+
+                  Schedule Site Visit
+
+                </Button>
+
+              </PermissionGate>
 
               <Button
 
@@ -902,41 +982,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         );
 
-      case "interested":
-
-        return (
-
-          <PermissionGate permission="leads.update">
-
-            <div className="flex flex-wrap items-center gap-2">
-
-              {activityButtons}
-
-              {accountHref ? (
-
-                <Button size="sm" className="h-9" asChild>
-
-                  <Link href={accountHref}>Open Account</Link>
-
-                </Button>
-
-              ) : (
-
-                <Badge variant="secondary" className="h-9 px-3 font-normal">
-
-                  Account provisioning…
-
-                </Badge>
-
-              )}
-
-            </div>
-
-          </PermissionGate>
-
-        );
-
-      case "account_created":
+      case "site_visit_required":
+      case "site_visit_assigned":
 
         return (
 
@@ -1012,7 +1059,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
               <Button size="sm" variant="outline" className="h-9" asChild>
 
-                <Link href={`/crm/site-visits/${latestSiteVisitId}`}>
+                <Link href={`/site-ops/visits/${latestSiteVisitId}`}>
 
                   View Visit
 
@@ -1045,6 +1092,80 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
                 Awaiting visit approval
 
               </Badge>
+
+            ) : null}
+
+          </div>
+
+        );
+
+      case "measurements_submitted":
+
+        return (
+
+          <div className="flex flex-wrap gap-2">
+
+            {activityButtons}
+
+            <Button size="sm" variant="outline" className="h-9" asChild>
+
+              <Link href="/site-ops/measurements">Review Measurements</Link>
+
+            </Button>
+
+          </div>
+
+        );
+
+      case "design_required":
+
+        return (
+
+          <div className="flex flex-wrap gap-2">
+
+            {activityButtons}
+
+            <Button size="sm" variant="outline" className="h-9" asChild>
+
+              <Link href={`/design/jobs?lead_id=${leadId}`}>Open Design Jobs</Link>
+
+            </Button>
+
+          </div>
+
+        );
+
+      case "ready_for_quotation":
+
+        return (
+
+          <div className="flex flex-wrap gap-2">
+
+            {activityButtons}
+
+            <Button size="sm" className="h-9" asChild>
+
+              <Link href="/quotation/proforma">Create Proforma Quotation</Link>
+
+            </Button>
+
+            {lead?.latest_quotation ? (
+
+              <LeadQuotationActions
+
+                latestQuotation={lead.latest_quotation}
+
+                salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
+
+                linkedAccountId={linkedAccountId}
+
+                showCreateQuotation={false}
+
+                disabled={disabled}
+
+                onRefresh={reloadLead}
+
+              />
 
             ) : null}
 
@@ -1207,7 +1328,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <Badge variant="outline" className="font-normal text-[#1e3a5f]">
 
-              {card.tag}
+              {getPipelineStageLabel(pipelineStage)}
 
             </Badge>
 
@@ -1295,9 +1416,46 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
         }
 
-        sidebar={<LeadRelatedLists leadId={Number(leadId)} lead={lead} />}
+        sidebar={
+          <div className="space-y-4">
+            {lead ? (
+              <LeadRelatedRecords lead={lead} designJobsCount={designJobsCount} />
+            ) : null}
+            <LeadRelatedLists leadId={Number(leadId)} lead={lead} />
+          </div>
+        }
 
       >
+
+        {lead ? (
+          <LeadPipelineTracker
+            pipelineStage={lead.pipeline_stage}
+            status={status}
+            updatedAt={lead.updated_at}
+            className="mb-4"
+          />
+        ) : null}
+
+        {nextPipelineAction ? (
+          <div className="mb-4 rounded-[10px] border border-border/70 bg-[#ebf2ff]/40 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Suggested next step
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[#1e3a5f]">
+              {nextPipelineAction.label}
+            </p>
+            {nextPipelineAction.description ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {nextPipelineAction.description}
+              </p>
+            ) : null}
+            {nextPipelineAction.href ? (
+              <Button size="sm" variant="link" className="mt-1 h-auto px-0" asChild>
+                <Link href={nextPipelineAction.href}>Open module</Link>
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {stageActions && (
 
@@ -1633,7 +1791,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             <div className="space-y-2">
 
-              <Label>Assigned to</Label>
+              <Label>Assigned To</Label>
 
               <ScheduleSiteVisitFieldOfficerTag
 
@@ -1663,7 +1821,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
                 currentUserName={user?.name}
 
-                placeholder="Select assignee"
+                placeholder="Assigned To"
 
               />
 

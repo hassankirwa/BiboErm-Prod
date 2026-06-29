@@ -50,7 +50,7 @@ export function LeadCreateForm() {
       : "/crm/leads?view=list";
 
   const [form, setForm] = useState<LeadFormValues>(() =>
-    emptyLeadForm("new", {
+    emptyLeadForm("new_lead", {
       ownerId: user?.id ?? null,
       leadSourceId: lookups?.lead_sources[0]?.id ?? null,
     }),
@@ -207,6 +207,17 @@ export function LeadCreateForm() {
         toast.error(photoUploadError);
       }
 
+      const contactConfirmed =
+        Boolean(lead.contact_person_name?.trim()) ||
+        Boolean(lead.phone?.trim()) ||
+        Boolean(lead.email?.trim());
+
+      toast.success(
+        contactConfirmed
+          ? "Lead created — contact confirmed. Follow up to schedule a site visit if needed."
+          : "Lead created. Add contact details when the client is identified.",
+      );
+
       router.push(`/crm/leads/${lead.id}`);
     } catch (err) {
       toast.error(
@@ -289,7 +300,8 @@ export function LeadCreateForm() {
                 Set the stage and next action date to keep follow-ups on track.
               </p>
               <p>
-                Estimated value helps prioritize high-impact opportunities.
+                Commercial value is captured later, after measurements and
+                quotation preparation.
               </p>
             </CardContent>
           </Card>

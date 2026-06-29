@@ -77,6 +77,18 @@ class LeadDetailResource extends LeadResource
                 fn () => new DealResource($this->sales_context['sales_deal']),
             ),
             'site_visits' => SiteVisitResource::collection($this->whenLoaded('siteVisits')),
+            'related_record_counts' => $this->when(
+                $this->relationLoaded('siteVisits')
+                    || $this->relationLoaded('measurementReports')
+                    || $this->relationLoaded('designJobs')
+                    || $this->relationLoaded('quotationRequests'),
+                fn () => [
+                    'site_visits' => $this->relationLoaded('siteVisits') ? $this->siteVisits->count() : null,
+                    'measurement_reports' => $this->relationLoaded('measurementReports') ? $this->measurementReports->count() : null,
+                    'design_jobs' => $this->relationLoaded('designJobs') ? $this->designJobs->count() : null,
+                    'quotation_requests' => $this->relationLoaded('quotationRequests') ? $this->quotationRequests->count() : null,
+                ],
+            ),
             'attachments' => $this->whenLoaded('attachments'),
             'activities' => $this->whenLoaded('activities'),
             'created_by' => $this->created_by,

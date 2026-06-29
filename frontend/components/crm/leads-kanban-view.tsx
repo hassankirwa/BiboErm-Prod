@@ -79,7 +79,7 @@ export function LeadsKanbanView({
   const handleDrop = async (stageId: LeadKanbanStageId, leadId: string) => {
     if (!leadId) return;
     const card = cards.find((c) => c.id === leadId);
-    if (card && !canKanbanMove(card.statusKey, stageId)) {
+    if (card && !canKanbanMove(card.statusKey, stageId, card.pipelineStageKey)) {
       setDraggingId(null);
       setDropTargetStage(null);
       return;

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\LeadStatus;
 use App\Support\Crm\LeadAccountEligibility;
 use App\Traits\Auditable;
@@ -18,7 +19,7 @@ class Lead extends Model
 
     protected $fillable = [
         'reference', 'lead_number', 'name', 'first_name', 'last_name', 'company',
-        'lead_type_id', 'lead_source_id', 'status', 'priority',
+        'lead_type_id', 'lead_source_id', 'status', 'pipeline_stage', 'priority',
         'lead_owner_id', 'assigned_sales_user_id', 'assigned_field_officer_id', 'assigned_to',
         'contact_person_name', 'phone', 'whatsapp', 'email', 'job_title',
         'preferred_contact_method', 'preferred_contact_time',
@@ -39,6 +40,7 @@ class Lead extends Model
     {
         return [
             'status' => LeadStatus::class,
+            'pipeline_stage' => LeadPipelineStage::class,
             'product_interests' => 'array',
             'need_site_visit' => 'boolean',
             'estimated_budget' => 'decimal:2',
@@ -130,6 +132,21 @@ class Lead extends Model
     public function siteVisits(): HasMany
     {
         return $this->hasMany(SiteVisit::class);
+    }
+
+    public function measurementReports(): HasMany
+    {
+        return $this->hasMany(MeasurementReport::class);
+    }
+
+    public function designJobs(): HasMany
+    {
+        return $this->hasMany(DesignJob::class);
+    }
+
+    public function quotationRequests(): HasMany
+    {
+        return $this->hasMany(QuotationRequest::class);
     }
 
     public function activities(): HasMany

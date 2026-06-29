@@ -51,8 +51,6 @@ export function apiLeadToFormValues(lead: ApiLeadDetail): LeadFormValues {
     productInterests: lead.product_interests ?? [],
     requirementDescription: lead.requirement_description ?? "",
     propertySiteType: lead.property_site_type ?? "",
-    estimatedValue: Number(lead.estimated_value ?? 0),
-    estimatedBudget: Number(lead.estimated_budget ?? 0),
     urgency: lead.urgency ?? "",
     expectedTimeline: lead.expected_timeline ?? "",
     nextActionDate:
@@ -100,8 +98,6 @@ export function cardToFormValues(card: LeadKanbanCard): LeadFormValues {
     productInterests: [],
     requirementDescription: card.notes ?? "",
     propertySiteType: "",
-    estimatedValue: card.estimatedValue,
-    estimatedBudget: 0,
     urgency: "",
     expectedTimeline: "",
     nextActionDate: card.nextActionDate,

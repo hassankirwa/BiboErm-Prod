@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm\Leads;
 
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\LeadStatus;
 use App\Models\Account;
 use App\Models\AccountDocument;
@@ -37,11 +38,9 @@ class AccountProvisioningService
             return $this->linkLeadToExistingAccount($lead, $existingAccount, $user);
         }
 
-        $status = $lead->status instanceof LeadStatus ? $lead->status->value : (string) $lead->status;
-
-        if (! in_array($status, [LeadStatus::Interested->value, LeadStatus::AccountCreated->value], true)) {
+        if (! $this->isEligibleForProvisioning($lead)) {
             throw ValidationException::withMessages([
-                'status' => ['Lead must be interested before provisioning an account.'],
+                'status' => ['Lead must reach ready for quotation or have a quotation request before provisioning an account.'],
             ]);
         }
 
@@ -199,6 +198,29 @@ class AccountProvisioningService
         }
 
         return $this->linkLeadToExistingAccount($lead, $existingAccount, $user);
+    }
+
+    public function isEligibleForProvisioning(Lead $lead): bool
+    {
+        $status = $lead->status instanceof LeadStatus ? $lead->status->value : (string) $lead->status;
+
+        if ($status === LeadStatus::AccountCreated->value) {
+            return true;
+        }
+
+        $pipelineStage = $lead->pipeline_stage instanceof LeadPipelineStage
+            ? $lead->pipeline_stage->value
+            : (string) ($lead->pipeline_stage ?? '');
+
+        if ($pipelineStage === LeadPipelineStage::ReadyForQuotation->value) {
+            return true;
+        }
+
+        if ($lead->quotationRequests()->exists()) {
+            return true;
+        }
+
+        return false;
     }
 
     public function copyLeadPhotosToAccountDocuments(Lead $lead, Account $account, User $user): void

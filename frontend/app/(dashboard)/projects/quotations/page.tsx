@@ -40,13 +40,13 @@ export default function ProjectQuotationsPage() {
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
-        title="Quotation"
-        subtitle="Draft and send project quotations after site measurements are approved"
+        title="Proforma Quotation"
+        subtitle="Draft and send proforma quotations after site measurements are approved"
         actions={
           <Button asChild>
             <Link href="/projects/quotations/new">
               <Plus className="mr-2 h-4 w-4" />
-              New Quotation
+              New Proforma Quotation
             </Link>
           </Button>
         }
@@ -56,7 +56,7 @@ export default function ProjectQuotationsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Ruler className="h-4 w-4" />
-              Pending — Measurements Done, No Quotation
+              Pending — Measurements Done, No Proforma Quotation
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -66,7 +66,7 @@ export default function ProjectQuotationsPage() {
               </div>
             ) : pending.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                No accounts are waiting for a quotation. Approved site visits will appear here.
+                No accounts are waiting for a proforma quotation. Approved site visits will appear here.
               </p>
             ) : (
               <Table>
@@ -107,7 +107,7 @@ export default function ProjectQuotationsPage() {
                         <Button size="sm" asChild>
                           <Link href={`/projects/quotations/new?accountId=${account.id}`}>
                             <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                            Create Quote
+                            Create Proforma Quotation
                           </Link>
                         </Button>
                       </TableCell>

@@ -9,6 +9,7 @@ export type CreateLeadPayload = {
   lead_type_id?: number | null;
   lead_source_id?: number | null;
   status?: string;
+  pipeline_stage?: string | null;
   priority?: string;
   lead_owner_id?: number | null;
   assigned_sales_user_id?: number | null;

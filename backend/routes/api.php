@@ -122,6 +122,23 @@ Route::prefix('v1')->group(function () {
             require __DIR__.'/api/lookups.php';
         });
 
+    Route::middleware(['auth:sanctum', 'active'])->prefix('pipeline')->group(function () {
+        Route::get('dashboard', \App\Http\Controllers\PipelineDashboardController::class)
+            ->middleware('permission:crm.view|leads.view|projects.view');
+    });
+
+    Route::middleware(['auth:sanctum', 'active'])->prefix('site-ops')->group(function () {
+        require __DIR__.'/api/site-ops.php';
+    });
+
+    Route::middleware(['auth:sanctum', 'active'])->prefix('design')->group(function () {
+        require __DIR__.'/api/design.php';
+    });
+
+    Route::middleware(['auth:sanctum', 'active'])->prefix('quotation')->group(function () {
+        require __DIR__.'/api/quotation.php';
+    });
+
     Route::middleware(['auth:sanctum', 'active'])->prefix('crm')->group(function () {
         require __DIR__.'/api/crm/leads.php';
         require __DIR__.'/api/crm/contacts.php';

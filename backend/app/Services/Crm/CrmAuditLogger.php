@@ -32,6 +32,11 @@ class CrmAuditLogger
         $this->logEntity('lead.account_provisioned', $lead, null, $newValues ?? []);
     }
 
+    public function leadPipelineStageChanged(Lead $lead, ?array $oldValues, ?array $newValues, ?User $user = null): void
+    {
+        $this->logEntity('lead.pipeline_stage_changed', $lead, $oldValues, $newValues);
+    }
+
     public function dealStageChanged(Deal $deal, ?array $oldValues, ?array $newValues, ?User $user = null): void
     {
         $this->logEntity('deal.stage_changed', $deal, $oldValues, $newValues);

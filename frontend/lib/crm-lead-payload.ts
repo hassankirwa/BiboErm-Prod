@@ -66,8 +66,6 @@ export function leadFormToCreatePayload(
       "Lead created from CRM",
     property_site_type: values.propertySiteType || null,
     building_construction_stage_id: values.buildingConstructionStageId,
-    estimated_value: values.estimatedValue || undefined,
-    estimated_budget: values.estimatedBudget || undefined,
     urgency: values.urgency || null,
     expected_timeline: values.expectedTimeline.trim() || null,
     need_site_visit: false,

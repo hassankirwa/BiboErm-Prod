@@ -85,6 +85,27 @@ export type Department = {
 
 export const departments: Department[] = [
   {
+    id: "workspace",
+    name: "Workspace",
+    icon: LayoutGrid,
+    path: "/workspace",
+    subModules: [
+      { name: "Home", path: "/workspace" },
+      { name: "Today", path: "/workspace/today" },
+      { name: "Tasks", path: "/workspace/tasks" },
+      { name: "Calendar", path: "/workspace/calendar" },
+    ],
+    nav: {
+      topItems: [
+        { name: "Home", path: "/workspace" },
+        { name: "Today", path: "/workspace/today" },
+        { name: "Tasks", path: "/workspace/tasks" },
+        { name: "Calendar", path: "/workspace/calendar" },
+      ],
+      groups: [],
+    },
+  },
+  {
     id: "crm",
     name: "CRM",
     icon: Users,
@@ -94,19 +115,6 @@ export const departments: Department[] = [
       { name: "Contacts", path: "/crm/contacts" },
       { name: "Accounts", path: "/crm/accounts" },
       { name: "Deals", path: "/crm/deals" },
-      { name: "Projects", path: "/crm/projects", permission: "projects.view" },
-      { name: "Site Visits", path: "/crm/site-visits" },
-      {
-        name: "My Visits",
-        path: "/crm/site-visits/my-visits",
-        anyPermissions: ["site_visits.execute", "field_installation.log"],
-      },
-      { name: "Field Day", path: "/crm/field-day", permission: "field_day.view" },
-      {
-        name: "Field Day Reports",
-        path: "/crm/field-day/reports",
-        permission: "field_day.view",
-      },
       { name: "Activities", path: "/crm/activities" },
     ],
     nav: {
@@ -124,24 +132,6 @@ export const departments: Department[] = [
             { name: "Contacts", path: "/crm/contacts" },
             { name: "Accounts", path: "/crm/accounts" },
             { name: "Deals", path: "/crm/deals" },
-            { name: "Projects", path: "/crm/projects", permission: "projects.view" },
-            { name: "Site Visits", path: "/crm/site-visits" },
-            {
-              name: "My Visits",
-              path: "/crm/site-visits/my-visits",
-              anyPermissions: ["site_visits.execute", "field_installation.log"],
-            },
-            { name: "Today", path: "/crm/site-visits/today" },
-            {
-              name: "Field Day",
-              path: "/crm/field-day",
-              permission: "field_day.view",
-            },
-            {
-              name: "Field Day Reports",
-              path: "/crm/field-day/reports",
-              permission: "field_day.view",
-            },
           ],
         },
         {
@@ -158,6 +148,108 @@ export const departments: Department[] = [
     },
   },
   {
+    id: "site-ops",
+    name: "Site Operations",
+    icon: MapPin,
+    path: "/site-ops",
+    subModules: [
+      { name: "Site Visits", path: "/site-ops/visits" },
+      { name: "Measurements", path: "/site-ops/measurements" },
+      {
+        name: "My Visits",
+        path: "/site-ops/my-visits",
+        anyPermissions: ["site_visits.execute", "field_installation.log"],
+      },
+      { name: "Field Day", path: "/site-ops/field-day", permission: "field_day.view" },
+      { name: "Measurement Reports", path: "/site-ops/reports" },
+    ],
+    nav: {
+      topItems: [{ name: "Home", path: "/site-ops/visits" }],
+      groups: [
+        {
+          label: "Site Operations",
+          icon: MapPin,
+          items: [
+            { name: "Site Visits", path: "/site-ops/visits" },
+            { name: "Measurements", path: "/site-ops/measurements" },
+            {
+              name: "My Visits",
+              path: "/site-ops/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            { name: "Today", path: "/site-ops/today" },
+            {
+              name: "Field Day",
+              path: "/site-ops/field-day",
+              permission: "field_day.view",
+            },
+            { name: "Measurement Reports", path: "/site-ops/reports" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: "design",
+    name: "Design",
+    icon: Layers,
+    path: "/design",
+    subModules: [
+      { name: "Design Jobs", path: "/design/jobs", permission: "projects.view" },
+      { name: "Measurement Packages", path: "/design/packages" },
+      { name: "WINCAD Uploads", path: "/design/uploads" },
+      { name: "Design Review", path: "/design/review" },
+    ],
+    nav: {
+      topItems: [{ name: "Home", path: "/design/jobs" }],
+      groups: [
+        {
+          label: "Design",
+          icon: Layers,
+          items: [
+            { name: "Design Jobs", path: "/design/jobs", permission: "projects.view" },
+            { name: "Measurement Packages", path: "/design/packages" },
+            { name: "WINCAD Uploads", path: "/design/uploads" },
+            { name: "Design Review", path: "/design/review" },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    id: "quotation",
+    name: "Quotation",
+    icon: FileText,
+    path: "/quotation",
+    subModules: [
+      { name: "Quotation Requests", path: "/quotation/requests" },
+      {
+        name: "Proforma Quotations",
+        path: "/quotation/proforma",
+        permission: "quotations.view",
+      },
+      { name: "Quotation Review", path: "/quotation/review" },
+    ],
+    nav: {
+      topItems: [{ name: "Home", path: "/quotation/proforma" }],
+      groups: [
+        {
+          label: "Quotation",
+          icon: FileText,
+          items: [
+            { name: "Quotation Requests", path: "/quotation/requests" },
+            {
+              name: "Proforma Quotations",
+              path: "/quotation/proforma",
+              permission: "quotations.view",
+            },
+            { name: "Quotation Review", path: "/quotation/review" },
+          ],
+        },
+      ],
+    },
+  },
+  {
     id: "projects",
     name: "Projects",
     icon: FolderKanban,
@@ -165,8 +257,8 @@ export const departments: Department[] = [
     subModules: [
       { name: "All Projects", path: "/projects" },
       { name: "Pipeline", path: "/projects/pipeline" },
-      { name: "Design", path: "/projects/design", permission: "projects.view" },
-      { name: "Quotation", path: "/projects/quotations", permission: "quotations.view" },
+      { name: "Fabrication", path: "/projects/fabrication" },
+      { name: "Installation", path: "/projects/installation" },
       { name: "Timeline", path: "/projects/timeline" },
       { name: "Client Portal", path: "/projects/client-portal" },
     ],
@@ -183,8 +275,8 @@ export const departments: Department[] = [
           items: [
             { name: "All Projects", path: "/projects" },
             { name: "Pipeline", path: "/projects/pipeline" },
-            { name: "Design", path: "/projects/design", permission: "projects.view" },
-            { name: "Quotation", path: "/projects/quotations", permission: "quotations.view" },
+            { name: "Fabrication", path: "/projects/fabrication" },
+            { name: "Installation", path: "/projects/installation" },
             { name: "Timeline", path: "/projects/timeline" },
             { name: "Client Portal", path: "/projects/client-portal" },
           ],
@@ -292,12 +384,12 @@ export const departments: Department[] = [
       { name: "Assembly", path: "/production/assembly", permission: "production.view" },
       {
         name: "My Visits",
-        path: "/crm/site-visits/my-visits",
+        path: "/site-ops/my-visits",
         anyPermissions: ["site_visits.execute", "field_installation.log"],
       },
       {
         name: "Site Visits Today",
-        path: "/crm/site-visits/today",
+        path: "/site-ops/today",
         anyPermissions: ["site_visits.execute", "field_installation.log"],
       },
     ],
@@ -324,12 +416,12 @@ export const departments: Department[] = [
           items: [
             {
               name: "My Visits",
-              path: "/crm/site-visits/my-visits",
+              path: "/site-ops/my-visits",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
             {
               name: "Today",
-              path: "/crm/site-visits/today",
+              path: "/site-ops/today",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
           ],
@@ -343,7 +435,7 @@ export const departments: Department[] = [
     icon: MapPin,
     path: "/field",
     subModules: [
-      { name: "Home", path: "/field" },
+      { name: "Home", path: "/site-ops/my-visits" },
       {
         name: "Open Deal Visits",
         path: "/field/open-visits",
@@ -351,12 +443,12 @@ export const departments: Department[] = [
       },
       {
         name: "Today's Visits",
-        path: "/field/site-visits/today",
+        path: "/site-ops/today",
         anyPermissions: ["site_visits.execute", "field_installation.log"],
       },
       {
         name: "Site Visits",
-        path: "/crm/site-visits",
+        path: "/site-ops/visits",
         anyPermissions: [
           "site_visits.view",
           "site_visits.execute",
@@ -372,7 +464,7 @@ export const departments: Department[] = [
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/field" },
+        { name: "Home", path: "/site-ops/my-visits" },
         {
           name: "Open Deal Visits",
           path: "/field/open-visits",
@@ -380,7 +472,7 @@ export const departments: Department[] = [
         },
         {
           name: "Today's Visits",
-          path: "/field/site-visits/today",
+          path: "/site-ops/today",
           anyPermissions: ["site_visits.execute", "field_installation.log"],
         },
       ],
@@ -396,12 +488,12 @@ export const departments: Department[] = [
             },
             {
               name: "Today's Visits",
-              path: "/field/site-visits/today",
+              path: "/site-ops/today",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
             {
               name: "All Site Visits",
-              path: "/crm/site-visits",
+              path: "/site-ops/visits",
               anyPermissions: [
                 "site_visits.view",
                 "site_visits.execute",
@@ -495,6 +587,8 @@ export const departments: Department[] = [
     icon: DollarSign,
     path: "/finance",
     subModules: [
+      { name: "Deposit Requests", path: "/finance/deposits" },
+      { name: "Receipts", path: "/finance/receipts" },
       { name: "Invoices", path: "/finance/invoices" },
       { name: "Payments", path: "/finance/payments" },
       { name: "Expenses", path: "/finance/expenses" },
@@ -511,6 +605,8 @@ export const departments: Department[] = [
           label: "Finance",
           icon: DollarSign,
           items: [
+            { name: "Deposit Requests", path: "/finance/deposits" },
+            { name: "Receipts", path: "/finance/receipts" },
             { name: "Invoices", path: "/finance/invoices" },
             { name: "Payments", path: "/finance/payments" },
             { name: "Expenses", path: "/finance/expenses" },
@@ -577,6 +673,7 @@ export type WorkspaceApp = {
 const FIELD_MODULE_PATH_PREFIXES = [
   "/field",
   "/field-installation",
+  "/site-ops",
 ] as const;
 
 export function isFieldModulePath(pathname: string): boolean {
@@ -595,11 +692,23 @@ export const workspaceApps: WorkspaceApp[] = [
     permission: "leads.view",
   },
   {
-    id: "field",
-    name: "Field",
-    href: "/field",
+    id: "site-ops",
+    name: "Site Operations",
+    href: "/site-ops/visits",
     icon: MapPin,
     iconClassName: "bg-green-100 text-green-700",
+    anyPermissions: [
+      "site_visits.view",
+      "site_visits.execute",
+      "field_day.view",
+    ],
+  },
+  {
+    id: "field",
+    name: "Field",
+    href: "/site-ops/my-visits",
+    icon: MapPin,
+    iconClassName: "bg-emerald-100 text-emerald-700",
     anyPermissions: [
       "site_visits.view",
       "site_visits.execute",
@@ -615,9 +724,9 @@ export const workspaceApps: WorkspaceApp[] = [
     permission: "projects.view",
   },
   {
-    id: "estimations",
-    name: "Estimations",
-    href: "/projects/design",
+    id: "design",
+    name: "Design",
+    href: "/design/jobs",
     icon: Calculator,
     iconClassName: "bg-yellow-100 text-yellow-600",
     permission: "projects.view",
@@ -654,9 +763,9 @@ export const workspaceApps: WorkspaceApp[] = [
     iconClassName: "bg-teal-100 text-teal-600",
   },
   {
-    id: "quotes",
-    name: "Quotes",
-    href: "/projects/quotations",
+    id: "quotation",
+    name: "Quotation",
+    href: "/quotation/proforma",
     icon: FileText,
     iconClassName: "bg-pink-100 text-pink-600",
     permission: "quotations.view",
@@ -863,8 +972,37 @@ function isProjectsModulePath(pathname: string): boolean {
   return pathname === "/projects" || pathname.startsWith("/projects/");
 }
 
+function isWorkspaceDepartmentPath(pathname: string): boolean {
+  return (
+    pathname === "/workspace" ||
+    pathname === "/workspace/today" ||
+    pathname.startsWith("/workspace/today/") ||
+    pathname === "/workspace/tasks" ||
+    pathname.startsWith("/workspace/tasks/") ||
+    pathname === "/workspace/calendar" ||
+    pathname.startsWith("/workspace/calendar/")
+  );
+}
+
+function isSiteOpsModulePath(pathname: string): boolean {
+  return pathname === "/site-ops" || pathname.startsWith("/site-ops/");
+}
+
+function isDesignModulePath(pathname: string): boolean {
+  return pathname === "/design" || pathname.startsWith("/design/");
+}
+
+function isQuotationModulePath(pathname: string): boolean {
+  return pathname === "/quotation" || pathname.startsWith("/quotation/");
+}
+
 const SLUG_TO_DEPARTMENT_ID: Record<string, string> = {
+  workspace: "workspace",
   sales_marketing: "crm",
+  site_operations: "site-ops",
+  site_ops: "site-ops",
+  design: "design",
+  quotation: "quotation",
   production: "production",
   field: "field",
   field_installation: "field",
@@ -914,6 +1052,22 @@ export function isWorkspaceSettingsPath(pathname: string): boolean {
 export { isWorkspaceSelfServicePath };
 
 export function getActiveDepartment(pathname: string): Department | null {
+  if (isWorkspaceDepartmentPath(pathname)) {
+    return departments.find((department) => department.id === "workspace") ?? null;
+  }
+
+  if (isSiteOpsModulePath(pathname)) {
+    return departments.find((department) => department.id === "site-ops") ?? null;
+  }
+
+  if (isDesignModulePath(pathname)) {
+    return departments.find((department) => department.id === "design") ?? null;
+  }
+
+  if (isQuotationModulePath(pathname)) {
+    return departments.find((department) => department.id === "quotation") ?? null;
+  }
+
   if (isProjectsModulePath(pathname)) {
     return departments.find((department) => department.id === "projects") ?? null;
   }
