@@ -547,7 +547,7 @@ export function LeadFormFields({
 
           {form.needSiteVisit ? (
             <>
-              <Field label="Assigned to">
+              <Field label="Assigned To">
                 <SiteVisitAssigneeSelect
                   value={
                     form.assignedFieldOfficerId
@@ -559,7 +559,7 @@ export function LeadFormFields({
                   }
                   currentUserId={user?.id}
                   currentUserName={user?.name}
-                  placeholder="Select assignee"
+                  placeholder="Assigned To"
                 />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -670,30 +670,6 @@ export function LeadFormFields({
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Estimated value (KES)">
-          <Input
-            type="number"
-            min={0}
-            step={1000}
-            value={form.estimatedValue || ""}
-            onChange={(e) =>
-              update("estimatedValue", Number(e.target.value) || 0)
-            }
-            className="h-9"
-          />
-        </Field>
-        <Field label="Estimated budget (KES)">
-          <Input
-            type="number"
-            min={0}
-            step={1000}
-            value={form.estimatedBudget || ""}
-            onChange={(e) =>
-              update("estimatedBudget", Number(e.target.value) || 0)
-            }
-            className="h-9"
-          />
-        </Field>
         <Field label="Urgency">
           <Select
             value={form.urgency || undefined}

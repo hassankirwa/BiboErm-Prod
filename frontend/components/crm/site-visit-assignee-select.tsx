@@ -37,7 +37,7 @@ export function SiteVisitAssigneeSelect({
   onValueChange,
   currentUserId,
   currentUserName,
-  placeholder = "Select assignee",
+  placeholder = "Assigned To",
   className,
 }: SiteVisitAssigneeSelectProps) {
   const [assignees, setAssignees] = useState<CrmAssignableUser[]>([]);

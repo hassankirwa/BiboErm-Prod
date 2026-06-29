@@ -1,10 +1,6 @@
-export type LeadKanbanStageId =
-  | "new"
-  | "contacted"
-  | "interested"
-  | "account_created"
-  | "not_reachable"
-  | "unqualified";
+import type { LeadKanbanStageId } from "@/lib/crm-lead-pipeline";
+
+export type { LeadKanbanStageId } from "@/lib/crm-lead-pipeline";
 
 export type LeadActivityType =
   | "create_task"
@@ -16,13 +12,13 @@ export type LeadKanbanCard = {
   id: string;
   stageId: LeadKanbanStageId;
   statusKey: string;
+  pipelineStageKey: string;
   title: string;
   location: string;
   owner: string;
   ownerId?: number | null;
   leadSourceId?: number | null;
   nextActionDate: string;
-  estimatedValue: number;
   tag: string;
   lastActivityType?: LeadActivityType | null;
   company?: string;
@@ -32,6 +28,8 @@ export type LeadKanbanCard = {
   notes?: string;
   latitude?: number | null;
   longitude?: number | null;
+  countySlug?: string;
+  subcounty?: string;
 };
 
 export const leadActivityTypes: {
@@ -56,12 +54,12 @@ export type LeadKanbanStageConfig = {
   terminal?: boolean;
 };
 
-/** v2 lead pipeline: new → contacted → interested → account_created */
+/** Modular lifecycle pipeline kanban columns */
 export const leadKanbanStages: LeadKanbanStageConfig[] = [
   {
-    id: "new",
+    id: "new_lead",
     label: "New Lead",
-    description: "Captured, not yet contacted",
+    description: "Captured, awaiting first contact",
     headerBg: "bg-blue-50",
     headerBorder: "border-blue-200",
     countBadge: "bg-blue-600 text-white",
@@ -69,9 +67,9 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-blue-700 hover:bg-blue-50",
   },
   {
-    id: "contacted",
-    label: "Contacted",
-    description: "Outreach started — log engagement",
+    id: "contact_confirmed",
+    label: "Contact Confirmed",
+    description: "Client reached — qualify and plan next step",
     headerBg: "bg-sky-50",
     headerBorder: "border-sky-200",
     countBadge: "bg-sky-600 text-white",
@@ -79,9 +77,9 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-sky-700 hover:bg-sky-50",
   },
   {
-    id: "interested",
-    label: "Interested",
-    description: "Client confirmed interest — account provisioning",
+    id: "site_visit_required",
+    label: "Site Visit Required",
+    description: "Measurements or inspection needed",
     headerBg: "bg-cyan-50",
     headerBorder: "border-cyan-200",
     countBadge: "bg-cyan-600 text-white",
@@ -89,9 +87,39 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-cyan-700 hover:bg-cyan-50",
   },
   {
-    id: "account_created",
-    label: "Account Created",
-    description: "Work continues on the account record",
+    id: "site_visit_assigned",
+    label: "Site Visit Assigned",
+    description: "Field visit scheduled or in progress",
+    headerBg: "bg-indigo-50",
+    headerBorder: "border-indigo-200",
+    countBadge: "bg-indigo-600 text-white",
+    tagClass: "bg-indigo-100 text-indigo-800",
+    addBtnClass: "text-indigo-700 hover:bg-indigo-50",
+  },
+  {
+    id: "measurements_submitted",
+    label: "Measurements Submitted",
+    description: "Awaiting measurement review",
+    headerBg: "bg-amber-50",
+    headerBorder: "border-amber-200",
+    countBadge: "bg-amber-600 text-white",
+    tagClass: "bg-amber-100 text-amber-800",
+    addBtnClass: "text-amber-700 hover:bg-amber-50",
+  },
+  {
+    id: "design_required",
+    label: "Design Required",
+    description: "WINCAD design in progress",
+    headerBg: "bg-violet-50",
+    headerBorder: "border-violet-200",
+    countBadge: "bg-violet-600 text-white",
+    tagClass: "bg-violet-100 text-violet-800",
+    addBtnClass: "text-violet-700 hover:bg-violet-50",
+  },
+  {
+    id: "ready_for_quotation",
+    label: "Ready for Quotation",
+    description: "Design approved — prepare proforma",
     headerBg: "bg-emerald-50",
     headerBorder: "border-emerald-200",
     countBadge: "bg-emerald-600 text-white",
@@ -99,9 +127,9 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-emerald-700 hover:bg-emerald-50",
   },
   {
-    id: "not_reachable",
-    label: "Not Reachable",
-    description: "Could not reach after attempts",
+    id: "cold",
+    label: "Cold",
+    description: "Not progressing — revisit later",
     headerBg: "bg-slate-50",
     headerBorder: "border-slate-200",
     countBadge: "bg-slate-600 text-white",
@@ -110,9 +138,9 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     terminal: true,
   },
   {
-    id: "unqualified",
-    label: "Unqualified",
-    description: "Not worth pursuing",
+    id: "lost",
+    label: "Lost",
+    description: "Closed without a win",
     headerBg: "bg-red-50",
     headerBorder: "border-red-200",
     countBadge: "bg-red-600 text-white",
@@ -135,10 +163,4 @@ export function formatKes(amount: number): string {
 
 export function formatKesFull(amount: number): string {
   return `KES ${amount.toLocaleString("en-KE")}`;
-}
-
-export function getStageTotalValue(stageId: LeadKanbanStageId): number {
-  return leadKanbanCards
-    .filter((c) => c.stageId === stageId)
-    .reduce((sum, c) => sum + c.estimatedValue, 0);
 }

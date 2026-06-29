@@ -55,17 +55,23 @@ export function siteVisitDetailPath(
 ): string {
   return workspace === "field"
     ? `/field/site-visits/${visitId}`
-    : `/crm/site-visits/${visitId}`;
+    : `/site-ops/visits/${visitId}`;
 }
 
 export function siteVisitOpenVisitsPath(workspace: SiteVisitWorkspace): string {
   return workspace === "field"
     ? "/field/open-visits"
-    : "/crm/site-visits/my-visits";
+    : "/site-ops/my-visits";
 }
 
 export function siteVisitTodayPath(workspace: SiteVisitWorkspace): string {
   return workspace === "field"
     ? "/field/site-visits/today"
-    : "/crm/site-visits/today";
+    : "/site-ops/today";
+}
+
+export function siteVisitListPath(workspace: SiteVisitWorkspace): string {
+  return workspace === "field"
+    ? "/field/site-visits"
+    : "/site-ops/visits";
 }

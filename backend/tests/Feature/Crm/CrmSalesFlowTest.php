@@ -3,11 +3,13 @@
 namespace Tests\Feature\Crm;
 
 use App\Enums\Crm\DealStage;
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\LeadStatus;
 use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Deal;
 use App\Models\Department;
+use App\Models\DesignJob;
 use App\Models\Lead;
 use App\Models\SiteVisit;
 use App\Models\User;
@@ -18,9 +20,6 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Queue;
-use App\Jobs\Crm\CreateAccountFromLead;
-use App\Services\Crm\Leads\AccountProvisioningService;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -83,25 +82,15 @@ class CrmSalesFlowTest extends TestCase
             'phone' => '+254712345678',
         ]);
 
-        Queue::fake();
-
         foreach ([LeadStatus::Contacted, LeadStatus::Interested] as $status) {
             $this->patchJson("/api/v1/crm/leads/{$leadId}/status", [
                 'status' => $status->value,
             ])->assertOk();
         }
 
-        (new CreateAccountFromLead($leadId, $this->salesRep->id))
-            ->handle(app(AccountProvisioningService::class));
-
-        $lead = Lead::query()->findOrFail($leadId);
-        $accountId = $lead->converted_account_id;
-        $this->assertNotNull($accountId);
-
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Prime Offices measurement',
             'lead_id' => $leadId,
-            'account_id' => $accountId,
             'assigned_field_officer_id' => $this->fieldOfficer->id,
             'visit_date' => now()->addDay()->toDateString(),
             'site_address' => 'Westlands, Nairobi',
@@ -137,11 +126,26 @@ class CrmSalesFlowTest extends TestCase
 
         $this->postJson("/api/v1/crm/site-visits/{$visitId}/approve")->assertOk();
 
+        $designJob = DesignJob::query()->where('lead_id', $leadId)->first();
+        $this->assertNotNull($designJob);
+
+        $this->postJson("/api/v1/design/jobs/{$designJob->id}/approve")->assertOk();
+
+        $lead = Lead::query()->findOrFail($leadId);
+        $accountId = $lead->converted_account_id;
+        $this->assertNotNull($accountId);
+
         $this->assertDatabaseHas('site_visits', [
             'id' => $visitId,
-            'account_id' => $accountId,
             'lead_id' => $leadId,
         ]);
+
+        $this->assertSame(
+            LeadPipelineStage::ReadyForQuotation->value,
+            $lead->pipeline_stage instanceof LeadPipelineStage
+                ? $lead->pipeline_stage->value
+                : $lead->pipeline_stage,
+        );
 
         $quotation = $this->postJson("/api/v1/crm/accounts/{$accountId}/quotations", [
             'lines' => [
@@ -650,6 +654,32 @@ class CrmSalesFlowTest extends TestCase
         $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
             'status' => LeadStatus::SiteVisitScheduled->value,
         ])->assertStatus(422);
+    }
+
+    public function test_lead_status_patch_syncs_pipeline_stage(): void
+    {
+        Sanctum::actingAs($this->salesRep);
+
+        $lead = Lead::query()->create([
+            'reference' => 'LD-PIPE-001',
+            'lead_number' => 'LD-PIPE-001',
+            'name' => 'Pipeline Sync Lead',
+            'first_name' => 'Pipeline',
+            'status' => LeadStatus::New,
+            'pipeline_stage' => LeadPipelineStage::NewLead->value,
+            'lead_owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
+        $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
+            'status' => LeadStatus::Contacted->value,
+        ])->assertOk()
+            ->assertJsonPath('data.pipeline_stage', LeadPipelineStage::ContactConfirmed->value);
+
+        $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
+            'status' => LeadStatus::Interested->value,
+        ])->assertOk()
+            ->assertJsonPath('data.pipeline_stage', LeadPipelineStage::SiteVisitRequired->value);
     }
 
     public function test_account_creation_rejected_for_unqualified_lead(): void

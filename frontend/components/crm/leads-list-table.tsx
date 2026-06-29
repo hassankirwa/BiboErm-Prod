@@ -145,7 +145,6 @@ function listRowToKanbanCard(row: LeadListRow): LeadKanbanCard {
     location: "—",
     owner: row.owner,
     nextActionDate: new Date().toISOString().slice(0, 10),
-    estimatedValue: 0,
     tag: row.stage,
     company: row.company,
     phone: row.phone,

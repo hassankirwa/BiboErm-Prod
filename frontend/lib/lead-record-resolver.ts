@@ -4,20 +4,23 @@ import {
   type LeadKanbanCard,
   type LeadKanbanStageId,
 } from "@/lib/leads-kanban-data";
-import { statusToKanbanStage } from "@/lib/crm-lead-status";
+import { statusToKanbanStage, resolvePipelineStage } from "@/lib/crm-lead-status";
 
 const stageLabelToId: Record<string, LeadKanbanStageId> = {
-  "New Lead": "new",
-  Contacted: "contacted",
-  Interested: "interested",
-  "Account Created": "account_created",
-  "Not Reachable": "not_reachable",
-  Unqualified: "unqualified",
-  "Qualified (legacy)": "account_created",
-  "Site Visit Required (legacy)": "account_created",
-  "Site Visit Scheduled (legacy)": "account_created",
-  "Measurements Captured (legacy)": "account_created",
-  "Converted (legacy)": "account_created",
+  "New Lead": "new_lead",
+  "Contact Confirmed": "contact_confirmed",
+  "Site Visit Required": "site_visit_required",
+  "Site Visit Assigned": "site_visit_assigned",
+  "Measurements Submitted": "measurements_submitted",
+  "Design Required": "design_required",
+  "Ready for Quotation": "ready_for_quotation",
+  Cold: "cold",
+  Lost: "lost",
+  Contacted: "contact_confirmed",
+  Interested: "contact_confirmed",
+  "Account Created": "site_visit_required",
+  "Not Reachable": "cold",
+  Unqualified: "lost",
 };
 
 function listRowToCard(row: LeadListRow): LeadKanbanCard {
@@ -28,11 +31,11 @@ function listRowToCard(row: LeadListRow): LeadKanbanCard {
     id: row.id,
     stageId,
     statusKey: row.statusKey,
+    pipelineStageKey: resolvePipelineStage({ status: row.statusKey }),
     title: row.leadName,
     location: "—",
     owner: row.owner,
     nextActionDate: new Date().toISOString().slice(0, 10),
-    estimatedValue: 0,
     tag: row.stage,
     company: row.company,
     phone: row.phone,

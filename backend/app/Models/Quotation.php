@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Quotation extends Model
 {
     protected $fillable = [
-        'quotation_number', 'deal_id', 'account_id', 'contact_id', 'prepared_by',
+        'quotation_number', 'deal_id', 'account_id', 'contact_id', 'design_job_id',
+        'quotation_request_id', 'prepared_by',
         'project_name', 'project_number',
         'status', 'subtotal', 'discount_amount', 'tax_amount', 'tax_rate', 'total_amount',
         'valid_until', 'terms_conditions', 'source_excel_path', 'sent_at', 'approved_at', 'approved_by', 'accepted_at',
@@ -50,6 +51,16 @@ class Quotation extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class);
+    }
+
+    public function designJob(): BelongsTo
+    {
+        return $this->belongsTo(DesignJob::class);
+    }
+
+    public function quotationRequest(): BelongsTo
+    {
+        return $this->belongsTo(QuotationRequest::class);
     }
 
     public function preparedBy(): BelongsTo

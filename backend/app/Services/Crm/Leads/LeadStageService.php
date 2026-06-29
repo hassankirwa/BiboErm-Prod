@@ -2,8 +2,8 @@
 
 namespace App\Services\Crm\Leads;
 
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\LeadStatus;
-use App\Jobs\Crm\CreateAccountFromLead;
 use App\Models\Lead;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
@@ -13,6 +13,7 @@ class LeadStageService
 {
     public function __construct(
         protected CrmAuditLogger $crmAudit,
+        protected LeadPipelineService $leadPipelineService,
     ) {}
 
     /** @var array<string, list<string>> */
@@ -79,10 +80,37 @@ class LeadStageService
             );
         }
 
-        if ($status === LeadStatus::Interested->value && ! $lead->converted_account_id) {
-            CreateAccountFromLead::dispatchSync($lead->id, $user->id);
-        }
+        $this->syncPipelineStageForStatus($lead->fresh(), $status, $user);
 
         return $lead->fresh();
+    }
+
+    protected function syncPipelineStageForStatus(Lead $lead, string $status, User $user): void
+    {
+        $stage = $this->pipelineStageForStatus($status);
+
+        if ($stage === null) {
+            return;
+        }
+
+        $this->leadPipelineService->updateStage($lead, $stage, $user);
+    }
+
+    protected function pipelineStageForStatus(string $status): ?LeadPipelineStage
+    {
+        return match ($status) {
+            LeadStatus::New->value => LeadPipelineStage::NewLead,
+            LeadStatus::Contacted->value => LeadPipelineStage::ContactConfirmed,
+            LeadStatus::Interested->value => LeadPipelineStage::SiteVisitRequired,
+            LeadStatus::AccountCreated->value => LeadPipelineStage::SiteVisitRequired,
+            LeadStatus::NotReachable->value => LeadPipelineStage::Cold,
+            LeadStatus::Unqualified->value => LeadPipelineStage::Lost,
+            LeadStatus::Qualified->value => LeadPipelineStage::SiteVisitRequired,
+            LeadStatus::SiteVisitRequired->value => LeadPipelineStage::SiteVisitRequired,
+            LeadStatus::SiteVisitScheduled->value => LeadPipelineStage::SiteVisitAssigned,
+            LeadStatus::MeasurementsCaptured->value => LeadPipelineStage::MeasurementsSubmitted,
+            LeadStatus::Converted->value => LeadPipelineStage::ProjectCreated,
+            default => null,
+        };
     }
 }

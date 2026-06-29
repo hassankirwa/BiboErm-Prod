@@ -32,7 +32,7 @@ export function QuotationPdfDownloadButton({
   async function handleDownload() {
     const element = targetRef.current;
     if (!element) {
-      toast.error("Quotation preview is not ready.");
+      toast.error("Proforma quotation preview is not ready.");
       return;
     }
 
@@ -45,7 +45,7 @@ export function QuotationPdfDownloadButton({
         element,
         filename ?? quotationPdfFilename(quotation),
       );
-      toast.success("Quotation PDF downloaded.");
+      toast.success("Proforma quotation PDF downloaded.");
     } catch (error) {
       console.error("Quotation PDF download failed:", error);
       toast.error(error instanceof Error ? error.message : "Could not download PDF.");

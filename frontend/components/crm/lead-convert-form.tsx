@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatKesFull } from "@/lib/leads-kanban-data";
 import { useCrmLead } from "@/lib/use-crm-lead";
 import { convertLead } from "@/lib/api/crm/leads";
 import { ensureCsrfCookie } from "@/lib/api/client";
@@ -429,8 +428,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
       }
       recordMeta={
         <p className="text-sm text-muted-foreground">
-          Source lead value: {formatKesFull(card?.estimatedValue ?? 0)} · Owner:{" "}
-          {card?.owner ?? "—"}
+          Owner: {card?.owner ?? "—"}
         </p>
       }
       actions={

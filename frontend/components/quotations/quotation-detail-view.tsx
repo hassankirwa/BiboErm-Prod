@@ -353,7 +353,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
     setSending(true);
     try {
       await sendQuotation(quotationId);
-      toast.success("Quotation sent to client.");
+      toast.success("Proforma quotation sent to client.");
       setSendConfirmOpen(false);
       await load();
     } catch (err) {
@@ -436,7 +436,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
 
   if (!quotation) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">Quotation not found.</div>
+      <div className="p-6 text-sm text-muted-foreground">Proforma quotation not found.</div>
     );
   }
 
@@ -456,7 +456,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
-        title={quotation.project_name ?? quotation.quotation_number ?? "Quotation"}
+        title={quotation.project_name ?? quotation.quotation_number ?? "Proforma Quotation"}
         subtitle={
           isCrmMode
             ? (quotation.deal?.name ??
@@ -512,7 +512,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Send to client
+                  Send Proforma Quotation
                 </Button>
               </PermissionGate>
             ) : null}

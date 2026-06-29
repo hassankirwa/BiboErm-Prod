@@ -1,4 +1,16 @@
-import type { LeadKanbanStageId } from "@/lib/leads-kanban-data";
+import type { LeadKanbanStageId } from "@/lib/crm-lead-pipeline";
+import {
+  getKanbanStageLabel,
+  getPipelineStageLabel,
+  kanbanStageToLegacyStatus,
+  LEGACY_STATUS_TO_PIPELINE_STAGE,
+  pipelineStageToKanban,
+  resolveLeadKanbanStage,
+  resolveLeadPipelineStage,
+  type LeadPipelineStage,
+} from "@/lib/crm-lead-pipeline";
+
+export type { LeadPipelineStage } from "@/lib/crm-lead-pipeline";
 
 /** Backend LeadStatus values — v2 pipeline + legacy statuses for existing records */
 export const LEAD_STATUSES = [
@@ -8,7 +20,6 @@ export const LEAD_STATUSES = [
   "account_created",
   "not_reachable",
   "unqualified",
-  // Legacy v1 (read-only display)
   "qualified",
   "site_visit_required",
   "site_visit_scheduled",
@@ -19,26 +30,29 @@ export const LEAD_STATUSES = [
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 export const KANBAN_STAGE_TO_STATUS: Record<LeadKanbanStageId, LeadStatus> = {
-  new: "new",
-  contacted: "contacted",
-  interested: "interested",
-  account_created: "account_created",
-  not_reachable: "not_reachable",
-  unqualified: "unqualified",
+  new_lead: "new",
+  contact_confirmed: "contacted",
+  site_visit_required: "site_visit_required",
+  site_visit_assigned: "site_visit_scheduled",
+  measurements_submitted: "measurements_captured",
+  design_required: "measurements_captured",
+  ready_for_quotation: "converted",
+  cold: "not_reachable",
+  lost: "unqualified",
 };
 
 export const STATUS_TO_KANBAN_STAGE: Record<string, LeadKanbanStageId> = {
-  new: "new",
-  contacted: "contacted",
-  interested: "interested",
-  account_created: "account_created",
-  not_reachable: "not_reachable",
-  unqualified: "unqualified",
-  qualified: "account_created",
-  site_visit_required: "account_created",
-  site_visit_scheduled: "account_created",
-  measurements_captured: "account_created",
-  converted: "account_created",
+  new: "new_lead",
+  contacted: "contact_confirmed",
+  interested: "contact_confirmed",
+  account_created: "site_visit_required",
+  not_reachable: "cold",
+  unqualified: "lost",
+  qualified: "site_visit_required",
+  site_visit_required: "site_visit_required",
+  site_visit_scheduled: "site_visit_assigned",
+  measurements_captured: "measurements_submitted",
+  converted: "ready_for_quotation",
 };
 
 /** Mirrors backend LeadStageService transitions (v2). */
@@ -65,7 +79,6 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   converted: "Converted (legacy)",
 };
 
-/** v2 pipeline statuses shown in filters and primary UI */
 export const ACTIVE_LEAD_STATUSES = [
   "new",
   "contacted",
@@ -115,20 +128,48 @@ export function isLegacyLeadStatus(status: string | null | undefined): boolean {
   return (LEGACY_LEAD_STATUSES as readonly string[]).includes(key);
 }
 
-/** True when API status differs from the kanban column's primary status (legacy records). */
-export function showLeadStatusOnKanbanCard(statusKey: string): boolean {
+export function showLeadStatusOnKanbanCard(
+  statusKey: string,
+  pipelineStageKey?: string | null,
+): boolean {
   const status = statusKey.toLowerCase();
-  if (status === "account_created") return false;
-  return statusToKanbanStage(status) === "account_created" && isLegacyLeadStatus(status);
+  const pipelineStage = resolveLeadPipelineStage({
+    pipeline_stage: pipelineStageKey,
+    status,
+  });
+  const kanbanFromPipeline = pipelineStageToKanban(pipelineStage);
+  const kanbanFromStatus = statusToKanbanStage(status);
+  return kanbanFromPipeline !== kanbanFromStatus || isLegacyLeadStatus(status);
 }
 
-export function statusToKanbanStage(status: string | null | undefined): LeadKanbanStageId {
+export function resolvePipelineStage(input: {
+  pipeline_stage?: string | null;
+  status?: string | null;
+}): LeadPipelineStage {
+  return resolveLeadPipelineStage(input);
+}
+
+export function statusToKanbanStage(
+  status: string | null | undefined,
+  pipelineStage?: string | null,
+): LeadKanbanStageId {
+  if (pipelineStage) {
+    return resolveLeadKanbanStage({ pipeline_stage: pipelineStage, status });
+  }
   const key = (status ?? "new").toLowerCase();
-  return STATUS_TO_KANBAN_STAGE[key] ?? "new";
+  const fromPipeline = LEGACY_STATUS_TO_PIPELINE_STAGE[key];
+  if (fromPipeline) {
+    return pipelineStageToKanban(fromPipeline);
+  }
+  return STATUS_TO_KANBAN_STAGE[key] ?? "new_lead";
 }
 
 export function kanbanStageToStatus(stageId: LeadKanbanStageId): LeadStatus {
   return KANBAN_STAGE_TO_STATUS[stageId];
+}
+
+export function kanbanStageToApiStatus(stageId: LeadKanbanStageId): string {
+  return kanbanStageToLegacyStatus(stageId);
 }
 
 export function isValidLeadStatusTransition(
@@ -161,7 +202,6 @@ export function hasProvisionedAccount(status: string | null | undefined): boolea
   return ["account_created", "converted"].includes(normalized);
 }
 
-/** Manual account provisioning — only when interested and account not yet linked. */
 export function canProvisionAccountFromLead(
   status: string | null | undefined,
   hasLinkedAccount: boolean,
@@ -295,18 +335,19 @@ export function canCommercialConvertLead(input: CommercialConvertInput): boolean
 export function canKanbanMove(
   currentStatus: string,
   targetStageId: LeadKanbanStageId,
+  pipelineStage?: string | null,
 ): boolean {
+  const currentKanban = statusToKanbanStage(currentStatus, pipelineStage);
+  if (currentKanban === targetStageId) return true;
+
   const targetStatus = kanbanStageToStatus(targetStageId);
   const current = currentStatus.toLowerCase();
   if (current === targetStatus) return true;
-  if (statusToKanbanStage(current) === targetStageId) return true;
-  // account_created is set automatically after interested + provisioning
-  if (
-    targetStatus === "account_created" &&
-    current !== "account_created"
-  ) {
-    return false;
+
+  if (targetStageId === "cold" || targetStageId === "lost") {
+    return true;
   }
+
   return isValidLeadStatusTransition(current, targetStatus);
 }
 
@@ -334,4 +375,15 @@ export function getNextLeadStatusAction(status: string | null | undefined): {
     status: next,
     label: `Advance to ${LEAD_STATUS_LABELS[next] ?? next}`,
   };
+}
+
+export function getPipelineStageDisplayLabel(input: {
+  pipeline_stage?: string | null;
+  status?: string | null;
+}): string {
+  const stage = resolveLeadPipelineStage(input);
+  if (input.pipeline_stage) {
+    return getPipelineStageLabel(stage);
+  }
+  return getKanbanStageLabel(statusToKanbanStage(input.status, input.pipeline_stage));
 }

@@ -6,7 +6,7 @@ use App\Enums\Crm\DealStage;
 use App\Enums\Crm\LeadStatus;
 use App\Enums\Crm\QuotationStatus;
 use App\Enums\Crm\SiteVisitStatus;
-use App\Jobs\Crm\CreateAccountFromLead;
+use App\Enums\Crm\LeadPipelineStage;
 use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Deal;
@@ -44,7 +44,7 @@ class CrmFlowV2Test extends TestCase
         $this->salesUser->assignRole('sales_representative');
     }
 
-    public function test_interested_provisions_account_synchronously(): void
+    public function test_interested_does_not_auto_provision_account(): void
     {
         $lead = Lead::query()->create([
             'reference' => 'LD-V2-001',
@@ -64,8 +64,29 @@ class CrmFlowV2Test extends TestCase
 
         $lead->refresh();
 
-        $this->assertSame(LeadStatus::AccountCreated->value, $lead->status->value);
-        $this->assertNotNull($lead->converted_account_id);
+        $this->assertSame(LeadStatus::Interested->value, $lead->status->value);
+        $this->assertNull($lead->converted_account_id);
+    }
+
+    public function test_account_provisions_at_ready_for_quotation(): void
+    {
+        $lead = Lead::query()->create([
+            'reference' => 'LD-V2-RFQ',
+            'lead_number' => 'LD-V2-RFQ',
+            'name' => 'Ready For Quote Lead',
+            'first_name' => 'Ready',
+            'phone' => '0712345678',
+            'contact_person_name' => 'Ready Client',
+            'status' => LeadStatus::Interested->value,
+            'pipeline_stage' => LeadPipelineStage::ReadyForQuotation->value,
+            'lead_owner_id' => $this->salesUser->id,
+            'created_by' => $this->salesUser->id,
+        ]);
+
+        $result = app(AccountProvisioningService::class)->provisionFromLead($lead, $this->salesUser);
+
+        $this->assertNotNull($result['account']);
+        $this->assertNotNull($lead->fresh()->converted_account_id);
     }
 
     public function test_manual_account_with_source_lead_links_lead(): void
@@ -137,12 +158,12 @@ class CrmFlowV2Test extends TestCase
             'account_name' => 'Test Client Ltd',
             'phone' => '+254712345678',
             'status' => LeadStatus::Interested->value,
+            'pipeline_stage' => LeadPipelineStage::ReadyForQuotation->value,
             'lead_owner_id' => $this->salesUser->id,
             'created_by' => $this->salesUser->id,
         ]);
 
-        $job = new CreateAccountFromLead($lead->id, $this->salesUser->id);
-        $job->handle(app(\App\Services\Crm\Leads\AccountProvisioningService::class));
+        app(AccountProvisioningService::class)->provisionFromLead($lead, $this->salesUser);
 
         $lead->refresh();
 
@@ -154,7 +175,7 @@ class CrmFlowV2Test extends TestCase
         ]);
     }
 
-    public function test_lead_show_provisions_interested_lead_without_account(): void
+    public function test_lead_show_does_not_provision_interested_lead_without_account(): void
     {
         $lead = Lead::query()->create([
             'reference' => 'LD-V2-PROV',
@@ -170,8 +191,8 @@ class CrmFlowV2Test extends TestCase
         $response = $this->actingAs($this->salesUser)->getJson("/api/v1/crm/leads/{$lead->id}");
 
         $response->assertOk();
-        $this->assertSame('account_created', $response->json('data.status'));
-        $this->assertNotNull($response->json('data.converted_account_id'));
+        $this->assertSame('interested', $response->json('data.status'));
+        $this->assertNull($response->json('data.converted_account_id'));
     }
 
     public function test_lead_conversion_rejects_deal_creation_flag_on_provision(): void
@@ -214,8 +235,8 @@ class CrmFlowV2Test extends TestCase
             'created_by' => $this->salesUser->id,
         ]);
 
-        (new CreateAccountFromLead($lead->id, $this->salesUser->id))
-            ->handle(app(AccountProvisioningService::class));
+        $lead->update(['pipeline_stage' => LeadPipelineStage::ReadyForQuotation->value]);
+        app(AccountProvisioningService::class)->provisionFromLead($lead->fresh(), $this->salesUser);
 
         $lead->refresh();
         $accountId = $lead->converted_account_id;

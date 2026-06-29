@@ -11,11 +11,7 @@ import {
   getLeadStatusLabel,
   showLeadStatusOnKanbanCard,
 } from "@/lib/crm-lead-status";
-import {
-  formatKes,
-  type LeadActivityType,
-  type LeadKanbanCard,
-} from "@/lib/leads-kanban-data";
+import type { LeadActivityType, LeadKanbanCard } from "@/lib/leads-kanban-data";
 import { Badge } from "@/components/ui/badge";
 import { LeadsKanbanActivitiesMenu } from "@/components/crm/leads-kanban-activities-menu";
 
@@ -59,7 +55,7 @@ export function LeadsKanbanCard({
         menuOpen && "z-20"
       )}
     >
-      {showLeadStatusOnKanbanCard(card.statusKey) ? (
+      {showLeadStatusOnKanbanCard(card.statusKey, card.pipelineStageKey) ? (
         <Badge
           variant="outline"
           className={cn(
@@ -84,12 +80,7 @@ export function LeadsKanbanCard({
         {card.title}
       </Link>
 
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">
-          {formatKes(card.estimatedValue)}
-        </span>
-
-        <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex items-center justify-end gap-0.5">
           {card.lastActivityType ? (
             <span
               className="flex h-6 w-6 items-center justify-center text-[#1e3a5f]/80"
@@ -130,7 +121,6 @@ export function LeadsKanbanCard({
               placement="below"
             />
           </div>
-        </div>
       </div>
     </article>
   );

@@ -9,11 +9,14 @@ use App\Enums\Crm\MeasurementFormStatus;
 use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Deal;
 use App\Models\Lead;
+use App\Models\MeasurementReport;
 use App\Models\Project;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Crm\Leads\LeadStageService;
+use App\Services\Design\DesignJobService;
 use App\Support\ProjectSiteLocation;
 use App\Support\SiteMeasurementFormData;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +28,8 @@ class SiteVisitWorkflowService
     public function __construct(
         protected CrmAuditLogger $crmAudit,
         protected LeadStageService $leadStageService,
+        protected LeadPipelineService $leadPipelineService,
+        protected DesignJobService $designJobService,
     ) {}
 
     public function schedule(User $user, array $data): SiteVisit
@@ -54,6 +59,8 @@ class SiteVisitWorkflowService
                 $data['longitude'] = $data['longitude'] ?? $resolved['longitude'];
             }
 
+            $assigneeId = $data['assigned_to_user_id'] ?? $data['assigned_field_officer_id'];
+
             $visit = SiteVisit::query()->create([
                 'visit_number' => 'SV-'.strtoupper(Str::random(8)),
                 'title' => $data['title'],
@@ -65,13 +72,20 @@ class SiteVisitWorkflowService
                 'site_address' => $data['site_address'] ?? null,
                 'latitude' => $data['latitude'] ?? null,
                 'longitude' => $data['longitude'] ?? null,
-                'assigned_field_officer_id' => $data['assigned_field_officer_id'],
+                'assigned_field_officer_id' => $assigneeId,
+                'assigned_to_user_id' => $assigneeId,
                 'scheduled_by' => $user->id,
+                'created_by' => $user->id,
                 'visit_date' => $data['visit_date'],
                 'visit_time' => $data['visit_time'] ?? null,
                 'visit_purpose' => $data['visit_purpose'] ?? ($context === MeasurementContext::Production ? 'measurement' : null),
+                'visit_type' => $data['visit_type'] ?? 'initial_measurement',
                 'measurement_context' => $context->value,
-                'requires_measurements' => $data['requires_measurements'] ?? true,
+                'requires_measurements' => $data['requires_measurements'] ?? (
+                    $context === MeasurementContext::Production
+                        ? true
+                        : $this->purposeRequiresMeasurements($data['visit_purpose'] ?? null)
+                ),
                 'status' => SiteVisitStatus::Scheduled->value,
                 'measurement_form_status' => MeasurementFormStatus::Draft->value,
                 'notes_for_field_officer' => $data['notes_for_field_officer'] ?? null,
@@ -92,9 +106,13 @@ class SiteVisitWorkflowService
                         'status' => LeadStatus::SiteVisitScheduled->value,
                     ]);
                 }
+
+                if ($lead) {
+                    $this->leadPipelineService->onSiteVisitAssigned($lead, $user);
+                }
             }
 
-            return $visit->load(['lead', 'deal', 'project', 'assignedFieldOfficer']);
+            return $visit->load(['lead', 'deal', 'project', 'assignedFieldOfficer', 'assignedToUser']);
         });
     }
 
@@ -122,10 +140,20 @@ class SiteVisitWorkflowService
             'status' => SiteVisitStatus::InProgress->value,
             'actual_latitude' => $data['latitude'] ?? null,
             'actual_longitude' => $data['longitude'] ?? null,
+            'gps_start' => isset($data['latitude'], $data['longitude'])
+                ? $data['latitude'].','.$data['longitude']
+                : null,
             'arrival_at' => now(),
         ]);
 
-        return $visit->fresh()->load(['assignedFieldOfficer', 'photos', 'project']);
+        if ($visit->lead_id) {
+            $lead = Lead::query()->find($visit->lead_id);
+            if ($lead) {
+                $this->leadPipelineService->onSiteVisitStarted($lead, $user);
+            }
+        }
+
+        return $visit->fresh()->load(['assignedFieldOfficer', 'assignedToUser', 'photos', 'project', 'measurementLines']);
     }
 
     public function saveMeasurementForm(
@@ -208,27 +236,37 @@ class SiteVisitWorkflowService
             'status' => SiteVisitStatus::SubmittedForReview->value,
             'measurement_form_status' => MeasurementFormStatus::Submitted->value,
             'completion_at' => now(),
+            'submitted_at' => now(),
             'client_present' => $data['client_present'] ?? null,
             'visit_outcome' => $data['visit_outcome'] ?? null,
             'follow_up_required' => $data['follow_up_required'] ?? null,
             'field_officer_notes' => $data['field_officer_notes'] ?? null,
+            'gps_end' => isset($data['latitude'], $data['longitude'])
+                ? $data['latitude'].','.$data['longitude']
+                : $visit->gps_end,
         ]);
 
-        if ($visit->lead_id && $this->visitRequiresMeasurements($visit) && $this->isQuotationContext($visit)) {
+        if ($visit->lead_id && $this->isQuotationContext($visit)) {
             $lead = Lead::query()->find($visit->lead_id);
-            $leadStatus = $lead?->status instanceof LeadStatus
-                ? $lead->status->value
-                : (string) ($lead?->status ?? '');
 
-            if (in_array($leadStatus, [
-                LeadStatus::SiteVisitScheduled->value,
-                LeadStatus::SiteVisitRequired->value,
-            ], true)) {
-                $this->leadStageService->updateStatus(
-                    $lead,
-                    LeadStatus::MeasurementsCaptured->value,
-                    $user,
-                );
+            if ($lead && $this->visitRequiresMeasurements($visit)) {
+                $leadStatus = $lead->status instanceof LeadStatus
+                    ? $lead->status->value
+                    : (string) ($lead->status ?? '');
+
+                if (in_array($leadStatus, [
+                    LeadStatus::SiteVisitScheduled->value,
+                    LeadStatus::SiteVisitRequired->value,
+                ], true)) {
+                    $this->leadStageService->updateStatus(
+                        $lead,
+                        LeadStatus::MeasurementsCaptured->value,
+                        $user,
+                    );
+                }
+
+                $this->leadPipelineService->onSiteVisitSubmitted($lead->fresh(), $user);
+                $this->leadPipelineService->onSiteVisitInReview($lead->fresh(), $user);
             }
         }
 
@@ -245,36 +283,67 @@ class SiteVisitWorkflowService
             ]);
         }
 
-        $visit->update([
-            'status' => SiteVisitStatus::Approved->value,
-            'measurement_form_status' => MeasurementFormStatus::Locked->value,
-            'approved_by' => $user->id,
-            'approved_at' => now(),
-        ]);
+        return DB::transaction(function () use ($visit, $user) {
+            $visit->update([
+                'status' => SiteVisitStatus::Approved->value,
+                'measurement_form_status' => MeasurementFormStatus::Locked->value,
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+                'reviewed_at' => now(),
+            ]);
 
-        if ($this->isQuotationContext($visit)) {
-            if ($visit->deal_id) {
-                Deal::query()->whereKey($visit->deal_id)->update([
-                    'stage' => DealStage::MeasurementsCompleted->value,
+            if ($this->isQuotationContext($visit)) {
+                if ($visit->deal_id) {
+                    Deal::query()->whereKey($visit->deal_id)->update([
+                        'stage' => DealStage::MeasurementsCompleted->value,
+                    ]);
+                }
+
+                if ($visit->account_id) {
+                    \App\Models\Account::query()->whereKey($visit->account_id)->update([
+                        'status' => 'awaiting_quotation',
+                    ]);
+                }
+
+                $report = MeasurementReport::query()->create([
+                    'site_visit_id' => $visit->id,
+                    'lead_id' => $visit->lead_id,
+                    'report_number' => 'MR-'.strtoupper(Str::random(8)),
+                    'status' => 'approved',
+                    'submitted_by' => $visit->assigned_to_user_id ?? $visit->assigned_field_officer_id,
+                    'reviewed_by' => $user->id,
+                    'approved_at' => now(),
                 ]);
+
+                $this->designJobService->createFromApprovedVisit($visit, $report, $user);
             }
 
-            if ($visit->account_id) {
-                \App\Models\Account::query()->whereKey($visit->account_id)->update([
-                    'status' => 'awaiting_quotation',
-                ]);
+            if ($this->isProductionContext($visit) && $visit->project_id) {
+                $this->syncProductionMeasurementToProject($visit, $user);
             }
-        }
 
-        if ($this->isProductionContext($visit) && $visit->project_id) {
-            $this->syncProductionMeasurementToProject($visit, $user);
-        }
+            if ($visit->lead_id && $this->isQuotationContext($visit)) {
+                $lead = Lead::query()->find($visit->lead_id);
+                if ($lead) {
+                    $this->leadPipelineService->onMeasurementApproved($lead, $user);
+                }
+            }
 
-        $visit = $visit->fresh()->load(['assignedFieldOfficer', 'approvedBy', 'photos', 'project']);
+            $visit = $visit->fresh()->load([
+                'assignedFieldOfficer',
+                'assignedToUser',
+                'approvedBy',
+                'photos',
+                'project',
+                'measurementLines',
+                'measurementReports',
+                'designJobs',
+            ]);
 
-        $this->crmAudit->siteVisitApproved($visit, $user);
+            $this->crmAudit->siteVisitApproved($visit, $user);
 
-        return $visit;
+            return $visit;
+        });
     }
 
     protected function syncProductionMeasurementToProject(SiteVisit $visit, User $user): void
@@ -404,7 +473,9 @@ class SiteVisitWorkflowService
 
     protected function assertAssignedFieldOfficer(SiteVisit $visit, User $user): void
     {
-        if ((int) $visit->assigned_field_officer_id !== $user->id && ! $user->can('site_visits.view_all')) {
+        $assigneeId = (int) ($visit->assigned_to_user_id ?? $visit->assigned_field_officer_id);
+
+        if ($assigneeId !== $user->id && ! $user->can('site_visits.view_all')) {
             throw ValidationException::withMessages([
                 'visit' => ['You are not the assigned user for this site visit.'],
             ]);

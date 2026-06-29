@@ -12,7 +12,9 @@ use App\Models\CrmActivity;
 use App\Models\FieldDayPin;
 use App\Models\Lead;
 use App\Models\LeadSource;
+use App\Enums\Crm\LeadPipelineStage;
 use App\Services\Crm\Leads\AccountProvisioningService;
+use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Crm\Leads\LeadSalesContextService;
 use App\Services\Crm\Leads\LeadContactService;
 use App\Services\Crm\Leads\LeadNumberGenerator;
@@ -27,6 +29,7 @@ class LeadController extends Controller
         protected LeadContactService $leadContactService,
         protected AccountProvisioningService $accountProvisioning,
         protected LeadSalesContextService $leadSalesContext,
+        protected LeadPipelineService $leadPipelineService,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -48,6 +51,10 @@ class LeadController extends Controller
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);
+        }
+
+        if ($pipelineStage = $request->query('pipeline_stage')) {
+            $query->where('pipeline_stage', $pipelineStage);
         }
 
         if ($search = $request->query('search')) {
@@ -133,7 +140,13 @@ class LeadController extends Controller
             ]);
         }
 
-        $this->leadContactService->createFromLead($lead, $user);
+        $contact = $this->leadContactService->createFromLead($lead, $user);
+
+        if ($contact) {
+            $this->leadPipelineService->onContactConfirmed($lead->fresh(), $user);
+        } else {
+            $lead->update(['pipeline_stage' => LeadPipelineStage::NewLead->value]);
+        }
 
         if ($fieldDayPinId) {
             FieldDayPin::query()
@@ -158,23 +171,17 @@ class LeadController extends Controller
         $this->authorize('view', $lead);
 
         if (! $lead->converted_account_id) {
-            $reconciled = $this->accountProvisioning->reconcileLeadAccount($lead, $request->user());
-
-            if (! $reconciled) {
-                $status = $lead->status instanceof LeadStatus
-                    ? $lead->status->value
-                    : (string) $lead->status;
-
-                if ($status === LeadStatus::Interested->value) {
-                    try {
-                        $this->accountProvisioning->provisionFromLead($lead, $request->user());
-                    } catch (\Throwable) {
-                        // Leave lead unchanged; UI keeps polling until provisioning succeeds.
-                    }
-                }
-            }
-
+            $this->accountProvisioning->reconcileLeadAccount($lead, $request->user());
             $lead->refresh();
+
+            if ($this->accountProvisioning->isEligibleForProvisioning($lead)) {
+                try {
+                    $this->accountProvisioning->provisionFromLead($lead, $request->user());
+                } catch (\Throwable) {
+                    // Account provisioning deferred until ready for quotation.
+                }
+                $lead->refresh();
+            }
         }
 
         $this->leadSalesContext->reconcileLeadDealLink($lead);
@@ -192,12 +199,15 @@ class LeadController extends Controller
                 'buildingConstructionStage',
                 'photos',
                 'sourceContact',
+                'siteVisits',
+                'measurementReports',
+                'designJobs',
+                'quotationRequests',
                 'sourceContacts',
                 'convertedContact',
                 'convertedAccount.contacts',
                 'convertedAccount',
                 'convertedDeal',
-                'siteVisits',
                 'activities',
                 'attachments',
             ])

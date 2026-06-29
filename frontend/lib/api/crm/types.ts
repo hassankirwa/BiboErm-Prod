@@ -241,6 +241,7 @@ export type ApiLead = {
   lead_type_id: number | null;
   lead_source_id: number | null;
   status: string;
+  pipeline_stage?: string | null;
   priority: string | null;
   phone: string | null;
   email: string | null;

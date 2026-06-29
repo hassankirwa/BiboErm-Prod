@@ -449,7 +449,7 @@ export default function SiteVisitsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Assigned to</Label>
+              <Label>Assigned To</Label>
               <div className="flex flex-wrap gap-2">
                 <ScheduleSiteVisitFieldOfficerTag
                   recordLabel="Lead"
@@ -467,7 +467,7 @@ export default function SiteVisitsPage() {
                 }
                 currentUserId={user?.id}
                 currentUserName={user?.name}
-                placeholder="Select assignee"
+                placeholder="Assigned To"
               />
             </div>
             <div className="space-y-2">
