@@ -42,19 +42,41 @@ function primaryAction(project: DesignQueueProject): {
   label: string;
   href: string;
   icon: typeof PencilRuler;
-} {
-  if (project.stage === "final_design_approval") {
+} | null {
+  if (!project.has_production_measurement) {
     return {
-      label: "Upload designs",
+      label: "Production measurements",
+      href: projectSiteAssessmentPath(project.id, "projects"),
+      icon: PencilRuler,
+    };
+  }
+
+  if (!project.has_design_document) {
+    return {
+      label: "Upload WINCAD",
       href: projectTabPath(project.id, "designs", "projects"),
       icon: Upload,
     };
   }
 
   return {
-    label: project.has_production_measurement ? "View measurements" : "Production measurements",
+    label: "View designs",
+    href: projectTabPath(project.id, "designs", "projects"),
+    icon: Upload,
+  };
+}
+
+function secondaryAction(project: DesignQueueProject): {
+  label: string;
+  href: string;
+} | null {
+  if (!project.has_production_measurement) {
+    return null;
+  }
+
+  return {
+    label: "View measurements",
     href: projectSiteAssessmentPath(project.id, "projects"),
-    icon: PencilRuler,
   };
 }
 
@@ -79,7 +101,7 @@ export default function ProjectDesignPage() {
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Design"
-        subtitle="Active projects awaiting production measurements and design files"
+        subtitle="After production measurements, upload WINCAD and design files per project"
       />
       <div className="space-y-6 p-6">
         <Card>
@@ -115,7 +137,8 @@ export default function ProjectDesignPage() {
                 <TableBody>
                   {projects.map((project) => {
                     const action = primaryAction(project);
-                    const ActionIcon = action.icon;
+                    const secondary = secondaryAction(project);
+                    const ActionIcon = action?.icon ?? PencilRuler;
 
                     return (
                       <TableRow key={project.id}>
@@ -166,11 +189,16 @@ export default function ProjectDesignPage() {
                               </Link>
                             </Button>
                             <Button size="sm" asChild>
-                              <Link href={action.href}>
+                              <Link href={action?.href ?? projectTabPath(project.id, "overview", "projects")}>
                                 <ActionIcon className="mr-1.5 h-3.5 w-3.5" />
-                                {action.label}
+                                {action?.label ?? "Open"}
                               </Link>
                             </Button>
+                            {secondary ? (
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={secondary.href}>{secondary.label}</Link>
+                              </Button>
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

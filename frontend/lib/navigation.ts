@@ -195,22 +195,24 @@ export const departments: Department[] = [
     icon: Layers,
     path: "/design",
     subModules: [
-      { name: "Design Jobs", path: "/design/jobs", permission: "projects.view" },
-      { name: "Measurement Packages", path: "/design/packages" },
-      { name: "WINCAD Uploads", path: "/design/uploads" },
-      { name: "Design Review", path: "/design/review" },
+      { name: "Design queue", path: "/projects/design", permission: "projects.view" },
+      { name: "Lead design jobs", path: "/design/jobs", permission: "projects.view" },
+      { name: "Measurement packages", path: "/design/packages" },
+      { name: "WINCAD uploads", path: "/design/uploads" },
+      { name: "Design review", path: "/design/review" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/design/jobs" }],
+      topItems: [{ name: "Home", path: "/projects/design" }],
       groups: [
         {
           label: "Design",
           icon: Layers,
           items: [
-            { name: "Design Jobs", path: "/design/jobs", permission: "projects.view" },
-            { name: "Measurement Packages", path: "/design/packages" },
-            { name: "WINCAD Uploads", path: "/design/uploads" },
-            { name: "Design Review", path: "/design/review" },
+            { name: "Design queue", path: "/projects/design", permission: "projects.view" },
+            { name: "Lead design jobs", path: "/design/jobs", permission: "projects.view" },
+            { name: "Measurement packages", path: "/design/packages" },
+            { name: "WINCAD uploads", path: "/design/uploads" },
+            { name: "Design review", path: "/design/review" },
           ],
         },
       ],
@@ -251,12 +253,13 @@ export const departments: Department[] = [
   },
   {
     id: "projects",
-    name: "Projects",
+    name: "Project Management",
     icon: FolderKanban,
     path: "/projects",
     subModules: [
       { name: "All Projects", path: "/projects" },
       { name: "Pipeline", path: "/projects/pipeline" },
+      { name: "Design queue", path: "/projects/design" },
       { name: "Fabrication", path: "/projects/fabrication" },
       { name: "Installation", path: "/projects/installation" },
       { name: "Timeline", path: "/projects/timeline" },
@@ -270,11 +273,12 @@ export const departments: Department[] = [
       ],
       groups: [
         {
-          label: "Projects",
+          label: "Project Management",
           icon: FolderKanban,
           items: [
             { name: "All Projects", path: "/projects" },
             { name: "Pipeline", path: "/projects/pipeline" },
+            { name: "Design queue", path: "/projects/design" },
             { name: "Fabrication", path: "/projects/fabrication" },
             { name: "Installation", path: "/projects/installation" },
             { name: "Timeline", path: "/projects/timeline" },
@@ -726,7 +730,7 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "design",
     name: "Design",
-    href: "/design/jobs",
+    href: "/projects/design",
     icon: Calculator,
     iconClassName: "bg-yellow-100 text-yellow-600",
     permission: "projects.view",
@@ -746,14 +750,6 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/crm/contacts",
     icon: Contact,
     iconClassName: "bg-violet-100 text-violet-600",
-  },
-  {
-    id: "projects",
-    name: "Projects",
-    href: "/projects",
-    icon: Briefcase,
-    iconClassName: "bg-amber-100 text-amber-600",
-    badge: { label: "8 Active Jobs", className: "text-primary" },
   },
   {
     id: "bom",
@@ -989,7 +985,11 @@ function isSiteOpsModulePath(pathname: string): boolean {
 }
 
 function isDesignModulePath(pathname: string): boolean {
-  return pathname === "/design" || pathname.startsWith("/design/");
+  return (
+    pathname === "/design" ||
+    pathname.startsWith("/design/") ||
+    pathname === "/projects/design"
+  );
 }
 
 function isQuotationModulePath(pathname: string): boolean {

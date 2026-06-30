@@ -368,7 +368,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
     try {
       const revised = await reviseWorkspaceQuotation(quotationId);
       toast.success(`Revision ${revised.revision_label ?? "created"} ready for editing.`);
-      router.push(quotationDetailPath(revised.id, "projects"));
+      router.push(quotationDetailPath(revised.id));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to create revision.");
     } finally {
@@ -565,7 +565,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
           </span>
           {quotation.project_id ? (
             <Button variant="link" className="h-auto p-0" asChild>
-              <Link href={projectDetailPath(quotation.project_id, mode)}>
+              <Link href={projectDetailPath(quotation.project_id, isCrmMode ? "crm" : "projects")}>
                 <ExternalLink className="mr-1 h-3.5 w-3.5" />
                 View project
               </Link>

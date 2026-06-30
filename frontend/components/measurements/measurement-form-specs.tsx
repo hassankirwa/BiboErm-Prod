@@ -4,9 +4,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ALUMINIUM_SERIES_OPTIONS,
   FLOOR_FINISH_OPTIONS,
+  GLASS_TYPE_CUSTOM_VALUE,
+  GLASS_TYPE_OPTIONS,
   SITE_STATUS_OPTIONS,
+  glassTypeLabel,
+  isKnownGlassType,
+  resolveGlassTypeSelectValue,
   type SiteMeasurementFormData,
   type SiteStatus,
 } from "@/lib/measurements/types";
@@ -71,13 +83,41 @@ export function MeasurementFormSpecs({
           <Label>Glass type</Label>
           {readOnly ? (
             <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-              {form.glass_type || "—"}
+              {glassTypeLabel(form.glass_type)}
             </p>
           ) : (
-            <Input
-              value={form.glass_type ?? ""}
-              onChange={(event) => onChange({ glass_type: event.target.value })}
-            />
+            <div className="space-y-2">
+              <Select
+                value={resolveGlassTypeSelectValue(form.glass_type)}
+                onValueChange={(value) => {
+                  if (value === GLASS_TYPE_CUSTOM_VALUE) {
+                    onChange({
+                      glass_type: isKnownGlassType(form.glass_type) ? "" : (form.glass_type ?? ""),
+                    });
+                    return;
+                  }
+                  onChange({ glass_type: value });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select glass type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GLASS_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {resolveGlassTypeSelectValue(form.glass_type) === GLASS_TYPE_CUSTOM_VALUE && (
+                <Input
+                  placeholder="Specify glass type"
+                  value={form.glass_type ?? ""}
+                  onChange={(event) => onChange({ glass_type: event.target.value })}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>

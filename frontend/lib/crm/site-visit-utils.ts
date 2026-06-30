@@ -58,6 +58,24 @@ export function canStartFieldVisit(status: string | null): boolean {
   return status === "scheduled" || status === "assigned";
 }
 
+export function canApproveSiteVisit(
+  visit:
+    | {
+        scheduled_by?: number | null;
+        lead?: { lead_owner_id?: number | null } | null;
+      }
+    | null
+    | undefined,
+  userId: number | null | undefined,
+  roles: string[],
+): boolean {
+  if (!visit || userId == null) return false;
+  if (roles.includes("super_admin")) return true;
+  if (visit.scheduled_by === userId) return true;
+  const leadOwnerId = visit.lead?.lead_owner_id;
+  return leadOwnerId != null && leadOwnerId === userId;
+}
+
 export type MeasurementDraft = {
   room_area_name: string;
   width: string;

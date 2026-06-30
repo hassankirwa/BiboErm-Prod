@@ -30,10 +30,12 @@ import { getProject, type ProjectDetail } from "@/lib/api/projects";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
+  canApproveSiteVisit,
   canExecuteFieldVisit,
   canStartFieldVisit,
 } from "@/lib/crm/site-visit-utils";
 import { contextLabel, resolveMeasurementContext } from "@/lib/measurements/adapters";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
 function scrollToLogDetails() {
@@ -45,6 +47,7 @@ function scrollToLogDetails() {
 
 export default function FieldSiteVisitDetailPage() {
   const params = useParams<{ id: string }>();
+  const { user, roles } = useAuth();
   const visitId = Number(params.id);
   const [visit, setVisit] = useState<ApiSiteVisit | null>(null);
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -142,6 +145,7 @@ export default function FieldSiteVisitDetailPage() {
   const showLogDetails = canExecuteFieldVisit(status);
   const showStart = canStartFieldVisit(status);
   const context = visit ? resolveMeasurementContext(visit) : "quotation";
+  const canApprove = canApproveSiteVisit(visit, user?.id, roles);
 
   return (
     <div className="flex h-full flex-col">
@@ -284,8 +288,7 @@ export default function FieldSiteVisitDetailPage() {
                     </PermissionGate>
                   )}
 
-                  {status === "submitted_for_review" && (
-                    <PermissionGate permission="site_visits.approve">
+                  {status === "submitted_for_review" && canApprove && (
                       <Button
                         size="sm"
                         disabled={actionLoading}
@@ -298,7 +301,6 @@ export default function FieldSiteVisitDetailPage() {
                         )}
                         Approve
                       </Button>
-                    </PermissionGate>
                   )}
                 </div>
               </CardContent>

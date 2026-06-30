@@ -5,6 +5,7 @@ import { Calendar, FileSpreadsheet, Layers, Ruler } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ApiLeadDetail } from "@/lib/api/crm/types";
+import { quotationDetailPath } from "@/lib/quotations/paths";
 import { cn } from "@/lib/utils";
 
 type LeadRelatedRecordsProps = {
@@ -109,7 +110,7 @@ export function LeadRelatedRecords({
           count={proforma ? 1 : 0}
           href={
             proforma
-              ? `/projects/quotations/${proforma.id}`
+              ? quotationDetailPath(proforma.id)
               : "/quotation/proforma"
           }
           meta={proformaMeta ?? "No proforma created yet"}

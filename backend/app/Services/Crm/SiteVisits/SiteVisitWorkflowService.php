@@ -14,6 +14,7 @@ use App\Models\Project;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Crm\Leads\AccountProvisioningService;
 use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Crm\Leads\LeadStageService;
 use App\Services\Design\DesignJobService;
@@ -30,6 +31,7 @@ class SiteVisitWorkflowService
         protected LeadStageService $leadStageService,
         protected LeadPipelineService $leadPipelineService,
         protected DesignJobService $designJobService,
+        protected AccountProvisioningService $accountProvisioning,
     ) {}
 
     public function schedule(User $user, array $data): SiteVisit
@@ -299,12 +301,6 @@ class SiteVisitWorkflowService
                     ]);
                 }
 
-                if ($visit->account_id) {
-                    \App\Models\Account::query()->whereKey($visit->account_id)->update([
-                        'status' => 'awaiting_quotation',
-                    ]);
-                }
-
                 $report = MeasurementReport::query()->create([
                     'site_visit_id' => $visit->id,
                     'lead_id' => $visit->lead_id,
@@ -316,17 +312,42 @@ class SiteVisitWorkflowService
                 ]);
 
                 $this->designJobService->createFromApprovedVisit($visit, $report, $user);
+
+                if ($visit->lead_id) {
+                    $lead = Lead::query()->find($visit->lead_id);
+                    if ($lead) {
+                        $this->leadPipelineService->onMeasurementApproved($lead, $user);
+                        $lead = $lead->fresh();
+                        $this->accountProvisioning->reconcileLeadAccount($lead, $user);
+
+                        if (! $lead->converted_account_id) {
+                            try {
+                                $provisioned = $this->accountProvisioning->provisionFromLead($lead, $user);
+                                $lead = $provisioned['lead'] ?? $lead->fresh();
+                            } catch (ValidationException) {
+                                // Leave visit without account; pending queue may reconcile later.
+                            }
+                        }
+
+                        if ($lead->converted_account_id) {
+                            $visit->update([
+                                'account_id' => $lead->converted_account_id,
+                                'contact_id' => $visit->contact_id ?? $lead->converted_contact_id,
+                            ]);
+                        }
+                    }
+                }
+
+                $accountId = $visit->fresh()->account_id;
+                if ($accountId) {
+                    \App\Models\Account::query()->whereKey($accountId)->update([
+                        'status' => 'awaiting_quotation',
+                    ]);
+                }
             }
 
             if ($this->isProductionContext($visit) && $visit->project_id) {
                 $this->syncProductionMeasurementToProject($visit, $user);
-            }
-
-            if ($visit->lead_id && $this->isQuotationContext($visit)) {
-                $lead = Lead::query()->find($visit->lead_id);
-                if ($lead) {
-                    $this->leadPipelineService->onMeasurementApproved($lead, $user);
-                }
             }
 
             $visit = $visit->fresh()->load([

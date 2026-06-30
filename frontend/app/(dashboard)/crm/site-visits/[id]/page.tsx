@@ -32,11 +32,13 @@ import { getProject, type ProjectDetail } from "@/lib/api/projects";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
+  canApproveSiteVisit,
   canExecuteFieldVisit,
   canStartFieldVisit,
 } from "@/lib/crm/site-visit-utils";
 import { contextLabel, resolveMeasurementContext } from "@/lib/measurements/adapters";
 import { hasSiteMeasurementFormData } from "@/lib/measurements/types";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
 function scrollToLogDetails() {
@@ -48,6 +50,7 @@ function scrollToLogDetails() {
 
 export default function SiteVisitDetailPage() {
   const params = useParams<{ id: string }>();
+  const { user, roles } = useAuth();
   const visitId = Number(params.id);
   const [visit, setVisit] = useState<ApiSiteVisit | null>(null);
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -151,6 +154,7 @@ export default function SiteVisitDetailPage() {
     status === "measurements_captured" ||
     hasSiteMeasurementFormData(visit?.measurement_form_data ?? null);
   const context = visit ? resolveMeasurementContext(visit) : "quotation";
+  const canApprove = canApproveSiteVisit(visit, user?.id, roles);
 
   return (
     <div className="flex h-full flex-col">
@@ -159,8 +163,7 @@ export default function SiteVisitDetailPage() {
         subtitle={visit?.visit_number ?? (visit ? `#${visit.id}` : "")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {awaitingApproval && (
-              <PermissionGate permission="site_visits.approve">
+            {awaitingApproval && canApprove && (
                 <Button
                   size="sm"
                   disabled={actionLoading}
@@ -173,7 +176,6 @@ export default function SiteVisitDetailPage() {
                   )}
                   Approve visit
                 </Button>
-              </PermissionGate>
             )}
             {showLogDetails && (
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
@@ -324,8 +326,7 @@ export default function SiteVisitDetailPage() {
                     </PermissionGate>
                   )}
 
-                  {status === "submitted_for_review" && (
-                    <PermissionGate permission="site_visits.approve">
+                  {status === "submitted_for_review" && canApprove && (
                       <Button
                         size="sm"
                         disabled={actionLoading}
@@ -338,7 +339,6 @@ export default function SiteVisitDetailPage() {
                         )}
                         Approve
                       </Button>
-                    </PermissionGate>
                   )}
                 </div>
               </CardContent>

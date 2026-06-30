@@ -137,6 +137,94 @@ class QuotationWorkspaceTest extends TestCase
         $response->assertJsonPath('data.0.name', $account->name);
     }
 
+    public function test_form_accounts_includes_account_with_existing_draft_quotation(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+
+        $this->postJson('/api/v1/projects/quotations', [
+            'account_id' => $account->id,
+            'project_name' => 'Existing draft',
+            'lines' => [
+                [
+                    'description' => 'Line',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                ],
+            ],
+        ])->assertCreated();
+
+        $pending = $this->getJson('/api/v1/projects/quotations/pending');
+        $pending->assertOk();
+        $this->assertEmpty(collect($pending->json('data'))->where('id', $account->id));
+
+        $formAccounts = $this->getJson('/api/v1/projects/quotations/form-accounts');
+        $formAccounts->assertOk();
+        $this->assertNotEmpty(collect($formAccounts->json('data'))->where('id', $account->id));
+        $this->assertNotNull(collect($formAccounts->json('data'))->firstWhere('id', $account->id)['latest_quotation']);
+    }
+
+    public function test_form_accounts_resolves_account_from_design_job_id(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+        $designJob = DesignJob::query()->where('lead_id', $account->source_lead_id)->first();
+        $this->assertNotNull($designJob);
+
+        $response = $this->getJson(
+            "/api/v1/projects/quotations/form-accounts?include_design_job_id={$designJob->id}",
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.id', $account->id);
+    }
+
+    public function test_pending_list_includes_approved_visit_without_account_id_on_visit(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $lead = Lead::query()->create([
+            'reference' => 'LD-QW-002',
+            'lead_number' => 'LD-QW-002',
+            'name' => 'Karen Heights',
+            'first_name' => 'Karen',
+            'phone' => '+254700000002',
+            'status' => 'interested',
+            'pipeline_stage' => LeadPipelineStage::DesignRequired->value,
+            'lead_owner_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        SiteVisit::query()->create([
+            'visit_number' => 'SV-QW-002',
+            'title' => 'Karen measurement visit',
+            'lead_id' => $lead->id,
+            'assigned_field_officer_id' => $this->user->id,
+            'assigned_to_user_id' => $this->user->id,
+            'scheduled_by' => $this->user->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Approved->value,
+            'measurement_context' => 'quotation',
+            'measurement_form_data' => [
+                'client_name' => 'Karen Heights',
+                'lines' => [
+                    ['ref' => 'W1', 'width_centre_mm' => 1200, 'height_centre_mm' => 1500],
+                ],
+            ],
+            'approved_by' => $this->user->id,
+            'approved_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/projects/quotations/pending');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.name', 'Karen Heights');
+        $response->assertJsonPath('data.0.latest_approved_visit.visit_number', 'SV-QW-002');
+
+        $lead->refresh();
+        $this->assertNotNull($lead->converted_account_id);
+    }
+
     public function test_quotation_extract_endpoint_parses_accounting_txt(): void
     {
         Sanctum::actingAs($this->user);
@@ -236,6 +324,70 @@ class QuotationWorkspaceTest extends TestCase
         $response->assertJsonPath('data.lines.3.code', 'SD-4');
         $response->assertJsonPath('data.lines.3.width_mm', 2828);
         $response->assertJsonPath('data.lines.3.height_mm', 1825);
+        $this->assertArrayHasKey('fabrication', $response->json('data.lines.0.metadata'));
+    }
+
+    public function test_fabrication_from_account_returns_saved_design_document(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+
+        $fabrication = new UploadedFile(
+            base_path('../docs/fabrication.txt'),
+            'beatrice-fabrication.txt',
+            'text/plain',
+            null,
+            true,
+        );
+
+        app(\App\Services\Design\DesignDocumentBridgeService::class)
+            ->storeAccountDocument($account, $fabrication, 'design', $this->user);
+
+        $response = $this->post(
+            "/api/v1/projects/quotations/fabrication-from-account/{$account->id}",
+            [],
+            ['Accept' => 'application/json'],
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.project.name', 'BEATRICE');
+        $this->assertNotEmpty($response->json('data.design_document.filename'));
+        $response->assertJsonPath('data.summary.total_items', 4);
+    }
+
+    public function test_quotation_extract_merges_fabrication_from_account_id(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+
+        $accounting = new UploadedFile(
+            base_path('../docs/excel dump.txt'),
+            'beatrice-accounting.txt',
+            'text/plain',
+            null,
+            true,
+        );
+
+        $fabrication = new UploadedFile(
+            base_path('../docs/fabrication.txt'),
+            'beatrice-fabrication.txt',
+            'text/plain',
+            null,
+            true,
+        );
+
+        app(\App\Services\Design\DesignDocumentBridgeService::class)
+            ->storeAccountDocument($account, $fabrication, 'design', $this->user);
+
+        $response = $this->post('/api/v1/projects/quotations/extract', [
+            'file' => $accounting,
+            'account_id' => $account->id,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.lines.0.code', 'SD-1');
+        $response->assertJsonPath('data.lines.0.width_mm', 1408);
+        $response->assertJsonPath('data.lines.0.height_mm', 2090);
         $this->assertArrayHasKey('fabrication', $response->json('data.lines.0.metadata'));
     }
 

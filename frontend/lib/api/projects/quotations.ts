@@ -18,7 +18,19 @@ export type PendingQuotationAccount = {
   } | null;
   has_design_document: boolean;
   has_accounting_document: boolean;
+  design_document?: { id: number; filename: string } | null;
+  accounting_document?: { id: number; filename: string } | null;
+  latest_design_job_id?: number | null;
   draft_quotations_count: number;
+  has_quotation?: boolean;
+  latest_quotation?: {
+    id: number;
+    quotation_number: string | null;
+    status: string;
+    project_name: string | null;
+    project_number: string | null;
+    design_job_id: number | null;
+  } | null;
 };
 
 export type AccountingDrawingMetadata = {
@@ -270,6 +282,25 @@ export async function fetchPendingQuotationAccounts(): Promise<PendingQuotationA
   return res.data ?? [];
 }
 
+export async function fetchQuotationFormAccounts(options?: {
+  includeAccountId?: number | null;
+  includeDesignJobId?: number | null;
+}): Promise<PendingQuotationAccount[]> {
+  const search = new URLSearchParams();
+  if (options?.includeAccountId != null) {
+    search.set("include_account_id", String(options.includeAccountId));
+  }
+  if (options?.includeDesignJobId != null) {
+    search.set("include_design_job_id", String(options.includeDesignJobId));
+  }
+  const query = search.toString();
+
+  const res = await apiFetch<{ data: PendingQuotationAccount[] }>(
+    `/api/v1/projects/quotations/form-accounts${query ? `?${query}` : ""}`,
+  );
+  return res.data ?? [];
+}
+
 export async function fetchWorkspaceQuotations(params?: {
   status?: string;
   page?: number;
@@ -286,14 +317,21 @@ export async function fetchWorkspaceQuotations(params?: {
   );
 }
 
+export type FabricationPrefillResult = FabricationExtractionResult & {
+  design_document?: { id: number; filename: string } | null;
+};
+
 export async function extractQuotationExcel(
   file: File,
   fabricationFile?: File | null,
+  accountId?: number | null,
 ): Promise<QuotationAccountingExtractionResult> {
   const form = new FormData();
   form.append("file", file);
   if (fabricationFile) {
     form.append("fabrication_file", fabricationFile);
+  } else if (accountId) {
+    form.append("account_id", String(accountId));
   }
 
   const res = await apiFetch<{ data: QuotationAccountingExtractionResult }>(
@@ -304,11 +342,32 @@ export async function extractQuotationExcel(
   return res.data;
 }
 
+export async function fetchFabricationFromAccount(
+  accountId: number,
+): Promise<FabricationPrefillResult> {
+  const res = await apiFetch<{ data: FabricationPrefillResult }>(
+    `/api/v1/projects/quotations/fabrication-from-account/${accountId}`,
+    { method: "POST" },
+  );
+  return res.data;
+}
+
+export async function extractQuotationFromAccount(
+  accountId: number,
+): Promise<QuotationAccountingExtractionResult> {
+  const res = await apiFetch<{ data: QuotationAccountingExtractionResult }>(
+    `/api/v1/projects/quotations/extract-from-account/${accountId}`,
+    { method: "POST" },
+  );
+  return res.data;
+}
+
 export async function createWorkspaceQuotation(
   payload: CreateWorkspaceQuotationPayload,
   file?: File | null,
+  fabricationFile?: File | null,
 ): Promise<ApiQuotation> {
-  if (file) {
+  if (file || fabricationFile) {
     const form = new FormData();
     form.append("account_id", String(payload.account_id));
     if (payload.project_name) form.append("project_name", payload.project_name);
@@ -317,7 +376,8 @@ export async function createWorkspaceQuotation(
     if (payload.terms_conditions) form.append("terms_conditions", payload.terms_conditions);
     if (payload.tax_rate != null) form.append("tax_rate", String(payload.tax_rate));
     form.append("lines", JSON.stringify(payload.lines));
-    form.append("file", file);
+    if (file) form.append("file", file);
+    if (fabricationFile) form.append("fabrication_file", fabricationFile);
 
     const res = await apiFetch<{ data: ApiQuotation }>("/api/v1/projects/quotations", {
       method: "POST",

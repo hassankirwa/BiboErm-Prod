@@ -26,5 +26,5 @@ Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisi
 Route::middleware("permission:{$executeSiteVisit}")->patch('site-visits/{siteVisit}/measurement-form', UpdateSiteMeasurementFormController::class);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/measurement-form/sketch', StoreSiteMeasurementSketchController::class);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/submit', SubmitSiteVisitController::class);
-Route::middleware('permission:site_visits.approve|crm.view|crm.manage')->post('site-visits/{siteVisit}/approve', ApproveSiteVisitController::class);
+Route::middleware("permission:{$viewSiteVisits}")->post('site-visits/{siteVisit}/approve', ApproveSiteVisitController::class);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/photos', StoreSiteVisitPhotoController::class);

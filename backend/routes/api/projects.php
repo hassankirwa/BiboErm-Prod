@@ -29,7 +29,10 @@ Route::prefix('design')->group(function () {
 
 Route::prefix('quotations')->group(function () {
     Route::get('pending', [ProjectQuotationWorkspaceController::class, 'pending']);
+    Route::get('form-accounts', [ProjectQuotationWorkspaceController::class, 'formAccounts']);
     Route::post('extract', [ProjectQuotationWorkspaceController::class, 'extract']);
+    Route::post('fabrication-from-account/{account}', [ProjectQuotationWorkspaceController::class, 'fabricationFromAccount']);
+    Route::post('extract-from-account/{account}', [ProjectQuotationWorkspaceController::class, 'extractFromAccount']);
     Route::get('/', [ProjectQuotationWorkspaceController::class, 'index']);
     Route::post('/', [ProjectQuotationWorkspaceController::class, 'store']);
     Route::get('{quotation}', [ProjectQuotationWorkspaceController::class, 'show']);

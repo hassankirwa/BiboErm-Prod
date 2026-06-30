@@ -46,7 +46,7 @@ import {
 } from "@/components/crm/site-visit-assignee-select";
 import { useAuth } from "@/contexts/auth-context";
 import { ensureCsrfCookie } from "@/lib/api/client";
-import { resolveFieldOfficerName } from "@/lib/crm/site-visit-utils";
+import { resolveFieldOfficerName, canApproveSiteVisit } from "@/lib/crm/site-visit-utils";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
 
@@ -68,7 +68,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 };
 
 export default function SiteVisitsPage() {
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -335,8 +335,8 @@ export default function SiteVisitsPage() {
                               View
                             </Link>
                           </Button>
-                          {visit.status === "submitted_for_review" && (
-                            <PermissionGate permission="site_visits.approve">
+                          {visit.status === "submitted_for_review" &&
+                            canApproveSiteVisit(visit, user?.id, roles) && (
                               <Button
                                 size="sm"
                                 disabled={approvingId === visit.id}
@@ -349,8 +349,7 @@ export default function SiteVisitsPage() {
                                 )}
                                 Approve
                               </Button>
-                            </PermissionGate>
-                          )}
+                            )}
                         </div>
                       </TableCell>
                     </TableRow>

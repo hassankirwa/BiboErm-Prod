@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import {
   assignDesignJob,
+  canUploadDesignJob,
   designJobStatusLabel,
   fetchDesignJobs,
   type ApiDesignJob,
@@ -179,12 +180,14 @@ export default function DesignJobsPage() {
                               Package
                             </Link>
                           </Button>
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/design/jobs/${job.id}?action=upload`}>
-                              <Upload className="mr-1.5 h-3.5 w-3.5" />
-                              Upload
-                            </Link>
-                          </Button>
+                          {canUploadDesignJob(job) ? (
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={`/design/jobs/${job.id}?action=upload`}>
+                                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                Upload
+                              </Link>
+                            </Button>
+                          ) : null}
                           {!job.assigned_designer_id ? (
                             <UserPlus className="hidden" />
                           ) : null}

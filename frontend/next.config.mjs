@@ -57,8 +57,13 @@ const nextConfig = {
         permanent: false,
       },
       {
-        source: "/projects/design",
-        destination: "/design/jobs",
+        source: "/design",
+        destination: "/projects/design",
+        permanent: false,
+      },
+      {
+        source: "/quotation",
+        destination: "/quotation/proforma",
         permanent: false,
       },
       {

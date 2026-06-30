@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  canUploadDesignJob,
   designJobStatusLabel,
   fetchDesignJobs,
   type ApiDesignJob,
@@ -94,12 +95,16 @@ export default function DesignUploadsPage() {
                       </TableCell>
                       <TableCell>{job.files_count ?? 0}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/design/jobs/${job.id}?action=upload`}>
-                            <Upload className="mr-1.5 h-3.5 w-3.5" />
-                            Upload
-                          </Link>
-                        </Button>
+                        {canUploadDesignJob(job) ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/design/jobs/${job.id}?action=upload`}>
+                              <Upload className="mr-1.5 h-3.5 w-3.5" />
+                              Upload
+                            </Link>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Approved</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

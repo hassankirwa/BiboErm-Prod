@@ -72,6 +72,12 @@ final class FileUploadValidator
             'image/png' => 'png',
             'image/webp' => 'webp',
             'application/pdf' => 'pdf',
+            'text/plain' => 'txt',
+            'text/csv', 'application/csv', 'text/comma-separated-values' => 'csv',
+            'application/json' => 'json',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-excel.sheet.macroEnabled.12' => 'xls',
             default => null,
         };
 
@@ -84,6 +90,13 @@ final class FileUploadValidator
 
         if ($guessed !== '' && in_array($guessed, $config['mimes'], true)) {
             return $guessed;
+        }
+
+        $clientExtension = strtolower((string) $file->getClientOriginalExtension());
+        $clientExtension = preg_replace('/[^a-z0-9]/', '', $clientExtension) ?: '';
+
+        if ($clientExtension !== '' && in_array($clientExtension, $config['mimes'], true)) {
+            return $clientExtension;
         }
 
         throw ValidationException::withMessages([

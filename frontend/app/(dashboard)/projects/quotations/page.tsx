@@ -33,6 +33,10 @@ import {
   QUOTATION_RELEASE_PERMISSIONS,
   SENDABLE_QUOTATION_STATUSES,
 } from "@/lib/quotations/status";
+import {
+  quotationDetailPath,
+  quotationNewPath,
+} from "@/lib/quotations/paths";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, ExternalLink, FileSpreadsheet, Loader2, Plus, Ruler, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -140,7 +144,7 @@ export default function ProjectQuotationsPage() {
         subtitle="Create proforma quotations, review pending approvals, and release to sales"
         actions={
           <Button asChild>
-            <Link href="/projects/quotations/new">
+            <Link href={quotationNewPath()}>
               <Plus className="mr-2 h-4 w-4" />
               New Proforma Quotation
             </Link>
@@ -238,7 +242,7 @@ export default function ProjectQuotationsPage() {
                         <TableCell className="text-right">
                           <div className="flex flex-wrap justify-end gap-2">
                             <Button size="sm" variant="outline" asChild>
-                              <Link href={`/projects/quotations/${quotation.id}`}>
+                              <Link href={quotationDetailPath(quotation.id)}>
                                 View
                                 <ExternalLink className="ml-1 h-3.5 w-3.5" />
                               </Link>
@@ -341,7 +345,7 @@ export default function ProjectQuotationsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" asChild>
-                          <Link href={`/projects/quotations/new?accountId=${account.id}`}>
+                          <Link href={quotationNewPath(account.id)}>
                             <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                             Create Proforma Quotation
                           </Link>

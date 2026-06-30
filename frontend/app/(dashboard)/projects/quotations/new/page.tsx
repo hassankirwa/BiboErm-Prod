@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { QuotationPreviewDocument } from "@/components/projects/quotation-preview-document";
 import { QuotationPdfDownloadButton } from "@/components/projects/quotation-pdf-download-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,9 @@ import {
 import {
   createWorkspaceQuotation,
   extractQuotationExcel,
-  fetchPendingQuotationAccounts,
+  extractQuotationFromAccount,
+  fetchFabricationFromAccount,
+  fetchQuotationFormAccounts,
   formatKes,
   formatUsd,
   type PendingQuotationAccount,
@@ -38,6 +41,8 @@ import {
 import { buildQuotationExchangeRate } from "@/lib/currency/usd-to-kes";
 import { useUsdToKesRate } from "@/lib/currency/use-usd-to-kes-rate";
 import { resolveLinePictureFields } from "@/lib/quotation-fabrication";
+import { quotationDetailPath, quotationListPath, quotationNewPath } from "@/lib/quotations/paths";
+import { formatQuotationStatus } from "@/lib/quotations/status";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, FileSpreadsheet, Loader2, RefreshCw, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -66,7 +71,9 @@ function accountingLineToPayload(
 export default function NewProjectQuotationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const accountIdParam = searchParams.get("accountId");
+  const accountIdParam =
+    searchParams.get("accountId") ?? searchParams.get("projectId");
+  const designJobIdParam = searchParams.get("designJobId");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fabricationInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -86,10 +93,12 @@ export default function NewProjectQuotationPage() {
 
   const [pendingAccounts, setPendingAccounts] = useState<PendingQuotationAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
+  const [loadingFabrication, setLoadingFabrication] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [fabricationFile, setFabricationFile] = useState<File | null>(null);
+  const [savedFabrication, setSavedFabrication] = useState<{ filename: string } | null>(null);
   const [lines, setLines] = useState<StructuredQuotationLinePayload[]>([]);
   const [extractedSubtotal, setExtractedSubtotal] = useState<number | null>(null);
   const [form, setForm] = useState({
@@ -99,20 +108,63 @@ export default function NewProjectQuotationPage() {
     tax_rate: "16",
   });
 
+  const loadFabricationForAccount = useCallback(async (accountId: number) => {
+    setLoadingFabrication(true);
+    try {
+      const result = await fetchFabricationFromAccount(accountId);
+      const filename = result.design_document?.filename ?? "saved fabrication";
+      setSavedFabrication({ filename });
+      setForm((f) => ({
+        ...f,
+        project_name: result.project?.name ?? result.project_name ?? f.project_name,
+        project_number: result.project?.order_no ?? result.project_number ?? f.project_number,
+      }));
+    } catch (err) {
+      setSavedFabrication(null);
+      toast.error(
+        err instanceof ApiError ? err.message : "Could not load saved fabrication for this account.",
+      );
+    } finally {
+      setLoadingFabrication(false);
+    }
+  }, []);
+
   useEffect(() => {
     void (async () => {
       setLoadingAccounts(true);
       try {
-        const accounts = await fetchPendingQuotationAccounts();
+        const preferredAccountId = accountIdParam ? Number(accountIdParam) : null;
+        const preferredDesignJobId = designJobIdParam ? Number(designJobIdParam) : null;
+        const accounts = await fetchQuotationFormAccounts({
+          includeAccountId:
+            preferredAccountId != null && Number.isFinite(preferredAccountId)
+              ? preferredAccountId
+              : null,
+          includeDesignJobId:
+            preferredDesignJobId != null && Number.isFinite(preferredDesignJobId)
+              ? preferredDesignJobId
+              : null,
+        });
         setPendingAccounts(accounts);
-        if (accountIdParam) {
-          const match = accounts.find((a) => String(a.id) === accountIdParam);
-          if (match) {
-            setForm((f) => ({
-              ...f,
-              account_id: String(match.id),
-              project_name: match.name,
-            }));
+
+        const preferredMatch =
+          preferredAccountId != null && Number.isFinite(preferredAccountId)
+            ? accounts.find((account) => account.id === preferredAccountId)
+            : null;
+        const designJobMatch =
+          !preferredMatch && preferredDesignJobId != null && Number.isFinite(preferredDesignJobId)
+            ? accounts.find((account) => account.latest_design_job_id === preferredDesignJobId)
+            : null;
+        const initialAccount = preferredMatch ?? designJobMatch ?? accounts[0] ?? null;
+
+        if (initialAccount) {
+          setForm((f) => ({
+            ...f,
+            account_id: String(initialAccount.id),
+            project_name: initialAccount.name,
+          }));
+          if (initialAccount.has_design_document) {
+            await loadFabricationForAccount(initialAccount.id);
           }
         }
       } catch (err) {
@@ -121,11 +173,38 @@ export default function NewProjectQuotationPage() {
         setLoadingAccounts(false);
       }
     })();
-  }, [accountIdParam]);
+  }, [accountIdParam, designJobIdParam, loadFabricationForAccount]);
+
+  function handleAccountChange(accountId: string) {
+    const match = pendingAccounts.find((account) => String(account.id) === accountId);
+    setForm((f) => ({
+      ...f,
+      account_id: accountId,
+      project_name: match?.name ?? "",
+      project_number: "",
+    }));
+    setLines([]);
+    setUploadFile(null);
+    setFabricationFile(null);
+    setSavedFabrication(null);
+    setExtractedSubtotal(null);
+    if (accountId && match?.has_design_document) {
+      void loadFabricationForAccount(Number(accountId));
+    }
+  }
+
+  const useAccountFabrication = Boolean(
+    savedFabrication && (!fabricationFile || fabricationFile.size === 0),
+  );
 
   const exchangeRate = useMemo(
     () => buildQuotationExchangeRate(rateInfo, effectiveRate, isManual),
     [rateInfo, effectiveRate, isManual],
+  );
+
+  const selectedAccount = useMemo(
+    () => pendingAccounts.find((account) => String(account.id) === form.account_id) ?? null,
+    [form.account_id, pendingAccounts],
   );
 
   const hasUsdLines = useMemo(() => quotationHasUsdLines(lines), [lines]);
@@ -181,7 +260,14 @@ export default function NewProjectQuotationPage() {
     const requestId = ++extractRequestIdRef.current;
     setExtracting(true);
     try {
-      const result = await extractQuotationExcel(file, fabFile ?? fabricationFile);
+      const localFab = fabFile ?? fabricationFile;
+      const uploadedFab = localFab && localFab.size > 0 ? localFab : null;
+      const accountIdForMerge =
+        !uploadedFab && useAccountFabrication && form.account_id
+          ? Number(form.account_id)
+          : null;
+
+      const result = await extractQuotationExcel(file, uploadedFab, accountIdForMerge);
       if (requestId !== extractRequestIdRef.current) return;
 
       setUploadFile(file);
@@ -192,10 +278,10 @@ export default function NewProjectQuotationPage() {
         project_name: result.project?.name ?? result.project_name ?? f.project_name,
         project_number: result.project?.order_no ?? result.project_number ?? f.project_number,
       }));
-      const enriched = fabFile ?? fabricationFile;
+      const enriched = uploadedFab ?? (accountIdForMerge ? savedFabrication : null);
       toast.success(
         enriched
-          ? `Extracted ${result.summary.total_items} lines and merged fabrication dimensions from ${enriched.name}`
+          ? `Extracted ${result.summary.total_items} lines and merged fabrication from ${uploadedFab?.name ?? savedFabrication?.filename}`
           : `Extracted ${result.summary.total_items} priced lines from ${file.name}`,
       );
     } catch (err) {
@@ -206,11 +292,12 @@ export default function NewProjectQuotationPage() {
         setExtracting(false);
       }
     }
-  }, [fabricationFile]);
+  }, [fabricationFile, form.account_id, savedFabrication, useAccountFabrication]);
 
   const handleFabricationPick = useCallback(
     async (file: File | null | undefined) => {
       if (!file) return;
+      setSavedFabrication(null);
       setFabricationFile(file);
       if (uploadFile) {
         await handleExtract(uploadFile, file);
@@ -225,6 +312,35 @@ export default function NewProjectQuotationPage() {
     if (file) void handleExtract(file, fabricationFile);
   }
 
+  async function handleLoadSavedDocuments() {
+    if (!form.account_id) {
+      toast.error("Select an account first.");
+      return;
+    }
+    setExtracting(true);
+    try {
+      const result = await extractQuotationFromAccount(Number(form.account_id));
+      setLines(result.lines.map(accountingLineToPayload));
+      setExtractedSubtotal(result.summary.subtotal ?? null);
+      setForm((f) => ({
+        ...f,
+        project_name: result.project?.name ?? result.project_name ?? f.project_name,
+        project_number: result.project?.order_no ?? result.project_number ?? f.project_number,
+      }));
+      if (selectedAccount?.design_document?.filename) {
+        setSavedFabrication({ filename: selectedAccount.design_document.filename });
+      }
+      if (selectedAccount?.accounting_document?.filename) {
+        setUploadFile(new File([], selectedAccount.accounting_document.filename));
+      }
+      toast.success("Loaded saved fabrication and accounting documents for this account.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not load saved documents.");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   async function handleSave() {
     if (!form.account_id) {
       toast.error("Select an account.");
@@ -237,6 +353,8 @@ export default function NewProjectQuotationPage() {
 
     setSaving(true);
     try {
+      const accountingFile = uploadFile && uploadFile.size > 0 ? uploadFile : null;
+      const fabFile = fabricationFile && fabricationFile.size > 0 ? fabricationFile : null;
       const quotation = await createWorkspaceQuotation(
         {
           account_id: Number(form.account_id),
@@ -245,10 +363,11 @@ export default function NewProjectQuotationPage() {
           tax_rate: parseFloat(form.tax_rate) || 16,
           lines,
         },
-        uploadFile,
+        accountingFile,
+        fabFile,
       );
       toast.success("Proforma quotation draft saved.");
-      router.push(`/projects/quotations/${quotation.id}`);
+      router.push(quotationDetailPath(quotation.id));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to save quotation.");
     } finally {
@@ -284,11 +403,11 @@ export default function NewProjectQuotationPage() {
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="New Proforma Quotation"
-        subtitle="Upload the accounting Excel sheet, review priced lines, and save a draft"
+        subtitle="Fabrication loads from the design job — upload the accounting sheet to price and save"
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href="/projects/quotations">
+              <Link href={quotationListPath()}>
                 <ChevronLeft className="mr-1.5 h-4 w-4" />
                 Back
               </Link>
@@ -307,22 +426,46 @@ export default function NewProjectQuotationPage() {
             <CardTitle className="text-base">Project Details</CardTitle>
           </CardHeader>
           <CardContent>
+            {selectedAccount?.latest_quotation ? (
+              <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">This project already has a quotation</p>
+                <p className="mt-1 text-muted-foreground">
+                  {selectedAccount.latest_quotation.project_name ?? selectedAccount.name}
+                  {" · "}
+                  {formatQuotationStatus(selectedAccount.latest_quotation.status)}
+                  {selectedAccount.latest_quotation.quotation_number
+                    ? ` · ${selectedAccount.latest_quotation.quotation_number}`
+                    : ""}
+                </p>
+                <div className="mt-3">
+                  <Button size="sm" asChild>
+                    <Link href={quotationDetailPath(selectedAccount.latest_quotation.id)}>
+                      Open existing quotation
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="account">Account</Label>
                 {loadingAccounts ? (
                   <Spinner className="h-5 w-5" />
+                ) : pendingAccounts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No accounts ready for quotation. Approve a site visit or design job first.
+                  </p>
                 ) : (
                   <select
                     id="account"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={form.account_id}
-                    onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
+                    onChange={(e) => handleAccountChange(e.target.value)}
                   >
-                    <option value="">Select account…</option>
                     {pendingAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
                         {account.name}
+                        {account.draft_quotations_count > 0 ? " (draft exists)" : ""}
                       </option>
                     ))}
                   </select>
@@ -356,6 +499,44 @@ export default function NewProjectQuotationPage() {
                 />
               </div>
             </div>
+            {selectedAccount &&
+            (selectedAccount.has_design_document ||
+              selectedAccount.has_accounting_document ||
+              savedFabrication) ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm">
+                <span className="text-muted-foreground">Saved on account:</span>
+                {savedFabrication || selectedAccount.design_document ? (
+                  <Badge variant="secondary">
+                    Fabrication:{" "}
+                    {savedFabrication?.filename ?? selectedAccount.design_document?.filename}
+                    {loadingFabrication ? " (loading…)" : " (ready)"}
+                  </Badge>
+                ) : null}
+                {selectedAccount.accounting_document ? (
+                  <Badge variant="secondary">
+                    Accounting: {selectedAccount.accounting_document.filename}
+                  </Badge>
+                ) : null}
+                {selectedAccount.has_accounting_document ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={extracting}
+                    onClick={() => void handleLoadSavedDocuments()}
+                  >
+                    Load saved accounting too
+                  </Button>
+                ) : null}
+                {selectedAccount.latest_design_job_id ? (
+                  <Button type="button" size="sm" variant="link" className="h-auto px-0" asChild>
+                    <Link href={`/design/jobs/${selectedAccount.latest_design_job_id}`}>
+                      Open design job
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             {extractedSubtotal != null ? (
               <div className="mt-4 rounded-md border bg-muted/40 px-3 py-2 text-sm">
                 <span className="font-medium">Sheet subtotal (USD): </span>
@@ -462,10 +643,16 @@ export default function NewProjectQuotationPage() {
                 <Upload className="mb-3 h-10 w-10 text-primary/70" />
               )}
               <p className="text-sm font-medium text-foreground">
-                {extracting ? "Extracting priced lines…" : "Drop accounting Excel here or click to browse"}
+                {extracting
+                  ? "Extracting priced lines…"
+                  : savedFabrication
+                    ? "Drop accounting / costing sheet here or click to browse"
+                    : "Drop accounting Excel here or click to browse"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Required — supports .xlsx, .xls, .csv, and .txt
+                {savedFabrication
+                  ? "Fabrication is already loaded — pricing merges automatically on upload"
+                  : "Required — supports .xlsx, .xls, .csv, and .txt"}
               </p>
               {uploadFile ? (
                 <p className="mt-3 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
@@ -474,43 +661,53 @@ export default function NewProjectQuotationPage() {
               ) : null}
             </div>
 
-            <div
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") fabricationInputRef.current?.click();
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setFabricationDragOver(true);
-              }}
-              onDragLeave={() => setFabricationDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setFabricationDragOver(false);
-                void handleFabricationPick(e.dataTransfer.files[0]);
-              }}
-              onClick={() => !extracting && fabricationInputRef.current?.click()}
-              className={cn(
-                "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-6 text-center transition-colors",
-                extracting && "pointer-events-none opacity-70",
-                fabricationDragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-border/80 bg-muted/10 hover:border-primary/30 hover:bg-muted/20",
-              )}
-            >
-              <p className="text-sm font-medium text-foreground">
-                Optional fabrication BOM (dimensions, glass, elevation drawing)
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Merged by W&amp;D code — .xlsx or .xls fabrication list
-              </p>
-              {fabricationFile ? (
-                <p className="mt-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
-                  {fabricationFile.name}
+            {!savedFabrication ? (
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") fabricationInputRef.current?.click();
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setFabricationDragOver(true);
+                }}
+                onDragLeave={() => setFabricationDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setFabricationDragOver(false);
+                  void handleFabricationPick(e.dataTransfer.files[0]);
+                }}
+                onClick={() => !extracting && fabricationInputRef.current?.click()}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-6 text-center transition-colors",
+                  extracting && "pointer-events-none opacity-70",
+                  fabricationDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-border/80 bg-muted/10 hover:border-primary/30 hover:bg-muted/20",
+                )}
+              >
+                <p className="text-sm font-medium text-foreground">
+                  Optional fabrication BOM (dimensions, glass, elevation drawing)
                 </p>
-              ) : null}
-            </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Merged by W&amp;D code — .xlsx or .xls fabrication list
+                </p>
+                {fabricationFile ? (
+                  <p className="mt-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground">
+                    {fabricationFile.name}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-xl border bg-muted/20 px-4 py-4 text-sm">
+                <p className="font-medium text-foreground">Fabrication loaded from design</p>
+                <p className="mt-1 text-muted-foreground">
+                  {savedFabrication.filename} — dimensions and glass details will merge when you upload
+                  accounting.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

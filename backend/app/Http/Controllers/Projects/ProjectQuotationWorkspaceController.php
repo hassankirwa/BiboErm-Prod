@@ -7,6 +7,7 @@ use App\Http\Resources\Crm\QuotationResource;
 use App\Models\Account;
 use App\Models\Quotation;
 use App\Services\Crm\Quotations\QuotationCalculatorService;
+use App\Services\Design\DesignDocumentBridgeService;
 use App\Services\Projects\FabricationExcelExtractionService;
 use App\Services\Projects\QuotationAccountingExcelExtractionService;
 use App\Services\Projects\QuotationLineEnrichmentService;
@@ -22,6 +23,7 @@ class ProjectQuotationWorkspaceController extends Controller
         protected FabricationExcelExtractionService $fabricationExcel,
         protected QuotationLineEnrichmentService $lineEnrichment,
         protected QuotationCalculatorService $calculator,
+        protected DesignDocumentBridgeService $designBridge,
     ) {}
 
     public function pending(Request $request): JsonResponse
@@ -30,6 +32,20 @@ class ProjectQuotationWorkspaceController extends Controller
 
         return response()->json([
             'data' => $this->workspace->listPending($request->user()),
+        ]);
+    }
+
+    public function formAccounts(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('quotations.create'), 403);
+
+        $includeAccountId = $request->query('include_account_id');
+        $includeId = is_numeric($includeAccountId) ? (int) $includeAccountId : null;
+        $includeDesignJobId = $request->query('include_design_job_id');
+        $designJobId = is_numeric($includeDesignJobId) ? (int) $includeDesignJobId : null;
+
+        return response()->json([
+            'data' => $this->workspace->listForQuotationForm($request->user(), $includeId, $designJobId),
         ]);
     }
 
@@ -54,13 +70,67 @@ class ProjectQuotationWorkspaceController extends Controller
         $request->validate([
             'file' => ['required', 'file', 'max:20480'],
             'fabrication_file' => ['nullable', 'file', 'max:20480'],
+            'account_id' => ['nullable', 'integer', 'exists:accounts,id'],
         ]);
 
         $payload = $this->excel->extractFromUpload($request->file('file'));
 
-        if ($request->hasFile('fabrication_file')) {
-            $fabricationPayload = $this->fabricationExcel->extractFromUpload($request->file('fabrication_file'));
+        $fabricationPayload = $this->resolveFabricationPayload($request);
+        if ($fabricationPayload !== null) {
             $payload = $this->lineEnrichment->enrich($payload, $fabricationPayload);
+        }
+
+        return response()->json(['data' => $payload]);
+    }
+
+    public function fabricationFromAccount(Request $request, Account $account): JsonResponse
+    {
+        abort_unless($request->user()->can('quotations.create'), 403);
+        $this->authorize('view', $account);
+
+        $designDocument = $this->designBridge->latestAccountDocument($account, 'design');
+        if (! $designDocument) {
+            return response()->json(['message' => 'No saved fabrication document for this account.'], 422);
+        }
+
+        $fabricationFile = $this->designBridge->uploadedFileFromDocument($designDocument);
+        if (! $fabricationFile) {
+            return response()->json(['message' => 'Saved fabrication document could not be read.'], 422);
+        }
+
+        $payload = $this->fabricationExcel->extractFromUpload($fabricationFile);
+        $payload['design_document'] = [
+            'id' => $designDocument->id,
+            'filename' => $designDocument->filename,
+        ];
+
+        return response()->json(['data' => $payload]);
+    }
+
+    public function extractFromAccount(Request $request, Account $account): JsonResponse
+    {
+        abort_unless($request->user()->can('quotations.create'), 403);
+        $this->authorize('view', $account);
+
+        $accountingDocument = $this->designBridge->latestAccountDocument($account, 'accounting');
+        if (! $accountingDocument) {
+            return response()->json(['message' => 'No saved accounting document for this account.'], 422);
+        }
+
+        $accountingFile = $this->designBridge->uploadedFileFromDocument($accountingDocument);
+        if (! $accountingFile) {
+            return response()->json(['message' => 'Saved accounting document could not be read.'], 422);
+        }
+
+        $payload = $this->excel->extractFromUpload($accountingFile);
+
+        $designDocument = $this->designBridge->latestAccountDocument($account, 'design');
+        if ($designDocument) {
+            $fabricationFile = $this->designBridge->uploadedFileFromDocument($designDocument);
+            if ($fabricationFile) {
+                $fabricationPayload = $this->fabricationExcel->extractFromUpload($fabricationFile);
+                $payload = $this->lineEnrichment->enrich($payload, $fabricationPayload);
+            }
         }
 
         return response()->json(['data' => $payload]);
@@ -83,6 +153,7 @@ class ProjectQuotationWorkspaceController extends Controller
             'tax_amount' => ['nullable', 'numeric', 'min:0'],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'file' => ['nullable', 'file', 'max:20480'],
+            'fabrication_file' => ['nullable', 'file', 'max:20480'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.description' => ['required', 'string'],
             'lines.*.series' => ['nullable', 'string', 'max:120'],
@@ -106,6 +177,7 @@ class ProjectQuotationWorkspaceController extends Controller
             $request->user(),
             $validated,
             $request->file('file'),
+            $request->file('fabrication_file'),
         );
 
         return (new QuotationResource($quotation))->response()->setStatusCode(201);
@@ -186,6 +258,35 @@ class ProjectQuotationWorkspaceController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function resolveFabricationPayload(Request $request): ?array
+    {
+        if ($request->hasFile('fabrication_file')) {
+            return $this->fabricationExcel->extractFromUpload($request->file('fabrication_file'));
+        }
+
+        if (! $request->filled('account_id')) {
+            return null;
+        }
+
+        $account = Account::query()->findOrFail($request->integer('account_id'));
+        $this->authorize('view', $account);
+
+        $designDocument = $this->designBridge->latestAccountDocument($account, 'design');
+        if (! $designDocument) {
+            return null;
+        }
+
+        $fabricationFile = $this->designBridge->uploadedFileFromDocument($designDocument);
+        if (! $fabricationFile) {
+            return null;
+        }
+
+        return $this->fabricationExcel->extractFromUpload($fabricationFile);
     }
 
     protected function mergeJsonFormFields(Request $request, array $fields): void

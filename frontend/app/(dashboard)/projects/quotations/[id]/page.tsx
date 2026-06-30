@@ -1,13 +1,1 @@
-"use client";
-
-import { use } from "react";
-import { QuotationDetailView } from "@/components/quotations/quotation-detail-view";
-
-export default function ProjectQuotationDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
-  return <QuotationDetailView quotationId={Number(id)} mode="projects" />;
-}
+export { default } from "../../../quotation/proforma/[id]/page";

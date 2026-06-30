@@ -28,7 +28,7 @@ export const MODULE_HOME_ROUTES: Record<string, string> = {
   crm: "/crm",
   site_ops: "/site-ops/visits",
   site_operations: "/site-ops/visits",
-  design: "/design/jobs",
+  design: "/projects/design",
   quotation: "/quotation/proforma",
   field: "/site-ops/my-visits",
   production: "/production/schedule",

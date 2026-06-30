@@ -216,6 +216,13 @@ class AccountProvisioningService
             return true;
         }
 
+        if (in_array($pipelineStage, [
+            LeadPipelineStage::MeasurementReview->value,
+            LeadPipelineStage::DesignRequired->value,
+        ], true)) {
+            return true;
+        }
+
         if ($lead->quotationRequests()->exists()) {
             return true;
         }

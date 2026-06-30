@@ -78,6 +78,24 @@ class SiteVisitPolicy
 
     public function approve(User $user, SiteVisit $siteVisit): bool
     {
-        return $user->can('site_visits.approve') || $this->hasLegacyCrmAccess($user);
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+
+        if ((int) $siteVisit->scheduled_by === $user->id) {
+            return true;
+        }
+
+        if ($siteVisit->lead_id) {
+            $leadOwnerId = $siteVisit->relationLoaded('lead')
+                ? $siteVisit->lead?->lead_owner_id
+                : Lead::query()->whereKey($siteVisit->lead_id)->value('lead_owner_id');
+
+            if ((int) $leadOwnerId === $user->id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

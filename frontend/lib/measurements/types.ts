@@ -80,6 +80,36 @@ export const FLOOR_FINISH_OPTIONS: { value: FloorFinish; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
+export const GLASS_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "Single Strength Glass", label: "Single Strength Glass" },
+  { value: "Double Strength Glass", label: "Double Strength Glass" },
+  { value: "Thicker Glass Options", label: "Thicker Glass Options" },
+  { value: "Laminated Glass", label: "Laminated Glass" },
+  { value: "Tempered Glass", label: "Tempered Glass" },
+  { value: "Low-E Glass", label: "Low-E Glass" },
+  { value: "other", label: "Other" },
+];
+
+export const GLASS_TYPE_CUSTOM_VALUE = "other" as const;
+
+export function glassTypeLabel(value?: string | null): string {
+  if (!value?.trim()) return "—";
+  const match = GLASS_TYPE_OPTIONS.find((option) => option.value === value);
+  return match?.label ?? value;
+}
+
+export function isKnownGlassType(value?: string | null): boolean {
+  if (!value) return false;
+  return GLASS_TYPE_OPTIONS.some(
+    (option) => option.value === value && option.value !== GLASS_TYPE_CUSTOM_VALUE,
+  );
+}
+
+export function resolveGlassTypeSelectValue(value?: string | null): string {
+  if (!value?.trim()) return "";
+  if (isKnownGlassType(value)) return value;
+  return GLASS_TYPE_CUSTOM_VALUE;
+}
 export function emptyMeasurementLine(sortOrder = 0): SiteMeasurementLine {
   return {
     ref: "",

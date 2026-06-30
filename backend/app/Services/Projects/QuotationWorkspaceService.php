@@ -9,15 +9,20 @@ use App\Enums\Design\DesignJobStatus;
 use App\Models\Account;
 use App\Models\AccountDocument;
 use App\Models\DesignJob;
+use App\Models\Lead;
 use App\Models\Quotation;
 use App\Models\QuotationRequest;
 use App\Models\SiteVisit;
 use App\Models\User;
+use App\Services\Crm\Leads\AccountProvisioningService;
 use App\Services\Crm\Quotations\QuotationCalculatorService;
+use App\Services\Design\DesignDocumentBridgeService;
 use App\Services\Media\FileStorageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class QuotationWorkspaceService
@@ -25,6 +30,8 @@ class QuotationWorkspaceService
     public function __construct(
         protected QuotationCalculatorService $calculator,
         protected FileStorageService $files,
+        protected AccountProvisioningService $accountProvisioning,
+        protected DesignDocumentBridgeService $designBridge,
     ) {}
 
     /**
@@ -32,7 +39,58 @@ class QuotationWorkspaceService
      */
     public function listPending(?User $user = null): array
     {
+        if ($user) {
+            $this->reconcileAccountsForApprovedVisits($user);
+        }
+
         $accountIds = $this->pendingAccountsQuery($user)->pluck('id');
+
+        return $this->serializeQuotationAccounts($accountIds);
+    }
+
+    /**
+     * Broader account list for the new-quotation form: includes design-ready accounts
+     * even when a draft quotation already exists, so users can switch accounts.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForQuotationForm(?User $user = null, ?int $includeAccountId = null, ?int $includeDesignJobId = null): array
+    {
+        if ($user) {
+            $this->reconcileAccountsForApprovedVisits($user);
+        }
+
+        if (! $includeAccountId && $includeDesignJobId && Schema::hasTable('design_jobs')) {
+            $designJob = DesignJob::query()->find($includeDesignJobId);
+            if ($designJob) {
+                $account = $this->designBridge->resolveAccountForDesignJob($designJob);
+                if ($account) {
+                    $includeAccountId = $account->id;
+                }
+            }
+        }
+
+        $accountIds = $this->quotationFormAccountsQuery($user)->pluck('id');
+
+        if ($includeAccountId && ! $accountIds->contains($includeAccountId)) {
+            $account = Account::query()->find($includeAccountId);
+            if ($account && $this->userCanSelectAccount($user, $account)) {
+                $accountIds->push($includeAccountId);
+            }
+        }
+
+        return $this->serializeQuotationAccounts($accountIds);
+    }
+
+    /**
+     * @param  Collection<int, int|string>  $accountIds
+     * @return array<int, array<string, mixed>>
+     */
+    protected function serializeQuotationAccounts(Collection $accountIds): array
+    {
+        if ($accountIds->isEmpty()) {
+            return [];
+        }
 
         return Account::query()
             ->whereIn('id', $accountIds)
@@ -48,6 +106,35 @@ class QuotationWorkspaceService
             ->get()
             ->map(fn (Account $account) => $this->serializePendingAccount($account))
             ->all();
+    }
+
+    public function quotationFormAccountsQuery(?User $user = null): Builder
+    {
+        $eligibleAccountIds = $this->accountIdsEligibleForQuotation();
+
+        $query = Account::query()->whereIn('id', $eligibleAccountIds);
+
+        if ($user && ! $user->can('accounts.view_all')) {
+            $query->visibleTo($user);
+        }
+
+        return $query;
+    }
+
+    protected function userCanSelectAccount(?User $user, Account $account): bool
+    {
+        if (! $user) {
+            return true;
+        }
+
+        if ($user->can('accounts.view_all')) {
+            return true;
+        }
+
+        return Account::query()
+            ->whereKey($account->id)
+            ->visibleTo($user)
+            ->exists();
     }
 
     /**
@@ -67,46 +154,7 @@ class QuotationWorkspaceService
 
     public function pendingAccountsQuery(?User $user = null): Builder
     {
-        $approvedMeasurementAccountIds = SiteVisit::query()
-            ->where('status', SiteVisitStatus::Approved->value)
-            ->where('measurement_context', MeasurementContext::Quotation->value)
-            ->whereNotNull('account_id')
-            ->where(function ($query) {
-                $query->whereNotNull('measurement_form_data')
-                    ->orWhereHas('measurementLines');
-            })
-            ->pluck('account_id');
-
-        $readyLeadIds = DesignJob::query()
-            ->where('status', DesignJobStatus::ReadyForQuotation->value)
-            ->whereNotNull('lead_id')
-            ->pluck('lead_id')
-            ->unique()
-            ->values();
-
-        $requestLeadIds = QuotationRequest::query()
-            ->where('status', 'ready_for_quotation')
-            ->whereNotNull('lead_id')
-            ->pluck('lead_id')
-            ->unique()
-            ->values();
-
-        $eligibleLeadIds = $readyLeadIds->merge($requestLeadIds)->unique()->values();
-
-        $accountIdsFromLeads = \App\Models\Lead::query()
-            ->whereIn('id', $eligibleLeadIds)
-            ->whereNotNull('converted_account_id')
-            ->pluck('converted_account_id');
-
-        $accountIdsFromSource = Account::query()
-            ->whereIn('source_lead_id', $eligibleLeadIds)
-            ->pluck('id');
-
-        $eligibleAccountIds = $approvedMeasurementAccountIds
-            ->merge($accountIdsFromLeads)
-            ->merge($accountIdsFromSource)
-            ->unique()
-            ->values();
+        $eligibleAccountIds = $this->accountIdsEligibleForQuotation();
 
         $quotedAccountIds = Quotation::query()
             ->whereIn('status', [
@@ -138,6 +186,7 @@ class QuotationWorkspaceService
         User $user,
         array $payload,
         ?UploadedFile $sourceFile = null,
+        ?UploadedFile $fabricationFile = null,
     ): Quotation {
         $lines = $payload['lines'] ?? [];
         if ($lines === []) {
@@ -146,7 +195,7 @@ class QuotationWorkspaceService
             ]);
         }
 
-        return DB::transaction(function () use ($account, $user, $payload, $sourceFile, $lines) {
+        return DB::transaction(function () use ($account, $user, $payload, $sourceFile, $fabricationFile, $lines) {
             $storedPath = null;
             if ($sourceFile) {
                 $stored = $this->files->store($sourceFile, 'project-documents', 'quotation-'.$account->id);
@@ -203,6 +252,19 @@ class QuotationWorkspaceService
                 'lines' => $normalizedLines,
             ]);
 
+            $designJob = $this->designBridge->completeDesignStageForQuotation(
+                $account,
+                $user,
+                $fabricationFile,
+                $sourceFile,
+            );
+
+            if ($designJob) {
+                $quotation->update(['design_job_id' => $designJob->id]);
+            }
+
+            $this->designBridge->advanceLeadAfterProformaCreated($account, $user);
+
             return $quotation->fresh()->load(['lines', 'account', 'contact', 'preparedBy']);
         });
     }
@@ -212,16 +274,38 @@ class QuotationWorkspaceService
      */
     protected function serializePendingAccount(Account $account): array
     {
-        $latestDesignJob = DesignJob::query()
-            ->where('status', DesignJobStatus::ReadyForQuotation->value)
-            ->whereHas('lead', fn ($q) => $q->where('converted_account_id', $account->id)
-                ->orWhere('id', $account->source_lead_id))
-            ->latest('approved_at')
-            ->first();
+        $latestDesignJob = Schema::hasTable('design_jobs')
+            ? DesignJob::query()
+                ->where('status', DesignJobStatus::ReadyForQuotation->value)
+                ->whereHas('lead', fn ($q) => $q->where('converted_account_id', $account->id)
+                    ->orWhere('id', $account->source_lead_id))
+                ->latest('approved_at')
+                ->first()
+            : null;
 
         $documents = AccountDocument::query()
             ->where('account_id', $account->id)
             ->get(['document_type']);
+
+        $latestApprovedVisit = $this->approvedQuotationSiteVisitsQuery()
+            ->where(function ($query) use ($account) {
+                $query->where('account_id', $account->id);
+                if ($account->source_lead_id) {
+                    $query->orWhere('lead_id', $account->source_lead_id);
+                }
+            })
+            ->latest('approved_at')
+            ->first(['id', 'visit_number', 'approved_at']);
+
+        $designDocument = $this->designBridge->latestAccountDocument($account, 'design');
+        $accountingDocument = $this->designBridge->latestAccountDocument($account, 'accounting');
+        $designJob = $this->designBridge->resolveDesignJobForAccount($account);
+
+        $latestQuotation = Quotation::query()
+            ->excludingReferenceCopies()
+            ->where('account_id', $account->id)
+            ->latest('id')
+            ->first(['id', 'quotation_number', 'status', 'project_name', 'project_number', 'design_job_id']);
 
         return [
             'id' => $account->id,
@@ -233,6 +317,11 @@ class QuotationWorkspaceService
                 'name' => $account->primaryContact->name,
             ] : null,
             'source_lead_id' => $account->source_lead_id,
+            'latest_approved_visit' => $latestApprovedVisit ? [
+                'id' => $latestApprovedVisit->id,
+                'visit_number' => $latestApprovedVisit->visit_number,
+                'approved_at' => $latestApprovedVisit->approved_at?->toIso8601String(),
+            ] : null,
             'latest_design_job' => $latestDesignJob ? [
                 'id' => $latestDesignJob->id,
                 'design_job_number' => $latestDesignJob->design_job_number,
@@ -240,7 +329,175 @@ class QuotationWorkspaceService
             ] : null,
             'has_design_document' => $documents->contains('document_type', 'design'),
             'has_accounting_document' => $documents->contains('document_type', 'accounting'),
+            'design_document' => $designDocument ? [
+                'id' => $designDocument->id,
+                'filename' => $designDocument->filename,
+            ] : null,
+            'accounting_document' => $accountingDocument ? [
+                'id' => $accountingDocument->id,
+                'filename' => $accountingDocument->filename,
+            ] : null,
+            'latest_design_job_id' => $designJob?->id,
             'draft_quotations_count' => (int) ($account->draft_quotations_count ?? 0),
+            'has_quotation' => $latestQuotation !== null,
+            'latest_quotation' => $latestQuotation ? [
+                'id' => $latestQuotation->id,
+                'quotation_number' => $latestQuotation->quotation_number,
+                'status' => $latestQuotation->status instanceof \BackedEnum
+                    ? $latestQuotation->status->value
+                    : (string) $latestQuotation->status,
+                'project_name' => $latestQuotation->project_name,
+                'project_number' => $latestQuotation->project_number,
+                'design_job_id' => $latestQuotation->design_job_id,
+            ] : null,
         ];
+    }
+
+    /**
+     * @return Collection<int, int|string>
+     */
+    protected function eligibleLeadIdsFromDesignPipeline(): Collection
+    {
+        $leadIds = collect();
+
+        if (Schema::hasTable('design_jobs')) {
+            $leadIds = $leadIds->merge(
+                DesignJob::query()
+                    ->whereIn('status', [
+                        DesignJobStatus::FilesUploaded->value,
+                        DesignJobStatus::DesignReview->value,
+                        DesignJobStatus::Approved->value,
+                        DesignJobStatus::ReadyForQuotation->value,
+                    ])
+                    ->whereNotNull('lead_id')
+                    ->pluck('lead_id'),
+            );
+        }
+
+        if (Schema::hasTable('quotation_requests')) {
+            $leadIds = $leadIds->merge(
+                QuotationRequest::query()
+                    ->where('status', 'ready_for_quotation')
+                    ->whereNotNull('lead_id')
+                    ->pluck('lead_id'),
+            );
+        }
+
+        return $leadIds->unique()->values();
+    }
+
+    /**
+     * @return Collection<int, int|string>
+     */
+    protected function accountIdsEligibleForQuotation(): Collection
+    {
+        $approvedVisits = $this->approvedQuotationSiteVisitsQuery()
+            ->get(['id', 'account_id', 'lead_id']);
+
+        $accountIds = $approvedVisits->pluck('account_id')->filter()->values();
+
+        $leadIds = $approvedVisits->pluck('lead_id')->filter()->unique()->values();
+
+        if ($leadIds->isNotEmpty()) {
+            $accountIds = $accountIds->merge(
+                Lead::query()
+                    ->whereIn('id', $leadIds)
+                    ->whereNotNull('converted_account_id')
+                    ->pluck('converted_account_id'),
+            )->merge(
+                Account::query()
+                    ->whereIn('source_lead_id', $leadIds)
+                    ->pluck('id'),
+            );
+        }
+
+        $readyLeadIds = $this->eligibleLeadIdsFromDesignPipeline();
+
+        if ($readyLeadIds->isNotEmpty()) {
+            $accountIds = $accountIds->merge(
+                Lead::query()
+                    ->whereIn('id', $readyLeadIds)
+                    ->whereNotNull('converted_account_id')
+                    ->pluck('converted_account_id'),
+            )->merge(
+                Account::query()
+                    ->whereIn('source_lead_id', $readyLeadIds)
+                    ->pluck('id'),
+            );
+        }
+
+        if (Schema::hasTable('account_documents')) {
+            $accountIds = $accountIds->merge(
+                AccountDocument::query()
+                    ->where('document_type', 'design')
+                    ->pluck('account_id'),
+            );
+        }
+
+        $accountIds = $accountIds->merge(
+            Account::query()
+                ->where('status', 'awaiting_quotation')
+                ->pluck('id'),
+        );
+
+        return $accountIds->unique()->values();
+    }
+
+    protected function approvedQuotationSiteVisitsQuery(): Builder
+    {
+        return SiteVisit::query()
+            ->where('status', SiteVisitStatus::Approved->value)
+            ->where(function ($query) {
+                $query->where('measurement_context', MeasurementContext::Quotation->value)
+                    ->orWhereNull('measurement_context');
+            })
+            ->where(function ($query) {
+                $query->whereNotNull('measurement_form_data')
+                    ->orWhereHas('measurementLines');
+            });
+    }
+
+    protected function reconcileAccountsForApprovedVisits(User $user): void
+    {
+        $leadIds = $this->approvedQuotationSiteVisitsQuery()
+            ->whereNotNull('lead_id')
+            ->whereNull('account_id')
+            ->pluck('lead_id')
+            ->unique()
+            ->values();
+
+        foreach ($leadIds as $leadId) {
+            $lead = Lead::query()->find($leadId);
+            if (! $lead) {
+                continue;
+            }
+
+            $this->accountProvisioning->reconcileLeadAccount($lead, $user);
+            $lead = $lead->fresh();
+
+            if (! $lead->converted_account_id && $this->accountProvisioning->isEligibleForProvisioning($lead)) {
+                try {
+                    $this->accountProvisioning->provisionFromLead($lead, $user);
+                    $lead = $lead->fresh();
+                } catch (ValidationException) {
+                    continue;
+                }
+            }
+
+            if ($lead->converted_account_id) {
+                SiteVisit::query()
+                    ->where('lead_id', $lead->id)
+                    ->whereNull('account_id')
+                    ->update([
+                        'account_id' => $lead->converted_account_id,
+                        'contact_id' => $lead->converted_contact_id,
+                    ]);
+
+                Account::query()
+                    ->whereKey($lead->converted_account_id)
+                    ->where('status', '!=', 'awaiting_quotation')
+                    ->update(['status' => 'awaiting_quotation']);
+            }
+        }
     }
 }

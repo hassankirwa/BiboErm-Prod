@@ -16,6 +16,7 @@ export type ApiDesignJob = {
   id: number;
   design_job_number: string | null;
   lead_id: number | null;
+  account_id: number | null;
   site_visit_id: number | null;
   measurement_report_id: number | null;
   assigned_designer_id: number | null;
@@ -28,10 +29,32 @@ export type ApiDesignJob = {
   review_notes: string | null;
   files_count: number | null;
   extracted_items_count: number | null;
+  latest_extraction?: WincadExtractionResult | null;
+  files?: Array<{
+    id: number;
+    file_name: string;
+    file_type: string;
+    uploaded_at: string | null;
+  }> | null;
+  extracted_items?: Array<{
+    id: number;
+    wd_code: string | null;
+    name: string | null;
+    code_no: string | null;
+    quantity: number | null;
+    colour: string | null;
+    specification: string | null;
+  }> | null;
   lead?: {
     id: number;
     name: string | null;
     reference: string | null;
+    converted_account_id?: number | null;
+  } | null;
+  account?: {
+    id: number;
+    name: string;
+    account_number: string | null;
   } | null;
   assigned_designer?: { id: number; name: string | null } | null;
   measurement_report?: {
@@ -132,6 +155,26 @@ export async function approveDesignJob(
   return unwrapResource(res);
 }
 
+export async function uploadDesignJobFabrication(
+  id: number,
+  file: File,
+): Promise<{ extraction: WincadExtractionResult; design_job: ApiDesignJob }> {
+  await ensureCsrfCookie();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch<
+    | { extraction: WincadExtractionResult; design_job: ApiDesignJob }
+    | { data: { extraction: WincadExtractionResult; design_job: ApiDesignJob } }
+  >(`/api/v1/design/jobs/${id}/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (res && typeof res === "object" && "data" in res && res.data) {
+    return res.data;
+  }
+  return res as { extraction: WincadExtractionResult; design_job: ApiDesignJob };
+}
+
 export async function extractWincadFile(file: File): Promise<WincadExtractionResult> {
   await ensureCsrfCookie();
   const form = new FormData();
@@ -159,4 +202,22 @@ export const DESIGN_JOB_STATUS_LABELS: Record<string, string> = {
 export function designJobStatusLabel(status: string | null | undefined): string {
   const key = (status ?? "").toLowerCase();
   return DESIGN_JOB_STATUS_LABELS[key] ?? key.replace(/_/g, " ");
+}
+
+export function isDesignJobApproved(
+  status: string | null | undefined,
+  approvedAt?: string | null,
+): boolean {
+  if (approvedAt) {
+    return true;
+  }
+
+  const key = (status ?? "").toLowerCase();
+  return key === "approved" || key === "ready_for_quotation";
+}
+
+export function canUploadDesignJob(
+  job: Pick<ApiDesignJob, "status" | "approved_at">,
+): boolean {
+  return !isDesignJobApproved(job.status, job.approved_at);
 }
