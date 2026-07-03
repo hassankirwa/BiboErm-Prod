@@ -88,6 +88,7 @@ export type ApiAccount = {
   source_lead_id: number | null;
   owner_id: number | null;
   owner?: ApiUser | null;
+  primary_contact?: ApiContact | null;
   contacts?: ApiContact[];
   created_at: string | null;
   updated_at: string | null;

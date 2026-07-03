@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { leadKanbanStages } from "@/lib/leads-kanban-data";
+import { CrmPillToggle } from "@/components/crm/crm-pill-toggle";
+import { AccountPicker } from "@/components/crm/account-picker";
+import type { ApiAccount } from "@/lib/api/crm/accounts";
 import {
   emptyLeadForm,
   type LeadFormValues,
@@ -57,6 +60,49 @@ export function LeadCreateForm() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [pinPrefillLoaded, setPinPrefillLoaded] = useState(!fieldDayPinId);
+  const [intakeMode, setIntakeMode] = useState<"new" | "existing">("new");
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
+    null,
+  );
+  const [selectedAccountLabel, setSelectedAccountLabel] = useState<
+    string | null
+  >(null);
+
+  const applyExistingAccountPrefill = (account: ApiAccount) => {
+    const contact = account.primary_contact;
+    const countySlug =
+      lookups?.counties.find((county) => county.id === account.county_id)
+        ?.slug ?? "";
+
+    setForm((current) => ({
+      ...current,
+      company: account.name,
+      contactPersonName:
+        contact?.name ?? current.contactPersonName ?? account.name,
+      phone: contact?.phone ?? account.phone ?? current.phone,
+      email: contact?.email ?? account.email ?? current.email,
+      whatsapp: contact?.whatsapp ?? current.whatsapp,
+      jobTitle: contact?.job_title ?? current.jobTitle,
+      ownerId:
+        account.account_owner_id ?? account.owner_id ?? current.ownerId ?? user?.id ?? null,
+      countySlug: countySlug || current.countySlug,
+      location:
+        account.physical_address ??
+        account.billing_address ??
+        current.location,
+      siteAddress:
+        account.physical_address ??
+        account.billing_address ??
+        current.siteAddress,
+    }));
+    setSelectedAccountId(account.id);
+    setSelectedAccountLabel(account.name);
+  };
+
+  const clearExistingAccount = () => {
+    setSelectedAccountId(null);
+    setSelectedAccountLabel(null);
+  };
 
   useEffect(() => {
     if (!lookups) return;
@@ -176,6 +222,10 @@ export function LeadCreateForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return;
+    if (intakeMode === "existing" && !selectedAccountId) {
+      toast.error("Select an existing client account.");
+      return;
+    }
     setSubmitting(true);
     try {
       await ensureCsrfCookie();
@@ -184,6 +234,8 @@ export function LeadCreateForm() {
           counties: lookups?.counties,
           product_interests: lookups?.product_interests,
           fieldDayPinId,
+          existingAccountId:
+            intakeMode === "existing" ? selectedAccountId : null,
         }),
       );
 
@@ -213,9 +265,11 @@ export function LeadCreateForm() {
         Boolean(lead.email?.trim());
 
       toast.success(
-        contactConfirmed
-          ? "Lead created — contact confirmed. Follow up to schedule a site visit if needed."
-          : "Lead created. Add contact details when the client is identified.",
+        intakeMode === "existing"
+          ? "Lead linked to existing client account."
+          : contactConfirmed
+            ? "Lead created — contact confirmed. Create an account before scheduling a site visit."
+            : "Lead created. Add contact details when the client is identified.",
       );
 
       router.push(`/crm/leads/${lead.id}`);
@@ -273,7 +327,9 @@ export function LeadCreateForm() {
             <p className="max-w-xl text-sm text-muted-foreground">
               {fieldDayPinId
                 ? "Review the prefilled site details from your field visit, then create the lead."
-                : "Capture the site or opportunity first. Contact details are optional until someone is identified."}
+                : intakeMode === "existing"
+                  ? "Link a new project opportunity to an existing client account. Contact details are prefilled from the account."
+                  : "Capture the site or opportunity first. Contact details are optional until someone is identified."}
             </p>
           </div>
         </div>
@@ -308,6 +364,49 @@ export function LeadCreateForm() {
         </aside>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {!fieldDayPinId ? (
+            <Card className="gap-0 py-0 shadow-sm">
+              <CardHeader className="border-b px-5 py-4">
+                <CardTitle className="text-sm text-[#1e3a5f]">
+                  Client type
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Choose whether this is a brand-new client or an existing
+                  account returning for another project.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 px-5 py-4">
+                <CrmPillToggle
+                  value={intakeMode}
+                  onChange={(value) => {
+                    setIntakeMode(value);
+                    if (value === "new") {
+                      clearExistingAccount();
+                    }
+                  }}
+                  options={[
+                    { id: "new", label: "New client" },
+                    { id: "existing", label: "Existing client" },
+                  ]}
+                />
+                {intakeMode === "existing" ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Existing account *
+                    </p>
+                    <AccountPicker
+                      value={selectedAccountId}
+                      displayLabel={selectedAccountLabel}
+                      onSelect={applyExistingAccountPrefill}
+                      onClear={clearExistingAccount}
+                      required
+                    />
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <LeadFormFields
             form={form}
             update={update}

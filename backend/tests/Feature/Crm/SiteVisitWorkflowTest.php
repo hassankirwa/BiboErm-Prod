@@ -3,6 +3,7 @@
 namespace Tests\Feature\Crm;
 
 use App\Enums\Crm\LeadStatus;
+use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Lead;
 use App\Models\SiteVisit;
@@ -50,6 +51,20 @@ class SiteVisitWorkflowTest extends TestCase
         $this->otherFieldOfficer->assignRole('field_officer');
     }
 
+    protected function provisionAccountForLead(Lead $lead): void
+    {
+        $lead->update([
+            'status' => LeadStatus::Interested->value,
+            'pipeline_stage' => LeadPipelineStage::ContactConfirmed->value,
+            'phone' => '+254712345678',
+            'contact_person_name' => $lead->contact_person_name ?? $lead->name,
+            'account_name' => $lead->account_name ?? $lead->name,
+        ]);
+
+        $this->postJson("/api/v1/crm/leads/{$lead->id}/provision-account")
+            ->assertCreated();
+    }
+
     public function test_field_officer_can_complete_visit_and_advance_linked_lead(): void
     {
         Sanctum::actingAs($this->salesRep);
@@ -63,6 +78,8 @@ class SiteVisitWorkflowTest extends TestCase
             'lead_owner_id' => $this->salesRep->id,
             'created_by' => $this->salesRep->id,
         ]);
+
+        $this->provisionAccountForLead($lead);
 
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Karen Heights measurement',
@@ -207,6 +224,8 @@ class SiteVisitWorkflowTest extends TestCase
             'created_by' => $this->salesRep->id,
         ]);
 
+        $this->provisionAccountForLead($lead);
+
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Sales-led measurement',
             'lead_id' => $lead->id,
@@ -240,6 +259,8 @@ class SiteVisitWorkflowTest extends TestCase
             'lead_owner_id' => $this->salesRep->id,
             'created_by' => $this->salesRep->id,
         ]);
+
+        $this->provisionAccountForLead($lead);
 
         $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Invalid assignee visit',

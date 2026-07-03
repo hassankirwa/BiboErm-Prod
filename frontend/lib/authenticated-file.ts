@@ -156,6 +156,42 @@ export function invalidateAuthenticatedFileObjectUrl(apiUrl: string): void {
   objectUrlCache.delete(normalized);
 }
 
+/** Fetch a private API file and trigger a browser download. */
+export async function downloadAuthenticatedFile(
+  apiUrl: string,
+  filename: string,
+): Promise<void> {
+  const normalized = normalizePrivateFileApiUrl(apiUrl);
+  const response = await fetch(normalized, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      Accept: "*/*",
+      "X-Requested-With": "XMLHttpRequest",
+      "X-Device-UUID": getDeviceUuid(),
+      "X-Device-Id": getDeviceUuid(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Download failed.");
+  }
+
+  const contentType = response.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+  const buffer = await response.arrayBuffer();
+  const blob = new Blob([buffer], {
+    type: contentType || "application/octet-stream",
+  });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 /** @deprecated Prefer acquire/release for lifecycle-safe blob URLs. */
 export async function fetchAuthenticatedFileObjectUrl(
   apiUrl: string,

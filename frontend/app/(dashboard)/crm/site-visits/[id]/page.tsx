@@ -6,12 +6,11 @@ import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { UnifiedSiteMeasurementForm } from "@/components/measurements/unified-site-measurement-form";
+import { SiteVisitPhotosGrid } from "@/components/measurements/site-visit-photos-grid";
 import { SiteVisitDealContext } from "@/components/crm/site-visit-deal-context";
-import { SiteVisitReviewPanel } from "@/components/crm/site-visit-review-panel";
 import { SiteVisitStatusBadge } from "@/components/crm/site-visit-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Calendar,
@@ -148,7 +147,8 @@ export default function SiteVisitDetailPage() {
   const showLogDetails = canExecuteFieldVisit(status);
   const showStart = canStartFieldVisit(status);
   const awaitingApproval = status === "submitted_for_review";
-  const showReviewPanel =
+  const showMeasurementForm =
+    showLogDetails ||
     awaitingApproval ||
     status === "approved" ||
     status === "measurements_captured" ||
@@ -184,6 +184,20 @@ export default function SiteVisitDetailPage() {
                   Log measurements
                 </Button>
               </PermissionGate>
+            )}
+            {showMeasurementForm && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  document.getElementById("measurement-sketch")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+              >
+                View sketch
+              </Button>
             )}
             <Button variant="outline" size="sm" asChild>
               <Link href="/crm/site-visits/my-visits">My visits</Link>
@@ -271,33 +285,9 @@ export default function SiteVisitDetailPage() {
                   </p>
                 )}
 
-                {visit.photos && visit.photos.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Uploaded photos</Label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                      {visit.photos.map((photo) => {
-                        const src = photo.url ?? photo.firebase_url ?? undefined;
-                        if (!src) return null;
-                        return (
-                          <a
-                            key={photo.id}
-                            href={src}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block overflow-hidden rounded-md border border-border bg-muted/30"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={src}
-                              alt={`Site visit photo ${photo.id}`}
-                              className="aspect-square w-full object-cover"
-                            />
-                          </a>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {visit.photos && visit.photos.length > 0 ? (
+                  <SiteVisitPhotosGrid visit={visit} />
+                ) : null}
 
                 <div className="flex flex-wrap gap-2">
                   {showStart && (
@@ -346,17 +336,22 @@ export default function SiteVisitDetailPage() {
 
             {visit.deal_id && <SiteVisitDealContext visit={visit} />}
 
-            {showReviewPanel && <SiteVisitReviewPanel visit={visit} />}
-
-            {showLogDetails && (
-              <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
+            {showMeasurementForm &&
+              (showLogDetails ? (
+                <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
+                  <UnifiedSiteMeasurementForm
+                    visit={visit}
+                    project={project}
+                    onVisitUpdated={setVisit}
+                  />
+                </PermissionGate>
+              ) : (
                 <UnifiedSiteMeasurementForm
                   visit={visit}
                   project={project}
                   onVisitUpdated={setVisit}
                 />
-              </PermissionGate>
-            )}
+              ))}
 
             {status === "submitted_for_review" && (
               <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">

@@ -105,10 +105,40 @@ class LeadController extends Controller
 
         $validated = $request->validated();
         $fieldDayPinId = $validated['field_day_pin_id'] ?? null;
-        unset($validated['field_day_pin_id']);
+        $existingAccountId = $validated['existing_account_id'] ?? null;
+        unset($validated['field_day_pin_id'], $validated['existing_account_id']);
 
         $user = $request->user();
         $leadNumber = $this->leadNumberGenerator->generate();
+
+        if ($existingAccountId) {
+            $account = \App\Models\Account::query()
+                ->with(['primaryContact', 'owner'])
+                ->findOrFail($existingAccountId);
+
+            $primaryContact = $account->primaryContact;
+
+            $validated['account_name'] = $validated['account_name'] ?? $account->name;
+            $validated['account_type'] = $validated['account_type'] ?? $account->account_type;
+            $validated['industry'] = $validated['industry'] ?? $account->industry;
+            $validated['company_phone'] = $validated['company_phone'] ?? $account->phone;
+            $validated['company_email'] = $validated['company_email'] ?? $account->email;
+            $validated['website'] = $validated['website'] ?? $account->website;
+            $validated['kra_pin'] = $validated['kra_pin'] ?? $account->kra_pin;
+            $validated['billing_address'] = $validated['billing_address'] ?? $account->billing_address;
+            $validated['county_id'] = $validated['county_id'] ?? $account->county_id;
+            $validated['contact_person_name'] = $validated['contact_person_name']
+                ?? $primaryContact?->name
+                ?? $account->name;
+            $validated['phone'] = $validated['phone'] ?? $primaryContact?->phone ?? $account->phone;
+            $validated['whatsapp'] = $validated['whatsapp'] ?? $primaryContact?->whatsapp;
+            $validated['email'] = $validated['email'] ?? $primaryContact?->email ?? $account->email;
+            $validated['job_title'] = $validated['job_title'] ?? $primaryContact?->job_title;
+            $validated['lead_owner_id'] = $validated['lead_owner_id']
+                ?? $account->account_owner_id
+                ?? $account->owner_id
+                ?? $user->id;
+        }
 
         $lead = Lead::query()->create([
             ...$validated,
@@ -140,19 +170,25 @@ class LeadController extends Controller
             ]);
         }
 
-        $contact = $this->leadContactService->createFromLead($lead, $user);
-
-        if ($contact) {
-            $this->leadPipelineService->onContactConfirmed($lead->fresh(), $user);
-        } else {
-            $lead->update(['pipeline_stage' => LeadPipelineStage::NewLead->value]);
-        }
-
         if ($fieldDayPinId) {
             FieldDayPin::query()
                 ->whereKey($fieldDayPinId)
                 ->whereNull('lead_id')
                 ->update(['lead_id' => $lead->id]);
+        }
+
+        if ($existingAccountId) {
+            $account = \App\Models\Account::query()->findOrFail($existingAccountId);
+            $result = $this->accountProvisioning->linkLeadToExistingAccount($lead->fresh(), $account, $user);
+            $this->leadPipelineService->onAccountProvisioned($result['lead']->fresh(), $user);
+        } else {
+            $contact = $this->leadContactService->createFromLead($lead, $user);
+
+            if ($contact) {
+                $this->leadPipelineService->onContactConfirmed($lead->fresh(), $user);
+            } else {
+                $lead->update(['pipeline_stage' => LeadPipelineStage::NewLead->value]);
+            }
         }
 
         return (new LeadDetailResource(
@@ -173,15 +209,6 @@ class LeadController extends Controller
         if (! $lead->converted_account_id) {
             $this->accountProvisioning->reconcileLeadAccount($lead, $request->user());
             $lead->refresh();
-
-            if ($this->accountProvisioning->isEligibleForProvisioning($lead)) {
-                try {
-                    $this->accountProvisioning->provisionFromLead($lead, $request->user());
-                } catch (\Throwable) {
-                    // Account provisioning deferred until ready for quotation.
-                }
-                $lead->refresh();
-            }
         }
 
         $this->leadSalesContext->reconcileLeadDealLink($lead);

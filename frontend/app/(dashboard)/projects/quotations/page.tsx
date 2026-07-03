@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -23,6 +24,7 @@ import {
   fetchPendingQuotationAccounts,
   fetchWorkspaceQuotations,
   formatKes,
+  generateQuotationFromAccount,
   type PendingQuotationAccount,
 } from "@/lib/api/projects/quotations";
 import {
@@ -37,6 +39,7 @@ import {
   quotationDetailPath,
   quotationNewPath,
 } from "@/lib/quotations/paths";
+import { ensureCsrfCookie } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, ExternalLink, FileSpreadsheet, Loader2, Plus, Ruler, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +69,7 @@ function accountLabel(quotation: ApiQuotation): string {
 }
 
 export default function ProjectQuotationsPage() {
+  const router = useRouter();
   const [pending, setPending] = useState<PendingQuotationAccount[]>([]);
   const [quotations, setQuotations] = useState<ApiQuotation[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
@@ -73,6 +77,7 @@ export default function ProjectQuotationsPage() {
   const [loadingQuotations, setLoadingQuotations] = useState(true);
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [generatingAccountId, setGeneratingAccountId] = useState<number | null>(null);
 
   const loadQuotations = useCallback(async () => {
     setLoadingQuotations(true);
@@ -106,6 +111,25 @@ export default function ProjectQuotationsPage() {
   useEffect(() => {
     void loadQuotations();
   }, [loadQuotations]);
+
+  async function handleGenerateQuotation(account: PendingQuotationAccount) {
+    if (account.latest_quotation) {
+      router.push(quotationDetailPath(account.latest_quotation.id));
+      return;
+    }
+
+    setGeneratingAccountId(account.id);
+    try {
+      await ensureCsrfCookie();
+      const quotation = await generateQuotationFromAccount(account.id);
+      toast.success("Proforma quotation generated from saved design documents.");
+      router.push(quotationDetailPath(quotation.id));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to generate quotation.");
+    } finally {
+      setGeneratingAccountId(null);
+    }
+  }
 
   async function handleApprove(quotation: ApiQuotation) {
     setApprovingId(quotation.id);
@@ -344,12 +368,31 @@ export default function ProjectQuotationsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" asChild>
-                          <Link href={quotationNewPath(account.id)}>
-                            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                            Create Proforma Quotation
-                          </Link>
-                        </Button>
+                        {account.latest_quotation ? (
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={quotationDetailPath(account.latest_quotation.id)}>
+                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                              Open quotation
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={
+                              generatingAccountId === account.id ||
+                              !account.has_design_document ||
+                              !account.has_accounting_document
+                            }
+                            onClick={() => void handleGenerateQuotation(account)}
+                          >
+                            {generatingAccountId === account.id ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            Create quote
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

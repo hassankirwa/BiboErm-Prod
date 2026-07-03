@@ -30,7 +30,13 @@ class AccountController extends Controller
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
-                    ->orWhere('email', 'ilike', "%{$search}%");
+                    ->orWhere('email', 'ilike', "%{$search}%")
+                    ->orWhere('account_number', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'ilike', "%{$search}%")
+                    ->orWhereHas('primaryContact', function ($contactQuery) use ($search) {
+                        $contactQuery->where('phone', 'ilike', "%{$search}%")
+                            ->orWhere('name', 'ilike', "%{$search}%");
+                    });
             });
         }
 

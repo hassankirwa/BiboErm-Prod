@@ -18,13 +18,30 @@ import {
   siteVisitTodayPath,
   type SiteVisitWorkspace,
 } from "@/lib/crm/site-visit-paths";
+import type { SiteOpsMeasurementContext } from "@/lib/site-ops/paths";
+import { SITE_OPS_CONTEXT_META } from "@/lib/site-ops/paths";
 import { toast } from "sonner";
 
 type AssignedOpenVisitsViewProps = {
   workspace: SiteVisitWorkspace;
+  measurementContext?: SiteOpsMeasurementContext;
+  title?: string;
+  subtitle?: string;
+  backPath?: string;
+  backLabel?: string;
+  todayPath?: string;
 };
 
-export function AssignedOpenVisitsView({ workspace }: AssignedOpenVisitsViewProps) {
+export function AssignedOpenVisitsView({
+  workspace,
+  measurementContext = "quotation",
+  title,
+  subtitle,
+  backPath,
+  backLabel,
+  todayPath,
+}: AssignedOpenVisitsViewProps) {
+  const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +51,9 @@ export function AssignedOpenVisitsView({ workspace }: AssignedOpenVisitsViewProp
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchOpenAssignedSiteVisits();
+      const res = await fetchOpenAssignedSiteVisits({
+        measurement_context: measurementContext,
+      });
       setVisits(res.data);
     } catch (err) {
       setError(
@@ -45,7 +64,7 @@ export function AssignedOpenVisitsView({ workspace }: AssignedOpenVisitsViewProp
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [measurementContext]);
 
   useEffect(() => {
     void loadVisits();
@@ -80,26 +99,27 @@ export function AssignedOpenVisitsView({ workspace }: AssignedOpenVisitsViewProp
     }
   }
 
-  const todayPath = siteVisitTodayPath(workspace);
-  const backPath =
-    workspace === "field" ? "/field" : "/crm/site-visits";
-  const backLabel = workspace === "field" ? "Field Home" : "All Visits";
+  const resolvedTodayPath = todayPath ?? siteVisitTodayPath(workspace);
+  const resolvedBackPath =
+    backPath ?? (workspace === "field" ? "/field" : "/crm/site-visits");
+  const resolvedBackLabel =
+    backLabel ?? (workspace === "field" ? "Field Home" : "All Visits");
 
   return (
     <div className="flex h-full flex-col">
       <AppHeader
-        title="My Open Visits"
-        subtitle="Site visits assigned to you that are ready to start or in progress"
+        title={title ?? contextMeta.myVisitsTitle}
+        subtitle={subtitle ?? contextMeta.myVisitsSubtitle}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={backPath}>
+              <Link href={resolvedBackPath}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
-                {backLabel}
+                {resolvedBackLabel}
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={todayPath}>Today&apos;s Visits</Link>
+              <Link href={resolvedTodayPath}>Today&apos;s Visits</Link>
             </Button>
           </div>
         }

@@ -18,6 +18,7 @@ use App\Services\Crm\Leads\AccountProvisioningService;
 use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Crm\Leads\LeadStageService;
 use App\Services\Design\DesignJobService;
+use App\Services\Notifications\AssignmentNotificationService;
 use App\Support\ProjectSiteLocation;
 use App\Support\SiteMeasurementFormData;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ class SiteVisitWorkflowService
         protected LeadPipelineService $leadPipelineService,
         protected DesignJobService $designJobService,
         protected AccountProvisioningService $accountProvisioning,
+        protected AssignmentNotificationService $assignmentNotifications,
     ) {}
 
     public function schedule(User $user, array $data): SiteVisit
@@ -41,6 +43,14 @@ class SiteVisitWorkflowService
                 ?? MeasurementContext::Quotation;
 
             $this->assertValidScheduleContext($data, $context);
+
+            if ($context === MeasurementContext::Quotation && ! empty($data['lead_id']) && empty($data['account_id'])) {
+                $lead = Lead::query()->find($data['lead_id']);
+                if ($lead?->converted_account_id) {
+                    $data['account_id'] = $lead->converted_account_id;
+                    $data['contact_id'] = $data['contact_id'] ?? $lead->converted_contact_id;
+                }
+            }
 
             if (empty($data['assigned_field_officer_id']) && ! empty($data['deal_id'])) {
                 $deal = Deal::query()->find($data['deal_id']);
@@ -96,21 +106,26 @@ class SiteVisitWorkflowService
 
             if ($visit->lead_id && $context === MeasurementContext::Quotation) {
                 $lead = Lead::query()->find($visit->lead_id);
-                $leadStatus = $lead?->status instanceof LeadStatus
-                    ? $lead->status->value
-                    : (string) ($lead?->status ?? '');
-
-                if (! in_array($leadStatus, [
-                    LeadStatus::AccountCreated->value,
-                    LeadStatus::Interested->value,
-                ], true)) {
-                    Lead::query()->whereKey($visit->lead_id)->update([
-                        'status' => LeadStatus::SiteVisitScheduled->value,
-                    ]);
-                }
 
                 if ($lead) {
+                    $leadStatus = $lead->status instanceof LeadStatus
+                        ? $lead->status->value
+                        : (string) ($lead->status ?? '');
+
+                    if ($leadStatus !== LeadStatus::SiteVisitScheduled->value) {
+                        Lead::query()->whereKey($visit->lead_id)->update([
+                            'status' => LeadStatus::SiteVisitScheduled->value,
+                        ]);
+                    }
+
                     $this->leadPipelineService->onSiteVisitAssigned($lead, $user);
+                }
+            }
+
+            if ($assigneeId) {
+                $assignee = User::query()->find($assigneeId);
+                if ($assignee) {
+                    $this->assignmentNotifications->notifySiteVisitAssigned($visit, $assignee, $user);
                 }
             }
 
@@ -319,13 +334,14 @@ class SiteVisitWorkflowService
                         $this->leadPipelineService->onMeasurementApproved($lead, $user);
                         $lead = $lead->fresh();
                         $this->accountProvisioning->reconcileLeadAccount($lead, $user);
+                        $lead = $lead->fresh();
 
-                        if (! $lead->converted_account_id) {
+                        if (! $lead->converted_account_id && $this->accountProvisioning->isEligibleForProvisioning($lead)) {
                             try {
-                                $provisioned = $this->accountProvisioning->provisionFromLead($lead, $user);
-                                $lead = $provisioned['lead'] ?? $lead->fresh();
+                                $this->accountProvisioning->provisionFromLead($lead, $user);
+                                $lead = $lead->fresh();
                             } catch (ValidationException) {
-                                // Leave visit without account; pending queue may reconcile later.
+                                // Lead may not yet meet all provisioning rules.
                             }
                         }
 
@@ -410,6 +426,15 @@ class SiteVisitWorkflowService
             throw ValidationException::withMessages([
                 'lead_id' => ['A lead, deal, or account is required for quotation measurement visits.'],
             ]);
+        }
+
+        if ($context === MeasurementContext::Quotation && ! empty($data['lead_id'])) {
+            $lead = Lead::query()->find($data['lead_id']);
+            if ($lead && ! $lead->converted_account_id) {
+                throw ValidationException::withMessages([
+                    'lead_id' => ['Create an account for this lead before scheduling a site visit.'],
+                ]);
+            }
         }
     }
 

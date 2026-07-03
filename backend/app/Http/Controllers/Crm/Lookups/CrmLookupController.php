@@ -51,14 +51,18 @@ class CrmLookupController extends Controller
             $rolePool = $roles !== [] ? $roles : SiteVisitAssigneeRoles::all();
         } else {
             $role = $request->string('role')->toString();
-            $spatieRole = match ($role) {
-                'sales_rep' => 'sales_representative',
-                default => $role,
-            };
-            $rolePool = match ($spatieRole) {
-                'field_officer' => ['field_officer', 'installation_lead', 'field_installation_engineer'],
-                default => [$spatieRole],
-            };
+            if ($role === '') {
+                $rolePool = [];
+            } else {
+                $spatieRole = match ($role) {
+                    'sales_rep' => 'sales_representative',
+                    default => $role,
+                };
+                $rolePool = match ($spatieRole) {
+                    'field_officer' => ['field_officer', 'installation_lead', 'field_installation_engineer'],
+                    default => [$spatieRole],
+                };
+            }
         }
 
         $users = User::query()

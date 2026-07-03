@@ -77,6 +77,16 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-sky-700 hover:bg-sky-50",
   },
   {
+    id: "account_provisioned",
+    label: "Account Created",
+    description: "CRM account ready — schedule site measurements",
+    headerBg: "bg-teal-50",
+    headerBorder: "border-teal-200",
+    countBadge: "bg-teal-600 text-white",
+    tagClass: "bg-teal-100 text-teal-800",
+    addBtnClass: "text-teal-700 hover:bg-teal-50",
+  },
+  {
     id: "site_visit_required",
     label: "Site Visit Required",
     description: "Measurements or inspection needed",

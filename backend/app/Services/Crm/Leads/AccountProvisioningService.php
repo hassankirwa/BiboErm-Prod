@@ -4,6 +4,8 @@ namespace App\Services\Crm\Leads;
 
 use App\Enums\Crm\LeadPipelineStage;
 use App\Enums\Crm\LeadStatus;
+use App\Enums\Crm\MeasurementContext;
+use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Account;
 use App\Models\AccountDocument;
 use App\Models\Contact;
@@ -208,9 +210,23 @@ class AccountProvisioningService
             return true;
         }
 
+        if (in_array($status, [
+            LeadStatus::Interested->value,
+            LeadStatus::Contacted->value,
+        ], true)) {
+            return true;
+        }
+
         $pipelineStage = $lead->pipeline_stage instanceof LeadPipelineStage
             ? $lead->pipeline_stage->value
             : (string) ($lead->pipeline_stage ?? '');
+
+        if (in_array($pipelineStage, [
+            LeadPipelineStage::ContactConfirmed->value,
+            LeadPipelineStage::AccountProvisioned->value,
+        ], true)) {
+            return true;
+        }
 
         if ($pipelineStage === LeadPipelineStage::ReadyForQuotation->value) {
             return true;
@@ -224,6 +240,17 @@ class AccountProvisioningService
         }
 
         if ($lead->quotationRequests()->exists()) {
+            return true;
+        }
+
+        if (SiteVisit::query()
+            ->where('lead_id', $lead->id)
+            ->where('status', SiteVisitStatus::Approved->value)
+            ->where(function ($query) {
+                $query->where('measurement_context', MeasurementContext::Quotation->value)
+                    ->orWhereNull('measurement_context');
+            })
+            ->exists()) {
             return true;
         }
 

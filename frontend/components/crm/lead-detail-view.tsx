@@ -32,6 +32,8 @@ import {
 
   Upload,
 
+  UserPlus,
+
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -93,6 +95,8 @@ import {
   fetchLead,
 
   leadDisplayName,
+
+  provisionLeadAccount,
 
   updateLead,
 
@@ -637,6 +641,28 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
 
 
+  async function handleProvisionAccount() {
+
+    await runStageAction(async () => {
+
+      const result = await provisionLeadAccount(Number(leadId));
+
+      setOverride({
+
+        lead: result.lead,
+
+        card: apiLeadToKanbanCard(result.lead),
+
+      });
+
+      toast.success("Account created for this lead.");
+
+    });
+
+  }
+
+
+
   async function handleAttachmentUpload(file: File) {
 
     setUploadingAttachment(true);
@@ -845,57 +871,21 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
               {activityButtons}
 
-              <PermissionGate permission="site_visits.schedule">
-
+              {!linkedAccountId ? (
                 <Button
-
                   size="sm"
-
                   className="h-9"
-
-                  disabled={disabled}
-
-                  onClick={() => {
-
-                    setVisitForm((f) => ({
-
-                      ...f,
-
-                      title: card?.title ?? "",
-
-                      site_address: lead?.site_address ?? "",
-
-                      visit_date: new Date().toISOString().slice(0, 10),
-
-                      assigned_field_officer_id: defaultSiteVisitAssigneeId(
-
-                        user?.id,
-
-                        lead?.assigned_field_officer_id ??
-
-                          (f.assigned_field_officer_id
-
-                            ? Number(f.assigned_field_officer_id)
-
-                            : null),
-
-                      ),
-
-                    }));
-
-                    setVisitDialogOpen(true);
-
-                  }}
-
+                  disabled={disabled || actionLoading}
+                  onClick={() => void handleProvisionAccount()}
                 >
-
-                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
-
-                  Schedule Site Visit
-
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                  Create Account
                 </Button>
-
-              </PermissionGate>
+              ) : accountHref ? (
+                <Button size="sm" variant="outline" className="h-9" asChild>
+                  <Link href={accountHref}>Open Account</Link>
+                </Button>
+              ) : null}
 
               <Button
 
@@ -986,6 +976,83 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
             </div>
 
           </PermissionGate>
+
+        );
+
+      case "account_provisioned":
+
+        return (
+
+          <div className="flex flex-wrap gap-2">
+
+            {activityButtons}
+
+            {accountHref ? (
+
+              <Button size="sm" variant="outline" className="h-9" asChild>
+
+                <Link href={accountHref}>Open Account</Link>
+
+              </Button>
+
+            ) : null}
+
+            {canScheduleVisit ? (
+            <PermissionGate permission="site_visits.schedule">
+
+              <Button
+
+                size="sm"
+
+                className="h-9"
+
+                disabled={disabled || !linkedAccountId}
+
+                onClick={() => {
+
+                  setVisitForm((f) => ({
+
+                    ...f,
+
+                    title: card?.title ?? "",
+
+                    site_address: lead?.site_address ?? "",
+
+                    visit_date: new Date().toISOString().slice(0, 10),
+
+                    assigned_field_officer_id: defaultSiteVisitAssigneeId(
+
+                      user?.id,
+
+                      lead?.assigned_field_officer_id ??
+
+                        (f.assigned_field_officer_id
+
+                          ? Number(f.assigned_field_officer_id)
+
+                          : null),
+
+                    ),
+
+                  }));
+
+                  setVisitDialogOpen(true);
+
+                }}
+
+              >
+
+                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+
+                Schedule Site Visit
+
+              </Button>
+
+              </PermissionGate>
+
+            ) : null}
+
+          </div>
 
         );
 
@@ -1297,6 +1364,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
   const showProvisionConvert = canProvisionAccountFromLead(
     status,
     Boolean(headerAccountId),
+    lead?.pipeline_stage,
   );
   const convertLabel = showCreateDealAfterDeposit
     ? "Create Deal"

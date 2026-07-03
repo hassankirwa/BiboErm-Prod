@@ -38,13 +38,14 @@ import {
   resolveMeasurementContext,
 } from "@/lib/measurements/adapters";
 import {
+  emptyMeasurementLine,
   hasSiteMeasurementFormData,
   isMeasurementFormLocked,
   type SiteMeasurementFormData,
 } from "@/lib/measurements/types";
 import { canExecuteFieldVisit } from "@/lib/crm/site-visit-utils";
 import { useAuth } from "@/contexts/auth-context";
-import { CheckCircle2, ClipboardList, Loader2, Save } from "lucide-react";
+import { CheckCircle2, ClipboardList, Loader2, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 
 type UnifiedSiteMeasurementFormProps = {
@@ -234,6 +235,12 @@ export function UnifiedSiteMeasurementForm({
     }
   }
 
+  function addLine() {
+    updateForm({
+      lines: [...form.lines, emptyMeasurementLine(form.lines.length)],
+    });
+  }
+
   return (
     <Card id={sectionId} className="border-border scroll-mt-24">
       <CardHeader>
@@ -247,27 +254,48 @@ export function UnifiedSiteMeasurementForm({
               {contextLabel(context)}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-2">
             {readOnly && (
               <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
                 Read-only
               </span>
             )}
             {!readOnly && (
-              <span className="text-xs text-muted-foreground">
-                {autosaving ? (
-                  <span className="inline-flex items-center">
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    Autosaving…
-                  </span>
-                ) : isDirty ? (
-                  "Unsaved changes · autosaves every 10s"
-                ) : lastAutosavedAt ? (
-                  `Saved ${lastAutosavedAt.toLocaleTimeString()}`
-                ) : (
-                  "Autosaves every 10s"
-                )}
-              </span>
+              <>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Add line
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={saving || !canSave}
+                  >
+                    {saving ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-1 h-4 w-4" />
+                    )}
+                    Save
+                  </Button>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {autosaving ? (
+                    <span className="inline-flex items-center">
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      Autosaving…
+                    </span>
+                  ) : isDirty ? (
+                    "Unsaved changes · autosaves every 10s"
+                  ) : lastAutosavedAt ? (
+                    `Saved ${lastAutosavedAt.toLocaleTimeString()}`
+                  ) : (
+                    "Autosaves every 10s"
+                  )}
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -287,19 +315,7 @@ export function UnifiedSiteMeasurementForm({
           <MeasurementFormSpecs form={form} readOnly={readOnly} onChange={updateForm} />
         </section>
 
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold">Measurement lines</h3>
-          <MeasurementLineGrid
-            lines={form.lines}
-            readOnly={readOnly}
-            photoUrls={photoUrls}
-            onChange={(lines) => updateForm({ lines })}
-            onLinePhotoUpload={handleLinePhotoUpload}
-            onLinePhotoRemove={handleLinePhotoRemove}
-          />
-        </section>
-
-        <section className="space-y-3">
+        <section id="measurement-sketch" className="scroll-mt-24 space-y-3">
           <h3 className="text-sm font-semibold">Sketch</h3>
           <AutoSketchPanel
             lines={form.lines}
@@ -318,6 +334,18 @@ export function UnifiedSiteMeasurementForm({
               />
             </div>
           )}
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold">Measurement lines</h3>
+          <MeasurementLineGrid
+            lines={form.lines}
+            readOnly={readOnly}
+            photoUrls={photoUrls}
+            onChange={(lines) => updateForm({ lines })}
+            onLinePhotoUpload={handleLinePhotoUpload}
+            onLinePhotoRemove={handleLinePhotoRemove}
+          />
         </section>
 
         <section className="space-y-2">

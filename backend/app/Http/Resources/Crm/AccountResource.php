@@ -29,6 +29,7 @@ class AccountResource extends JsonResource
             'source_lead_id' => $this->source_lead_id,
             'owner_id' => $this->owner_id,
             'owner' => new UserResource($this->whenLoaded('owner')),
+            'primary_contact' => new ContactResource($this->whenLoaded('primaryContact')),
             'contacts' => ContactResource::collection($this->whenLoaded('contacts')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

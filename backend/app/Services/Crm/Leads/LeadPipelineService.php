@@ -45,6 +45,11 @@ class LeadPipelineService
         return $this->updateStage($lead, LeadPipelineStage::ContactConfirmed, $user);
     }
 
+    public function onAccountProvisioned(Lead $lead, User $user): Lead
+    {
+        return $this->updateStage($lead, LeadPipelineStage::AccountProvisioned, $user);
+    }
+
     public function onSiteVisitRequired(Lead $lead, User $user): Lead
     {
         return $this->updateStage($lead, LeadPipelineStage::SiteVisitRequired, $user);

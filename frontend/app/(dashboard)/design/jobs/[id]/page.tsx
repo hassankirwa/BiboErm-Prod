@@ -13,12 +13,16 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   approveDesignJob,
+  canUploadAccountingDocument,
   canUploadDesignJob,
   designJobStatusLabel,
+  downloadDesignJobDocument,
   downloadDesignJobPackage,
   fetchDesignJob,
   uploadDesignJobFabrication,
+  uploadDesignJobAccounting,
   type ApiDesignJob,
+  type DesignJobDocumentType,
   type WincadExtractionResult,
 } from "@/lib/api/design/jobs";
 import { ensureCsrfCookie } from "@/lib/api/client";
@@ -34,12 +38,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { SiteVisitMeasurementDisplay } from "@/components/measurements/site-visit-measurement-display";
 
 export default function DesignJobWorkspacePage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const jobId = Number(params.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const accountingInputRef = useRef<HTMLInputElement>(null);
 
   const [job, setJob] = useState<ApiDesignJob | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,15 +87,41 @@ export default function DesignJobWorkspacePage() {
     try {
       await ensureCsrfCookie();
       const data = await downloadDesignJobPackage(job.id);
-      toast.success(
-        typeof data === "object" && data && "message" in data
-          ? String((data as { message?: string }).message)
-          : "Measurement package ready.",
-      );
+      const payload =
+        typeof data === "object" && data && "status" in data
+          ? (data as { status?: string; message?: string })
+          : null;
+      if (payload?.status === "stub") {
+        toast.info(
+          payload.message ??
+            "Measurement package export is not available yet. Use Download accounting for the costing sheet.",
+        );
+      } else {
+        toast.success("Measurement package ready.");
+      }
       await reload();
     } catch (err) {
       toast.error(
         err instanceof ApiError ? err.message : "Failed to download measurement package.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDownloadDocument = async (type: DesignJobDocumentType) => {
+    if (!job) return;
+    setBusy(`download-${type}`);
+    try {
+      const fallbackFilename =
+        type === "accounting"
+          ? job.accounting_document?.filename ?? "accounting-sheet.xlsx"
+          : job.design_document?.filename ?? "fabrication.xlsx";
+      await downloadDesignJobDocument(job.id, type, fallbackFilename);
+      toast.success(`Downloaded ${fallbackFilename}`);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to download document.",
       );
     } finally {
       setBusy(null);
@@ -109,6 +141,21 @@ export default function DesignJobWorkspacePage() {
       );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "WINCAD upload failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleAccountingUpload = async (file: File) => {
+    if (!job) return;
+    setBusy("accounting");
+    try {
+      await ensureCsrfCookie();
+      const result = await uploadDesignJobAccounting(job.id, file);
+      setJob(result.design_job);
+      toast.success(`Accounting sheet saved: ${result.accounting_document.filename}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Accounting upload failed.");
     } finally {
       setBusy(null);
     }
@@ -146,6 +193,7 @@ export default function DesignJobWorkspacePage() {
   }
 
   const uploadAllowed = canUploadDesignJob(job);
+  const accountingUploadAllowed = canUploadAccountingDocument(job);
   const quotationNewHref = quotationNewPath({
     accountId: job.account_id ?? job.lead?.converted_account_id ?? undefined,
     designJobId: job.id,
@@ -157,12 +205,28 @@ export default function DesignJobWorkspacePage() {
         title={job.design_job_number ?? `Design Job #${job.id}`}
         subtitle="Download measurements, upload WINCAD output, and approve design."
         actions={
-          <Button variant="outline" asChild>
-            <Link href="/design/jobs">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              All jobs
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {job.site_visit_id ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  document.getElementById("measurement-sketch")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+              >
+                View sketch
+              </Button>
+            ) : null}
+            <Button variant="outline" asChild>
+              <Link href="/design/jobs">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                All jobs
+              </Link>
+            </Button>
+          </div>
         }
       />
       <div className="space-y-6 p-6">
@@ -178,6 +242,108 @@ export default function DesignJobWorkspacePage() {
           </Button>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-border bg-muted/20 p-3">
+          <span className="mr-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Uploads
+          </span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".xls,.xlsx,.csv"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUpload(file);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={accountingInputRef}
+            type="file"
+            className="hidden"
+            accept=".xlsx,.xls,.csv,.txt"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleAccountingUpload(file);
+              e.target.value = "";
+            }}
+          />
+          {uploadAllowed ? (
+            <Button
+              size="sm"
+              disabled={busy === "upload"}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload WINCAD
+            </Button>
+          ) : null}
+          {accountingUploadAllowed ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy === "accounting"}
+              onClick={() => accountingInputRef.current?.click()}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Upload accounting
+            </Button>
+          ) : job.has_accounting_document ? (
+            <>
+              <Badge variant="secondary" className="h-8 px-3">
+                Accounting uploaded
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy === "download-accounting"}
+                onClick={() => void handleDownloadDocument("accounting")}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download accounting
+              </Button>
+            </>
+          ) : null}
+          {job.measurement_report_id ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy === "download"}
+              onClick={() => void handleDownloadPackage()}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download package
+            </Button>
+          ) : null}
+        </div>
+
+        {job.site_visit_id ? (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Site measurements</h2>
+              <div className="flex flex-wrap gap-2">
+                {job.measurement_report_id ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy === "download"}
+                    onClick={() => void handleDownloadPackage()}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download package
+                  </Button>
+                ) : null}
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/site-ops/visits/${job.site_visit_id}`}>
+                    Open site visit
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <SiteVisitMeasurementDisplay visitId={job.site_visit_id} />
+          </section>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="rounded-[10px]">
             <CardHeader>
@@ -189,22 +355,12 @@ export default function DesignJobWorkspacePage() {
                   <p className="text-sm text-muted-foreground">
                     Report #{job.measurement_report?.report_number ?? job.measurement_report_id}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      disabled={busy === "download"}
-                      onClick={() => void handleDownloadPackage()}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download package
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href="/site-ops/reports">
-                        <FileSpreadsheet className="mr-2 h-4 w-4" />
-                        All reports
-                      </Link>
-                    </Button>
-                  </div>
+                  <Button variant="outline" asChild>
+                    <Link href="/site-ops/reports">
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      All reports
+                    </Link>
+                  </Button>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -257,6 +413,102 @@ export default function DesignJobWorkspacePage() {
                   {job.files_count} file(s) · {job.extracted_items_count ?? 0} extracted items
                 </p>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[10px] lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Project documents</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-2">
+              {job.has_design_document && job.design_document ? (
+                <>
+                  <Badge variant="secondary">Fabrication: {job.design_document.filename}</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === "download-design"}
+                    onClick={() => void handleDownloadDocument("design")}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download fabrication
+                  </Button>
+                </>
+              ) : (
+                <Badge variant="outline">Fabrication pending</Badge>
+              )}
+              {job.has_accounting_document && job.accounting_document ? (
+                <>
+                  <Badge variant="secondary">Accounting: {job.accounting_document.filename}</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === "download-accounting"}
+                    onClick={() => void handleDownloadDocument("accounting")}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download accounting
+                  </Button>
+                </>
+              ) : (
+                <Badge variant="outline">Accounting pending</Badge>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[10px]">
+            <CardHeader>
+              <CardTitle className="text-base">Accounting upload</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {job.has_accounting_document && job.accounting_document ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Accounting sheet saved:{" "}
+                    <span className="font-medium text-foreground">
+                      {job.accounting_document.filename}
+                    </span>
+                  </p>
+                  <Button
+                    variant="outline"
+                    disabled={busy === "download-accounting"}
+                    onClick={() => void handleDownloadDocument("accounting")}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download accounting sheet
+                  </Button>
+                </div>
+              ) : accountingUploadAllowed ? (
+                <>
+                  <input
+                    ref={accountingInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".xlsx,.xls,.csv,.txt"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleAccountingUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Upload the costing / accounting Excel sheet for this project.
+                  </p>
+                  <Button
+                    disabled={busy === "accounting"}
+                    onClick={() => accountingInputRef.current?.click()}
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Upload accounting sheet
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {!job.account_id
+                    ? "Link an account to this design job before uploading accounting."
+                    : "Accounting upload is locked for this design job."}
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Crm\Leads\BulkImportLeadsController;
 use App\Http\Controllers\Crm\Leads\ConvertLeadController;
 use App\Http\Controllers\Crm\Leads\LeadController;
+use App\Http\Controllers\Crm\Leads\ProvisionLeadAccountController;
 use App\Http\Controllers\Crm\Leads\StoreLeadAttachmentController;
 use App\Http\Controllers\Crm\Leads\StoreLeadPhotoController;
 use App\Http\Controllers\Crm\Leads\UpdateLeadStatusController;
@@ -15,6 +16,7 @@ Route::middleware('permission:leads.view')->get('leads/{lead}', [LeadController:
 Route::middleware('permission:leads.update')->put('leads/{lead}', [LeadController::class, 'update']);
 Route::middleware('permission:leads.delete')->delete('leads/{lead}', [LeadController::class, 'destroy']);
 Route::middleware('permission:leads.update')->patch('leads/{lead}/status', UpdateLeadStatusController::class);
+Route::middleware('permission:leads.update')->post('leads/{lead}/provision-account', ProvisionLeadAccountController::class);
 Route::middleware('permission:leads.convert')->post('leads/{lead}/convert', ConvertLeadController::class);
 Route::middleware('permission:leads.update')->post('leads/{lead}/attachments', StoreLeadAttachmentController::class);
 Route::middleware('permission:leads.create|leads.update')->post('leads/{lead}/photos', StoreLeadPhotoController::class);

@@ -136,6 +136,18 @@ class ProjectQuotationWorkspaceController extends Controller
         return response()->json(['data' => $payload]);
     }
 
+    public function generateFromAccount(Request $request, Account $account): JsonResponse
+    {
+        abort_unless($request->user()->can('quotations.create'), 403);
+        $this->authorize('view', $account);
+
+        $quotation = $this->workspace->generateFromAccountDocuments($account, $request->user());
+
+        return (new QuotationResource($quotation))->response()->setStatusCode(
+            $quotation->wasRecentlyCreated ? 201 : 200,
+        );
+    }
+
     public function store(Request $request): JsonResponse
     {
         abort_unless($request->user()->can('quotations.create'), 403);

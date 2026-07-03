@@ -61,6 +61,7 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
 export async function fetchSiteVisits(params?: {
   status?: string;
   visit_date?: string;
+  measurement_context?: "quotation" | "production";
   page?: number;
   per_page?: number;
 }): Promise<PaginatedResponse<ApiSiteVisit>> {
@@ -69,12 +70,20 @@ export async function fetchSiteVisits(params?: {
   );
 }
 
-export async function fetchTodaySiteVisits(): Promise<{ data: ApiSiteVisit[] }> {
-  return apiFetch<{ data: ApiSiteVisit[] }>("/api/v1/crm/site-visits/today");
+export async function fetchTodaySiteVisits(params?: {
+  measurement_context?: "quotation" | "production";
+}): Promise<{ data: ApiSiteVisit[] }> {
+  return apiFetch<{ data: ApiSiteVisit[] }>(
+    `/api/v1/crm/site-visits/today${buildQuery(params)}`,
+  );
 }
 
-export async function fetchOpenAssignedSiteVisits(): Promise<{ data: ApiSiteVisit[] }> {
-  return apiFetch<{ data: ApiSiteVisit[] }>("/api/v1/crm/site-visits/open");
+export async function fetchOpenAssignedSiteVisits(params?: {
+  measurement_context?: "quotation" | "production";
+}): Promise<{ data: ApiSiteVisit[] }> {
+  return apiFetch<{ data: ApiSiteVisit[] }>(
+    `/api/v1/crm/site-visits/open${buildQuery(params)}`,
+  );
 }
 
 export async function fetchSiteVisit(id: number): Promise<ApiSiteVisit> {

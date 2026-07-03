@@ -89,7 +89,11 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
   const commercialMode = depositAndDealMode || finalizeDealMode;
   const provisionMode =
     !commercialMode &&
-    canProvisionAccountFromLead(lead?.status, Boolean(linkedAccountId));
+    canProvisionAccountFromLead(
+      lead?.status,
+      Boolean(linkedAccountId),
+      lead?.pipeline_stage,
+    );
 
   useEffect(() => {
     if (!lead) {

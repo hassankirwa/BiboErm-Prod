@@ -327,6 +327,33 @@ class QuotationWorkspaceTest extends TestCase
         $this->assertArrayHasKey('fabrication', $response->json('data.lines.0.metadata'));
     }
 
+    public function test_design_job_download_accounting_document_returns_url(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+        $designJob = DesignJob::query()->where('lead_id', $account->source_lead_id)->firstOrFail();
+
+        $accounting = new UploadedFile(
+            base_path('../docs/excel dump.txt'),
+            'beatrice-accounting.txt',
+            'text/plain',
+            null,
+            true,
+        );
+
+        app(\App\Services\Design\DesignDocumentBridgeService::class)
+            ->storeAccountDocument($account, $accounting, 'accounting', $this->user);
+
+        $response = $this->get(
+            "/api/v1/design/jobs/{$designJob->id}/download-document/accounting",
+            ['Accept' => 'application/json'],
+        );
+
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+        $this->assertStringContainsString('attachment', (string) $response->headers->get('content-disposition'));
+    }
+
     public function test_fabrication_from_account_returns_saved_design_document(): void
     {
         Sanctum::actingAs($this->user);

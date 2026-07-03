@@ -301,6 +301,14 @@ export async function fetchQuotationFormAccounts(options?: {
   return res.data ?? [];
 }
 
+export async function generateQuotationFromAccount(accountId: number): Promise<ApiQuotation> {
+  const res = await apiFetch<{ data: ApiQuotation }>(
+    `/api/v1/projects/quotations/generate-from-account/${accountId}`,
+    { method: "POST" },
+  );
+  return unwrapResource(res);
+}
+
 export async function fetchWorkspaceQuotations(params?: {
   status?: string;
   page?: number;

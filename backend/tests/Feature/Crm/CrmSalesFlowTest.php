@@ -88,6 +88,9 @@ class CrmSalesFlowTest extends TestCase
             ])->assertOk();
         }
 
+        $this->postJson("/api/v1/crm/leads/{$leadId}/provision-account")
+            ->assertCreated();
+
         $visitResponse = $this->postJson('/api/v1/crm/site-visits', [
             'title' => 'Prime Offices measurement',
             'lead_id' => $leadId,
@@ -106,13 +109,17 @@ class CrmSalesFlowTest extends TestCase
             'longitude' => 36.810,
         ])->assertOk();
 
-        $this->postJson("/api/v1/crm/site-visits/{$visitId}/measurements", [
-            'lines' => [
-                [
-                    'room_area_name' => 'Conference room',
-                    'width' => 2.5,
-                    'height' => 1.8,
-                    'quantity' => 2,
+        $this->patchJson("/api/v1/crm/site-visits/{$visitId}/measurement-form", [
+            'form' => [
+                'lines' => [
+                    [
+                        'ref' => '1',
+                        'room_location' => 'Conference room',
+                        'product_type' => 'Window',
+                        'quantity' => 2,
+                        'width_centre_mm' => 2500,
+                        'height_centre_mm' => 1800,
+                    ],
                 ],
             ],
         ])->assertOk();
@@ -161,6 +168,7 @@ class CrmSalesFlowTest extends TestCase
         $quotationId = $quotation->json('data.id');
 
         $this->postJson("/api/v1/crm/quotations/{$quotationId}/submit-for-review")->assertOk();
+        $this->postJson("/api/v1/crm/quotations/{$quotationId}/approve")->assertOk();
         $this->postJson("/api/v1/crm/quotations/{$quotationId}/send")->assertOk();
 
         $dealId = \App\Models\Quotation::query()->findOrFail($quotationId)->deal_id;
@@ -219,7 +227,7 @@ class CrmSalesFlowTest extends TestCase
 
         $lead = Lead::query()->findOrFail($leadId);
         $this->assertSame(
-            LeadStatus::AccountCreated->value,
+            LeadStatus::MeasurementsCaptured->value,
             $lead->status instanceof LeadStatus ? $lead->status->value : $lead->status
         );
     }

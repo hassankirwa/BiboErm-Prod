@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SiteOps;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Crm\SiteVisitResource;
 use App\Models\SiteVisit;
+use App\Support\Crm\SiteVisitMeasurementContextFilter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -26,6 +27,11 @@ class SiteVisitController extends Controller
         if ($visitType = $request->query('visit_type')) {
             $query->where('visit_type', $visitType);
         }
+
+        SiteVisitMeasurementContextFilter::apply(
+            $query,
+            $request->query('measurement_context'),
+        );
 
         return SiteVisitResource::collection(
             $query->paginate($request->integer('per_page', 25))

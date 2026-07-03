@@ -39,6 +39,7 @@ function buildQuery(params?: Record<string, string | number | undefined>): strin
 export async function fetchSiteOpsVisits(params?: {
   status?: string;
   visit_type?: string;
+  measurement_context?: "quotation" | "production";
   page?: number;
   per_page?: number;
 }): Promise<PaginatedResponse<ApiSiteOpsVisit>> {

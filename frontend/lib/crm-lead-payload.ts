@@ -18,6 +18,7 @@ export function leadFormToCreatePayload(
     counties?: CrmLookupItem[];
     product_interests?: CrmLookupItem[];
     fieldDayPinId?: number | null;
+    existingAccountId?: number | null;
   },
 ): CreateLeadPayload {
   const contactProvided = hasContactInfo(values);
@@ -87,6 +88,10 @@ export function leadFormToCreatePayload(
 
   if (lookups?.fieldDayPinId) {
     payload.field_day_pin_id = lookups.fieldDayPinId;
+  }
+
+  if (lookups?.existingAccountId) {
+    payload.existing_account_id = lookups.existingAccountId;
   }
 
   return payload;

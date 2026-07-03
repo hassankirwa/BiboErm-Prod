@@ -32,6 +32,9 @@ class QuotationWorkspaceService
         protected FileStorageService $files,
         protected AccountProvisioningService $accountProvisioning,
         protected DesignDocumentBridgeService $designBridge,
+        protected QuotationAccountingExcelExtractionService $excel,
+        protected FabricationExcelExtractionService $fabricationExcel,
+        protected QuotationLineEnrichmentService $lineEnrichment,
     ) {}
 
     /**
@@ -115,7 +118,15 @@ class QuotationWorkspaceService
         $query = Account::query()->whereIn('id', $eligibleAccountIds);
 
         if ($user && ! $user->can('accounts.view_all')) {
-            $query->visibleTo($user);
+            $visibleThroughVisits = $this->accountIdsVisibleThroughApprovedVisits($user);
+
+            $query->where(function (Builder $inner) use ($user, $visibleThroughVisits): void {
+                $inner->visibleTo($user);
+
+                if ($visibleThroughVisits->isNotEmpty()) {
+                    $inner->orWhereIn('id', $visibleThroughVisits);
+                }
+            });
         }
 
         return $query;
@@ -128,6 +139,10 @@ class QuotationWorkspaceService
         }
 
         if ($user->can('accounts.view_all')) {
+            return true;
+        }
+
+        if ($this->accountIdsVisibleThroughApprovedVisits($user)->contains($account->id)) {
             return true;
         }
 
@@ -172,10 +187,55 @@ class QuotationWorkspaceService
             ->whereNotIn('id', $quotedAccountIds);
 
         if ($user && ! $user->can('accounts.view_all')) {
-            $query->visibleTo($user);
+            $visibleThroughVisits = $this->accountIdsVisibleThroughApprovedVisits($user);
+
+            $query->where(function (Builder $inner) use ($user, $visibleThroughVisits): void {
+                $inner->visibleTo($user);
+
+                if ($visibleThroughVisits->isNotEmpty()) {
+                    $inner->orWhereIn('id', $visibleThroughVisits);
+                }
+            });
         }
 
         return $query;
+    }
+
+    /**
+     * Accounts linked to approved quotation visits the user can access via site-visit visibility.
+     *
+     * @return Collection<int, int|string>
+     */
+    protected function accountIdsVisibleThroughApprovedVisits(User $user): Collection
+    {
+        $accountIds = collect();
+
+        $visits = $this->approvedQuotationSiteVisitsQuery()
+            ->visibleTo($user)
+            ->get(['id', 'account_id', 'lead_id']);
+
+        foreach ($visits as $visit) {
+            if ($visit->account_id) {
+                $accountIds->push($visit->account_id);
+            }
+
+            if ($visit->lead_id) {
+                $lead = Lead::query()->find($visit->lead_id);
+                if ($lead?->converted_account_id) {
+                    $accountIds->push($lead->converted_account_id);
+                }
+
+                $sourceAccountId = Account::query()
+                    ->where('source_lead_id', $visit->lead_id)
+                    ->value('id');
+
+                if ($sourceAccountId) {
+                    $accountIds->push($sourceAccountId);
+                }
+            }
+        }
+
+        return $accountIds->filter()->unique()->values();
     }
 
     /**
@@ -267,6 +327,102 @@ class QuotationWorkspaceService
 
             return $quotation->fresh()->load(['lines', 'account', 'contact', 'preparedBy']);
         });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function extractMergedPayloadFromAccount(Account $account): array
+    {
+        $accountingDocument = $this->designBridge->latestAccountDocument($account, 'accounting');
+        if (! $accountingDocument) {
+            throw ValidationException::withMessages([
+                'accounting' => ['No saved accounting document for this account. Upload costing in Design first.'],
+            ]);
+        }
+
+        $designDocument = $this->designBridge->latestAccountDocument($account, 'design');
+        if (! $designDocument) {
+            throw ValidationException::withMessages([
+                'design' => ['No saved fabrication document for this account. Upload WINCAD in Design first.'],
+            ]);
+        }
+
+        $accountingFile = $this->designBridge->uploadedFileFromDocument($accountingDocument);
+        if (! $accountingFile) {
+            throw ValidationException::withMessages([
+                'accounting' => ['Saved accounting document could not be read.'],
+            ]);
+        }
+
+        $fabricationFile = $this->designBridge->uploadedFileFromDocument($designDocument);
+        if (! $fabricationFile) {
+            throw ValidationException::withMessages([
+                'design' => ['Saved fabrication document could not be read.'],
+            ]);
+        }
+
+        $payload = $this->excel->extractFromUpload($accountingFile);
+        $fabricationPayload = $this->fabricationExcel->extractFromUpload($fabricationFile);
+
+        return $this->lineEnrichment->enrich($payload, $fabricationPayload);
+    }
+
+    public function generateFromAccountDocuments(Account $account, User $user): Quotation
+    {
+        $existing = Quotation::query()
+            ->excludingReferenceCopies()
+            ->where('account_id', $account->id)
+            ->whereIn('status', [
+                QuotationStatus::Draft->value,
+                QuotationStatus::InternalReview->value,
+                QuotationStatus::Sent->value,
+                QuotationStatus::Accepted->value,
+            ])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return $existing->load(['lines', 'account', 'contact', 'preparedBy']);
+        }
+
+        $payload = $this->extractMergedPayloadFromAccount($account);
+        $lines = [];
+
+        foreach ($payload['lines'] ?? [] as $index => $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+
+            $lines[] = array_filter([
+                'description' => $line['description'] ?? trim(($line['series'] ?? '').' '.($line['code'] ?? '')),
+                'series' => $line['series'] ?? null,
+                'code' => $line['code'] ?? null,
+                'glass_type' => $line['glass_type'] ?? null,
+                'width_mm' => $line['width_mm'] ?? null,
+                'height_mm' => $line['height_mm'] ?? null,
+                'sqm_per_pcs' => $line['sqm_per_pcs'] ?? null,
+                'total_sqm' => $line['total_sqm'] ?? null,
+                'quantity' => (float) ($line['quantity'] ?? 1),
+                'unit_price' => (float) ($line['unit_price'] ?? 0),
+                'metadata' => $line['metadata'] ?? null,
+                'sort_order' => $index,
+            ], fn (mixed $value): bool => $value !== null);
+        }
+
+        if ($lines === []) {
+            throw ValidationException::withMessages([
+                'lines' => ['No quotation lines could be extracted from saved documents.'],
+            ]);
+        }
+
+        return $this->createFromPayload($account, $user, [
+            'account_id' => $account->id,
+            'project_name' => $payload['project']['name'] ?? $payload['project_name'] ?? $account->name,
+            'project_number' => $payload['project']['order_no'] ?? $payload['project_number'] ?? null,
+            'tax_rate' => config('bibo.quotation.default_tax_rate', 16),
+            'lines' => $lines,
+        ]);
     }
 
     /**
@@ -364,6 +520,10 @@ class QuotationWorkspaceService
             $leadIds = $leadIds->merge(
                 DesignJob::query()
                     ->whereIn('status', [
+                        DesignJobStatus::DesignRequired->value,
+                        DesignJobStatus::Assigned->value,
+                        DesignJobStatus::PackageDownloaded->value,
+                        DesignJobStatus::WincadInProgress->value,
                         DesignJobStatus::FilesUploaded->value,
                         DesignJobStatus::DesignReview->value,
                         DesignJobStatus::Approved->value,
@@ -452,15 +612,20 @@ class QuotationWorkspaceService
                     ->orWhereNull('measurement_context');
             })
             ->where(function ($query) {
-                $query->whereNotNull('measurement_form_data')
-                    ->orWhereHas('measurementLines');
+                $query->whereHas('measurementReports')
+                    ->orWhereHas('measurementLines')
+                    ->orWhereHas('designJobs')
+                    ->orWhereNotNull('measurement_form_data');
             });
     }
 
     protected function reconcileAccountsForApprovedVisits(User $user): void
     {
-        $leadIds = $this->approvedQuotationSiteVisitsQuery()
+        $approvedVisits = $this->approvedQuotationSiteVisitsQuery()
             ->whereNotNull('lead_id')
+            ->get(['id', 'lead_id', 'account_id']);
+
+        $leadIds = $approvedVisits
             ->whereNull('account_id')
             ->pluck('lead_id')
             ->unique()
@@ -498,6 +663,19 @@ class QuotationWorkspaceService
                     ->where('status', '!=', 'awaiting_quotation')
                     ->update(['status' => 'awaiting_quotation']);
             }
+        }
+
+        $linkedAccountIds = $approvedVisits
+            ->pluck('account_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($linkedAccountIds->isNotEmpty()) {
+            Account::query()
+                ->whereIn('id', $linkedAccountIds)
+                ->where('status', '!=', 'awaiting_quotation')
+                ->update(['status' => 'awaiting_quotation']);
         }
     }
 }

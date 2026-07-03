@@ -8,6 +8,7 @@ use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\SiteVisits\SiteVisitWorkflowService;
 use App\Support\Crm\SiteVisitAssigneeRoles;
+use App\Support\Crm\SiteVisitMeasurementContextFilter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -33,6 +34,11 @@ class SiteVisitController extends Controller
         if ($date = $request->query('visit_date')) {
             $query->whereDate('visit_date', $date);
         }
+
+        SiteVisitMeasurementContextFilter::apply(
+            $query,
+            $request->query('measurement_context'),
+        );
 
         return SiteVisitResource::collection(
             $query->paginate($request->integer('per_page', 25))

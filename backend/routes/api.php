@@ -135,6 +135,10 @@ Route::prefix('v1')->group(function () {
         require __DIR__.'/api/design.php';
     });
 
+    Route::middleware(['auth:sanctum', 'active'])->prefix('notifications')->group(function () {
+        require __DIR__.'/api/notifications.php';
+    });
+
     Route::middleware(['auth:sanctum', 'active'])->prefix('quotation')->group(function () {
         require __DIR__.'/api/quotation.php';
     });

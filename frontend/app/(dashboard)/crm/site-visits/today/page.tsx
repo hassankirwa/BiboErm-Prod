@@ -28,8 +28,27 @@ import {
   canStartFieldVisit,
 } from "@/lib/crm/site-visit-utils";
 import { toast } from "sonner";
+import type { SiteOpsMeasurementContext } from "@/lib/site-ops/paths";
+import { SITE_OPS_CONTEXT_META } from "@/lib/site-ops/paths";
 
-export default function SiteVisitsTodayPage() {
+type SiteVisitsTodayPageViewProps = {
+  measurementContext?: SiteOpsMeasurementContext;
+  title?: string;
+  subtitle?: string;
+  myVisitsPath?: string;
+  allVisitsPath?: string;
+  visitDetailBasePath?: string;
+};
+
+export function SiteVisitsTodayPageView({
+  measurementContext = "quotation",
+  title,
+  subtitle,
+  myVisitsPath = "/crm/site-visits/my-visits",
+  allVisitsPath = "/crm/site-visits",
+  visitDetailBasePath = "/crm/site-visits",
+}: SiteVisitsTodayPageViewProps) {
+  const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +58,9 @@ export default function SiteVisitsTodayPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchTodaySiteVisits();
+      const res = await fetchTodaySiteVisits({
+        measurement_context: measurementContext,
+      });
       setVisits(res.data);
     } catch (err) {
       setError(
@@ -48,7 +69,7 @@ export default function SiteVisitsTodayPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [measurementContext]);
 
   useEffect(() => {
     loadVisits();
@@ -86,20 +107,23 @@ export default function SiteVisitsTodayPage() {
   return (
     <div className="flex h-full flex-col">
       <AppHeader
-        title="Today's Visits"
-        subtitle={new Date().toLocaleDateString(undefined, {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })}
+        title={title ?? contextMeta.todayTitle}
+        subtitle={
+          subtitle ??
+          new Date().toLocaleDateString(undefined, {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/crm/site-visits/my-visits">My Visits</Link>
+              <Link href={myVisitsPath}>My Visits</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/crm/site-visits">
+              <Link href={allVisitsPath}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 All Visits
               </Link>
@@ -137,7 +161,7 @@ export default function SiteVisitsTodayPage() {
                     <div>
                       <CardTitle className="text-base">
                         <Link
-                          href={`/crm/site-visits/${visit.id}`}
+                          href={`${visitDetailBasePath}/${visit.id}`}
                           className="hover:underline"
                         >
                           {visit.title}
@@ -190,7 +214,7 @@ export default function SiteVisitsTodayPage() {
                           className="sm:flex-1"
                           asChild
                         >
-                          <Link href={`/crm/site-visits/${visit.id}#log-details`}>
+                          <Link href={`${visitDetailBasePath}/${visit.id}#log-details`}>
                             <ClipboardList className="mr-2 h-4 w-4" />
                             Log details
                           </Link>
@@ -215,7 +239,7 @@ export default function SiteVisitsTodayPage() {
 
                   {!showStart && !showLogDetails && !isDone && (
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/crm/site-visits/${visit.id}`}>View visit</Link>
+                      <Link href={`${visitDetailBasePath}/${visit.id}`}>View visit</Link>
                     </Button>
                   )}
                 </CardContent>
@@ -226,4 +250,8 @@ export default function SiteVisitsTodayPage() {
       </div>
     </div>
   );
+}
+
+export default function SiteVisitsTodayPage() {
+  return <SiteVisitsTodayPageView measurementContext="quotation" />;
 }

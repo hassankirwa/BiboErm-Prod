@@ -65,6 +65,7 @@ export type CreateLeadPayload = {
   first_name?: string | null;
   last_name?: string | null;
   company?: string | null;
+  existing_account_id?: number | null;
 };
 
 export type ConvertLeadPayload = {
@@ -229,6 +230,23 @@ export async function convertLead(
     method: "POST",
     json: payload,
   });
+}
+
+export type ProvisionLeadAccountResult = {
+  data: {
+    lead: ApiLeadDetail;
+    account: ApiAccount | null;
+  };
+};
+
+export async function provisionLeadAccount(
+  id: number,
+): Promise<ProvisionLeadAccountResult["data"]> {
+  const res = await apiFetch<ProvisionLeadAccountResult>(
+    `/api/v1/crm/leads/${id}/provision-account`,
+    { method: "POST" },
+  );
+  return res.data;
 }
 
 export async function deleteLead(id: number): Promise<void> {

@@ -1,1 +1,1 @@
-export { default } from "../../crm/site-visits/page";
+export { default } from "../quotation/visits/page";

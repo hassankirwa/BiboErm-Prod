@@ -28,7 +28,7 @@ export function AutoSketchPanel({
   onUpload,
 }: AutoSketchPanelProps) {
   const floorCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [expanded, setExpanded] = useState(context !== "quotation");
+  const [expanded, setExpanded] = useState(true);
   const [activeFloorIndex, setActiveFloorIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
   const lastUploadSignature = useRef("");
@@ -109,17 +109,15 @@ export function AutoSketchPanel({
               Updating sketch…
             </span>
           )}
-          {context === "quotation" && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded(false)}
-            >
-              <ChevronUp className="mr-1 h-4 w-4" />
-              Hide
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setExpanded(false)}
+          >
+            <ChevronUp className="mr-1 h-4 w-4" />
+            Hide sketch
+          </Button>
         </div>
       </div>
 

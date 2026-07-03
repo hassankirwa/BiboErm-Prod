@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,8 @@ import {
 } from "@/lib/currency/quotation-pricing";
 import { buildQuotationExchangeRate } from "@/lib/currency/usd-to-kes";
 import { useUsdToKesRate } from "@/lib/currency/use-usd-to-kes-rate";
+import { QuotationPreviewDocument } from "@/components/projects/quotation-preview-document";
+import { QuotationPdfDownloadButton } from "@/components/projects/quotation-pdf-download-button";
 import { projectDetailPath } from "@/lib/projects/paths";
 import {
   quotationDetailPath,
@@ -258,6 +260,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   const [addingNote, setAddingNote] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [recordingDeposit, setRecordingDeposit] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [paymentForm, setPaymentForm] = useState({
     payment_reference: "",
     payment_date: new Date().toISOString().slice(0, 10),
@@ -732,6 +735,21 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
             rate={hasUsdLines ? effectiveRate : null}
           />
         )}
+
+        {!isCrmMode && quotation ? (
+          <div className="w-full min-w-0">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold">Proforma Preview</h2>
+              <QuotationPdfDownloadButton targetRef={previewRef} quotation={quotation} />
+            </div>
+            <QuotationPreviewDocument
+              ref={previewRef}
+              quotation={quotation}
+              showFabricationDetails={false}
+              exchangeRate={hasUsdLines ? exchangeRate : null}
+            />
+          </div>
+        ) : null}
       </div>
 
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>

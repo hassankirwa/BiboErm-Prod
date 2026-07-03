@@ -89,6 +89,7 @@ class StoreLeadRequest extends FormRequest
             'notes' => ['nullable', 'string'],
             'source' => ['nullable', 'string', 'max:64'],
             'field_day_pin_id' => ['nullable', 'exists:field_day_pins,id'],
+            'existing_account_id' => ['nullable', 'exists:accounts,id'],
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'company' => ['nullable', 'string', 'max:255'],

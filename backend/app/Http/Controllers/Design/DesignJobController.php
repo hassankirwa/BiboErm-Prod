@@ -12,9 +12,13 @@ use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Design\DesignDocumentBridgeService;
 use App\Services\Design\DesignJobService;
 use App\Services\Design\WincadUploadService;
+use App\Services\Notifications\AssignmentNotificationService;
 use App\Services\SiteOps\MeasurementPackageService;
+use App\Support\BiboStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DesignJobController extends Controller
 {
@@ -25,6 +29,7 @@ class DesignJobController extends Controller
         protected DesignDocumentBridgeService $documentBridge,
         protected LeadPipelineService $leadPipelineService,
         protected AccountProvisioningService $accountProvisioning,
+        protected AssignmentNotificationService $assignmentNotifications,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -84,6 +89,8 @@ class DesignJobController extends Controller
             $this->leadPipelineService->onDesignJobAssigned($job->lead, $request->user());
         }
 
+        $this->assignmentNotifications->notifyDesignJobAssigned($job, $designer, $request->user());
+
         return response()->json(['data' => $this->serialize($job)]);
     }
 
@@ -99,6 +106,47 @@ class DesignJobController extends Controller
 
         return response()->json([
             'data' => $this->packageService->downloadPackage($report),
+        ]);
+    }
+
+    public function downloadDocument(DesignJob $designJob, string $type): StreamedResponse|JsonResponse
+    {
+        if (! in_array($type, ['accounting', 'design'], true)) {
+            return response()->json(['message' => 'Invalid document type.'], 422);
+        }
+
+        $account = $this->documentBridge->resolveAccountForDesignJob($designJob);
+        if (! $account) {
+            return response()->json(['message' => 'No account linked to this design job.'], 422);
+        }
+
+        $document = $this->documentBridge->latestAccountDocument($account, $type);
+        if (! $document || ! $document->file_path) {
+            return response()->json(['message' => ucfirst($type).' document not found.'], 404);
+        }
+
+        $disk = Storage::disk(BiboStorage::diskName());
+        if (! $disk->exists($document->file_path)) {
+            return response()->json(['message' => 'Document file is unavailable.'], 404);
+        }
+
+        $filename = $document->filename ?? basename($document->file_path);
+        $mime = $disk->mimeType($document->file_path) ?: 'application/octet-stream';
+
+        return response()->stream(function () use ($disk, $document): void {
+            $stream = $disk->readStream($document->file_path);
+
+            if (! is_resource($stream)) {
+                return;
+            }
+
+            fpassthru($stream);
+            fclose($stream);
+        }, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store, max-age=0',
         ]);
     }
 
@@ -123,6 +171,37 @@ class DesignJobController extends Controller
                         'files',
                         'extractedItems',
                     ]),
+                ),
+            ],
+        ]);
+    }
+
+    public function uploadAccounting(Request $request, DesignJob $designJob): JsonResponse
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:20480'],
+        ]);
+
+        $account = $this->documentBridge->resolveAccountForDesignJob($designJob);
+        if (! $account) {
+            return response()->json(['message' => 'No account linked to this design job.'], 422);
+        }
+
+        $document = $this->documentBridge->storeAccountDocument(
+            $account,
+            $validated['file'],
+            'accounting',
+            $request->user(),
+        );
+
+        return response()->json([
+            'data' => [
+                'accounting_document' => [
+                    'id' => $document->id,
+                    'filename' => $document->filename,
+                ],
+                'design_job' => $this->serialize(
+                    $designJob->fresh()->load(['lead', 'files', 'extractedItems', 'assignedDesigner']),
                 ),
             ],
         ]);
@@ -191,6 +270,10 @@ class DesignJobController extends Controller
             'site_visit_id' => $job->site_visit_id,
             'measurement_report_id' => $job->measurement_report_id,
             'assigned_designer_id' => $job->assigned_designer_id,
+            'assigned_designer' => $job->relationLoaded('assignedDesigner') && $job->assignedDesigner ? [
+                'id' => $job->assignedDesigner->id,
+                'name' => $job->assignedDesigner->name,
+            ] : null,
             'status' => $job->status instanceof DesignJobStatus ? $job->status->value : $job->status,
             'downloaded_at' => $job->downloaded_at?->toIso8601String(),
             'design_started_at' => $job->design_started_at?->toIso8601String(),
@@ -230,6 +313,20 @@ class DesignJobController extends Controller
                 'id' => $account->id,
                 'name' => $account->name,
                 'account_number' => $account->account_number,
+            ] : null,
+            'has_design_document' => $account
+                ? $this->documentBridge->latestAccountDocument($account, 'design') !== null
+                : false,
+            'has_accounting_document' => $account
+                ? $this->documentBridge->latestAccountDocument($account, 'accounting') !== null
+                : false,
+            'design_document' => ($account && ($designDoc = $this->documentBridge->latestAccountDocument($account, 'design'))) ? [
+                'id' => $designDoc->id,
+                'filename' => $designDoc->filename,
+            ] : null,
+            'accounting_document' => ($account && ($accountingDoc = $this->documentBridge->latestAccountDocument($account, 'accounting'))) ? [
+                'id' => $accountingDoc->id,
+                'filename' => $accountingDoc->filename,
             ] : null,
             'measurement_report' => $job->relationLoaded('measurementReport') && $job->measurementReport ? [
                 'id' => $job->measurementReport->id,

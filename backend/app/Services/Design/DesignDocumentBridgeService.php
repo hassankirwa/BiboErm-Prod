@@ -108,7 +108,7 @@ class DesignDocumentBridgeService
         $stored = $this->files->store(
             $file,
             'project-documents',
-            'account-'.$account->id.'/'.$documentType,
+            'account-'.$account->id.'-'.$documentType,
         );
 
         AccountDocument::query()

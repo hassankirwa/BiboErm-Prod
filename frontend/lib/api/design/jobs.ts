@@ -1,4 +1,7 @@
 import { apiFetch, ensureCsrfCookie } from "../client";
+import { getApiBaseUrl } from "../config";
+import { getDeviceUuid } from "../device";
+import { ApiError } from "../errors";
 import { unwrapResource } from "../crm/types";
 import type { PaginatedMeta, PaginatedResponse } from "../crm/types";
 
@@ -57,6 +60,10 @@ export type ApiDesignJob = {
     account_number: string | null;
   } | null;
   assigned_designer?: { id: number; name: string | null } | null;
+  has_design_document?: boolean;
+  has_accounting_document?: boolean;
+  design_document?: { id: number; filename: string } | null;
+  accounting_document?: { id: number; filename: string } | null;
   measurement_report?: {
     id: number;
     report_number: string | null;
@@ -140,6 +147,54 @@ export async function downloadDesignJobPackage(id: number): Promise<unknown> {
   return res.data;
 }
 
+export type DesignJobDocumentType = "accounting" | "design";
+
+export async function downloadDesignJobDocument(
+  id: number,
+  type: DesignJobDocumentType,
+  fallbackFilename?: string,
+): Promise<void> {
+  await ensureCsrfCookie();
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/design/jobs/${id}/download-document/${type}`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "*/*",
+        "X-Requested-With": "XMLHttpRequest",
+        "X-Device-UUID": getDeviceUuid(),
+        "X-Device-Id": getDeviceUuid(),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    const message =
+      (typeof body.message === "string" && body.message) ||
+      "Could not download document.";
+    throw new ApiError(response.status, message, body);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/i);
+  const filename =
+    match?.[1] ??
+    fallbackFilename ??
+    (type === "accounting" ? "accounting-sheet.xlsx" : "fabrication.xlsx");
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function approveDesignJob(
   id: number,
   reviewNotes?: string,
@@ -173,6 +228,26 @@ export async function uploadDesignJobFabrication(
     return res.data;
   }
   return res as { extraction: WincadExtractionResult; design_job: ApiDesignJob };
+}
+
+export async function uploadDesignJobAccounting(
+  id: number,
+  file: File,
+): Promise<{ accounting_document: { id: number; filename: string }; design_job: ApiDesignJob }> {
+  await ensureCsrfCookie();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiFetch<
+    | { accounting_document: { id: number; filename: string }; design_job: ApiDesignJob }
+    | { data: { accounting_document: { id: number; filename: string }; design_job: ApiDesignJob } }
+  >(`/api/v1/design/jobs/${id}/upload-accounting`, {
+    method: "POST",
+    body: form,
+  });
+  if (res && typeof res === "object" && "data" in res && res.data) {
+    return res.data;
+  }
+  return res as { accounting_document: { id: number; filename: string }; design_job: ApiDesignJob };
 }
 
 export async function extractWincadFile(file: File): Promise<WincadExtractionResult> {
@@ -219,5 +294,15 @@ export function isDesignJobApproved(
 export function canUploadDesignJob(
   job: Pick<ApiDesignJob, "status" | "approved_at">,
 ): boolean {
+  return !isDesignJobApproved(job.status, job.approved_at);
+}
+
+export function canUploadAccountingDocument(
+  job: Pick<ApiDesignJob, "has_accounting_document" | "account_id" | "status" | "approved_at">,
+): boolean {
+  if (!job.account_id || job.has_accounting_document) {
+    return false;
+  }
+
   return !isDesignJobApproved(job.status, job.approved_at);
 }

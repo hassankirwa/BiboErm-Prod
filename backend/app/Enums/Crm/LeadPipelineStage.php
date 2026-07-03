@@ -6,6 +6,7 @@ enum LeadPipelineStage: string
 {
     case NewLead = 'new_lead';
     case ContactConfirmed = 'contact_confirmed';
+    case AccountProvisioned = 'account_provisioned';
     case SiteVisitRequired = 'site_visit_required';
     case SiteVisitAssigned = 'site_visit_assigned';
     case SiteVisitInProgress = 'site_visit_in_progress';

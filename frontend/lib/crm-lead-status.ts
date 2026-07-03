@@ -32,6 +32,7 @@ export type LeadStatus = (typeof LEAD_STATUSES)[number];
 export const KANBAN_STAGE_TO_STATUS: Record<LeadKanbanStageId, LeadStatus> = {
   new_lead: "new",
   contact_confirmed: "contacted",
+  account_provisioned: "account_created",
   site_visit_required: "site_visit_required",
   site_visit_assigned: "site_visit_scheduled",
   measurements_submitted: "measurements_captured",
@@ -45,7 +46,7 @@ export const STATUS_TO_KANBAN_STAGE: Record<string, LeadKanbanStageId> = {
   new: "new_lead",
   contacted: "contact_confirmed",
   interested: "contact_confirmed",
-  account_created: "site_visit_required",
+  account_created: "account_provisioned",
   not_reachable: "cold",
   unqualified: "lost",
   qualified: "site_visit_required",
@@ -205,10 +206,19 @@ export function hasProvisionedAccount(status: string | null | undefined): boolea
 export function canProvisionAccountFromLead(
   status: string | null | undefined,
   hasLinkedAccount: boolean,
+  pipelineStage?: string | null,
 ): boolean {
   if (hasLinkedAccount) return false;
   const normalized = (status ?? "new").toLowerCase();
-  return normalized === "interested" || isLeadQualifiedForAccount(normalized);
+  const stage = (pipelineStage ?? "").toLowerCase();
+  if (
+    stage === "contact_confirmed" ||
+    normalized === "interested" ||
+    normalized === "contacted"
+  ) {
+    return true;
+  }
+  return isLeadQualifiedForAccount(normalized);
 }
 
 const SENT_QUOTATION_STATUSES = new Set([

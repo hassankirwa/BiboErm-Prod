@@ -2,6 +2,7 @@
 export const LEAD_PIPELINE_STAGES = [
   "new_lead",
   "contact_confirmed",
+  "account_provisioned",
   "site_visit_required",
   "site_visit_assigned",
   "site_visit_in_progress",
@@ -28,6 +29,7 @@ export type LeadPipelineStage = (typeof LEAD_PIPELINE_STAGES)[number];
 export type LeadKanbanStageId =
   | "new_lead"
   | "contact_confirmed"
+  | "account_provisioned"
   | "site_visit_required"
   | "site_visit_assigned"
   | "measurements_submitted"
@@ -39,6 +41,7 @@ export type LeadKanbanStageId =
 export const KANBAN_PIPELINE_STAGE_IDS: LeadKanbanStageId[] = [
   "new_lead",
   "contact_confirmed",
+  "account_provisioned",
   "site_visit_required",
   "site_visit_assigned",
   "measurements_submitted",
@@ -53,6 +56,7 @@ export const TERMINAL_KANBAN_STAGE_IDS: LeadKanbanStageId[] = ["cold", "lost"];
 export const PIPELINE_STAGE_LABELS: Record<LeadPipelineStage, string> = {
   new_lead: "New Lead",
   contact_confirmed: "Contact Confirmed",
+  account_provisioned: "Account Provisioned",
   site_visit_required: "Site Visit Required",
   site_visit_assigned: "Site Visit Assigned",
   site_visit_in_progress: "Site Visit In Progress",
@@ -76,6 +80,7 @@ export const PIPELINE_STAGE_LABELS: Record<LeadPipelineStage, string> = {
 export const KANBAN_STAGE_LABELS: Record<LeadKanbanStageId, string> = {
   new_lead: "New Lead",
   contact_confirmed: "Contact Confirmed",
+  account_provisioned: "Account Created",
   site_visit_required: "Site Visit Required",
   site_visit_assigned: "Site Visit Assigned",
   measurements_submitted: "Measurements Submitted",
@@ -89,6 +94,7 @@ export const KANBAN_STAGE_LABELS: Record<LeadKanbanStageId, string> = {
 export const PIPELINE_STAGE_TO_KANBAN: Record<LeadPipelineStage, LeadKanbanStageId> = {
   new_lead: "new_lead",
   contact_confirmed: "contact_confirmed",
+  account_provisioned: "account_provisioned",
   site_visit_required: "site_visit_required",
   site_visit_assigned: "site_visit_assigned",
   site_visit_in_progress: "site_visit_assigned",
@@ -114,7 +120,7 @@ export const LEGACY_STATUS_TO_PIPELINE_STAGE: Record<string, LeadPipelineStage> 
   new: "new_lead",
   contacted: "contact_confirmed",
   interested: "contact_confirmed",
-  account_created: "site_visit_required",
+  account_created: "account_provisioned",
   not_reachable: "cold",
   unqualified: "lost",
   qualified: "site_visit_required",
@@ -128,6 +134,7 @@ export const LEGACY_STATUS_TO_PIPELINE_STAGE: Record<string, LeadPipelineStage> 
 export const KANBAN_STAGE_TO_LEGACY_STATUS: Record<LeadKanbanStageId, string> = {
   new_lead: "new",
   contact_confirmed: "contacted",
+  account_provisioned: "account_created",
   site_visit_required: "site_visit_required",
   site_visit_assigned: "site_visit_scheduled",
   measurements_submitted: "measurements_captured",
@@ -141,6 +148,7 @@ export const KANBAN_STAGE_TO_LEGACY_STATUS: Record<LeadKanbanStageId, string> = 
 export const PIPELINE_TRACKER_STAGES: LeadKanbanStageId[] = [
   "new_lead",
   "contact_confirmed",
+  "account_provisioned",
   "site_visit_required",
   "site_visit_assigned",
   "measurements_submitted",
@@ -160,6 +168,10 @@ const NEXT_ACTIONS: Partial<Record<LeadPipelineStage, PipelineNextAction>> = {
     description: "Confirm contact details and initial interest.",
   },
   contact_confirmed: {
+    label: "Create account",
+    description: "Provision a CRM account before scheduling measurements.",
+  },
+  account_provisioned: {
     label: "Schedule site visit",
     description: "Book a field visit for measurements or inspection.",
   },

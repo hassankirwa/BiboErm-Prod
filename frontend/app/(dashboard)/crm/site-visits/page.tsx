@@ -49,6 +49,8 @@ import { ensureCsrfCookie } from "@/lib/api/client";
 import { resolveFieldOfficerName, canApproveSiteVisit } from "@/lib/crm/site-visit-utils";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
+import type { SiteOpsMeasurementContext } from "@/lib/site-ops/paths";
+import { SITE_OPS_CONTEXT_META } from "@/lib/site-ops/paths";
 
 function formatStatus(status: string | null): string {
   if (!status) return "-";
@@ -67,7 +69,30 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   assigned: "outline",
 };
 
-export default function SiteVisitsPage() {
+type SiteVisitsPageViewProps = {
+  measurementContext?: SiteOpsMeasurementContext;
+  title?: string;
+  subtitle?: string;
+  myVisitsPath?: string;
+  todayPath?: string;
+  fieldDayPath?: string;
+  visitDetailBasePath?: string;
+  allowSchedule?: boolean;
+};
+
+export function SiteVisitsPageView({
+  measurementContext = "quotation",
+  title,
+  subtitle,
+  myVisitsPath = "/crm/site-visits/my-visits",
+  todayPath = "/crm/site-visits/today",
+  fieldDayPath = "/crm/field-day",
+  visitDetailBasePath = "/crm/site-visits",
+  allowSchedule = measurementContext === "quotation",
+}: SiteVisitsPageViewProps) {
+  const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
+  const headerTitle = title ?? contextMeta.visitsTitle;
+  const headerSubtitle = subtitle ?? contextMeta.visitsSubtitle;
   const { user, roles } = useAuth();
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +123,10 @@ export default function SiteVisitsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchSiteVisits({ per_page: 100 });
+      const res = await fetchSiteVisits({
+        per_page: 100,
+        measurement_context: measurementContext,
+      });
       setVisits(res.data);
     } catch (err) {
       setError(
@@ -107,7 +135,7 @@ export default function SiteVisitsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [measurementContext]);
 
   useEffect(() => {
     loadVisits();
@@ -177,7 +205,7 @@ export default function SiteVisitsPage() {
         site_address: form.site_address || undefined,
         deal_id: selectedDealId ?? undefined,
         lead_id: selectedLeadId ?? undefined,
-        measurement_context: "quotation",
+        measurement_context: measurementContext,
         notes_for_field_officer: form.notes_for_field_officer || undefined,
       });
       setDialogOpen(false);
@@ -209,38 +237,46 @@ export default function SiteVisitsPage() {
   return (
     <div className="flex h-full flex-col">
       <AppHeader
-        title="Site Visits"
-        subtitle="Schedule and track field measurement visits"
+        title={headerTitle}
+        subtitle={headerSubtitle}
         actions={
           <div className="flex gap-2">
             <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
               <Button size="sm" variant="outline" asChild>
-                <Link href="/crm/site-visits/my-visits">My Visits</Link>
+                <Link href={myVisitsPath}>My Visits</Link>
               </Button>
             </PermissionGate>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/crm/site-visits/today">Today</Link>
+              <Link href={todayPath}>Today</Link>
             </Button>
-            <Button size="sm" variant="outline" asChild>
-              <Link href="/crm/field-day">Field Day</Link>
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 gap-1.5"
-              onClick={() => {
-                setForm((f) => ({
-                  ...f,
-                  visit_date: f.visit_date || new Date().toISOString().slice(0, 10),
-                  assigned_field_officer_id:
-                    f.assigned_field_officer_id ||
-                    defaultSiteVisitAssigneeId(user?.id, null),
-                }));
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              Schedule Visit
-            </Button>
+            {measurementContext === "quotation" ? (
+              <Button size="sm" variant="outline" asChild>
+                <Link href={fieldDayPath}>Field Day</Link>
+              </Button>
+            ) : null}
+            {allowSchedule ? (
+              <Button
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => {
+                  setForm((f) => ({
+                    ...f,
+                    visit_date: f.visit_date || new Date().toISOString().slice(0, 10),
+                    assigned_field_officer_id:
+                      f.assigned_field_officer_id ||
+                      defaultSiteVisitAssigneeId(user?.id, null),
+                  }));
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Schedule Visit
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/projects">Schedule from project</Link>
+              </Button>
+            )}
           </div>
         }
       />
@@ -261,7 +297,7 @@ export default function SiteVisitsPage() {
         ) : (
           <Card className="border-border">
             <CardHeader>
-              <CardTitle className="text-base">All Visits</CardTitle>
+              <CardTitle className="text-base">{contextMeta.shortLabel} visits</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -280,7 +316,7 @@ export default function SiteVisitsPage() {
                     <TableRow key={visit.id}>
                       <TableCell>
                         <Link
-                          href={`/crm/site-visits/${visit.id}`}
+                          href={`${visitDetailBasePath}/${visit.id}`}
                           className="hover:underline"
                         >
                           <p className="font-medium">{visit.title}</p>
@@ -330,7 +366,7 @@ export default function SiteVisitsPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" asChild>
-                            <Link href={`/crm/site-visits/${visit.id}`}>
+                            <Link href={`${visitDetailBasePath}/${visit.id}`}>
                               <Eye className="mr-1 h-3.5 w-3.5" />
                               View
                             </Link>
@@ -512,3 +548,6 @@ export default function SiteVisitsPage() {
   );
 }
 
+export default function SiteVisitsPage() {
+  return <SiteVisitsPageView measurementContext="quotation" />;
+}

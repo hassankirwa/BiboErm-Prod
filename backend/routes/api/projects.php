@@ -32,6 +32,7 @@ Route::prefix('quotations')->group(function () {
     Route::get('form-accounts', [ProjectQuotationWorkspaceController::class, 'formAccounts']);
     Route::post('extract', [ProjectQuotationWorkspaceController::class, 'extract']);
     Route::post('fabrication-from-account/{account}', [ProjectQuotationWorkspaceController::class, 'fabricationFromAccount']);
+    Route::post('generate-from-account/{account}', [ProjectQuotationWorkspaceController::class, 'generateFromAccount']);
     Route::post('extract-from-account/{account}', [ProjectQuotationWorkspaceController::class, 'extractFromAccount']);
     Route::get('/', [ProjectQuotationWorkspaceController::class, 'index']);
     Route::post('/', [ProjectQuotationWorkspaceController::class, 'store']);

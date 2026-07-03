@@ -153,37 +153,76 @@ export const departments: Department[] = [
     icon: MapPin,
     path: "/site-ops",
     subModules: [
-      { name: "Site Visits", path: "/site-ops/visits" },
-      { name: "Measurements", path: "/site-ops/measurements" },
-      {
-        name: "My Visits",
-        path: "/site-ops/my-visits",
-        anyPermissions: ["site_visits.execute", "field_installation.log"],
-      },
       { name: "Field Day", path: "/site-ops/field-day", permission: "field_day.view" },
-      { name: "Measurement Reports", path: "/site-ops/reports" },
+      { name: "Quotation Visits", path: "/site-ops/quotation/visits" },
+      { name: "Production Visits", path: "/site-ops/production/visits" },
+      {
+        name: "Installation Jobs",
+        path: "/field-installation/jobs",
+        permission: "field_installation.view",
+      },
+      { name: "Reports", path: "/site-ops/reports" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/site-ops/visits" }],
+      topItems: [{ name: "Home", path: "/site-ops/quotation/visits" }],
       groups: [
         {
-          label: "Site Operations",
-          icon: MapPin,
+          label: "Lead capture",
+          icon: Megaphone,
           items: [
-            { name: "Site Visits", path: "/site-ops/visits" },
-            { name: "Measurements", path: "/site-ops/measurements" },
-            {
-              name: "My Visits",
-              path: "/site-ops/my-visits",
-              anyPermissions: ["site_visits.execute", "field_installation.log"],
-            },
-            { name: "Today", path: "/site-ops/today" },
             {
               name: "Field Day",
               path: "/site-ops/field-day",
               permission: "field_day.view",
             },
-            { name: "Measurement Reports", path: "/site-ops/reports" },
+          ],
+        },
+        {
+          label: "Quotation stage",
+          icon: HandshakeIcon,
+          items: [
+            { name: "Site visits", path: "/site-ops/quotation/visits" },
+            {
+              name: "My visits",
+              path: "/site-ops/quotation/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today",
+              path: "/site-ops/quotation/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            { name: "Review queue", path: "/site-ops/quotation/review" },
+            { name: "Reports", path: "/site-ops/reports" },
+          ],
+        },
+        {
+          label: "Production stage",
+          icon: Factory,
+          items: [
+            { name: "Site visits", path: "/site-ops/production/visits" },
+            {
+              name: "My visits",
+              path: "/site-ops/production/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today",
+              path: "/site-ops/production/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            { name: "Review queue", path: "/site-ops/production/review" },
+          ],
+        },
+        {
+          label: "Installation",
+          icon: Wrench,
+          items: [
+            {
+              name: "Installation jobs",
+              path: "/field-installation/jobs",
+              permission: "field_installation.view",
+            },
           ],
         },
       ],
@@ -415,17 +454,33 @@ export const departments: Department[] = [
           ],
         },
         {
-          label: "Measurements",
+          label: "Quotation measurements",
           icon: ClipboardList,
           items: [
             {
-              name: "My Visits",
-              path: "/site-ops/my-visits",
+              name: "My visits",
+              path: "/site-ops/quotation/my-visits",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
             {
               name: "Today",
-              path: "/site-ops/today",
+              path: "/site-ops/quotation/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+          ],
+        },
+        {
+          label: "Production measurements",
+          icon: Factory,
+          items: [
+            {
+              name: "My visits",
+              path: "/site-ops/production/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today",
+              path: "/site-ops/production/today",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
           ],
@@ -439,26 +494,21 @@ export const departments: Department[] = [
     icon: MapPin,
     path: "/field",
     subModules: [
-      { name: "Home", path: "/site-ops/my-visits" },
+      { name: "Home", path: "/site-ops/quotation/my-visits" },
       {
-        name: "Open Deal Visits",
-        path: "/field/open-visits",
+        name: "Field Day",
+        path: "/site-ops/field-day",
+        permission: "field_day.view",
+      },
+      {
+        name: "Quotation visits",
+        path: "/site-ops/quotation/my-visits",
         anyPermissions: ["site_visits.execute", "field_installation.log"],
       },
       {
-        name: "Today's Visits",
-        path: "/site-ops/today",
+        name: "Production visits",
+        path: "/site-ops/production/my-visits",
         anyPermissions: ["site_visits.execute", "field_installation.log"],
-      },
-      {
-        name: "Site Visits",
-        path: "/site-ops/visits",
-        anyPermissions: [
-          "site_visits.view",
-          "site_visits.execute",
-          "field_installation.view",
-          "field_installation.log",
-        ],
       },
       {
         name: "Installation Jobs",
@@ -468,36 +518,68 @@ export const departments: Department[] = [
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/site-ops/my-visits" },
+        { name: "Home", path: "/site-ops/quotation/my-visits" },
         {
-          name: "Open Deal Visits",
-          path: "/field/open-visits",
-          anyPermissions: ["site_visits.execute", "field_installation.log"],
-        },
-        {
-          name: "Today's Visits",
-          path: "/site-ops/today",
-          anyPermissions: ["site_visits.execute", "field_installation.log"],
+          name: "Field Day",
+          path: "/site-ops/field-day",
+          permission: "field_day.view",
         },
       ],
       groups: [
         {
-          label: "Measurements",
+          label: "Lead capture",
+          icon: Megaphone,
+          items: [
+            {
+              name: "Field Day",
+              path: "/site-ops/field-day",
+              permission: "field_day.view",
+            },
+          ],
+        },
+        {
+          label: "Quotation measurements",
           icon: ClipboardList,
           items: [
             {
-              name: "Open Deal Visits",
-              path: "/field/open-visits",
+              name: "My visits",
+              path: "/site-ops/quotation/my-visits",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
             {
-              name: "Today's Visits",
-              path: "/site-ops/today",
+              name: "Today",
+              path: "/site-ops/quotation/today",
               anyPermissions: ["site_visits.execute", "field_installation.log"],
             },
             {
-              name: "All Site Visits",
-              path: "/site-ops/visits",
+              name: "All quotation visits",
+              path: "/site-ops/quotation/visits",
+              anyPermissions: [
+                "site_visits.view",
+                "site_visits.execute",
+                "field_installation.view",
+                "field_installation.log",
+              ],
+            },
+          ],
+        },
+        {
+          label: "Production measurements",
+          icon: Factory,
+          items: [
+            {
+              name: "My visits",
+              path: "/site-ops/production/my-visits",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "Today",
+              path: "/site-ops/production/today",
+              anyPermissions: ["site_visits.execute", "field_installation.log"],
+            },
+            {
+              name: "All production visits",
+              path: "/site-ops/production/visits",
               anyPermissions: [
                 "site_visits.view",
                 "site_visits.execute",
@@ -512,7 +594,7 @@ export const departments: Department[] = [
           icon: Wrench,
           items: [
             {
-              name: "Jobs",
+              name: "Installation jobs",
               path: "/field-installation/jobs",
               permission: "field_installation.view",
             },
@@ -698,7 +780,7 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "site-ops",
     name: "Site Operations",
-    href: "/site-ops/visits",
+    href: "/site-ops/quotation/visits",
     icon: MapPin,
     iconClassName: "bg-green-100 text-green-700",
     anyPermissions: [
@@ -710,7 +792,7 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "field",
     name: "Field",
-    href: "/site-ops/my-visits",
+    href: "/site-ops/quotation/my-visits",
     icon: MapPin,
     iconClassName: "bg-emerald-100 text-emerald-700",
     anyPermissions: [

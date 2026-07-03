@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Search, Bell, MessageSquare, HelpCircle, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/auth-context";
+import { fetchUnreadNotificationCount } from "@/lib/api/notifications";
 
 function SearchField({ className }: { className?: string }) {
   return (
@@ -39,6 +41,28 @@ function SearchField({ className }: { className?: string }) {
 export function AppTopbar() {
   const router = useRouter();
   const { user, roles, logout, homeRoute } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const count = await fetchUnreadNotificationCount();
+        if (!cancelled) setUnreadCount(count);
+      } catch {
+        if (!cancelled) setUnreadCount(0);
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(() => void load(), 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user?.id]);
 
   const handleLogout = async () => {
     await logout();
@@ -69,12 +93,14 @@ export function AppTopbar() {
           <Button variant="ghost" size="icon" className="relative h-9 w-9 shrink-0" asChild>
             <Link href="/notifications">
               <Bell className="h-4 w-4" />
-              <Badge
-                variant="destructive"
-                className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
-              >
-                7
-              </Badge>
+              {unreadCount > 0 ? (
+                <Badge
+                  variant="destructive"
+                  className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]"
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Badge>
+              ) : null}
             </Link>
           </Button>
           <Button

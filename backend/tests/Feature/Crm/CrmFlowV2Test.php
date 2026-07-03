@@ -280,6 +280,10 @@ class CrmFlowV2Test extends TestCase
             ->assertOk();
 
         $this->actingAs($this->salesUser)
+            ->postJson("/api/v1/crm/quotations/{$quotation->id}/approve")
+            ->assertOk();
+
+        $this->actingAs($this->salesUser)
             ->postJson("/api/v1/crm/quotations/{$quotation->id}/send")
             ->assertOk();
 
@@ -376,11 +380,56 @@ class CrmFlowV2Test extends TestCase
             'created_by' => $this->salesUser->id,
         ]);
 
+        $contact = Contact::query()->create([
+            'contact_number' => 'CT-NOPAY01',
+            'first_name' => 'No',
+            'last_name' => 'Payment',
+            'name' => 'No Payment',
+            'phone' => '+254700000099',
+            'status' => 'active',
+            'account_id' => $account->id,
+            'created_by' => $this->salesUser->id,
+        ]);
+
+        $account->update(['primary_contact_id' => $contact->id]);
         $lead->update(['converted_account_id' => $account->id]);
+
+        SiteVisit::query()->create([
+            'visit_number' => 'SV-V2-NOPAY',
+            'title' => 'No payment visit',
+            'lead_id' => $lead->id,
+            'account_id' => $account->id,
+            'assigned_field_officer_id' => $this->salesUser->id,
+            'scheduled_by' => $this->salesUser->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Approved->value,
+        ]);
+
+        $quotationResponse = $this->actingAs($this->salesUser)->postJson("/api/v1/crm/accounts/{$account->id}/quotations", [
+            'lines' => [
+                [
+                    'description' => 'No payment package',
+                    'quantity' => 1,
+                    'unit_price' => 100000,
+                ],
+            ],
+        ]);
+        $quotationResponse->assertCreated();
+        $quotationId = $quotationResponse->json('data.id');
+
+        $this->actingAs($this->salesUser)
+            ->postJson("/api/v1/crm/quotations/{$quotationId}/submit-for-review")
+            ->assertOk();
+        $this->actingAs($this->salesUser)
+            ->postJson("/api/v1/crm/quotations/{$quotationId}/approve")
+            ->assertOk();
+        $this->actingAs($this->salesUser)
+            ->postJson("/api/v1/crm/quotations/{$quotationId}/send")
+            ->assertOk();
 
         $this->actingAs($this->salesUser)
             ->postJson("/api/v1/crm/leads/{$lead->id}/convert", [])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['payment_reference', 'payment_date', 'amount_paid', 'payment_method']);
+            ->assertJsonValidationErrors(['amount_paid']);
     }
 }

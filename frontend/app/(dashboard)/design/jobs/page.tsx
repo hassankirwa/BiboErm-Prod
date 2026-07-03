@@ -23,7 +23,7 @@ import {
   fetchDesignJobs,
   type ApiDesignJob,
 } from "@/lib/api/design/jobs";
-import { fetchCrmAssignableUsers } from "@/lib/api/crm/lookups";
+import { fetchUsers } from "@/lib/api/users";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { Download, ExternalLink, Upload, UserPlus } from "lucide-react";
@@ -66,7 +66,7 @@ export default function DesignJobsPage() {
   }, [leadId]);
 
   useEffect(() => {
-    fetchCrmAssignableUsers()
+    fetchUsers()
       .then((res) => setDesigners(res.data.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setDesigners([]));
   }, []);
@@ -132,12 +132,17 @@ export default function DesignJobsPage() {
                       </TableCell>
                       <TableCell>
                         {job.lead_id ? (
-                          <Link
-                            href={`/crm/leads/${job.lead_id}`}
-                            className="hover:underline"
-                          >
-                            Lead #{job.lead_id}
-                          </Link>
+                          <div>
+                            <Link
+                              href={`/crm/leads/${job.lead_id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {job.lead?.name ?? job.lead?.reference ?? `Lead #${job.lead_id}`}
+                            </Link>
+                            {job.account?.name ? (
+                              <div className="text-xs text-muted-foreground">{job.account.name}</div>
+                            ) : null}
+                          </div>
                         ) : (
                           "—"
                         )}

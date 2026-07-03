@@ -209,6 +209,8 @@ export function MeasurementLineGrid({
                     photoIds={line.photo_refs ?? []}
                     photoUrls={photoUrls}
                     readOnly={readOnly}
+                    unitFloor={line.unit_floor}
+                    roomLocation={line.room_location}
                     onUpload={(file) => onLinePhotoUpload(index, file)}
                     onRemove={(photoId) => onLinePhotoRemove(index, photoId)}
                   />

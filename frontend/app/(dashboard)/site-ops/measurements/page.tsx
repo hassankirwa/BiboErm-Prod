@@ -20,6 +20,8 @@ import type { ApiSiteOpsVisit } from "@/lib/api/site-ops/visits";
 import { ApiError } from "@/lib/api/errors";
 import { Eye } from "lucide-react";
 import { toast } from "sonner";
+import type { SiteOpsMeasurementContext } from "@/lib/site-ops/paths";
+import { SITE_OPS_CONTEXT_META } from "@/lib/site-ops/paths";
 
 function formatStatus(status: string | null): string {
   if (!status) return "—";
@@ -29,7 +31,18 @@ function formatStatus(status: string | null): string {
     .join(" ");
 }
 
-export default function SiteOpsMeasurementsPage() {
+type SiteOpsReviewQueuePageViewProps = {
+  measurementContext?: SiteOpsMeasurementContext;
+  title?: string;
+  subtitle?: string;
+};
+
+export function SiteOpsReviewQueuePageView({
+  measurementContext = "quotation",
+  title,
+  subtitle,
+}: SiteOpsReviewQueuePageViewProps) {
+  const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
   const [visits, setVisits] = useState<ApiSiteOpsVisit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +52,7 @@ export default function SiteOpsMeasurementsPage() {
       try {
         const res = await fetchSiteOpsVisits({
           status: "submitted_for_review",
+          measurement_context: measurementContext,
           per_page: 50,
         });
         setVisits(res.data);
@@ -50,13 +64,13 @@ export default function SiteOpsMeasurementsPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [measurementContext]);
 
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
-        title="Measurements"
-        subtitle="Review site visits with submitted measurements awaiting approval."
+        title={title ?? contextMeta.reviewTitle}
+        subtitle={subtitle ?? contextMeta.reviewSubtitle}
       />
       <div className="space-y-6 p-6">
         <Card className="rounded-[10px]">
@@ -117,4 +131,8 @@ export default function SiteOpsMeasurementsPage() {
       </div>
     </div>
   );
+}
+
+export default function SiteOpsMeasurementsPage() {
+  return <SiteOpsReviewQueuePageView measurementContext="quotation" />;
 }
