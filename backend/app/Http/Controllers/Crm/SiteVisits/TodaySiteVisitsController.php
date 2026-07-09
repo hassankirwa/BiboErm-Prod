@@ -15,15 +15,27 @@ class TodaySiteVisitsController extends Controller
     {
         $this->authorize('viewAny', SiteVisit::class);
 
+        $validated = $request->validate([
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'measurement_context' => ['nullable', 'string'],
+        ]);
+
+        $user = $request->user();
+        $assigneeId = $validated['user_id'] ?? $user->id;
+
+        if ($assigneeId !== $user->id && ! $user->can('site_visits.view_all')) {
+            abort(403, 'You cannot view another user\'s visits.');
+        }
+
         $query = SiteVisit::query()
-            ->where('assigned_field_officer_id', $request->user()->id)
+            ->where('assigned_field_officer_id', $assigneeId)
             ->whereDate('visit_date', today())
             ->with(['lead', 'deal', 'measurementLines'])
             ->orderBy('visit_time');
 
         SiteVisitMeasurementContextFilter::apply(
             $query,
-            $request->query('measurement_context'),
+            $validated['measurement_context'] ?? $request->query('measurement_context'),
         );
 
         $visits = $query->get();

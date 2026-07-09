@@ -7,15 +7,27 @@ import {
   getProjectsDashboard,
   listProjects,
 } from "@/lib/api/projects";
+import { useAuth } from "@/contexts/auth-context";
 import { ProjectsFilters } from "@/components/projects/projects-filters";
 import { ProjectsGrid } from "@/components/projects/projects-grid";
 import { ProjectsStats } from "@/components/projects/projects-stats";
+import type { ProjectViewMode } from "@/lib/projects/paths";
 
-export function ProjectsOverview() {
+type ProjectsOverviewProps = {
+  viewMode?: ProjectViewMode;
+};
+
+export function ProjectsOverview({ viewMode = "projects" }: ProjectsOverviewProps) {
+  const { permissions } = useAuth();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [dashboard, setDashboard] = useState<ProjectsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const seesAllProjects =
+    permissions.includes("*") ||
+    permissions.includes("projects.view_all") ||
+    permissions.includes("projects.manage");
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +68,11 @@ export function ProjectsOverview() {
 
   return (
     <>
+      {!seesAllProjects ? (
+        <p className="text-sm text-muted-foreground">
+          Showing projects where you are the sales rep or project manager.
+        </p>
+      ) : null}
       <ProjectsStats dashboard={dashboard} loading={loading} />
       <ProjectsFilters />
       {error ? (
@@ -63,7 +80,7 @@ export function ProjectsOverview() {
           {error}
         </div>
       ) : null}
-      <ProjectsGrid projects={projects} loading={loading} />
+      <ProjectsGrid projects={projects} loading={loading} viewMode={viewMode} />
     </>
   );
 }

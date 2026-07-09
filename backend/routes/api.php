@@ -127,6 +127,10 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:crm.view|leads.view|projects.view');
     });
 
+    Route::middleware(['auth:sanctum', 'active'])->prefix('workspace')->group(function () {
+        require __DIR__.'/api/workspace.php';
+    });
+
     Route::middleware(['auth:sanctum', 'active'])->prefix('site-ops')->group(function () {
         require __DIR__.'/api/site-ops.php';
     });

@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/auth-context";
-import { canAccessWorkspaceHub, isFieldModuleRole, isWorkspaceHubPath } from "@/lib/auth/redirect";
+import { canAccessWorkspaceHub, canAccessWorkspaceInsights, isFieldModuleRole, isWorkspaceHubPath } from "@/lib/auth/redirect";
 import { canPerformSiteVisitMeasurements } from "@/lib/crm/site-visit-paths";
 import {
   departments,
@@ -46,6 +46,9 @@ import {
   isWorkspaceSettingsPath,
   workspaceNavItems,
   filterWorkspaceFooterNavItems,
+  filterWorkspaceInsightsNavItems,
+  leaveHrefForDepartment,
+  isWorkspaceShellPath,
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -125,27 +128,64 @@ function SidebarCollapseButton() {
   );
 }
 
-function WorkspaceContent({ pathname }: { pathname: string }) {
+function WorkspaceContent({
+  pathname,
+  permissions,
+  roles,
+}: {
+  pathname: string;
+  permissions: string[];
+  roles: string[];
+}) {
   const footerItems = filterWorkspaceFooterNavItems();
+  const insightsItems = filterWorkspaceInsightsNavItems(permissions, roles);
+  const showFullWorkspaceNav = canAccessWorkspaceHub(roles);
 
   return (
     <>
       <SidebarContent className="flex flex-1 flex-col overflow-hidden px-0 py-0">
-        <SidebarGroup className="shrink-0 p-0 pt-4">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1 px-3">
-              {workspaceNavItems.map((item) => (
-                <NavItem
-                  key={item.name}
-                  href={item.href}
-                  name={item.name}
-                  icon={item.icon}
-                  isActive={isWorkspaceNavActive(pathname, item.href)}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {showFullWorkspaceNav ? (
+          <SidebarGroup className="shrink-0 p-0 pt-4">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1 px-3">
+                {workspaceNavItems.map((item) => (
+                  <NavItem
+                    key={item.name}
+                    href={item.href}
+                    name={item.name}
+                    icon={item.icon}
+                    isActive={isWorkspaceNavActive(pathname, item.href)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+
+        {insightsItems.length > 0 ? (
+          <>
+            {showFullWorkspaceNav ? (
+              <SidebarSeparator className="mx-3 my-3 bg-neutral-200" />
+            ) : (
+              <div className="pt-4" />
+            )}
+            <SidebarGroup className="shrink-0 p-0">
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1 px-3">
+                  {insightsItems.map((item) => (
+                    <NavItem
+                      key={item.href}
+                      href={item.href}
+                      name={item.name}
+                      icon={item.icon}
+                      isActive={isWorkspaceNavActive(pathname, item.href)}
+                    />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : null}
 
         <SidebarSeparator className="mx-3 my-3 bg-neutral-200" />
 
@@ -179,12 +219,20 @@ function DepartmentContent({
   department,
   pathname,
   showWorkspaceLink = false,
+  permissions,
+  roles,
 }: {
   department: NonNullable<ReturnType<typeof getActiveDepartment>>;
   pathname: string;
   showWorkspaceLink?: boolean;
+  permissions: string[];
+  roles: string[];
 }) {
   const footerItems = filterWorkspaceFooterNavItems();
+  const insightsItems =
+    department.id === "workspace"
+      ? filterWorkspaceInsightsNavItems(permissions, roles)
+      : [];
   const nav = department.nav;
   const workspaceLink = showWorkspaceLink ? (
     <NavItem
@@ -313,18 +361,43 @@ function DepartmentContent({
 
         <SidebarSeparator className="mx-3 my-3 shrink-0 bg-neutral-200" />
 
+        {insightsItems.length > 0 ? (
+          <SidebarGroup className="shrink-0 p-0">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1 px-3">
+                {insightsItems.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    name={item.name}
+                    icon={item.icon}
+                    isActive={isWorkspaceNavActive(pathname, item.href)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+
+        {insightsItems.length > 0 ? (
+          <SidebarSeparator className="mx-3 my-3 shrink-0 bg-neutral-200" />
+        ) : null}
+
         <SidebarGroup className="shrink-0 p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1 px-3">
-              {footerItems.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  name={item.name}
-                  icon={item.icon}
-                  isActive={isWorkspaceNavActive(pathname, item.href)}
-                />
-              ))}
+              {footerItems.map((item) => {
+                const href = leaveHrefForDepartment(department);
+                return (
+                  <NavItem
+                    key={href}
+                    href={href}
+                    name={item.name}
+                    icon={item.icon}
+                    isActive={isWorkspaceNavActive(pathname, href)}
+                  />
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -341,9 +414,11 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { roles, departments, permissions } = useAuth();
   const canWorkspace = canAccessWorkspaceHub(roles);
+  const canWorkspaceInsights = canAccessWorkspaceInsights(roles);
   const isSuperAdmin = roles.includes("super_admin");
   const activeDepartment = getActiveDepartment(pathname);
   const primaryDepartment = getPrimaryDepartmentNav(departments, roles);
+  const onWorkspaceShell = isWorkspaceShellPath(pathname);
   const canUseFieldSidebar =
     isFieldModuleRole(roles) ||
     canPerformSiteVisitMeasurements(permissions, roles);
@@ -357,6 +432,7 @@ export function AppSidebar() {
   ) => filterDepartmentNav(department, permissions, roles);
 
   const showWorkspaceSidebar =
+    (onWorkspaceShell && canWorkspaceInsights) ||
     (isWorkspaceHubPath(pathname) &&
       canWorkspace &&
       activeDepartment?.id !== "workspace") ||
@@ -367,12 +443,14 @@ export function AppSidebar() {
     fieldDepartment && isFieldModulePath(pathname) ? fieldDepartment : null;
 
   const sidebarDepartmentSource =
-    activeDepartment ??
-    fieldSidebarFallback ??
-    (isWorkspaceSettingsPath(pathname) && !canWorkspace
-      ? primaryDepartment
-      : null) ??
-    primaryDepartment;
+    onWorkspaceShell && canWorkspaceInsights
+      ? null
+      : activeDepartment ??
+        fieldSidebarFallback ??
+        (isWorkspaceSettingsPath(pathname) && !canWorkspace
+          ? primaryDepartment
+          : null) ??
+        primaryDepartment;
 
   const sidebarDepartment = sidebarDepartmentSource
     ? filterDepartment(sidebarDepartmentSource)
@@ -384,15 +462,19 @@ export function AppSidebar() {
       className="top-14 z-20 !h-[calc(100dvh-3.5rem)] border-r border-neutral-200 bg-[#f5f5f5]"
     >
       {showWorkspaceSidebar ? (
-        <WorkspaceContent pathname={pathname} />
+        <WorkspaceContent pathname={pathname} permissions={permissions} roles={roles} />
       ) : sidebarDepartment ? (
         <DepartmentContent
           department={sidebarDepartment}
           pathname={pathname}
           showWorkspaceLink={isSuperAdmin && !isWorkspaceHubPath(pathname)}
+          permissions={permissions}
+          roles={roles}
         />
+      ) : canWorkspaceInsights ? (
+        <WorkspaceContent pathname={pathname} permissions={permissions} roles={roles} />
       ) : canWorkspace ? (
-        <WorkspaceContent pathname={pathname} />
+        <WorkspaceContent pathname={pathname} permissions={permissions} roles={roles} />
       ) : null}
     </Sidebar>
   );

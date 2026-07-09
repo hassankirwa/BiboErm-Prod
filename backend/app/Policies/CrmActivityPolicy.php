@@ -21,7 +21,7 @@ class CrmActivityPolicy
             return false;
         }
 
-        return $this->canViewAll($user, 'activities.view')
+        return $this->canViewAll($user, 'activities.view_all')
             || $this->ownsRecord($user, $activity, ['assigned_to', 'created_by']);
     }
 

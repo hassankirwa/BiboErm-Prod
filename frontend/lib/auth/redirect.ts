@@ -3,6 +3,14 @@ import type { AuthDepartment, UserStatus } from "./types";
 /** Roles that can access the /workspace app hub (not settings). */
 export const WORKSPACE_HUB_ROLES = ["super_admin", "it_admin"] as const;
 
+/** Roles that see Analytics / Reports in the workspace sidebar. */
+export const WORKSPACE_INSIGHTS_ROLES = [
+  "super_admin",
+  "it_admin",
+  "project_manager",
+  "operations_manager",
+] as const;
+
 /** Field measurements and installation — primary landing is /field, not CRM. */
 export const FIELD_MODULE_ROLES = [
   "field_officer",
@@ -13,6 +21,14 @@ export const FIELD_MODULE_ROLES = [
 export function canAccessWorkspaceHub(roles: string[]): boolean {
   return roles.some((role) =>
     WORKSPACE_HUB_ROLES.includes(role as (typeof WORKSPACE_HUB_ROLES)[number])
+  );
+}
+
+export function canAccessWorkspaceInsights(roles: string[]): boolean {
+  return roles.some((role) =>
+    WORKSPACE_INSIGHTS_ROLES.includes(
+      role as (typeof WORKSPACE_INSIGHTS_ROLES)[number],
+    ),
   );
 }
 

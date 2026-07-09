@@ -38,7 +38,8 @@ export default function WorkspacePage() {
                 Bibo Workspace
               </h1>
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-                Manage projects, production and operations in one place.
+                Manage projects, production and operations in one place. Metrics below refresh
+                automatically from the backend.
               </p>
             </div>
 

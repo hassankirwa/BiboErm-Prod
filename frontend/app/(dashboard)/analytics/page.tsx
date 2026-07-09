@@ -1,34 +1,45 @@
-import { AppHeader } from "@/components/app-header";
-import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
-import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
-import { RecentActivities } from "@/components/dashboard/recent-activities";
-import { ProjectsOverview } from "@/components/dashboard/projects-overview";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+"use client";
 
-export default function AnalyticsPage() {
+import { AppHeader } from "@/components/app-header";
+import { OperationsAnalyticsDashboard } from "@/components/analytics/operations-analytics-dashboard";
+import { PermissionGate } from "@/components/auth/permission-gate";
+import { useAuth } from "@/contexts/auth-context";
+
+function AnalyticsContent() {
+  const { user } = useAuth();
+
   return (
     <div className="flex flex-col">
       <AppHeader
         title="Analytics"
-        subtitle="Welcome back, John"
-        actions={
-          <Button size="sm" className="h-8 gap-1.5 rounded-[5px]">
-            <Plus className="h-4 w-4" />
-            Quick Create
-          </Button>
+        subtitle={
+          user?.name
+            ? `Operations overview for ${user.name}`
+            : "Live operations overview"
         }
       />
       <div className="min-w-0 w-full">
         <div className="space-y-6 p-6">
-          <DashboardOverview />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <DashboardCharts />
-            <RecentActivities />
-          </div>
-          <ProjectsOverview />
+          <OperationsAnalyticsDashboard />
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <PermissionGate
+      anyOf={["analytics.view", "crm.view", "projects.view"]}
+      fallback={
+        <div className="p-6">
+          <p className="text-sm text-muted-foreground">
+            You do not have permission to view analytics.
+          </p>
+        </div>
+      }
+    >
+      <AnalyticsContent />
+    </PermissionGate>
   );
 }

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { isFieldModuleRole, isWorkspaceSelfServicePath } from "@/lib/auth/redirect";
+import { isFieldModuleRole, isWorkspaceSelfServicePath, canAccessWorkspaceInsights } from "@/lib/auth/redirect";
 import { SITE_VISIT_MEASUREMENT_ROLES } from "@/lib/crm/site-visit-paths";
 import {
   LayoutGrid,
@@ -115,6 +115,7 @@ export const departments: Department[] = [
       { name: "Contacts", path: "/crm/contacts" },
       { name: "Accounts", path: "/crm/accounts" },
       { name: "Deals", path: "/crm/deals" },
+      { name: "Projects", path: "/crm/projects", permission: "projects.view" },
       { name: "Activities", path: "/crm/activities" },
     ],
     nav: {
@@ -132,6 +133,7 @@ export const departments: Department[] = [
             { name: "Contacts", path: "/crm/contacts" },
             { name: "Accounts", path: "/crm/accounts" },
             { name: "Deals", path: "/crm/deals" },
+            { name: "Projects", path: "/crm/projects", permission: "projects.view" },
           ],
         },
         {
@@ -1028,6 +1030,25 @@ export const workspaceNavItems = [
   { name: "Pinned", href: "/workspace/pinned", icon: Pin },
 ] as const;
 
+/** Analytics and reports — workspace sidebar (super admin, project managers). */
+export const workspaceInsightsNavItems = [
+  { name: "Analytics", href: "/analytics", icon: BarChart3, permission: "analytics.view" },
+  { name: "Reports", href: "/analytics/reports", icon: FileBarChart, permission: "crm.view" },
+] as const;
+
+export function filterWorkspaceInsightsNavItems(
+  permissions: string[],
+  roles: string[] = [],
+): Array<(typeof workspaceInsightsNavItems)[number]> {
+  if (!canAccessWorkspaceInsights(roles)) {
+    return [];
+  }
+
+  return workspaceInsightsNavItems.filter((item) =>
+    hasNavPermission(item.permission, permissions, roles),
+  );
+}
+
 /** Self-service leave link shown in every department sidebar footer. */
 export const workspaceFooterNavItems = [
   { name: "Leave", href: "/workspace/leave", icon: CalendarDays },
@@ -1035,6 +1056,19 @@ export const workspaceFooterNavItems = [
 
 export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems {
   return workspaceFooterNavItems;
+}
+
+/**
+ * Self-service leave URL scoped to the active department so the sidebar stays
+ * on the user's dashboard instead of switching to the workspace shell.
+ * HR reuses its existing `/hr/leave` management page; the workspace hub and
+ * analytics fall back to the shared `/workspace/leave` route.
+ */
+export function leaveHrefForDepartment(department: Department | null): string {
+  if (!department) return "/workspace/leave";
+  if (department.id === "hr") return "/hr/leave";
+  if (department.id === "analytics") return "/workspace/leave";
+  return `${department.path}/leave`;
 }
 
 export function isWorkspaceNavActive(pathname: string, href: string): boolean {
@@ -1045,6 +1079,12 @@ export function isWorkspaceNavActive(pathname: string, href: string): boolean {
 }
 
 const workspaceShellPrefixes = ["/analytics", "/notifications"];
+
+export function isWorkspaceShellPath(pathname: string): boolean {
+  return workspaceShellPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 function isProjectsModulePath(pathname: string): boolean {
   return pathname === "/projects" || pathname.startsWith("/projects/");

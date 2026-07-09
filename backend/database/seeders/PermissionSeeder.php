@@ -59,6 +59,7 @@ class PermissionSeeder extends Seeder
         'deal_payments.record',
         'deal_payments.view',
         'activities.view',
+        'activities.view_all',
         'activities.create',
         'activities.complete',
         'field_day.view',

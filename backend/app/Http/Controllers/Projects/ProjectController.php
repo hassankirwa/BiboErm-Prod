@@ -103,6 +103,10 @@ class ProjectController extends Controller
 
         $user = $request->user();
 
+        if (empty($validated['sales_rep_id'])) {
+            $validated['sales_rep_id'] = $user->id;
+        }
+
         $project = Project::query()->create([
             ...$validated,
             'reference' => 'PR-'.strtoupper(Str::random(8)),

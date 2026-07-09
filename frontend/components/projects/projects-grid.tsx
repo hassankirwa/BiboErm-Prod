@@ -22,6 +22,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import type { ProjectSummary } from "@/lib/api/projects";
+import { projectDetailPath, type ProjectViewMode } from "@/lib/projects/paths";
 
 const stageColors: Record<string, string> = {
   awaiting_deposit: "bg-muted text-muted-foreground",
@@ -61,9 +62,14 @@ function formatStage(stage: string): string {
 type ProjectsGridProps = {
   projects: ProjectSummary[];
   loading?: boolean;
+  viewMode?: ProjectViewMode;
 };
 
-export function ProjectsGrid({ projects, loading = false }: ProjectsGridProps) {
+export function ProjectsGrid({
+  projects,
+  loading = false,
+  viewMode = "projects",
+}: ProjectsGridProps) {
   if (loading) {
     return (
       <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
@@ -120,13 +126,13 @@ export function ProjectsGrid({ projects, loading = false }: ProjectsGridProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem asChild>
-                      <Link href={`/projects/${project.id}`}>
+                      <Link href={projectDetailPath(project.id, viewMode)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href={`/projects/${project.id}?tab=bom`}>
+                      <Link href={projectDetailPath(project.id, viewMode, { tab: "bom" })}>
                         <FileText className="mr-2 h-4 w-4" />
                         View BOM
                       </Link>
