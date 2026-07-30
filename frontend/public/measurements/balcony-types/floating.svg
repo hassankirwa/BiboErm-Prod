@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" fill="none">
+  <rect width="200" height="150" fill="#F8FAFC"/>
+  <!-- Building face + door -->
+  <rect x="20" y="8" width="160" height="28" fill="#64748B"/>
+  <rect x="86" y="14" width="28" height="22" fill="#FEF3C7" stroke="#B45309" stroke-width="1.5"/>
+  <text x="100" y="29" text-anchor="middle" font-size="7" fill="#92400E" font-family="system-ui,sans-serif">DOOR</text>
+  <!-- Slab — no full side walls -->
+  <rect x="36" y="36" width="128" height="78" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+  <!-- Left barricade + open -->
+  <rect x="36" y="100" width="12" height="14" fill="#94A3B8"/>
+  <rect x="36" y="72" width="12" height="28" fill="#93C5FD" fill-opacity="0.55" stroke="#2563EB" stroke-width="1" stroke-dasharray="3 2"/>
+  <!-- Right barricade + open -->
+  <rect x="152" y="100" width="12" height="14" fill="#94A3B8"/>
+  <rect x="152" y="72" width="12" height="28" fill="#93C5FD" fill-opacity="0.55" stroke="#2563EB" stroke-width="1" stroke-dasharray="3 2"/>
+  <!-- Front barricade + open -->
+  <rect x="48" y="100" width="104" height="14" fill="#94A3B8"/>
+  <rect x="52" y="72" width="96" height="28" fill="#93C5FD" fill-opacity="0.45" stroke="#2563EB" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="100" y="90" text-anchor="middle" font-size="7" fill="#1E3A8A" font-family="system-ui,sans-serif">OPEN ↑</text>
+  <text x="100" y="140" text-anchor="middle" font-size="8" fill="#475569" font-family="system-ui,sans-serif">Three open sides</text>
+</svg>

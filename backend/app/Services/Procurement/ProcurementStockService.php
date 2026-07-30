@@ -3,22 +3,39 @@
 namespace App\Services\Procurement;
 
 use App\Models\Warehouse\Item;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class ProcurementStockService
 {
-    public function overview(): array
+    public function overview(?Request $request = null): array
     {
         $items = $this->loadItems();
+        $page = max(1, (int) ($request?->integer('page', 1) ?? 1));
+        $perPage = max(1, min(500, (int) ($request?->integer('per_page', 100) ?? 100)));
+        $search = trim((string) ($request?->input('search') ?? ''));
+        $category = $request?->input('category');
+        $status = $request?->input('stock_status', $request?->input('status'));
+
+        $filtered = $this->filterItems($items, $search, $category, $status);
+        $total = $filtered->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $lastPage);
 
         return [
             'summary' => $this->buildSummary($items),
             'status_breakdown' => $this->buildStatusBreakdown($items),
             'categories' => $this->buildCategoryBreakdown($items),
-            'alerts' => $this->buildAlerts($items)->values()->all(),
-            'items' => $items->values()->all(),
+            'alerts' => $this->buildAlerts($items)->take(50)->values()->all(),
+            'items' => $filtered->slice(($page - 1) * $perPage, $perPage)->values()->all(),
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => $lastPage,
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
         ];
     }
 
@@ -58,6 +75,16 @@ class ProcurementStockService
     protected function loadItems(): Collection
     {
         return Item::query()
+            ->select([
+                'id',
+                'sku',
+                'name',
+                'category',
+                'unit_of_measure',
+                'min_stock_qty',
+                'catalog_metadata',
+                'is_active',
+            ])
             ->where('is_active', true)
             ->withSum('stockLevels as total_quantity_on_hand', 'quantity_on_hand')
             ->withSum('stockLevels as total_quantity_reserved', 'quantity_reserved')
@@ -77,6 +104,13 @@ class ProcurementStockService
                 $isAlert = $stockStatus === 'out_of_stock'
                     || ($this->hasMinimumThreshold($minStockQty) && bccomp($quantityAvailable, $minStockQty, 3) < 0);
 
+                $metadata = is_array($item->catalog_metadata) ? $item->catalog_metadata : [];
+                $refTotal = $metadata['reference_total_qty'] ?? $metadata['total_qty'] ?? null;
+                $docVsSystemDelta = null;
+                if ($refTotal !== null) {
+                    $docVsSystemDelta = bcsub($quantityOnHand, number_format((float) $refTotal, 3, '.', ''), 3);
+                }
+
                 return [
                     'id' => $item->id,
                     'sku' => $item->sku,
@@ -88,6 +122,8 @@ class ProcurementStockService
                     'quantity_on_hand' => $quantityOnHand,
                     'quantity_reserved' => $quantityReserved,
                     'quantity_available' => $quantityAvailable,
+                    'reference_total_qty' => $refTotal !== null ? number_format((float) $refTotal, 3, '.', '') : null,
+                    'doc_vs_system_delta' => $docVsSystemDelta,
                     'stock_status' => $stockStatus,
                     'low_stock_alert' => $isAlert,
                     'locations_count' => (int) ($item->locations_count ?? 0),
@@ -100,6 +136,36 @@ class ProcurementStockService
                     'min_stock_qty_numeric' => (float) $minStockQty,
                 ];
             });
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $items
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function filterItems(
+        Collection $items,
+        string $search,
+        mixed $category,
+        mixed $status,
+    ): Collection {
+        return $items
+            ->when($search !== '', function (Collection $collection) use ($search) {
+                $term = Str::lower($search);
+
+                return $collection->filter(function (array $item) use ($term) {
+                    return str_contains(Str::lower((string) $item['sku']), $term)
+                        || str_contains(Str::lower((string) $item['name']), $term);
+                });
+            })
+            ->when(is_string($category) && $category !== '' && $category !== 'all', function (Collection $collection) use ($category) {
+                return $collection->filter(function (array $item) use ($category) {
+                    return $item['category'] === $category || $item['category_label'] === $category;
+                });
+            })
+            ->when(is_string($status) && $status !== '' && $status !== 'all', function (Collection $collection) use ($status) {
+                return $collection->where('stock_status', $status);
+            })
+            ->values();
     }
 
     /**

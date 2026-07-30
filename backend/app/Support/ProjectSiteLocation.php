@@ -15,8 +15,9 @@ final class ProjectSiteLocation
     {
         $project->loadMissing(['account.sourceLead', 'deal']);
 
-        foreach (self::addressCandidates($project) as $candidate) {
-            $trimmed = trim((string) ($candidate ?? ''));
+        // Evaluate lazily so we do not hit SiteVisit when a local address already exists.
+        foreach (self::addressCandidateResolvers($project) as $resolver) {
+            $trimmed = trim((string) ($resolver() ?? ''));
             if ($trimmed !== '') {
                 return [
                     'site_address' => $trimmed,
@@ -34,18 +35,18 @@ final class ProjectSiteLocation
     }
 
     /**
-     * @return list<string|null>
+     * @return list<\Closure(): (?string)>
      */
-    protected static function addressCandidates(Project $project): array
+    protected static function addressCandidateResolvers(Project $project): array
     {
         return [
-            $project->site_address,
-            $project->deal?->site_address,
-            $project->account?->physical_address,
-            $project->account?->billing_address,
-            $project->account?->sourceLead?->site_address,
-            self::addressFromLeadSiteFields($project->account?->sourceLead),
-            self::addressFromLatestQuotationVisit($project->account_id),
+            fn () => $project->site_address,
+            fn () => $project->deal?->site_address,
+            fn () => $project->account?->physical_address,
+            fn () => $project->account?->billing_address,
+            fn () => $project->account?->sourceLead?->site_address,
+            fn () => self::addressFromLeadSiteFields($project->account?->sourceLead),
+            fn () => self::addressFromLatestQuotationVisit($project->account_id),
         ];
     }
 

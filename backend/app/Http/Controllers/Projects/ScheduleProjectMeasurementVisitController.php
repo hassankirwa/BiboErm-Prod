@@ -8,7 +8,6 @@ use App\Http\Resources\Crm\SiteVisitResource;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Crm\SiteVisits\SiteVisitWorkflowService;
-use App\Support\Crm\SiteVisitAssigneeRoles;
 use App\Support\ProjectSiteLocation;
 use Illuminate\Http\Request;
 
@@ -29,8 +28,8 @@ class ScheduleProjectMeasurementVisitController extends Controller
                 'exists:users,id',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $assignee = User::query()->find($value);
-                    if (! $assignee || ! SiteVisitAssigneeRoles::userIsEligible($assignee)) {
-                        $fail('The selected assignee cannot perform site visits.');
+                    if (! $assignee || $assignee->status !== User::STATUS_ACTIVE) {
+                        $fail('The selected assignee must be an active user.');
                     }
                 },
             ],

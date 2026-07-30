@@ -81,6 +81,55 @@ class ProjectDocumentController extends Controller
         ]);
     }
 
+    public function update(Request $request, Project $project, ProjectDocument $document): JsonResponse
+    {
+        $this->authorize('update', $project);
+        abort_unless($request->user()->can('projects.documents.upload') || $request->user()->can('projects.manage'), 403);
+
+        if ((int) $document->project_id !== $project->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'bom_line_ids' => ['required', 'array'],
+            'bom_line_ids.*' => ['integer'],
+        ]);
+
+        $bomLineIds = array_values(array_unique(array_map('intval', $validated['bom_line_ids'])));
+        $bom = $project->latestBom()->with('lines')->first();
+
+        if ($bomLineIds !== [] && $bom === null) {
+            return response()->json([
+                'message' => 'No BOM is available to tag on this project.',
+            ], 422);
+        }
+
+        if ($bom !== null && $bomLineIds !== []) {
+            $validIds = $bom->lines->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $invalid = array_values(array_diff($bomLineIds, $validIds));
+            if ($invalid !== []) {
+                return response()->json([
+                    'message' => 'One or more BOM lines do not belong to this project\'s latest BOM.',
+                    'invalid_bom_line_ids' => $invalid,
+                ], 422);
+            }
+        }
+
+        $metadata = is_array($document->metadata) ? $document->metadata : [];
+        $metadata['bom_tags'] = [
+            'bom_id' => $bom?->id,
+            'bom_line_ids' => $bomLineIds,
+            'tagged_at' => now()->toIso8601String(),
+            'tagged_by' => $request->user()->id,
+        ];
+
+        $document->update(['metadata' => $metadata]);
+
+        return response()->json([
+            'data' => $this->serialize($document->fresh()->load('uploader')),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -93,6 +142,7 @@ class ProjectDocumentController extends Controller
             'filename' => $document->filename,
             'path' => $document->path,
             'version' => $document->version,
+            'metadata' => $document->metadata,
             'uploaded_by' => $document->uploaded_by,
             'uploaded_by_user' => $document->relationLoaded('uploader') && $document->uploader ? [
                 'id' => $document->uploader->id,

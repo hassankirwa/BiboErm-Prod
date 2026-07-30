@@ -78,6 +78,15 @@ export function ProjectDetailOverview({
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex flex-wrap gap-2">
+              {project.fifo_order != null && (
+                <Badge
+                  variant="outline"
+                  className="font-mono text-[11px] tabular-nums"
+                  title="FIFO queue position"
+                >
+                  #{project.fifo_order}
+                </Badge>
+              )}
               <Badge variant="secondary">
                 {contextualProjectStageLabel(project.stage, materialStatus?.summary)}
               </Badge>
@@ -150,8 +159,13 @@ export function ProjectDetailOverview({
           </CardContent>
         </Card>
 
-        {project.stage === "final_design_approval" && !isCrmMode ? (
-          <StageReadinessChecklist project={project} mode={mode} />
+        {(project.stage === "site_assessment" || project.stage === "final_design_approval") &&
+        !isCrmMode ? (
+          <StageReadinessChecklist
+            project={project}
+            mode={mode}
+            requireBomFinalized={project.stage === "final_design_approval"}
+          />
         ) : null}
 
         <StageDataCards
@@ -171,12 +185,33 @@ export function ProjectDetailOverview({
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3 text-sm">
                 <div>
-                  <p className="text-xs text-muted-foreground">BOM lines</p>
+                  <p className="text-xs text-muted-foreground">BOM cut lines</p>
                   <p className="font-medium">{materialStatus.summary.total_lines}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    One row per opening cut / hardware / glass
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Unique materials</p>
+                  <p className="font-medium">
+                    {materialStatus.summary.unique_materials ?? "—"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Distinct warehouse / procurement items
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Fully reserved</p>
-                  <p className="font-medium">{materialStatus.summary.fully_reserved}</p>
+                  <p className="font-medium">
+                    {materialStatus.summary.reservation_units_reserved ??
+                      materialStatus.summary.fully_reserved}
+                    /
+                    {materialStatus.summary.reservation_units_total ??
+                      materialStatus.summary.warehouse_lines}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Reservation units (aluminium once per SKU)
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Shortage lines</p>
@@ -192,6 +227,15 @@ export function ProjectDetailOverview({
                   <p className="text-xs text-muted-foreground">Glass orders pending</p>
                   <p className="font-medium">{materialStatus.summary.glass_orders_pending}</p>
                 </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Materials released</p>
+                  <p className="font-medium">
+                    {materialStatus.summary.materials_released_lines ?? 0}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    SKUs handed to production from reservations
+                  </p>
+                </div>
                 {materialStatus.fifo_position ? (
                   <div>
                     <p className="text-xs text-muted-foreground">FIFO queue position</p>
@@ -200,8 +244,19 @@ export function ProjectDetailOverview({
                 ) : null}
               </div>
 
-              {project.stage_data?.material_check ? (
-                <MaterialCheckResults check={project.stage_data.material_check} />
+              {materialStatus.stock_check || project.stage_data?.material_check ? (
+                <MaterialCheckResults
+                  check={
+                    materialStatus.stock_check
+                      ? {
+                          ...materialStatus.stock_check,
+                          checked_at:
+                            materialStatus.stock_check.checked_at ?? "Live check",
+                        }
+                      : project.stage_data!.material_check!
+                  }
+                  live={Boolean(materialStatus.stock_check)}
+                />
               ) : null}
 
               {!isCrmMode ? (
@@ -251,8 +306,16 @@ export function ProjectDetailOverview({
   );
 }
 
-function MaterialCheckResults({ check }: { check: ProjectStageMaterialCheck }) {
-  if (!check.lines?.length) return null;
+function MaterialCheckResults({
+  check,
+  live = false,
+}: {
+  check: ProjectStageMaterialCheck;
+  live?: boolean;
+}) {
+  const shortageLines = (check.lines ?? []).filter(
+    (line) => Number(line.shortage ?? 0) > 0,
+  );
 
   return (
     <div className="space-y-2">
@@ -268,28 +331,40 @@ function MaterialCheckResults({ check }: { check: ProjectStageMaterialCheck }) {
           </Badge>
         )}
         {check.checked_at ? (
-          <span className="text-xs text-muted-foreground">Checked {check.checked_at}</span>
+          <span className="text-xs text-muted-foreground">
+            {live ? "Live" : "Snapshot"} · {check.checked_at}
+          </span>
         ) : null}
       </div>
-      <div className="divide-y rounded-md border text-sm">
-        {check.lines.map((line, index) => {
-          const hasShortage = Number(line.shortage ?? 0) > 0;
-
-          return (
+      {shortageLines.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No open stock shortages on the current BOM. Aluminium profiles are checked by
+          warehouse SKU (e.g. PY08), which may use a catalog name different from the BOM
+          line label.
+        </p>
+      ) : (
+        <div className="divide-y rounded-md border text-sm">
+          {shortageLines.map((line, index) => (
             <div
               key={`${line.project_bom_line_id ?? line.item_id ?? index}`}
               className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
             >
-              <span>{line.name ?? line.sku ?? "Line"}</span>
-              <span className={hasShortage ? "text-destructive" : "text-success"}>
-                {hasShortage
-                  ? `Short ${line.shortage} (need ${line.required}, available ${line.effective_available})`
-                  : `Available ${line.effective_available} / need ${line.required}`}
+              <span>
+                {line.sku ? (
+                  <span className="mr-1 font-mono text-xs text-muted-foreground">
+                    {line.sku}
+                  </span>
+                ) : null}
+                {line.name ?? "Line"}
+              </span>
+              <span className="text-destructive">
+                Short {line.shortage} (need {line.required}, available{" "}
+                {line.effective_available})
               </span>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -297,9 +372,11 @@ function MaterialCheckResults({ check }: { check: ProjectStageMaterialCheck }) {
 function StageReadinessChecklist({
   project,
   mode,
+  requireBomFinalized = true,
 }: {
   project: ProjectDetail;
   mode: ProjectViewMode;
+  requireBomFinalized?: boolean;
 }) {
   const hasDesign = projectHasDesignDocument(project);
   const hasBom = projectHasBomUploaded(project);
@@ -321,11 +398,13 @@ function StageReadinessChecklist({
           complete={hasBom}
           href={projectTabPath(project.id, "bom", mode)}
         />
-        <ReadinessRow
-          label="BOM finalized"
-          complete={bomFinalized}
-          href={projectTabPath(project.id, "bom", mode)}
-        />
+        {requireBomFinalized ? (
+          <ReadinessRow
+            label="BOM finalized"
+            complete={bomFinalized}
+            href={projectTabPath(project.id, "bom", mode)}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );

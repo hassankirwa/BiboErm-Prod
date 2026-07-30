@@ -4,6 +4,7 @@ namespace App\Services\Procurement\Glass;
 
 use App\Enums\Procurement\GlassOrderStatus;
 use App\Models\Procurement\GlassOrder;
+use App\Models\Procurement\GlassPriceRecord;
 use App\Models\ProjectBom;
 use App\Models\ProjectBomLine;
 use App\Models\User;
@@ -68,16 +69,126 @@ class GlassOrderService
         });
     }
 
-    public function markDelivered(GlassOrder $order): GlassOrder
+    /**
+     * @param  list<array{unit_buying_price: float|int|string}>  $panePrices
+     */
+    public function markDelivered(GlassOrder $order, array $panePrices = [], string $currency = 'KES'): GlassOrder
     {
-        $order->update([
-            'status' => GlassOrderStatus::Delivered,
-            'delivered_at' => now(),
-        ]);
+        if (! in_array($order->status, [GlassOrderStatus::Ordered, GlassOrderStatus::InTransit], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['Only ordered or in-transit glass orders can be marked delivered.'],
+            ]);
+        }
 
-        $this->audit->log('glass_order.delivered', $order);
+        return DB::transaction(function () use ($order, $panePrices, $currency) {
+            $specs = is_array($order->specs) ? $order->specs : [];
+            $panes = is_array($specs['panes'] ?? null) ? $specs['panes'] : [];
 
-        return $order->fresh(['project', 'supplier']);
+            if ($panes === []) {
+                throw ValidationException::withMessages([
+                    'panes' => ['Glass order has no panes to price on delivery.'],
+                ]);
+            }
+
+            if (count($panePrices) !== count($panes)) {
+                throw ValidationException::withMessages([
+                    'panes' => ['Provide a unit buying price for every glass component (pane) on this order.'],
+                ]);
+            }
+
+            $pricedPanes = [];
+            $totalCost = 0.0;
+            $totalArea = 0.0;
+            $recordedAt = now();
+
+            foreach ($panes as $index => $pane) {
+                if (! is_array($pane)) {
+                    throw ValidationException::withMessages([
+                        "panes.{$index}" => ['Invalid pane data.'],
+                    ]);
+                }
+
+                $width = $pane['width_mm'] ?? null;
+                $height = $pane['height_mm'] ?? null;
+                $quantity = $pane['quantity'] ?? null;
+                $unitBuyingPrice = $panePrices[$index]['unit_buying_price'] ?? null;
+
+                if (! is_numeric($width) || (float) $width <= 0
+                    || ! is_numeric($height) || (float) $height <= 0
+                    || ! is_numeric($quantity) || (float) $quantity <= 0) {
+                    throw ValidationException::withMessages([
+                        "panes.{$index}" => ['Each pane needs valid width, height, and quantity before delivery pricing.'],
+                    ]);
+                }
+
+                if (! is_numeric($unitBuyingPrice) || (float) $unitBuyingPrice < 0) {
+                    throw ValidationException::withMessages([
+                        "panes.{$index}.unit_buying_price" => ['Enter a unit buying price of 0 or greater for each glass component.'],
+                    ]);
+                }
+
+                $qty = (float) $quantity;
+                $unitPrice = round((float) $unitBuyingPrice, 2);
+                $lineTotal = round($unitPrice * $qty, 2);
+                $areaM2 = GlassAreaCalculator::areaM2($width, $height, $qty);
+                $pricePerSqm = GlassAreaCalculator::pricePerSqm($lineTotal, $areaM2);
+
+                if ($pricePerSqm === null) {
+                    throw ValidationException::withMessages([
+                        "panes.{$index}.unit_buying_price" => ['Unable to compute price per m² for this pane.'],
+                    ]);
+                }
+
+                $pricedPane = array_merge($pane, [
+                    'unit_buying_price' => $unitPrice,
+                    'buying_price' => $lineTotal,
+                    'area_m2' => $areaM2,
+                    'price_per_sqm' => $pricePerSqm,
+                    'currency' => $currency,
+                ]);
+                $pricedPanes[] = $pricedPane;
+
+                $totalCost += $lineTotal;
+                $totalArea += $areaM2;
+
+                GlassPriceRecord::query()->create([
+                    'glass_order_id' => $order->id,
+                    'project_id' => $order->project_id,
+                    'supplier_id' => $order->supplier_id,
+                    'pane_index' => $index,
+                    'pane_name' => $pane['name'] ?? null,
+                    'glass_type' => $pane['glass_type'] ?? null,
+                    'tint' => $pane['tint'] ?? null,
+                    'width_mm' => (float) $width,
+                    'height_mm' => (float) $height,
+                    'quantity' => $qty,
+                    'area_m2' => $areaM2,
+                    'buying_price' => $lineTotal,
+                    'price_per_sqm' => $pricePerSqm,
+                    'currency' => $currency,
+                    'recorded_at' => $recordedAt,
+                ]);
+            }
+
+            $specs['panes'] = $pricedPanes;
+
+            $order->update([
+                'status' => GlassOrderStatus::Delivered,
+                'delivered_at' => $recordedAt,
+                'specs' => $specs,
+                'total_cost' => round($totalCost, 2),
+                'total_area_m2' => round($totalArea, 4),
+                'currency' => $currency,
+            ]);
+
+            $this->audit->log('glass_order.delivered', $order, null, [
+                'total_cost' => round($totalCost, 2),
+                'total_area_m2' => round($totalArea, 4),
+                'currency' => $currency,
+            ]);
+
+            return $order->fresh(['project', 'supplier', 'priceRecords']);
+        });
     }
 
     /**

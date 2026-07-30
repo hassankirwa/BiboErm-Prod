@@ -23,16 +23,24 @@ function QCInspectionDetailPageContent() {
   const [inspection, setInspection] = useState<QcInspection | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(() => {
+  const load = useCallback((options?: { silent?: boolean }) => {
     if (!Number.isFinite(id)) return;
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
     getQcInspection(id)
       .then((res) => setInspection(res.data))
       .catch((error: Error) => {
         toast.error(error.message || "Failed to load inspection.");
-        setInspection(null);
+        if (!options?.silent) {
+          setInspection(null);
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!options?.silent) {
+          setLoading(false);
+        }
+      });
   }, [id]);
 
   useEffect(() => {
@@ -76,7 +84,7 @@ function QCInspectionDetailPageContent() {
       <div className="p-6">
         <QCInspectionDetail
           inspection={inspection}
-          onUpdated={load}
+          onUpdated={() => load({ silent: true })}
           canInspect={canInspect}
           canResolveDefects={canResolveDefects}
         />

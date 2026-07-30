@@ -26,6 +26,8 @@ class CompleteProductionStageController extends Controller
             user: $request->user(),
             notes: $validated['notes'] ?? null,
             offcuts: $validated['offcuts'] ?? null,
+            evidenceFiles: $request->evidenceFiles(),
+            discardWasteLineIds: $validated['discard_waste_line_ids'] ?? [],
         );
 
         return new ProductionOrderResource(

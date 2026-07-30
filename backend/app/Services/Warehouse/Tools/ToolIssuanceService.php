@@ -22,9 +22,21 @@ class ToolIssuanceService
         User $issuedBy,
         ?int $projectId = null,
         ?string $conditionOut = null,
+        int $quantity = 1,
     ): ToolIssuance {
-        if ($tool->activeIssuance()) {
-            throw new InvalidArgumentException('Tool is already issued.');
+        if ($quantity < 1) {
+            throw new InvalidArgumentException('Quantity must be at least 1.');
+        }
+
+        if ($tool->isSerialized()) {
+            $quantity = 1;
+            if ($tool->activeIssuance()) {
+                throw new InvalidArgumentException('Tool is already issued.');
+            }
+        } elseif ($quantity > $tool->availableQty()) {
+            throw new InvalidArgumentException(
+                "Insufficient available quantity. Available: {$tool->availableQty()}."
+            );
         }
 
         $issuance = ToolIssuance::query()->create([
@@ -32,6 +44,7 @@ class ToolIssuanceService
             'project_id' => $projectId,
             'issued_to' => $issuedTo->id,
             'issued_by' => $issuedBy->id,
+            'quantity' => $quantity,
             'issue_date' => now()->toDateString(),
             'condition_out' => $conditionOut ?? ($tool->condition?->value ?? ToolCondition::Good->value),
             'created_at' => now(),
@@ -42,6 +55,7 @@ class ToolIssuanceService
             'tool_code' => $tool->tool_code,
             'issued_to' => $issuedTo->id,
             'project_id' => $projectId,
+            'quantity' => $quantity,
         ]);
 
         return $issuance;
@@ -63,8 +77,10 @@ class ToolIssuanceService
 
         if ($conditionIn) {
             $tool = $issuance->tool;
-            $tool->condition = ToolCondition::tryFrom($conditionIn) ?? $tool->condition;
-            $tool->save();
+            if ($tool->isSerialized()) {
+                $tool->condition = ToolCondition::tryFrom($conditionIn) ?? $tool->condition;
+                $tool->save();
+            }
         }
 
         $updated = $issuance->fresh(['tool', 'issuedToUser', 'issuedByUser', 'project']);
@@ -84,6 +100,7 @@ class ToolIssuanceService
                 'issuance_id' => $updated->id,
                 'condition_in' => $conditionIn,
                 'damage_notes' => $damageNotes,
+                'quantity' => $updated->quantity,
             ]);
         }
 

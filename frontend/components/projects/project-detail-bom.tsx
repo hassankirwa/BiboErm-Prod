@@ -32,6 +32,7 @@ import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MaterialCodeSearch } from "@/components/warehouse/material-code-search";
 
 const BOM_UPLOAD_PERMISSIONS = ["projects.bom.upload", "projects.manage"] as const;
 
@@ -281,6 +282,14 @@ export function ProjectDetailBom({
         <CardContent className="space-y-4">
           {!readOnly ? (
           <>
+          <div className="max-w-md">
+            <MaterialCodeSearch
+              placeholder="Find material by code for BOM"
+              onSelect={(item) => {
+                toast.info(`Found ${item.sku}. Use import/edit flow to add this line.`);
+              }}
+            />
+          </div>
           <PermissionGate anyOf={[...BOM_UPLOAD_PERMISSIONS]}>
             {showUploadDropZone ? (
               <div
@@ -461,6 +470,9 @@ function BomLinesTable({
             <TableHead>Material</TableHead>
             <TableHead className="text-right">Qty</TableHead>
             <TableHead className="text-right">Length (mm)</TableHead>
+            {mode === "saved" ? (
+              <TableHead className="text-right">Bars (nested)</TableHead>
+            ) : null}
             {mode === "saved" ? <TableHead>Flags</TableHead> : null}
           </TableRow>
         </TableHeader>
@@ -517,6 +529,11 @@ function BomLinesTable({
                   <TableCell>{line.material_name}</TableCell>
                   <TableCell className="text-right">{line.quantity}</TableCell>
                   <TableCell className="text-right">{line.measurement_mm ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    {line.line_type === "aluminium_profile"
+                      ? (line.bars_needed ?? "—")
+                      : "—"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {line.is_glass ? (

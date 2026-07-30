@@ -1,13 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
+import {
+  fetchWorkspaceHubBadges,
+  type WorkspaceHubBadges,
+} from "@/lib/api/workspace/hub-badges";
 import { filterAppsByPermissions, workspaceApps } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceAppsGrid() {
   const { permissions, roles } = useAuth();
   const apps = filterAppsByPermissions(workspaceApps, permissions, roles);
+  const [badges, setBadges] = useState<WorkspaceHubBadges>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchWorkspaceHubBadges()
+      .then((res) => {
+        if (!cancelled) {
+          setBadges(res.data ?? {});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBadges({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section className="min-w-0 w-full">
@@ -15,6 +41,11 @@ export function WorkspaceAppsGrid() {
       <div className="grid w-full min-w-0 grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
         {apps.map((app) => {
           const Icon = app.icon;
+          const liveBadge = app.badgeKey ? badges[app.badgeKey] : undefined;
+          const badge = liveBadge
+            ? { label: liveBadge.label, className: liveBadge.className }
+            : app.badge;
+
           return (
             <Link
               key={app.id}
@@ -33,14 +64,14 @@ export function WorkspaceAppsGrid() {
                 <span className="block text-sm font-medium leading-tight text-foreground">
                   {app.name}
                 </span>
-                {app.badge && (
+                {badge && (
                   <span
                     className={cn(
                       "mt-0.5 block text-xs font-medium leading-tight sm:text-[11px]",
-                      app.badge.className
+                      badge.className
                     )}
                   >
-                    {app.badge.label}
+                    {badge.label}
                   </span>
                 )}
               </div>

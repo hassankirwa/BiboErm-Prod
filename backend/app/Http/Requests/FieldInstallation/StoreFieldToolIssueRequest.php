@@ -17,6 +17,7 @@ class StoreFieldToolIssueRequest extends FormRequest
         return [
             'tool_id' => ['required', 'integer', 'exists:warehouse_tools,id'],
             'issued_to' => ['required', 'integer', 'exists:users,id'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
             'condition_out' => ['nullable', 'string', 'max:32'],
             'expected_return_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],

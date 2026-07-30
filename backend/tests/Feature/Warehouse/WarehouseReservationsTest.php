@@ -186,9 +186,9 @@ class WarehouseReservationsTest extends WarehouseFeatureTestCase
             ->assertJsonFragment(['project_id' => $project->id]);
     }
 
-    public function test_warehouse_manager_cannot_create_reservations(): void
+    public function test_procurement_officer_cannot_create_reservations(): void
     {
-        $user = $this->warehouseAccessoriesManager();
+        $user = $this->procurementOfficer();
         $project = $this->createTestProject();
         $item = $this->itemBySku('ACC-HNG-001');
 
@@ -218,12 +218,13 @@ class WarehouseReservationsTest extends WarehouseFeatureTestCase
             ->assertForbidden();
     }
 
-    public function test_release_project_materials_advances_to_materials_released(): void
+    public function test_release_project_materials_subtracts_stock_with_received_by(): void
     {
         $manager = $this->operationsManager();
         $releaser = $this->productionManager();
         $project = $this->createTestProject(['stage' => ProjectStage::MaterialsReady->value]);
         $item = $this->itemBySku('ACC-HDL-001');
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN1');
 
         $this->actingAsSanctum($manager)
             ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
@@ -236,17 +237,67 @@ class WarehouseReservationsTest extends WarehouseFeatureTestCase
 
         app(ProjectStageService::class)->initialize($project->fresh(), $manager);
 
+        $beforeOnHand = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_on_hand');
+
+        $beforeReserved = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
         $this->actingAsSanctum($releaser)
             ->postJson("/api/v1/warehouse/projects/{$project->id}/release-materials", [
+                'received_by' => $releaser->id,
                 'notes' => 'Handoff to cutting',
             ])
             ->assertOk()
             ->assertJsonPath('data.project_stage', ProjectStage::MaterialsReleased->value)
-            ->assertJsonFragment(['status' => ReservationStatus::Pending->value]);
+            ->assertJsonPath('data.reservation.status', ReservationStatus::Released->value)
+            ->assertJsonPath('data.reservation.received_by', $releaser->id);
 
+        $afterOnHand = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_on_hand');
+
+        $afterReserved = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        $this->assertSame(bcsub((string) $beforeOnHand, '4', 3), (string) $afterOnHand);
+        $this->assertSame(bcsub((string) $beforeReserved, '4', 3), (string) $afterReserved);
         $this->assertSame(
             ProjectStage::MaterialsReleased,
             $project->fresh()->stage,
         );
+    }
+
+    public function test_release_project_materials_requires_received_by(): void
+    {
+        $manager = $this->operationsManager();
+        $releaser = $this->productionManager();
+        $project = $this->createTestProject(['stage' => ProjectStage::MaterialsReady->value]);
+        $item = $this->itemBySku('ACC-HDL-001');
+
+        $this->actingAsSanctum($manager)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 2,
+                ]],
+            ])
+            ->assertOk();
+
+        app(ProjectStageService::class)->initialize($project->fresh(), $manager);
+
+        $this->actingAsSanctum($releaser)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/release-materials", [
+                'notes' => 'Missing receiver',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['received_by']);
     }
 }

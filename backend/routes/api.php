@@ -15,6 +15,7 @@ use App\Http\Controllers\Auth\RecoverEmailController;
 use App\Http\Controllers\Auth\RefreshSessionController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\Auth\TwoFactorLoginController;
+use App\Http\Controllers\ClientPortal\ClientPortalController;
 use App\Http\Controllers\Hr\HrProfileChangeRequestController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\MyHrDocumentController;
@@ -41,6 +42,12 @@ Route::prefix('v1')->group(function () {
     Route::middleware('throttle:bibo-reset-password')->post('auth/reset-password', [ResetPasswordController::class, 'store']);
 
     Route::middleware('throttle:bibo-recover-email')->post('auth/recover-email', [RecoverEmailController::class, 'store']);
+
+    Route::middleware('throttle:20,1')->post('client-portal/access', [ClientPortalController::class, 'access']);
+    Route::middleware('throttle:60,1')->get('client-portal/projects/{project}/progress', [ClientPortalController::class, 'progress']);
+    Route::middleware('throttle:60,1')->get('client-portal/projects/{project}/documents/{document}', [ClientPortalController::class, 'document']);
+    Route::middleware('throttle:120,1')->get('client-portal/projects/{project}/media/{mediaKey}', [ClientPortalController::class, 'media'])
+        ->where('mediaKey', '[A-Za-z0-9_-]+');
 
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('auth/change-password', [ChangePasswordController::class, 'update'])

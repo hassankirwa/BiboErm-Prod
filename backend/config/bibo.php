@@ -15,6 +15,11 @@ return [
         'expire_hours' => (int) env('INVITE_EXPIRY_HOURS', 72),
     ],
 
+    'warehouse' => [
+        // Image-heavy material catalog workbooks (PREMIUM, BALUSTRADE, ALUMINIUM…).
+        'material_catalog_workbook_max_kb' => (int) env('BIBO_WAREHOUSE_CATALOG_WORKBOOK_MAX_KB', 153600),
+    ],
+
     /*
     | Project file storage (outside backend/) — profiles, field-work, etc.
     | Run once: php artisan storage:link  (symlinks public/media → ../storage/public)
@@ -30,6 +35,14 @@ return [
                 'max_width' => (int) env('BIBO_PROFILE_MAX_WIDTH', 4096),
                 'max_height' => (int) env('BIBO_PROFILE_MAX_HEIGHT', 4096),
                 'mimes' => ['jpeg', 'jpg', 'png', 'webp'],
+                'image_only' => true,
+            ],
+            'warehouse-catalog' => [
+                'public' => true,
+                'max_kb' => (int) env('BIBO_WAREHOUSE_CATALOG_MAX_KB', 4096),
+                'max_width' => (int) env('BIBO_WAREHOUSE_CATALOG_MAX_WIDTH', 4096),
+                'max_height' => (int) env('BIBO_WAREHOUSE_CATALOG_MAX_HEIGHT', 4096),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp', 'gif', 'bmp'],
                 'image_only' => true,
             ],
             'field-work' => [
@@ -99,6 +112,28 @@ return [
                 'image_only' => false,
                 'permissions' => [
                     'hr_documents.manage', 'employees.view',
+                ],
+            ],
+            'production-stage-evidence' => [
+                'public' => false,
+                'max_kb' => (int) env('BIBO_PRODUCTION_STAGE_EVIDENCE_MAX_KB', 10240),
+                'max_width' => (int) env('BIBO_PRODUCTION_STAGE_EVIDENCE_MAX_WIDTH', 4096),
+                'max_height' => (int) env('BIBO_PRODUCTION_STAGE_EVIDENCE_MAX_HEIGHT', 4096),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp'],
+                'image_only' => true,
+                'permissions' => [
+                    'production.view', 'production.manage',
+                ],
+            ],
+            'qc-photos' => [
+                'public' => false,
+                'max_kb' => (int) env('BIBO_QC_PHOTO_MAX_KB', 10240),
+                'max_width' => (int) env('BIBO_QC_PHOTO_MAX_WIDTH', 4096),
+                'max_height' => (int) env('BIBO_QC_PHOTO_MAX_HEIGHT', 4096),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp'],
+                'image_only' => true,
+                'permissions' => [
+                    'qc.view', 'qc.inspect', 'qc.manage',
                 ],
             ],
         ],

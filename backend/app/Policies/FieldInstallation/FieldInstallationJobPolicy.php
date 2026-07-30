@@ -36,4 +36,14 @@ class FieldInstallationJobPolicy
     {
         return $this->canManage($user);
     }
+
+    public function hold(User $user, FieldInstallationJob $job): bool
+    {
+        return $this->canManage($user);
+    }
+
+    public function cancel(User $user, FieldInstallationJob $job): bool
+    {
+        return $this->canManage($user);
+    }
 }

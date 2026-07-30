@@ -24,7 +24,10 @@ class CuttingSheetController extends Controller
         $this->authorize('view', $order);
 
         return CuttingSheetResource::collection(
-            $order->cuttingSheets()->orderBy('sort_order')->get()
+            $order->cuttingSheets()
+                ->with(['warehouseItem.aluminiumProfile'])
+                ->orderBy('sort_order')
+                ->get()
         );
     }
 

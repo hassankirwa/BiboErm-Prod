@@ -20,7 +20,7 @@ class SiteVisit extends Model
         'parking_security_notes', 'lift_stair_access', 'power_availability',
         'installation_access_notes', 'special_risks', 'general_notes',
         'actual_latitude', 'actual_longitude', 'gps_start', 'gps_end',
-        'arrival_at', 'completion_at', 'submitted_at', 'reviewed_at',
+        'arrival_at', 'completion_at', 'submitted_at', 'reviewed_at', 'reviewed_by', 'review_notes',
         'client_present', 'visit_outcome', 'follow_up_required', 'field_officer_notes',
         'measurement_form_data', 'measurement_form_status', 'rough_sketch_path',
         'approved_by', 'approved_at',
@@ -93,6 +93,11 @@ class SiteVisit extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
     }
 
     public function measurementLines(): HasMany

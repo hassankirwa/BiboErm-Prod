@@ -55,7 +55,15 @@ class FieldInstallationJobController extends Controller
         $this->authorize('view', $fieldJob);
 
         return new FieldInstallationJobResource(
-            $fieldJob->load(['project', 'teamLead', 'activeMembers.user', 'units', 'toolAssignments.toolIssuance'])
+            $fieldJob->load([
+                'project',
+                'teamLead',
+                'activeMembers.user',
+                'units',
+                'toolAssignments.toolIssuance.tool',
+                'toolAssignments.toolIssuance.issuedToUser',
+                'toolAssignments.assignedByUser',
+            ])
         );
     }
 
@@ -82,6 +90,24 @@ class FieldInstallationJobController extends Controller
         $this->authorize('complete', $fieldJob);
 
         $job = $this->service->complete($fieldJob, request()->user());
+
+        return new FieldInstallationJobResource($job);
+    }
+
+    public function hold(FieldInstallationJob $fieldJob): FieldInstallationJobResource
+    {
+        $this->authorize('hold', $fieldJob);
+
+        $job = $this->service->hold($fieldJob, request()->user());
+
+        return new FieldInstallationJobResource($job);
+    }
+
+    public function cancel(FieldInstallationJob $fieldJob): FieldInstallationJobResource
+    {
+        $this->authorize('cancel', $fieldJob);
+
+        $job = $this->service->cancel($fieldJob, request()->user());
 
         return new FieldInstallationJobResource($job);
     }

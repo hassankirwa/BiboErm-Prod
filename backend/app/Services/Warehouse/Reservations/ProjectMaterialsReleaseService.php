@@ -9,7 +9,10 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\StockReservationLine;
+use App\Services\Production\ProductionOrderService;
+use App\Services\Projects\ProjectMaterialStatusService;
 use App\Services\Projects\ProjectStageService;
+use App\Services\Warehouse\Movements\StockMovementService;
 use App\Services\Warehouse\Offcuts\OffcutAllocationService;
 use App\Services\Warehouse\WarehouseAuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -21,12 +24,14 @@ class ProjectMaterialsReleaseService
         protected OffcutAllocationService $offcuts,
         protected ProjectStageService $stages,
         protected WarehouseAuditLogger $audit,
+        protected FifoReservationService $fifoReservation,
+        protected StockMovementService $movements,
+        protected ProjectMaterialStatusService $materialStatus,
+        protected ProductionOrderService $productionOrders,
     ) {}
 
     /**
-     * Confirm reserved stock is ready for production pickup and advance to materials_released.
-     *
-     * Does not consume reservations — production fetches (stage release / transfer) per pipeline stage.
+     * Hand reserved materials to production: subtract stock, record receiver, advance stage.
      *
      * @return array{
      *     reservation: StockReservation,
@@ -35,8 +40,19 @@ class ProjectMaterialsReleaseService
      *     project_stage: string
      * }
      */
-    public function releaseForProduction(Project $project, User $performer, ?string $notes = null): array
-    {
+    public function releaseForProduction(
+        Project $project,
+        User $performer,
+        int $receivedByUserId,
+        ?string $notes = null,
+    ): array {
+        $receiver = User::query()->find($receivedByUserId);
+        if (! $receiver) {
+            throw ValidationException::withMessages([
+                'received_by' => ['Select who received the materials.'],
+            ]);
+        }
+
         $reservation = StockReservation::query()
             ->where('project_id', $project->id)
             ->whereIn('status', [
@@ -54,9 +70,14 @@ class ProjectMaterialsReleaseService
 
         $currentStage = $this->stages->currentStage($project);
 
-        if (! in_array($currentStage, [ProjectStage::MaterialsReady, ProjectStage::MaterialsReleased], true)) {
+        if (! in_array($currentStage, [
+            ProjectStage::MaterialsReady,
+            ProjectStage::MaterialsReserved,
+            ProjectStage::AwaitingProcurement,
+            ProjectStage::MaterialsReleased,
+        ], true)) {
             throw ValidationException::withMessages([
-                'stage' => ['Materials can only be released when the project is at materials ready.'],
+                'stage' => ['Materials can only be released when the project has reserved materials ready for handover.'],
             ]);
         }
 
@@ -74,26 +95,135 @@ class ProjectMaterialsReleaseService
 
         $offcutLines = $this->buildOffcutSummary($project->id, $reservation);
 
-        return DB::transaction(function () use ($project, $performer, $notes, $reservation, $offcutLines) {
-            if ($this->stages->canTransition($project->fresh(), ProjectStage::MaterialsReleased)) {
-                $this->stages->transition($project->fresh(), ProjectStage::MaterialsReleased, $performer, [
-                    'reason' => 'warehouse_materials_staged_for_production',
-                    'delay_reason' => $notes,
-                ]);
+        return DB::transaction(function () use (
+            $project,
+            $performer,
+            $receiver,
+            $notes,
+            $reservation,
+            $offcutLines,
+        ) {
+            // Assert / advance to materials_ready BEFORE consuming reservation remaining qty.
+            $this->prepareProductionHandover(
+                project: $project->fresh(),
+                performer: $performer,
+                reservation: $reservation,
+                notes: $notes,
+            );
+
+            $beforeReleased = $reservation->lines
+                ->mapWithKeys(fn (StockReservationLine $line) => [$line->id => (string) $line->quantity_released])
+                ->all();
+
+            $updated = $this->fifoReservation->release($reservation);
+
+            $movementLines = [];
+            foreach ($updated->lines as $line) {
+                $previous = $beforeReleased[$line->id] ?? '0';
+                $delta = bcsub((string) $line->quantity_released, $previous, 3);
+                if (bccomp($delta, '0', 3) !== 1) {
+                    continue;
+                }
+                $movementLines[] = [
+                    'item_id' => $line->item_id,
+                    'from_bin_id' => $line->bin_id,
+                    'quantity' => $delta,
+                ];
             }
 
+            $movementId = null;
+            if ($movementLines !== []) {
+                $movement = $this->movements->recordOutboundDocument(
+                    performer: $performer,
+                    lines: $movementLines,
+                    referenceType: 'project',
+                    referenceId: $project->id,
+                    notes: $notes ?? 'Warehouse materials released to production',
+                );
+                $movementId = $movement->id;
+            }
+
+            $updated->received_by = $receiver->id;
+            $updated->released_at = now();
+            $updated->release_notes = $notes;
+            $updated->save();
+
+            $this->transitionToMaterialsReleased(
+                project: $project->fresh(),
+                performer: $performer,
+                notes: $notes,
+            );
+
             $this->audit->materialsStagedForProduction($project->id, [
-                'reservation_id' => $reservation->id,
+                'reservation_id' => $updated->id,
+                'received_by' => $receiver->id,
+                'movement_id' => $movementId,
                 'notes' => $notes,
             ]);
 
             return [
-                'reservation' => $reservation->fresh(['lines.item', 'lines.bin', 'project']),
-                'movement_id' => null,
+                'reservation' => $updated->fresh([
+                    'lines.item',
+                    'lines.bin',
+                    'project',
+                    'receivedByUser',
+                    'reservedByUser',
+                ]),
+                'movement_id' => $movementId,
                 'offcut_lines' => $offcutLines,
                 'project_stage' => ProjectStage::MaterialsReleased->value,
             ];
         });
+    }
+
+    /**
+     * Move to materials_ready and ensure a production order while reservation still covers the BOM.
+     */
+    protected function prepareProductionHandover(
+        Project $project,
+        User $performer,
+        StockReservation $reservation,
+        ?string $notes,
+    ): void {
+        $current = $this->stages->currentStage($project);
+
+        if (in_array($current, [ProjectStage::AwaitingProcurement, ProjectStage::MaterialsReserved], true)) {
+            $this->materialStatus->assertCanAdvanceToMaterialsReady($project);
+
+            if ($this->stages->canTransition($project, ProjectStage::MaterialsReady)) {
+                $this->stages->transition($project, ProjectStage::MaterialsReady, $performer, [
+                    'reason' => 'warehouse_materials_ready_for_release',
+                    'delay_reason' => $notes,
+                ]);
+            }
+
+            $project = $project->fresh();
+            $current = $this->stages->currentStage($project);
+        }
+
+        if ($current === ProjectStage::MaterialsReady) {
+            $this->productionOrders->ensureActiveOrder(
+                projectId: $project->id,
+                fifoSequence: (int) ($reservation->fifo_sequence ?? 1),
+            );
+        }
+    }
+
+    protected function transitionToMaterialsReleased(
+        Project $project,
+        User $performer,
+        ?string $notes,
+    ): void {
+        if ($this->stages->currentStage($project) === ProjectStage::MaterialsReleased) {
+            return;
+        }
+
+        if ($this->stages->canTransition($project, ProjectStage::MaterialsReleased)) {
+            $this->stages->transition($project, ProjectStage::MaterialsReleased, $performer, [
+                'reason' => 'warehouse_materials_released_to_production',
+                'delay_reason' => $notes,
+            ]);
+        }
     }
 
     /**
@@ -148,5 +278,4 @@ class ProjectMaterialsReleaseService
 
         return (int) ($bomLine?->measurement_mm ?? 0);
     }
-
 }

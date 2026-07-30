@@ -10,5 +10,6 @@ Route::middleware('permission:qc.view')->get('inspections/{inspection}', [QcInsp
 Route::middleware('permission:qc.inspect')->post('inspections', [QcInspectionController::class, 'store']);
 Route::middleware('permission:qc.inspect')->patch('inspections/{inspection}', [QcInspectionController::class, 'update']);
 Route::middleware('permission:qc.inspect')->post('inspections/{inspection}/submit', [QcInspectionController::class, 'submit']);
+Route::middleware('permission:qc.inspect')->post('inspections/{inspection}/skip', [QcInspectionController::class, 'skip']);
 Route::middleware('permission:qc.inspect')->post('inspections/{inspection}/photos', [QcInspectionPhotoController::class, 'store']);
 Route::middleware('permission:qc.inspect')->post('inspections/{inspection}/defects', [QcDefectController::class, 'store']);

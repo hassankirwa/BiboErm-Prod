@@ -9,6 +9,7 @@ use App\Http\Resources\Warehouse\StockReservationResource;
 use App\Models\Project;
 use App\Models\Warehouse\StockReservation;
 use App\Services\Warehouse\Reservations\FifoQueueDemandRegistry;
+use App\Services\Warehouse\Reservations\MaterialCheckSnapshotService;
 use App\Services\Warehouse\Reservations\ProjectMaterialReservationOrchestrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,13 +20,17 @@ class ProjectReservationController extends Controller
     public function __construct(
         protected FifoQueueDemandRegistry $demandRegistry,
         protected ProjectMaterialReservationOrchestrator $orchestrator,
+        protected MaterialCheckSnapshotService $materialCheckSnapshot,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = StockReservation::query()
             ->with(['project', 'lines.item', 'lines.bin', 'reservedByUser'])
-            ->orderBy('fifo_sequence');
+            ->leftJoin('projects', 'projects.id', '=', 'stock_reservations.project_id')
+            ->orderBy('projects.id')
+            ->orderBy('stock_reservations.id')
+            ->select('stock_reservations.*');
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);
@@ -46,10 +51,12 @@ class ProjectReservationController extends Controller
 
         $this->demandRegistry->record($project->id, $lines);
 
-        return response()->json(
-            app(\App\Services\Warehouse\Reservations\BomStockCheckService::class)
-                ->check($project->id, $lines)
-        );
+        $check = app(\App\Services\Warehouse\Reservations\BomStockCheckService::class)
+            ->check($project->id, $lines);
+
+        $this->materialCheckSnapshot->store($project, $check);
+
+        return response()->json($check);
     }
 
     public function reserve(ReserveStockRequest $request, Project $project): JsonResponse
@@ -63,6 +70,10 @@ class ProjectReservationController extends Controller
             notes: $data['notes'] ?? null,
             emitEvents: $request->boolean('emit_events', true),
         );
+
+        if (! empty($result['check']) && is_array($result['check'])) {
+            $this->materialCheckSnapshot->store($project, $result['check']);
+        }
 
         if (! $result['success']) {
             return response()->json([

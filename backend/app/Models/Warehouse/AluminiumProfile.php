@@ -21,6 +21,7 @@ class AluminiumProfile extends Model
         'finish',
         'weight_per_metre',
         'standard_bar_length_mm',
+        'default_bin_id',
     ];
 
     protected function casts(): array
@@ -35,5 +36,10 @@ class AluminiumProfile extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class, 'item_id');
+    }
+
+    public function defaultBin(): BelongsTo
+    {
+        return $this->belongsTo(Bin::class, 'default_bin_id');
     }
 }

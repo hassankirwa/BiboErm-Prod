@@ -82,12 +82,23 @@ export function ProjectMaterialRequisitionBoard({
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="text-base">
-                  <Link
-                    href={`/projects/${entry.project.id}`}
-                    className="text-primary hover:underline"
-                  >
-                    {entry.project.name}
-                  </Link>
+                  <span className="mr-2 inline-flex items-center gap-2">
+                    {entry.project.fifo_order != null && (
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[11px] tabular-nums"
+                        title="FIFO queue position"
+                      >
+                        #{entry.project.fifo_order}
+                      </Badge>
+                    )}
+                    <Link
+                      href={`/projects/${entry.project.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {entry.project.name}
+                    </Link>
+                  </span>
                 </CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {entry.project.reference}

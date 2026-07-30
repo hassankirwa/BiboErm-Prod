@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\EnsureTrustedDevice;
 use App\Http\Middleware\EnsureUserIsActive;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('warehouse:cleanup-catalog-extracts')->daily();
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         /*
          * Cookie + session stack for /api (login, refresh, logout, etc.).

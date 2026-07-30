@@ -2,8 +2,13 @@
 
 use App\Http\Controllers\Warehouse\Inventory\ItemSearchController;
 use App\Http\Controllers\Warehouse\Inventory\LowStockAlertController;
+use App\Http\Controllers\Warehouse\Inventory\PutawayOptionsController;
 use App\Http\Controllers\Warehouse\Inventory\StockLevelController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('permission:warehouse.stock.view|procurement.view|procurement.grn.view|warehouse.stock.receive')->group(function () {
+    Route::get('inventory/putaway-options', PutawayOptionsController::class);
+});
 
 Route::middleware('permission:warehouse.stock.view')->group(function () {
     Route::get('inventory', [StockLevelController::class, 'index']);

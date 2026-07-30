@@ -24,8 +24,9 @@ class DatabaseSeeder extends Seeder
             CrmSeeder::class,
             ProcurementSeeder::class,
             WarehouseStructureSeeder::class,
-            WarehouseMasterDataSeeder::class,
-            LowStockDemoSeeder::class,
+            QcDefaultChecklistsSeeder::class,
+            // Demo SKUs / low-stock fixtures are test-only (see InteractsWithWarehouseData).
+            // Production master data comes from catalog imports.
         ]);
 
         app()->make(PermissionRegistrar::class)->forgetCachedPermissions();

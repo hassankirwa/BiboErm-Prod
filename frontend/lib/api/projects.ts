@@ -20,6 +20,7 @@ export type ProjectSummary = {
   resolved_site_address?: string | null;
   stage: string;
   completion_percent: number;
+  fifo_order?: number | null;
   priority: string;
   quoted_amount: string | null;
   deposit_received: string | null;
@@ -84,6 +85,7 @@ export type PipelineProject = {
   reference: string;
   name: string;
   priority: string;
+  fifo_order?: number | null;
   stage: string;
   completion_percent: number;
   projected_start: string | null;
@@ -291,6 +293,7 @@ export type ProjectStageMaterialCheck = {
     item_id?: number | null;
     sku?: string | null;
     name?: string | null;
+    category?: string | null;
     required?: string;
     effective_available?: string;
     shortage?: string;
@@ -381,6 +384,13 @@ export type BomExtractedLine = {
   quantity: number;
   line_type: string;
   measurement_mm: number | null;
+  unit_of_measure?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  opening_code?: string | null;
+  source_system?: string | null;
+  series?: string | null;
+  compatible_profile_code?: string | null;
   notes: string | null;
   warehouse_item_id: number | null;
   warehouse_match: boolean;
@@ -408,6 +418,15 @@ export type ProjectBomLine = {
   material_name: string;
   quantity: string | number;
   measurement_mm: number | null;
+  unit_of_measure?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  opening_code?: string | null;
+  source_system?: string | null;
+  series?: string | null;
+  bars_needed?: number | null;
+  reserve_qty?: string | number | null;
+  reserve_uom?: string | null;
   is_procurement_only: boolean;
   is_glass: boolean;
   is_addon: boolean;
@@ -440,8 +459,77 @@ export type ProjectDocument = {
   filename: string;
   version: number;
   url: string;
+  metadata?: {
+    source?: string;
+    code?: string | null;
+    series?: string | null;
+    quantity?: number | string | null;
+    colour?: string | null;
+    description?: string | null;
+    dimensions?: {
+      width_mm?: number | null;
+      height_mm?: number | null;
+      sqm?: number | null;
+      weight_kg?: number | null;
+      sill_height?: number | null;
+      source?: string | null;
+    } | null;
+    has_elevation_image?: boolean;
+    fabrication_document_id?: number;
+    frame_profiles?: FabricationProfileRow[];
+    sash_profiles?: FabricationProfileRow[];
+    hardware?: FabricationHardwareRow[];
+    glass?: FabricationGlassRow[];
+    sash_openings?: FabricationSashOpeningRow[];
+    packaging?: string | Record<string, unknown> | null;
+    bom_tags?: {
+      bom_id?: number | null;
+      bom_line_ids?: number[];
+      tagged_at?: string | null;
+      tagged_by?: number | null;
+    } | null;
+    project?: { name?: string | null; order_no?: string | null } | null;
+    summary?: { total_items?: number; source_filename?: string | null } | null;
+    items?: unknown[];
+  } | null;
   uploaded_by_user?: { id: number; name: string; email: string } | null;
   created_at?: string;
+};
+
+export type FabricationProfileRow = {
+  name?: string | null;
+  code_no?: string | null;
+  length_mm?: number | null;
+  qty?: number | null;
+  corner?: string | null;
+  mark?: string | null;
+};
+
+export type FabricationHardwareRow = {
+  name?: string | null;
+  specification?: string | null;
+  unit?: string | null;
+  qty?: number | null;
+  purpose?: string | null;
+  mark?: string | null;
+};
+
+export type FabricationGlassRow = {
+  name?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  qty?: number | null;
+  specification?: string | null;
+  mark?: string | null;
+};
+
+export type FabricationSashOpeningRow = {
+  type?: string | null;
+  opening?: string | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  qty?: number | null;
+  mark?: string | null;
 };
 
 export type ProjectMaterialLine = {
@@ -452,7 +540,15 @@ export type ProjectMaterialLine = {
   warehouse_item_id: number | null;
   required_qty: string;
   reserved_qty: string;
+  reservation_target_qty?: string;
+  reservation_uom?: string | null;
+  sku_cuts_total?: number | null;
   shortage_qty: string;
+  warehouse_available?: string | null;
+  offcut_usable?: string | null;
+  bars_needed?: number | null;
+  stock_check_shortage?: string | null;
+  is_fully_reserved?: boolean;
   measurement_mm: number | null;
   is_procurement_only: boolean;
   is_glass: boolean;
@@ -495,22 +591,41 @@ export type ProjectProcurementReceipt = {
   lines: ProjectProcurementReceiptLine[];
 };
 
+export type ProjectMaterialReleasedLine = {
+  item_id: number;
+  sku?: string | null;
+  name?: string | null;
+  unit_of_measure?: string | null;
+  quantity_released: string;
+  quantity_reserved: string;
+  reservation_ids: number[];
+};
+
 export type ProjectMaterialStatus = {
   project_id: number;
   stage: string;
   bom_version: number | null;
   summary: {
     total_lines: number;
+    unique_materials?: number;
     warehouse_lines: number;
     procurement_only_lines: number;
     fully_reserved: number;
+    reservation_units_total?: number;
+    reservation_units_reserved?: number;
+    reservation_complete?: boolean;
     shortage_lines: number;
     open_requisitions: number;
     glass_orders_pending: number;
+    materials_released_lines?: number;
+    can_fully_reserve?: boolean;
+    can_reserve_now?: boolean;
   };
+  stock_check?: ProjectStageMaterialCheck;
   lines: ProjectMaterialLine[];
   fifo_position: number | null;
   goods_receipts?: ProjectProcurementReceipt[];
+  materials_released?: ProjectMaterialReleasedLine[];
 };
 
 export type ProjectMaterialShortageEntry = {
@@ -520,6 +635,7 @@ export type ProjectMaterialShortageEntry = {
     name: string;
     stage: string;
     priority: string;
+    fifo_order?: number | null;
     account: { id: number; name: string } | null;
     project_manager: { id: number; name: string } | null;
     bom: { id: number; version: number; status: string } | null;
@@ -553,6 +669,10 @@ export async function advanceProjectStage(
   payload: {
     stage: string;
     reason?: string;
+    driver_id?: number;
+    vehicle_reg?: string;
+    vehicle_details?: string;
+    packing_notes?: string;
     deposit_confirmation?: ProjectStageDepositConfirmation;
     site_assessment?: ProjectStageSiteAssessment;
   },
@@ -561,6 +681,111 @@ export async function advanceProjectStage(
     method: "POST",
     body: payload,
   });
+}
+
+export type DesignChangeOrderStatus =
+  | "drafted"
+  | "awaiting_remeasure"
+  | "design_in_progress"
+  | "bom_revised"
+  | "materials_ready"
+  | "remake_in_production"
+  | "closed"
+  | "cancelled";
+
+export type DesignChangeOrder = {
+  id: number;
+  project_id: number;
+  field_non_conformity_id: number | null;
+  status: DesignChangeOrderStatus | string;
+  reason: string | null;
+  measurement_notes: Record<string, unknown> | string[] | null;
+  scope_bom_line_ids: number[] | null;
+  remeasure_site_visit_id: number | null;
+  revised_bom_version: number | null;
+  parent_production_order_id: number | null;
+  remake_production_order_id: number | null;
+  requested_by: number | null;
+  approved_by: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  project?: {
+    id: number;
+    reference: string;
+    name: string;
+    stage: string;
+  };
+  non_conformity?: {
+    id: number;
+    nc_type: string;
+    severity: string;
+    title: string;
+    status: string;
+  } | null;
+  parent_production_order?: {
+    id: number;
+    reference: string;
+    status: string;
+  } | null;
+  remake_production_order?: {
+    id: number;
+    reference: string;
+    status: string;
+  } | null;
+  requester?: { id: number; name: string } | null;
+  approver?: { id: number; name: string } | null;
+};
+
+export async function listDesignChangeOrders(projectId: number) {
+  return apiRequest<{ data: DesignChangeOrder[] }>(
+    `/projects/${projectId}/design-change-orders`,
+  );
+}
+
+export async function createDesignChangeOrder(
+  projectId: number,
+  payload: {
+    reason?: string;
+    measurement_notes?: Record<string, unknown> | string;
+    scope_bom_line_ids?: number[];
+    field_non_conformity_id?: number;
+    parent_production_order_id?: number;
+  },
+) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/${projectId}/design-change-orders`,
+    { method: "POST", body: payload },
+  );
+}
+
+export async function getDesignChangeOrder(id: number) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}`,
+  );
+}
+
+export async function approveDesignChangeOrder(
+  id: number,
+  payload: { target_stage: string },
+) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}/approve`,
+    { method: "POST", body: payload },
+  );
+}
+
+export async function createDesignChangeRemake(id: number) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}/create-remake`,
+    { method: "POST" },
+  );
+}
+
+export async function closeDesignChangeOrder(id: number) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}/close`,
+    { method: "POST" },
+  );
 }
 
 export async function updateProjectSiteAssessmentNotes(
@@ -608,6 +833,27 @@ export function hasProductionMeasurementData(project: ProjectDetail): boolean {
   }
 
   return hasSiteAssessmentOperationalData(project.stage_data?.site_assessment);
+}
+
+/** Site assessment (or later) — not awaiting/deposit-only stages. */
+export function projectStageAllowsProductionMeasurements(stage: string): boolean {
+  return stage !== "awaiting_deposit" && stage !== "deposit_received";
+}
+
+export function hasAssignedProductionMeasurementVisit(
+  visits: Array<{
+    measurement_context?: "quotation" | "production" | null;
+    assigned_field_officer_id?: number | null;
+    assigned_field_officer?: { id: number } | null;
+  }>,
+): boolean {
+  return visits.some((visit) => {
+    const context = visit.measurement_context ?? "production";
+    if (context !== "production") return false;
+    return Boolean(
+      visit.assigned_field_officer_id ?? visit.assigned_field_officer?.id,
+    );
+  });
 }
 
 export async function uploadSiteAssessmentImage(projectId: number, file: File) {
@@ -758,6 +1004,20 @@ export async function uploadProjectDocument(
   });
 }
 
+export async function tagProjectDocumentBom(
+  projectId: number,
+  documentId: number,
+  bomLineIds: number[],
+) {
+  return apiRequest<{ data: ProjectDocument }>(
+    `/projects/${projectId}/documents/${documentId}`,
+    {
+      method: "PATCH",
+      body: { bom_line_ids: bomLineIds },
+    },
+  );
+}
+
 export async function getProjectMaterialStatus(projectId: number) {
   return apiRequest<{ data: ProjectMaterialStatus }>(
     `/projects/${projectId}/material-status`,
@@ -834,6 +1094,25 @@ export function canAdvanceFromFinalDesignApproval(project: ProjectDetail): {
   };
 }
 
+/** Requirements to enter final design approval from site assessment. */
+export function canAdvanceToFinalDesignApproval(project: ProjectDetail): {
+  ok: boolean;
+  missingMeasurement: boolean;
+  missingDesign: boolean;
+  missingBomUpload: boolean;
+} {
+  const missingMeasurement = !hasProductionMeasurementData(project);
+  const missingDesign = !projectHasDesignDocument(project);
+  const missingBomUpload = !projectHasBomUploaded(project);
+
+  return {
+    ok: !missingMeasurement && !missingDesign && !missingBomUpload,
+    missingMeasurement,
+    missingDesign,
+    missingBomUpload,
+  };
+}
+
 /** User-friendly stage labels (match backend config/bibo.php). */
 export const PROJECT_STAGE_LABELS: Record<string, string> = {
   awaiting_deposit: "Awaiting deposit",
@@ -863,13 +1142,93 @@ export const AUTO_PROJECT_STAGES = new Set(["material_check"]);
 /** Waiting hints when the current user cannot advance. */
 export const STAGE_WAITING_MESSAGES: Record<string, string> = {
   material_check: "Waiting for warehouse to check stock and reserve materials.",
-  materials_reserved: "Materials reserved — warehouse must confirm ready for production.",
+  materials_reserved:
+    "Materials reserved — warehouse must confirm ready for production once stock is fully reserved to this project.",
   awaiting_procurement: "Waiting for procurement to fulfill material shortages.",
   materials_ready:
-    "Stock reserved in warehouse — stage materials for production before shop floor fetches.",
+    "Stock reserved in warehouse — release to a named receiver (stock deducted at handover).",
   materials_released:
-    "Reserved stock ready for production pickup — fetch per stage; log offcuts back to warehouse.",
+    "Materials handed to production — stock already deducted at warehouse release.",
 };
+
+/** Reservation completeness uses combined aluminium SKUs (one unit per nested profile). */
+export function reservationUnitsTotal(
+  summary: ProjectMaterialStatus["summary"] | null | undefined,
+): number {
+  if (!summary) return 0;
+  return summary.reservation_units_total ?? summary.warehouse_lines ?? 0;
+}
+
+export function reservationUnitsReserved(
+  summary: ProjectMaterialStatus["summary"] | null | undefined,
+): number {
+  if (!summary) return 0;
+  return summary.reservation_units_reserved ?? summary.fully_reserved ?? 0;
+}
+
+export function isReservationComplete(
+  summary: ProjectMaterialStatus["summary"] | null | undefined,
+): boolean {
+  if (!summary) return false;
+  if (typeof summary.reservation_complete === "boolean") {
+    return summary.reservation_complete;
+  }
+  const total = reservationUnitsTotal(summary);
+  return total > 0 && reservationUnitsReserved(summary) >= total;
+}
+
+/** Gate for warehouse advance to materials_ready. */
+export function canAdvanceToMaterialsReady(
+  summary: ProjectMaterialStatus["summary"] | null | undefined,
+): {
+  ok: boolean;
+  reason: string | null;
+  shortageLines: boolean;
+  openRequisitions: boolean;
+  glassPending: boolean;
+  missingBom: boolean;
+} {
+  if (!summary) {
+    return {
+      ok: false,
+      reason:
+        "Load material status first. Materials ready requires full reservation to this project.",
+      shortageLines: true,
+      openRequisitions: false,
+      glassPending: false,
+      missingBom: true,
+    };
+  }
+
+  const unitsTotal = reservationUnitsTotal(summary);
+  const unitsReserved = reservationUnitsReserved(summary);
+  const notFullyReserved = unitsTotal > 0 && unitsReserved < unitsTotal;
+  const openRequisitions =
+    (summary.open_requisitions ?? 0) > 0 && notFullyReserved;
+  const glassPending = (summary.glass_orders_pending ?? 0) > 0;
+  const missingBom = (summary.total_lines ?? 0) === 0;
+
+  let reason: string | null = null;
+  if (missingBom) {
+    reason = "Cannot mark materials ready: upload and finalize a BOM first.";
+  } else if (notFullyReserved) {
+    const missing = unitsTotal - unitsReserved;
+    reason = `Cannot mark materials ready: ${missing} material unit(s) still short or not reserved (aluminium profiles count once per SKU). Stock reserved for other projects does not count.`;
+  } else if (openRequisitions) {
+    reason = "Cannot mark materials ready: open procurement requisitions remain.";
+  } else if (glassPending) {
+    reason = "Cannot mark materials ready: glass orders are still pending.";
+  }
+
+  return {
+    ok: !notFullyReserved && !openRequisitions && !glassPending && !missingBom,
+    reason,
+    shortageLines: notFullyReserved,
+    openRequisitions,
+    glassPending,
+    missingBom,
+  };
+}
 
 /** PM-manual next stages from the current stage. */
 export const PM_MANUAL_NEXT_STAGES: Record<string, string[]> = {
@@ -914,8 +1273,7 @@ export function contextualProjectStageLabel(
   if (
     stage === "materials_reserved" &&
     materialSummary &&
-    materialSummary.warehouse_lines > 0 &&
-    materialSummary.fully_reserved < materialSummary.warehouse_lines
+    !isReservationComplete(materialSummary)
   ) {
     return "Awaiting materials reservation";
   }
@@ -924,7 +1282,7 @@ export function contextualProjectStageLabel(
     stage === "material_check" &&
     materialSummary &&
     materialSummary.shortage_lines === 0 &&
-    materialSummary.fully_reserved < materialSummary.warehouse_lines
+    !isReservationComplete(materialSummary)
   ) {
     return "Awaiting materials reservation";
   }

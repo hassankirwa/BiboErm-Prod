@@ -72,6 +72,7 @@ class MaterialReleaseRequestService
                 ->whereIn('status', [
                     ReservationStatus::Pending,
                     ReservationStatus::Partial,
+                    ReservationStatus::Released,
                 ])
                 ->latest('id')
                 ->first();
@@ -80,6 +81,11 @@ class MaterialReleaseRequestService
                 throw ValidationException::withMessages([
                     'reservation' => ['No active warehouse reservation found for this project.'],
                 ]);
+            }
+
+            // Warehouse already subtracted stock at materials release — do not double-consume.
+            if ($reservation->status === ReservationStatus::Released) {
+                return;
             }
 
             $before = $this->releasedQuantitiesByLine($reservation->id);

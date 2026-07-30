@@ -28,6 +28,13 @@ class QcInspectionResource extends JsonResource
             'stage' => $this->stage,
             'template_id' => $this->template_id,
             'result' => $this->result instanceof \BackedEnum ? $this->result->value : $this->result,
+            'can_skip' => $this->result instanceof \BackedEnum
+                ? ($this->result->value === 'pending' && in_array(
+                    $this->context instanceof \BackedEnum ? $this->context->value : $this->context,
+                    ['production_qc_pre_check', 'production_in_process'],
+                    true,
+                ))
+                : false,
             'inspector_id' => $this->inspector_id,
             'completed_by' => $this->completed_by,
             'checklist_responses' => $this->checklist_responses ?? [],

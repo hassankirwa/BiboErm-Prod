@@ -25,7 +25,11 @@ import {
   type ProductionStageValue,
 } from "@/lib/api/production";
 import { fetchUsers, type ApiUserDetail } from "@/lib/api/users";
-import { PRODUCTION_STAGE_OPTIONS, TEAM_ROLE_OPTIONS } from "@/lib/production/utils";
+import {
+  defaultRoleForStage,
+  PRODUCTION_STAGE_OPTIONS,
+  TEAM_ROLE_OPTIONS,
+} from "@/lib/production/utils";
 import { toast } from "sonner";
 
 type Props = {
@@ -46,14 +50,31 @@ export function ProductionTeamPanel({
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<ApiUserDetail[]>([]);
   const [userId, setUserId] = useState("");
-  const [role, setRole] = useState<string>(TEAM_ROLE_OPTIONS[0].value);
+  const [role, setRole] = useState<string>(defaultRoleForStage(currentStage));
   const [stage, setStage] = useState<ProductionStageValue>(currentStage);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const assignedStages = new Set(teams.map((team) => team.stage));
+  const availableStages = PRODUCTION_STAGE_OPTIONS.filter(
+    (opt) => !assignedStages.has(opt.value),
+  );
+
+  function selectStage(next: ProductionStageValue) {
+    setStage(next);
+    setRole(defaultRoleForStage(next));
+  }
+
   async function openAssign() {
+    if (availableStages.length === 0) {
+      toast.error("All stages already have an assignee");
+      return;
+    }
+    const preferred =
+      availableStages.find((opt) => opt.value === currentStage)?.value ??
+      availableStages[0].value;
+    selectStage(preferred);
     setOpen(true);
-    setStage(currentStage);
     try {
       const res = await fetchUsers({ status: "active" });
       setUsers(res.data);
@@ -65,6 +86,10 @@ export function ProductionTeamPanel({
   async function handleAssign() {
     if (!userId) {
       toast.error("Select a team member");
+      return;
+    }
+    if (!availableStages.some((opt) => opt.value === stage)) {
+      toast.error("That stage already has an assignee");
       return;
     }
     setLoading(true);
@@ -92,7 +117,12 @@ export function ProductionTeamPanel({
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium">Team assignments</h4>
         {canAssign && (
-          <Button size="sm" variant="outline" onClick={openAssign}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={openAssign}
+            disabled={availableStages.length === 0}
+          >
             Assign member
           </Button>
         )}
@@ -142,13 +172,13 @@ export function ProductionTeamPanel({
               <Label>Stage</Label>
               <Select
                 value={stage}
-                onValueChange={(v) => setStage(v as ProductionStageValue)}
+                onValueChange={(v) => selectStage(v as ProductionStageValue)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select stage…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRODUCTION_STAGE_OPTIONS.map((opt) => (
+                  {availableStages.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -177,7 +207,10 @@ export function ProductionTeamPanel({
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleAssign} disabled={loading}>
+            <Button
+              onClick={handleAssign}
+              disabled={loading || availableStages.length === 0}
+            >
               Assign
             </Button>
           </DialogFooter>

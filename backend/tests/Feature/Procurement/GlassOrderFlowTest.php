@@ -122,6 +122,72 @@ class GlassOrderFlowTest extends TestCase
         $this->assertSame('2.000', $requisition->lines->first()->quantity);
     }
 
+    public function test_mark_delivered_requires_buying_prices_and_records_price_per_sqm(): void
+    {
+        $project = $this->createProject();
+        $supplier = \App\Models\Procurement\Supplier::query()->create([
+            'code' => 'GLASS-02',
+            'name' => 'Supplier 2 Glass Ltd',
+            'category' => 'glass',
+            'is_active' => true,
+        ]);
+
+        $order = GlassOrder::query()->create([
+            'order_number' => 'GLS-TEST-004',
+            'project_id' => $project->id,
+            'supplier_id' => $supplier->id,
+            'specs' => [
+                'requirements' => '6mm tempered clear',
+                'panes' => [
+                    [
+                        'name' => 'Window 1',
+                        'width_mm' => 1000,
+                        'height_mm' => 1000,
+                        'quantity' => 2,
+                        'glass_type' => 'Tempered',
+                        'tint' => 'Clear',
+                    ],
+                ],
+            ],
+            'status' => GlassOrderStatus::Ordered,
+            'ordered_at' => now(),
+            'created_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/procurement/glass-orders/{$order->id}/mark-delivered")
+            ->assertStatus(422);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/procurement/glass-orders/{$order->id}/mark-delivered", [
+                'panes' => [
+                    ['unit_buying_price' => 5000],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'delivered')
+            ->assertJsonPath('data.total_cost', 10000)
+            ->assertJsonPath('data.total_area_m2', 2)
+            ->assertJsonPath('data.specs.panes.0.unit_buying_price', 5000)
+            ->assertJsonPath('data.specs.panes.0.buying_price', 10000)
+            ->assertJsonPath('data.specs.panes.0.price_per_sqm', 5000);
+
+        $this->assertDatabaseHas('glass_price_records', [
+            'glass_order_id' => $order->id,
+            'glass_type' => 'Tempered',
+            'quantity' => 2,
+            'buying_price' => 10000,
+            'price_per_sqm' => 5000,
+            'area_m2' => 2,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->getJson('/api/v1/procurement/glass-price-analytics')
+            ->assertOk()
+            ->assertJsonPath('data.summary.records_count', 1)
+            ->assertJsonPath('data.price_by_type.0.glass_type', 'Tempered');
+    }
+
     public function test_glass_order_index_includes_project(): void
     {
         $project = $this->createProject([

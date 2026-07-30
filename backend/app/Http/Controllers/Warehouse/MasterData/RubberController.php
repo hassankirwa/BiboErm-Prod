@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class RubberController extends Controller
 {
@@ -22,15 +23,41 @@ class RubberController extends Controller
         protected WarehouseAuditLogger $audit,
     ) {}
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        $items = Item::query()
+        $query = Item::query()
+            ->select([
+                'id',
+                'sku',
+                'name',
+                'category',
+                'unit_of_measure',
+                'door_type_id',
+                'min_stock_qty',
+                'is_active',
+                'catalog_tier',
+                'description',
+                'image_path',
+            ])
             ->where('category', ItemCategory::Rubber)
+            ->where('is_active', true)
             ->with('rubber')
-            ->orderBy('sku')
-            ->get();
+            ->orderBy('sku');
 
-        return ItemResource::collection($items);
+        if ($search = $request->query('search')) {
+            $term = '%'.trim((string) $search).'%';
+            $query->where(function ($builder) use ($term) {
+                $builder->where('sku', 'like', $term)->orWhere('name', 'like', $term);
+            });
+        }
+
+        if ($request->filled('per_page')) {
+            return ItemResource::collection(
+                $query->paginate(min($request->integer('per_page', 50), 200))
+            );
+        }
+
+        return ItemResource::collection($query->limit(2000)->get());
     }
 
     public function store(StoreRubberRequest $request): ItemResource
@@ -63,6 +90,52 @@ class RubberController extends Controller
         ]);
 
         return new ItemResource($item->load('rubber'));
+    }
+
+    public function update(Request $request, Item $item): ItemResource
+    {
+        abort_unless($item->category === ItemCategory::Rubber, 404);
+
+        $data = $request->validate([
+            'sku' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('warehouse_items', 'sku')->ignore($item->id)],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'unit_of_measure' => ['sometimes', 'required', 'string', 'max:20'],
+            'min_stock_qty' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'compatible_profile_ids' => ['sometimes', 'nullable', 'array'],
+            'compatible_profile_ids.*' => ['integer', 'exists:warehouse_items,id'],
+            'default_section_id' => ['sometimes', 'nullable', 'exists:warehouse_sections,id'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($item, $data) {
+            $item->update(collect($data)->only(['sku', 'name', 'unit_of_measure', 'min_stock_qty', 'is_active'])->all());
+            $item->rubber()->updateOrCreate(
+                ['item_id' => $item->id],
+                collect($data)->only(['compatible_profile_ids', 'default_section_id'])->all()
+            );
+        });
+
+        $this->audit->masterDataUpdated($item->id, [
+            'sku' => $item->fresh()->sku,
+            'category' => ItemCategory::Rubber->value,
+            'action' => 'updated',
+        ]);
+
+        return new ItemResource($item->fresh('rubber'));
+    }
+
+    public function destroy(Item $item): JsonResponse
+    {
+        abort_unless($item->category === ItemCategory::Rubber, 404);
+
+        $item->update(['is_active' => false]);
+        $this->audit->masterDataUpdated($item->id, [
+            'sku' => $item->sku,
+            'category' => ItemCategory::Rubber->value,
+            'action' => 'deactivated',
+        ]);
+
+        return response()->json(null, 204);
     }
 
     public function suggest(Request $request): JsonResponse

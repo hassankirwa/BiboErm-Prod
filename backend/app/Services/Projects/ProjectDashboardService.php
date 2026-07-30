@@ -10,6 +10,7 @@ class ProjectDashboardService
 {
     public function __construct(
         protected ProjectMaterialStatusService $materialStatus,
+        protected ProjectFifoOrderService $fifoOrder,
     ) {}
 
     /**
@@ -84,6 +85,7 @@ class ProjectDashboardService
             'reference' => $project->reference,
             'name' => $project->name,
             'priority' => $project->priority,
+            'fifo_order' => $this->fifoOrder->positionFor((int) $project->id),
             'stage' => $project->stage?->value ?? $project->stage,
             'completion_percent' => $project->completion_percent,
             'projected_start' => $project->projected_start?->toDateString(),

@@ -162,7 +162,7 @@ export function buildRequisitionPdfHtml(requisition: PurchaseRequisition): strin
       </tr>
       <tr>
         <td><strong>Supplier</strong><br>${escapeHtml(requisition.supplier?.name ?? "—")}</td>
-        <td><strong>Admin approver</strong><br>${escapeHtml(requisition.approver?.name ?? "Pending approval")}</td>
+        <td><strong>Required by</strong><br>${escapeHtml(requisition.required_by ?? "—")}</td>
         <td><strong>Approved</strong><br>${requisition.approved_at ? formatDateTime(requisition.approved_at) : "Pending approval"}</td>
       </tr>
     </table>

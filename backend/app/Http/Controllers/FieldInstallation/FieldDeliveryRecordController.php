@@ -4,7 +4,9 @@ namespace App\Http\Controllers\FieldInstallation;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FieldInstallation\StoreDeliveryRecordRequest;
+use App\Http\Requests\FieldInstallation\UpdateDeliveryRecordRequest;
 use App\Http\Resources\FieldInstallation\FieldDeliveryRecordResource;
+use App\Models\FieldInstallation\FieldDeliveryRecord;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Services\FieldInstallation\FieldDeliveryRecordService;
 use Illuminate\Http\JsonResponse;
@@ -37,5 +39,15 @@ class FieldDeliveryRecordController extends Controller
         return (new FieldDeliveryRecordResource($record))
             ->response()
             ->setStatusCode(201);
+    }
+
+    public function update(UpdateDeliveryRecordRequest $request, FieldDeliveryRecord $deliveryRecord): FieldDeliveryRecordResource
+    {
+        $deliveryRecord->loadMissing('job', 'lines');
+        $this->authorize('deliver', $deliveryRecord->job);
+
+        $deliveryRecord->update($request->validated());
+
+        return new FieldDeliveryRecordResource($deliveryRecord->fresh('lines'));
     }
 }

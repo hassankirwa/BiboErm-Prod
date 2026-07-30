@@ -54,12 +54,21 @@ class QcInspection extends Model
     protected static function booted(): void
     {
         static::saving(function (self $inspection): void {
+            // Keep an explicit production sub-stage (e.g. cutting) when set;
+            // only default stage from context when empty.
+            if (filled($inspection->stage)) {
+                if (! $inspection->context && is_string($inspection->stage)) {
+                    $inspection->context = QcInspectionContext::tryFrom($inspection->stage)
+                        ?? $inspection->stage;
+                }
+
+                return;
+            }
+
             if ($inspection->context instanceof QcInspectionContext) {
                 $inspection->stage = $inspection->context->value;
             } elseif (is_string($inspection->context) && $inspection->context !== '') {
                 $inspection->stage = $inspection->context;
-            } elseif ($inspection->stage && ! $inspection->context) {
-                $inspection->context = $inspection->stage;
             }
         });
     }

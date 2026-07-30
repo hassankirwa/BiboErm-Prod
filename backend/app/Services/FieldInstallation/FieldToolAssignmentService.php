@@ -6,10 +6,10 @@ use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\FieldInstallation\FieldToolAssignment;
 use App\Models\User;
 use App\Models\Warehouse\Tool;
-use App\Models\Warehouse\ToolIssuance;
 use App\Services\Warehouse\Tools\ToolIssuanceService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class FieldToolAssignmentService
 {
@@ -26,13 +26,20 @@ class FieldToolAssignmentService
         array $data = [],
     ): FieldToolAssignment {
         return DB::transaction(function () use ($job, $tool, $issuedTo, $issuedBy, $data) {
-            $issuance = $this->toolIssuance->issue(
-                tool: $tool,
-                issuedTo: $issuedTo,
-                issuedBy: $issuedBy,
-                projectId: $job->project_id,
-                conditionOut: $data['condition_out'] ?? null,
-            );
+            try {
+                $issuance = $this->toolIssuance->issue(
+                    tool: $tool,
+                    issuedTo: $issuedTo,
+                    issuedBy: $issuedBy,
+                    projectId: $job->project_id,
+                    conditionOut: $data['condition_out'] ?? null,
+                    quantity: (int) ($data['quantity'] ?? 1),
+                );
+            } catch (InvalidArgumentException $e) {
+                throw ValidationException::withMessages([
+                    'quantity' => [$e->getMessage()],
+                ]);
+            }
 
             $assignment = FieldToolAssignment::query()->create([
                 'job_id' => $job->id,
@@ -46,9 +53,15 @@ class FieldToolAssignmentService
             $this->audit->log('field.tool_linked', $assignment, newValues: [
                 'tool_issuance_id' => $issuance->id,
                 'job_id' => $job->id,
+                'quantity' => $issuance->quantity,
+                'issued_to' => $issuedTo->id,
             ]);
 
-            return $assignment->fresh(['toolIssuance.tool', 'assignedByUser']);
+            return $assignment->fresh([
+                'toolIssuance.tool',
+                'toolIssuance.issuedToUser',
+                'assignedByUser',
+            ]);
         });
     }
 
@@ -73,7 +86,11 @@ class FieldToolAssignmentService
 
             $assignment->update(['returned_at' => now()]);
 
-            return $assignment->fresh(['toolIssuance.tool', 'assignedByUser']);
+            return $assignment->fresh([
+                'toolIssuance.tool',
+                'toolIssuance.issuedToUser',
+                'assignedByUser',
+            ]);
         });
     }
 }

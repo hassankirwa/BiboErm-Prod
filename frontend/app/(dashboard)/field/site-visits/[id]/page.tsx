@@ -188,7 +188,7 @@ export default function FieldSiteVisitDetailPage() {
             {error ?? "Site visit not found."}
           </div>
         ) : (
-          <div className="mx-auto max-w-6xl space-y-4">
+          <div className="w-full space-y-4">
             <Card className="border-border">
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -305,6 +305,25 @@ export default function FieldSiteVisitDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {visit.review_notes ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">
+                  {status === "revisit_required"
+                    ? "Revisit required"
+                    : "Corrections requested"}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap">{visit.review_notes}</p>
+                <p className="mt-1 text-xs">
+                  {visit.reviewer?.name
+                    ? `Reviewed by ${visit.reviewer.name}`
+                    : "Reviewer feedback"}
+                  {visit.reviewed_at
+                    ? ` · ${new Date(visit.reviewed_at).toLocaleString()}`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
 
             {showLogDetails && (
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>

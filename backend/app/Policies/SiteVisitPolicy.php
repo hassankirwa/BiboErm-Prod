@@ -65,6 +65,19 @@ class SiteVisitPolicy
         return $this->view($user, $siteVisit);
     }
 
+    public function reassign(User $user, SiteVisit $siteVisit): bool
+    {
+        if ((int) $siteVisit->scheduled_by === $user->id) {
+            return true;
+        }
+
+        return $this->canAny($user, [
+            'site_visits.schedule',
+            'projects.manage',
+            'crm.manage',
+        ]);
+    }
+
     public function execute(User $user, SiteVisit $siteVisit): bool
     {
         if ((int) $siteVisit->assigned_field_officer_id !== $user->id) {

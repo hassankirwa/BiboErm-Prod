@@ -17,7 +17,10 @@ class SkipStageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'stage' => ['required', 'string', Rule::in([ProductionStage::GlassAssembly->value])],
+            'stage' => ['required', 'string', Rule::in([
+                ProductionStage::GlassAssembly->value,
+                ProductionStage::QcPreCheck->value,
+            ])],
             'notes' => ['nullable', 'string'],
         ];
     }

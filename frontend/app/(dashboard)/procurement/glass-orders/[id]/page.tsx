@@ -33,7 +33,7 @@ export default function GlassOrderDetailPage({
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Glass order"
-        subtitle="Complete dimensions, requirements, and supplier before ordering"
+        subtitle="Complete dimensions, requirements, and supplier — then print a PO for the supplier and capture buying prices on delivery"
         actions={
           <Button variant="outline" size="sm" asChild>
             <Link href="/procurement/dashboard">Back</Link>

@@ -60,6 +60,8 @@ export default function WarehouseOffcutsPage() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [allocatingOffcutId, setAllocatingOffcutId] = useState<number | null>(null);
   const [allocateProjectId, setAllocateProjectId] = useState("");
+  const [skuSearch, setSkuSearch] = useState("");
+  const [skuQuery, setSkuQuery] = useState("");
   const [form, setForm] = useState({
     item_id: "",
     bin_id: "",
@@ -71,7 +73,13 @@ export default function WarehouseOffcutsPage() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([listOffcuts({ per_page: 50 }), getOffcutAnalytics()])
+    Promise.all([
+      listOffcuts({
+        per_page: 50,
+        ...(skuQuery.trim() ? { sku: skuQuery.trim() } : {}),
+      }),
+      getOffcutAnalytics(),
+    ])
       .then(([offcutsRes, analyticsRes]) => {
         setItems(offcutsRes.data);
         setAnalytics(analyticsRes.data);
@@ -82,7 +90,7 @@ export default function WarehouseOffcutsPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [skuQuery]);
 
   useEffect(() => {
     Promise.all([listWarehouseItems(), getLocationTree(), listProjects({ per_page: 100 })])
@@ -226,7 +234,36 @@ export default function WarehouseOffcutsPage() {
               <CardHeader>
                 <CardTitle>Offcut Pool</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
+                <form
+                  className="flex flex-wrap gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setSkuQuery(skuSearch.trim());
+                  }}
+                >
+                  <Input
+                    className="max-w-xs"
+                    placeholder="Search SKU, name, or offcut #"
+                    value={skuSearch}
+                    onChange={(event) => setSkuSearch(event.target.value)}
+                  />
+                  <Button type="submit" variant="secondary">
+                    Search
+                  </Button>
+                  {skuQuery ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setSkuSearch("");
+                        setSkuQuery("");
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  ) : null}
+                </form>
                 {loading ? (
                   <p className="text-sm text-muted-foreground">Loading offcuts…</p>
                 ) : (
@@ -235,6 +272,7 @@ export default function WarehouseOffcutsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Offcut</TableHead>
+                          <TableHead>SKU</TableHead>
                           <TableHead>Item</TableHead>
                           <TableHead>Length</TableHead>
                           <TableHead>Status</TableHead>
@@ -245,6 +283,9 @@ export default function WarehouseOffcutsPage() {
                         {items.map((item) => (
                           <TableRow key={item.id}>
                             <TableCell className="font-medium">{item.offcut_number}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {item.item?.sku ?? "—"}
+                            </TableCell>
                             <TableCell>{item.item?.name ?? `Item #${item.item_id}`}</TableCell>
                             <TableCell>{item.length_mm} mm</TableCell>
                             <TableCell>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { NewInspectionDialog } from "@/components/qc/new-inspection-dialog";
 import {
   listQcInspections,
+  PRODUCTION_IN_PROCESS_STAGES,
   QC_CONTEXT_LABELS,
   type QcInspection,
   type QcInspectionContext,
@@ -18,12 +19,50 @@ import { toast } from "sonner";
 
 const PRODUCTION_QC_CONTEXTS: QcInspectionContext[] = [
   "production_qc_pre_check",
+  "production_in_process",
   "production_qc_post_fabrication",
 ];
+
+const IN_PROCESS_STAGE_VALUES = new Set(
+  PRODUCTION_IN_PROCESS_STAGES.map((s) => s.value),
+);
+
+function stageLabel(stage: string | null | undefined): string | null {
+  if (!stage) return null;
+  const inProcess = PRODUCTION_IN_PROCESS_STAGES.find((s) => s.value === stage);
+  if (inProcess) return inProcess.label;
+  return null;
+}
+
+/** Map production order stage → QC inspection defaults. */
+export function qcDefaultsForProductionStage(currentStage?: string | null): {
+  context: QcInspectionContext;
+  stage?: string;
+  lockContext: boolean;
+} {
+  if (currentStage === "qc_post_fabrication") {
+    return {
+      context: "production_qc_post_fabrication",
+      lockContext: true,
+    };
+  }
+  if (currentStage === "qc_pre_check") {
+    return { context: "production_qc_pre_check", lockContext: false };
+  }
+  if (currentStage && IN_PROCESS_STAGE_VALUES.has(currentStage)) {
+    return {
+      context: "production_in_process",
+      stage: currentStage,
+      lockContext: false,
+    };
+  }
+  return { context: "production_qc_pre_check", lockContext: false };
+}
 
 type Props = {
   productionOrderId: number;
   projectId?: number;
+  currentStage?: string | null;
   canViewQc: boolean;
   canInspectQc?: boolean;
 };
@@ -31,6 +70,7 @@ type Props = {
 export function ProductionQcLinks({
   productionOrderId,
   projectId,
+  currentStage,
   canViewQc,
   canInspectQc = false,
 }: Props) {
@@ -38,6 +78,11 @@ export function ProductionQcLinks({
   const [inspections, setInspections] = useState<QcInspection[]>([]);
   const [loading, setLoading] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+
+  const defaults = useMemo(
+    () => qcDefaultsForProductionStage(currentStage),
+    [currentStage],
+  );
 
   const load = useCallback(() => {
     if (!canViewQc || !productionOrderId) return;
@@ -72,13 +117,22 @@ export function ProductionQcLinks({
   }
 
   const pending = inspections.filter((i) => i.result === "pending");
+  const pendingForCurrentContext = pending.filter((i) => i.context === defaults.context);
+  const isPostFabStage = currentStage === "qc_post_fabrication";
 
   return (
     <div className="space-y-3">
+      {isPostFabStage ? (
+        <p className="text-xs text-muted-foreground">
+          After-assembly QC is required and cannot be skipped. Use the{" "}
+          <span className="font-medium text-foreground">Post-fabrication QC</span> checklist.
+        </p>
+      ) : null}
+
       {inspections.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No production QC inspections yet. Pre/post-fabrication inspections are created when
-          those stages complete.
+          No production QC inspections yet. Pre-cutting QC is optional; after-assembly QC is
+          created when finishing completes — or start the correct inspection below.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -93,8 +147,14 @@ export function ProductionQcLinks({
               <Badge variant="outline">
                 {QC_CONTEXT_LABELS[inspection.context as QcInspectionContext] ??
                   inspection.context}
+                {stageLabel(inspection.stage)
+                  ? ` · ${stageLabel(inspection.stage)}`
+                  : ""}
               </Badge>
               <Badge variant="secondary">{inspection.result}</Badge>
+              {inspection.template?.name ? (
+                <span className="text-xs text-muted-foreground">{inspection.template.name}</span>
+              ) : null}
               {inspection.result === "pending" && (
                 <Button variant="link" size="sm" className="h-auto p-0" asChild>
                   <Link href={`/qc/inspections/${inspection.id}`}>Continue</Link>
@@ -107,12 +167,23 @@ export function ProductionQcLinks({
 
       {canInspectQc && (
         <div className="flex flex-wrap gap-2 pt-1">
-          {pending.length === 0 && (
+          {pendingForCurrentContext.length === 0 && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setNewOpen(true)}>
               <Plus className="h-4 w-4" />
-              Start QC inspection
+              {isPostFabStage
+                ? inspections.some((i) => i.context === "production_qc_post_fabrication")
+                  ? "Reopen after-assembly QC"
+                  : "Start after-assembly QC"
+                : "Start QC inspection"}
             </Button>
           )}
+          {pendingForCurrentContext.length > 0 && isPostFabStage ? (
+            <Button size="sm" asChild>
+              <Link href={`/qc/inspections/${pendingForCurrentContext[0].id}`}>
+                Continue after-assembly QC
+              </Link>
+            </Button>
+          ) : null}
         </div>
       )}
 
@@ -120,7 +191,18 @@ export function ProductionQcLinks({
         <NewInspectionDialog
           open={newOpen}
           onOpenChange={setNewOpen}
-          defaultContext="production_qc_pre_check"
+          defaultContext={defaults.context}
+          defaultStage={defaults.stage}
+          lockContext={defaults.lockContext}
+          allowedContexts={
+            isPostFabStage
+              ? ["production_qc_post_fabrication"]
+              : [
+                  "production_qc_pre_check",
+                  "production_in_process",
+                  "production_qc_post_fabrication",
+                ]
+          }
           defaultProjectId={projectId}
           defaultProductionOrderId={productionOrderId}
           onCreated={(id) => {

@@ -195,9 +195,21 @@ export function DriversTable({
                 <TableCell>{driver.license_number ?? "—"}</TableCell>
                 <TableCell>{driver.vehicle_registration ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={driver.is_active ? "secondary" : "outline"}>
-                    {driver.is_active ? "Active" : "Inactive"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant={driver.is_active ? "secondary" : "outline"}>
+                      {driver.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                    {driver.status === "occupied" ? (
+                      <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                        Occupied
+                      </Badge>
+                    ) : null}
+                    {driver.status === "available" && driver.is_active ? (
+                      <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700">
+                        Available
+                      </Badge>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <PermissionGate anyOf={["procurement.driver.manage", "procurement.manage"]}>

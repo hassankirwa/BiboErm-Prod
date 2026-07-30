@@ -44,9 +44,9 @@ export function SiteVisitsTodayPageView({
   measurementContext = "quotation",
   title,
   subtitle,
-  myVisitsPath = "/crm/site-visits/my-visits",
-  allVisitsPath = "/crm/site-visits",
-  visitDetailBasePath = "/crm/site-visits",
+  myVisitsPath = "/site-visits/my-visits",
+  allVisitsPath = "/site-visits",
+  visitDetailBasePath = "/site-visits",
 }: SiteVisitsTodayPageViewProps) {
   const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);

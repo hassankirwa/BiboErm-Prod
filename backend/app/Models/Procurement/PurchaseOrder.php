@@ -84,4 +84,16 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(TransportOrder::class);
     }
+
+    public function isEditable(): bool
+    {
+        $status = $this->status instanceof PurchaseOrderStatus
+            ? $this->status
+            : PurchaseOrderStatus::tryFrom((string) $this->status);
+
+        return in_array($status, [
+            PurchaseOrderStatus::Draft,
+            PurchaseOrderStatus::PendingApproval,
+        ], true);
+    }
 }

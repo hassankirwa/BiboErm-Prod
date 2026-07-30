@@ -84,10 +84,10 @@ export function SiteVisitsPageView({
   measurementContext = "quotation",
   title,
   subtitle,
-  myVisitsPath = "/crm/site-visits/my-visits",
-  todayPath = "/crm/site-visits/today",
+  myVisitsPath = "/site-visits/my-visits",
+  todayPath = "/site-visits/today",
   fieldDayPath = "/crm/field-day",
-  visitDetailBasePath = "/crm/site-visits",
+  visitDetailBasePath = "/site-visits",
   allowSchedule = measurementContext === "quotation",
 }: SiteVisitsPageViewProps) {
   const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];

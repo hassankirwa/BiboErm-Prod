@@ -21,6 +21,8 @@ class OpenAssignedSiteVisitsController extends Controller
             SiteVisitStatus::Assigned->value,
             SiteVisitStatus::InProgress->value,
             SiteVisitStatus::MeasurementsCaptured->value,
+            SiteVisitStatus::ClarificationNeeded->value,
+            SiteVisitStatus::RevisitRequired->value,
         ];
 
         $query = SiteVisit::query()
@@ -30,9 +32,9 @@ class OpenAssignedSiteVisitsController extends Controller
                 'lead',
                 'deal.account',
                 'deal.contact',
-                'deal.assignedFieldOfficer',
                 'project',
                 'assignedFieldOfficer',
+                'reviewedBy',
             ])
             ->orderBy('visit_date')
             ->orderBy('visit_time');
@@ -42,7 +44,7 @@ class OpenAssignedSiteVisitsController extends Controller
             $request->query('measurement_context'),
         );
 
-        $visits = $query->get();
+        $visits = $query->limit(200)->get();
 
         return SiteVisitResource::collection($visits);
     }

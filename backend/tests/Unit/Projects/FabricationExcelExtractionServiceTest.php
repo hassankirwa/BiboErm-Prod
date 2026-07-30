@@ -87,6 +87,43 @@ class FabricationExcelExtractionServiceTest extends TestCase
         $this->assertSame('frame_profiles', $fourth['dimensions']['source']);
     }
 
+    public function test_extracts_elevation_images_for_all_beatrice_openings(): void
+    {
+        if (! extension_loaded('gd')) {
+            $this->markTestSkipped('PHP GD extension is required to extract .xls MemoryDrawings.');
+        }
+
+        $path = base_path('tests/Fixtures/BEATRICE_FABRICATION_LIST.xls');
+        if (! is_file($path)) {
+            $path = base_path('../docs/BEATRICE FABRICATION LIST.xls');
+        }
+        $this->assertFileExists($path);
+
+        $upload = new \Illuminate\Http\UploadedFile(
+            $path,
+            'BEATRICE FABRICATION LIST.xls',
+            null,
+            null,
+            true
+        );
+
+        $payload = $this->service->extractFromUpload($upload);
+
+        $this->assertCount(4, $payload['items']);
+
+        foreach ($payload['items'] as $index => $item) {
+            $status = $item['drawing']['embedded_media']['status'] ?? null;
+            $dataUrl = $item['drawing']['embedded_media']['data_url'] ?? null;
+            $this->assertSame(
+                'extracted',
+                $status,
+                "Expected elevation image for item {$index} ({$item['code']})."
+            );
+            $this->assertIsString($dataUrl);
+            $this->assertStringStartsWith('data:image/', $dataUrl);
+        }
+    }
+
     public function test_build_payload_requires_at_least_one_item(): void
     {
         $this->expectException(\Illuminate\Validation\ValidationException::class);

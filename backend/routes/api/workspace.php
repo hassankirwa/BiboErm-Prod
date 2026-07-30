@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\Workspace\WorkspaceCalendarController;
 use App\Http\Controllers\Workspace\WorkspaceCalendarEventController;
+use App\Http\Controllers\Workspace\WorkspaceHubBadgesController;
 use App\Http\Controllers\Workspace\WorkspaceTasksController;
 use App\Http\Controllers\Workspace\WorkspaceTodayController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('hub-badges', WorkspaceHubBadgesController::class);
 
 Route::middleware('permission:activities.view|crm.view|site_visits.view|projects.view|field_installation.view|field_day.view')->group(function () {
     Route::get('today', WorkspaceTodayController::class);

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Procurement\Requisitions;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Procurement\PurchaseRequisitionResource;
 use App\Models\Procurement\PurchaseRequisition;
-use App\Models\Procurement\PurchaseRequisitionLine;
 use App\Services\Procurement\Requisitions\PurchaseRequisitionService;
+use App\Services\Procurement\Requisitions\PurchaseRequisitionXlsxExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -15,6 +15,7 @@ class PurchaseRequisitionController extends Controller
 {
     public function __construct(
         protected PurchaseRequisitionService $service,
+        protected PurchaseRequisitionXlsxExportService $xlsxExport,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -23,11 +24,12 @@ class PurchaseRequisitionController extends Controller
 
         $query = PurchaseRequisition::query()->with([
             'lines.warehouseItem',
+            'lines.preferredSupplier',
             'project',
             'supplier',
             'requester',
             'approver',
-            'purchaseOrders',
+            'purchaseOrders.lines',
         ])->withCount('purchaseOrders')->latest();
 
         if ($request->filled('project_id')) {
@@ -52,6 +54,7 @@ class PurchaseRequisitionController extends Controller
         $validated = $request->validate([
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'required_by' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.description' => ['required', 'string', 'max:255'],
@@ -61,6 +64,7 @@ class PurchaseRequisitionController extends Controller
             'lines.*.sku' => ['nullable', 'string', 'max:50'],
             'lines.*.trigger_type' => ['nullable', 'string'],
             'lines.*.estimated_unit_price' => ['nullable', 'numeric'],
+            'lines.*.preferred_supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
         ]);
 
         $requisition = $this->service->createDraft($request->user(), $validated);
@@ -75,8 +79,27 @@ class PurchaseRequisitionController extends Controller
         $this->authorize('view', $requisition);
 
         return new PurchaseRequisitionResource(
-            $requisition->load(['lines.warehouseItem', 'project', 'supplier', 'requester', 'approver', 'purchaseOrders'])
+            $requisition->load([
+                'lines.warehouseItem',
+                'lines.preferredSupplier',
+                'project',
+                'supplier',
+                'requester',
+                'approver',
+                'purchaseOrders.lines',
+            ])
         );
+    }
+
+    public function export(PurchaseRequisition $requisition)
+    {
+        $this->authorize('view', $requisition);
+
+        $path = $this->xlsxExport->export($requisition);
+
+        return response()
+            ->download($path, $requisition->reference.'-materials.xlsx')
+            ->deleteFileAfterSend(true);
     }
 
     public function update(Request $request, PurchaseRequisition $requisition): PurchaseRequisitionResource
@@ -86,38 +109,22 @@ class PurchaseRequisitionController extends Controller
         $validated = $request->validate([
             'notes' => ['nullable', 'string'],
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'required_by' => ['nullable', 'date'],
             'lines' => ['sometimes', 'array', 'min:1'],
-            'lines.*.description' => ['required_with:lines', 'string', 'max:255'],
+            'lines.*.id' => ['nullable', 'integer', 'exists:purchase_requisition_lines,id'],
+            'lines.*.description' => ['required_without:lines.*.id', 'string', 'max:255'],
             'lines.*.quantity' => ['required_with:lines', 'numeric', 'min:0.001'],
             'lines.*.required_quantity' => ['nullable', 'numeric', 'min:0.001'],
             'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
+            'lines.*.sku' => ['nullable', 'string', 'max:50'],
+            'lines.*.preferred_supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'lines.*.estimated_unit_price' => ['nullable', 'numeric'],
+            'lines.*.notes' => ['nullable', 'string'],
+            'lines.*.trigger_type' => ['nullable', 'string'],
         ]);
 
-        if (array_key_exists('notes', $validated)) {
-            $requisition->update(['notes' => $validated['notes']]);
-        }
+        $requisition = $this->service->updateEditable($requisition, $validated);
 
-        if (array_key_exists('supplier_id', $validated)) {
-            $requisition->update(['supplier_id' => $validated['supplier_id']]);
-        }
-
-        if (isset($validated['lines'])) {
-            $requisition->lines()->delete();
-            foreach ($validated['lines'] as $line) {
-                PurchaseRequisitionLine::query()->create([
-                    'purchase_requisition_id' => $requisition->id,
-                    'warehouse_item_id' => $line['warehouse_item_id'] ?? null,
-                    'description' => $line['description'],
-                    'sku' => $line['sku'] ?? null,
-                    'quantity' => $line['quantity'],
-                    'required_quantity' => $line['required_quantity'] ?? $line['quantity'],
-                    'trigger_type' => $line['trigger_type'] ?? 'manual',
-                ]);
-            }
-        }
-
-        return new PurchaseRequisitionResource(
-            $requisition->fresh(['lines.warehouseItem', 'project', 'supplier', 'requester', 'approver'])
-        );
+        return new PurchaseRequisitionResource($requisition);
     }
 }

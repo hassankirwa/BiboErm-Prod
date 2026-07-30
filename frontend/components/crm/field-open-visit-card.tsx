@@ -50,7 +50,12 @@ export function FieldOpenVisitCard({
   const status = visit.status ?? "scheduled";
   const showStart = canStartFieldVisit(status) && onStartVisit != null;
   // Check raw visit.status so null/undefined never silently falls through to "scheduled"
-  const showLog = visit.status === "in_progress" || visit.status === "measurements_captured";
+  const showLog = [
+    "in_progress",
+    "measurements_captured",
+    "clarification_needed",
+    "revisit_required",
+  ].includes(visit.status ?? "");
   const contextLabel = visitContextLabel(visit);
   const officerName = resolveFieldOfficerName(
     visit.assigned_field_officer,
@@ -122,6 +127,20 @@ export function FieldOpenVisitCard({
           <p className="rounded-md border border-dashed border-border/80 p-3 text-sm text-muted-foreground">
             {visit.notes_for_field_officer}
           </p>
+        )}
+
+        {visit.review_notes && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p className="font-medium">
+              {visit.status === "revisit_required"
+                ? "Revisit required"
+                : "Corrections requested"}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap">{visit.review_notes}</p>
+            {visit.reviewer?.name ? (
+              <p className="mt-1 text-xs">Reviewed by {visit.reviewer.name}</p>
+            ) : null}
+          </div>
         )}
 
         <div className="space-y-2">

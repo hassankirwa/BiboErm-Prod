@@ -7,7 +7,10 @@ import type {
 import {
   emptyMeasurementLine,
   emptySiteMeasurementForm,
+  normalizeMeasurementProductType,
 } from "@/lib/measurements/types";
+import { emptyBalconyDetails } from "@/lib/measurements/balcony-types";
+import { emptyShowerDetails } from "@/lib/measurements/shower-types";
 
 export type MeasurementParentContext = {
   accountName?: string | null;
@@ -43,7 +46,23 @@ export function buildFormFromVisit(
       measured_by: existing.measured_by?.trim() || measurerName,
       lines:
         existing.lines?.length > 0
-          ? existing.lines
+          ? existing.lines.map((line) => {
+              const productType = normalizeMeasurementProductType(
+                line.product_type,
+              );
+              return {
+                ...line,
+                product_type: productType,
+                balcony_details:
+                  productType === "Balcony"
+                    ? (line.balcony_details ?? emptyBalconyDetails())
+                    : (line.balcony_details ?? null),
+                shower_details:
+                  productType === "Bathroom"
+                    ? (line.shower_details ?? emptyShowerDetails())
+                    : (line.shower_details ?? null),
+              };
+            })
           : [emptyMeasurementLine(0)],
     };
   }

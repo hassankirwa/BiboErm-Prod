@@ -19,6 +19,7 @@ class IssueToolRequest extends FormRequest
             'issued_to' => ['required', 'exists:users,id'],
             'project_id' => ['nullable', 'exists:projects,id'],
             'condition_out' => ['nullable', Rule::in(['good', 'fair', 'damaged', 'retired'])],
+            'quantity' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

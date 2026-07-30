@@ -1,3 +1,11 @@
+import type { BalconyMeasurementDetails } from "@/lib/measurements/balcony-types";
+import { hasBalconyDetailsData } from "@/lib/measurements/balcony-types";
+import type { ShowerMeasurementDetails } from "@/lib/measurements/shower-types";
+import { hasShowerDetailsData } from "@/lib/measurements/shower-types";
+
+export type { BalconyMeasurementDetails } from "@/lib/measurements/balcony-types";
+export type { ShowerMeasurementDetails } from "@/lib/measurements/shower-types";
+
 export type MeasurementContext = "quotation" | "production";
 
 export type MeasurementFormStatus = "draft" | "submitted" | "approved" | "locked";
@@ -14,11 +22,17 @@ export type SiteStatus =
   | "painted"
   | "occupied";
 
+export type MeasurementProductType =
+  | "Door"
+  | "Window"
+  | "Balcony"
+  | "Bathroom";
+
 export type SiteMeasurementLine = {
   ref?: string | null;
   unit_floor?: string | null;
   room_location?: string | null;
-  product_type?: string | null;
+  product_type?: MeasurementProductType | null;
   quantity?: number;
   width_top_mm?: number | null;
   width_centre_mm?: number | null;
@@ -31,6 +45,8 @@ export type SiteMeasurementLine = {
   photo_refs?: number[];
   remarks?: string | null;
   sort_order?: number;
+  balcony_details?: BalconyMeasurementDetails | null;
+  shower_details?: ShowerMeasurementDetails | null;
 };
 
 export type SiteMeasurementFormData = {
@@ -65,6 +81,34 @@ export const SITE_STATUS_OPTIONS: { value: SiteStatus; label: string }[] = [
   { value: "painted", label: "Painted" },
   { value: "occupied", label: "Occupied" },
 ];
+
+export const MEASUREMENT_PRODUCT_TYPE_OPTIONS: {
+  value: MeasurementProductType;
+  label: string;
+}[] = [
+  { value: "Door", label: "Door" },
+  { value: "Window", label: "Window" },
+  { value: "Balcony", label: "Balcony" },
+  { value: "Bathroom", label: "Shower Enclosure" },
+];
+
+export function normalizeMeasurementProductType(
+  value?: string | null,
+): MeasurementProductType | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  if (!normalized) return null;
+  if (normalized.includes("bathroom") || normalized.includes("shower")) {
+    return "Bathroom";
+  }
+  if (normalized.includes("balcony") || normalized.includes("balustrade")) {
+    return "Balcony";
+  }
+  if (normalized.includes("door")) return "Door";
+  if (normalized.includes("window") || normalized.includes("win")) {
+    return "Window";
+  }
+  return null;
+}
 
 export const ALUMINIUM_SERIES_OPTIONS: { value: AluminiumSeries; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -115,7 +159,7 @@ export function emptyMeasurementLine(sortOrder = 0): SiteMeasurementLine {
     ref: "",
     unit_floor: "",
     room_location: "",
-    product_type: "",
+    product_type: null,
     quantity: 1,
     width_top_mm: null,
     width_centre_mm: null,
@@ -128,7 +172,15 @@ export function emptyMeasurementLine(sortOrder = 0): SiteMeasurementLine {
     photo_refs: [],
     remarks: "",
     sort_order: sortOrder,
+    balcony_details: null,
+    shower_details: null,
   };
+}
+
+export function isSpecializedMeasurementProduct(
+  productType?: MeasurementProductType | string | null,
+): productType is "Balcony" | "Bathroom" {
+  return productType === "Balcony" || productType === "Bathroom";
 }
 
 export function emptySiteMeasurementForm(): SiteMeasurementFormData {
@@ -169,7 +221,9 @@ export function hasSiteMeasurementFormData(
       (line.product_type?.trim() ?? "") !== "" ||
       [line.width_centre_mm, line.height_centre_mm, line.width_top_mm].some(
         (v) => v != null && v > 0,
-      ),
+      ) ||
+      hasBalconyDetailsData(line.balcony_details) ||
+      hasShowerDetailsData(line.shower_details),
   );
 
   return hasLines || (form.operational_notes?.trim() ?? "") !== "";

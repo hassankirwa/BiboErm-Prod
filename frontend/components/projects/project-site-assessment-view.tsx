@@ -15,11 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiSiteVisit } from "@/lib/api/crm/types";
+import { reassignSiteVisit } from "@/lib/api/crm/site-visits";
 import {
   siteVisitDetailPath,
   siteVisitOpenVisitsPath,
-  siteVisitTodayPath,
   siteVisitWorkspaceForRoles,
+  projectSiteVisitDetailPath,
 } from "@/lib/crm/site-visit-paths";
 import {
   canExecuteFieldVisit,
@@ -66,6 +67,8 @@ const ACTIVE_VISIT_STATUSES = new Set([
   "in_progress",
   "measurements_captured",
   "submitted_for_review",
+  "clarification_needed",
+  "revisit_required",
 ]);
 
 type ProjectSiteAssessmentViewProps = {
@@ -84,6 +87,8 @@ export function ProjectSiteAssessmentView({
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [scheduling, setScheduling] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+  const [reassignAssigneeId, setReassignAssigneeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "",
@@ -180,6 +185,32 @@ export function ProjectSiteAssessmentView({
     }
   }
 
+  async function handleReassign(visit: ApiSiteVisit) {
+    if (!reassignAssigneeId) {
+      toast.error("Select the new assignee.");
+      return;
+    }
+
+    setReassigning(true);
+    try {
+      await ensureCsrfCookie();
+      await reassignSiteVisit(visit.id, Number(reassignAssigneeId));
+      toast.success(
+        visit.status === "revisit_required"
+          ? "Visit reassigned for redo."
+          : "Measurement visit reassigned.",
+      );
+      setReassignAssigneeId("");
+      await loadData();
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to reassign visit.",
+      );
+    } finally {
+      setReassigning(false);
+    }
+  }
+
   const activeVisit = useMemo(
     () => visits.find((visit) => ACTIVE_VISIT_STATUSES.has(visit.status ?? "")),
     [visits],
@@ -196,6 +227,12 @@ export function ProjectSiteAssessmentView({
     () => visits.find((visit) => visit.status === "submitted_for_review"),
     [visits],
   );
+  const assignmentVisit = activeVisit ?? approvedVisit;
+  const canReassignVisit =
+    assignmentVisit != null &&
+    !["submitted_for_review", "approved"].includes(
+      assignmentVisit.status ?? "",
+    );
 
   if (loading) {
     return (
@@ -254,7 +291,7 @@ export function ProjectSiteAssessmentView({
       />
 
       <div className="space-y-4 p-6">
-        <div className="mx-auto w-full max-w-6xl space-y-4">
+        <div className="w-full space-y-4">
           {isTooEarly ? (
             <Card>
               <CardHeader>
@@ -266,26 +303,8 @@ export function ProjectSiteAssessmentView({
             </Card>
           ) : (
             <>
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="py-4 text-sm text-muted-foreground">
-                  Assign a field or production team member to a{" "}
-                  <strong className="font-medium text-foreground">production measurement</strong>{" "}
-                  site visit. Visits appear in{" "}
-                  <Link href="/crm/site-visits" className="text-primary hover:underline">
-                    CRM Site Visits
-                  </Link>{" "}
-                  for project management and in{" "}
-                  <Link
-                    href={siteVisitTodayPath(visitWorkspace)}
-                    className="text-primary hover:underline"
-                  >
-                    field today&apos;s visits
-                  </Link>{" "}
-                  for the assignee.
-                </CardContent>
-              </Card>
-
-              <Card>
+              {!assignmentVisit ? (
+                <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Assign measurement visit</CardTitle>
                   <p className="text-sm text-muted-foreground">
@@ -342,7 +361,8 @@ export function ProjectSiteAssessmentView({
                         }
                         currentUserId={user?.id}
                         currentUserName={user?.name}
-                        placeholder="Select field / production officer"
+                        placeholder="Select assignee"
+                        allActiveUsers
                       />
                     </div>
                   </div>
@@ -378,19 +398,83 @@ export function ProjectSiteAssessmentView({
                     />
                   </div>
                   <PermissionGate anyOf={[...SCHEDULE_PERMISSIONS]}>
-                    <Button onClick={() => void handleSchedule()} disabled={scheduling || !!activeVisit}>
+                    <Button onClick={() => void handleSchedule()} disabled={scheduling}>
                       {scheduling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Assign & schedule visit
                     </Button>
                   </PermissionGate>
-                  {activeVisit ? (
-                    <p className="text-sm text-muted-foreground">
-                      An active measurement visit already exists. Open it below to start or
-                      continue measurements in Site Visits.
-                    </p>
-                  ) : null}
                 </CardContent>
-              </Card>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      Measurement visit assigned
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      The assignment form is hidden while an active visit exists.
+                      {canReassignVisit
+                        ? " Reassign this visit if another person should complete it"
+                        : " The visit is awaiting review or has already been approved"}
+                      {assignmentVisit.status === "revisit_required"
+                        ? " or redo the rejected measurements."
+                        : "."}
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <SiteVisitStatusBadge status={assignmentVisit.status} />
+                      <span className="text-sm">
+                        Assigned to{" "}
+                        <strong>
+                          {assignmentVisit.assigned_field_officer?.name ?? "Unknown user"}
+                        </strong>
+                      </span>
+                    </div>
+                    {assignmentVisit.review_notes ? (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                        <p className="font-medium">Review feedback</p>
+                        <p className="mt-1 whitespace-pre-wrap">
+                          {assignmentVisit.review_notes}
+                        </p>
+                      </div>
+                    ) : null}
+                    {canReassignVisit ? (
+                    <PermissionGate anyOf={[...SCHEDULE_PERMISSIONS]}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <div className="min-w-64 flex-1 space-y-1.5">
+                          <Label>Reassign to</Label>
+                          <SiteVisitAssigneeSelect
+                            value={reassignAssigneeId}
+                            onValueChange={setReassignAssigneeId}
+                            currentUserId={user?.id}
+                            currentUserName={user?.name}
+                            placeholder="Select replacement assignee"
+                            allActiveUsers
+                          />
+                        </div>
+                        <Button
+                          variant={
+                            assignmentVisit.status === "revisit_required"
+                              ? "destructive"
+                              : "outline"
+                          }
+                          disabled={reassigning || !reassignAssigneeId}
+                          onClick={() => void handleReassign(assignmentVisit)}
+                        >
+                          {reassigning ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          {assignmentVisit.status === "revisit_required"
+                            ? "Reassign for redo"
+                            : "Reassign visit"}
+                        </Button>
+                      </div>
+                    </PermissionGate>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              )}
 
               {visits.length > 0 ? (
                 <Card>
@@ -406,6 +490,10 @@ export function ProjectSiteAssessmentView({
                       const crmPath = siteVisitDetailPath(visit.id, "crm");
                       const fieldPath = siteVisitDetailPath(visit.id, "field");
                       const preferredPath = siteVisitDetailPath(visit.id, visitWorkspace);
+                      const managementPath =
+                        mode === "projects"
+                          ? projectSiteVisitDetailPath(visit.id)
+                          : crmPath;
                       const canStart = canStartFieldVisit(visit.status ?? null);
 
                       return (
@@ -433,9 +521,9 @@ export function ProjectSiteAssessmentView({
                           <div className="flex flex-wrap items-center gap-2">
                             <SiteVisitStatusBadge status={visit.status ?? "scheduled"} />
                             <Button size="sm" asChild>
-                              <Link href={crmPath}>
+                              <Link href={managementPath}>
                                 <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                                Open in CRM
+                                View measurements
                               </Link>
                             </Button>
                             {visitWorkspace === "field" ? (

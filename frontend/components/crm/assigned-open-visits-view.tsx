@@ -15,6 +15,7 @@ import {
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import {
+  siteVisitListPath,
   siteVisitTodayPath,
   type SiteVisitWorkspace,
 } from "@/lib/crm/site-visit-paths";
@@ -24,36 +25,50 @@ import { toast } from "sonner";
 
 type AssignedOpenVisitsViewProps = {
   workspace: SiteVisitWorkspace;
+  /** When omitted, returns all open assigned visits (quotation + production). */
   measurementContext?: SiteOpsMeasurementContext;
   title?: string;
   subtitle?: string;
   backPath?: string;
   backLabel?: string;
   todayPath?: string;
+  /** Hide page chrome when nested inside another workspace (e.g. Activities tabs). */
+  embedded?: boolean;
 };
 
 export function AssignedOpenVisitsView({
   workspace,
-  measurementContext = "quotation",
+  measurementContext,
   title,
   subtitle,
   backPath,
   backLabel,
   todayPath,
+  embedded = false,
 }: AssignedOpenVisitsViewProps) {
-  const contextMeta = SITE_OPS_CONTEXT_META[measurementContext];
+  const contextMeta = measurementContext
+    ? SITE_OPS_CONTEXT_META[measurementContext]
+    : null;
   const [visits, setVisits] = useState<ApiSiteVisit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
+  const resolvedTitle = title ?? contextMeta?.myVisitsTitle ?? "My site visits";
+  const resolvedSubtitle =
+    subtitle ??
+    contextMeta?.myVisitsSubtitle ??
+    "Open measurement visits assigned to you (quotation and production).";
+
   const loadVisits = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchOpenAssignedSiteVisits({
-        measurement_context: measurementContext,
-      });
+      const res = await fetchOpenAssignedSiteVisits(
+        measurementContext
+          ? { measurement_context: measurementContext }
+          : undefined,
+      );
       setVisits(res.data);
     } catch (err) {
       setError(
@@ -101,15 +116,61 @@ export function AssignedOpenVisitsView({
 
   const resolvedTodayPath = todayPath ?? siteVisitTodayPath(workspace);
   const resolvedBackPath =
-    backPath ?? (workspace === "field" ? "/field" : "/crm/site-visits");
+    backPath ??
+    (workspace === "field" ? "/field" : siteVisitListPath(workspace));
   const resolvedBackLabel =
     backLabel ?? (workspace === "field" ? "Field Home" : "All Visits");
+
+  const list = (
+    <div className={embedded ? "space-y-4" : "flex-1 space-y-4 overflow-auto p-6"}>
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Spinner className="h-8 w-8 text-primary" />
+        </div>
+      ) : error ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-8 text-center text-sm text-destructive">
+          {error}
+        </div>
+      ) : visits.length === 0 ? (
+        <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
+          No open visits assigned to you right now.
+        </div>
+      ) : (
+        visits.map((visit) => (
+          <FieldOpenVisitCard
+            key={visit.id}
+            visit={visit}
+            workspace={workspace}
+            actionLoading={actionLoading}
+            onStartVisit={(id) => void handleStartVisit(id)}
+          />
+        ))
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{resolvedTitle}</h2>
+            <p className="text-sm text-muted-foreground">{resolvedSubtitle}</p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={resolvedTodayPath}>Today&apos;s Visits</Link>
+          </Button>
+        </div>
+        {list}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">
       <AppHeader
-        title={title ?? contextMeta.myVisitsTitle}
-        subtitle={subtitle ?? contextMeta.myVisitsSubtitle}
+        title={resolvedTitle}
+        subtitle={resolvedSubtitle}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
@@ -125,31 +186,7 @@ export function AssignedOpenVisitsView({
         }
       />
 
-      <div className="flex-1 space-y-4 overflow-auto p-6">
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner className="h-8 w-8 text-primary" />
-          </div>
-        ) : error ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-8 text-center text-sm text-destructive">
-            {error}
-          </div>
-        ) : visits.length === 0 ? (
-          <div className="rounded-md border border-border bg-card px-4 py-12 text-center text-sm text-muted-foreground">
-            No open visits assigned to you right now.
-          </div>
-        ) : (
-          visits.map((visit) => (
-            <FieldOpenVisitCard
-              key={visit.id}
-              visit={visit}
-              workspace={workspace}
-              actionLoading={actionLoading}
-              onStartVisit={(id) => void handleStartVisit(id)}
-            />
-          ))
-        )}
-      </div>
+      {list}
     </div>
   );
 }

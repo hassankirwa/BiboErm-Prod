@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
 use App\Models\FieldInstallation\FieldInstallationJob;
+use App\Models\Projects\DesignChangeOrder;
+use App\Models\Projects\ProjectDispatch;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +20,7 @@ class Project extends Model
 
     protected $fillable = [
         'reference',
+        'client_portal_code',
         'name',
         'deal_id',
         'contact_id',
@@ -128,6 +131,16 @@ class Project extends Model
     public function fieldInstallationJobs(): HasMany
     {
         return $this->hasMany(FieldInstallationJob::class);
+    }
+
+    public function dispatches(): HasMany
+    {
+        return $this->hasMany(ProjectDispatch::class);
+    }
+
+    public function designChangeOrders(): HasMany
+    {
+        return $this->hasMany(DesignChangeOrder::class);
     }
 
     public function floors(): HasMany

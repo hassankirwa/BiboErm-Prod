@@ -11,6 +11,7 @@ const STATUS_VARIANT: Record<
   in_progress: "secondary",
   scheduled: "outline",
   assigned: "outline",
+  clarification_needed: "destructive",
   revisit_required: "destructive",
   cancelled: "destructive",
 };

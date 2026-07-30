@@ -10,7 +10,7 @@ import {
   type FloorSketchPage,
 } from "@/lib/measurements/auto-sketch";
 import type { MeasurementContext, SiteMeasurementLine } from "@/lib/measurements/types";
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 type AutoSketchPanelProps = {
   lines: SiteMeasurementLine[];
@@ -98,8 +98,8 @@ export function AutoSketchPanel({
         <div>
           <p className="text-sm font-medium">System sketch</p>
           <p className="text-xs text-muted-foreground">
-            Doors and windows are placed on an invisible grid per floor. Identical
-            product and dimensions appear once with a quantity badge.
+            Doors and windows use front elevations. Balconies and bathrooms include
+            schematic top and side corner views. Identical dimensions are combined.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -119,6 +119,15 @@ export function AutoSketchPanel({
             Hide sketch
           </Button>
         </div>
+      </div>
+
+      <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <p className="text-xs">
+          This system-generated sketch is indicative and may not be accurate to the
+          point. Refer to the uploaded site images and recorded measurements before
+          design or fabrication.
+        </p>
       </div>
 
       {pages.length === 0 ? (
@@ -173,6 +182,8 @@ function FloorSummary({ page }: { page: FloorSketchPage | null }) {
       {page.symbols.map((symbol) => (
         <li key={symbol.key}>
           {symbol.product_type} · {symbol.width_mm}×{symbol.height_mm} mm
+          {symbol.wall_height_mm ? ` · WH ${symbol.wall_height_mm} mm` : ""}
+          {symbol.wall_thickness_mm ? ` · WTK ${symbol.wall_thickness_mm} mm` : ""}
           {symbol.quantity > 1 ? ` · ×${symbol.quantity}` : ""}
         </li>
       ))}

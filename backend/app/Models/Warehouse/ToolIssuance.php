@@ -2,10 +2,12 @@
 
 namespace App\Models\Warehouse;
 
+use App\Models\FieldInstallation\FieldToolAssignment;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ToolIssuance extends Model
 {
@@ -16,6 +18,7 @@ class ToolIssuance extends Model
         'project_id',
         'issued_to',
         'issued_by',
+        'quantity',
         'issue_date',
         'return_date',
         'condition_out',
@@ -26,6 +29,7 @@ class ToolIssuance extends Model
     protected function casts(): array
     {
         return [
+            'quantity' => 'integer',
             'issue_date' => 'date',
             'return_date' => 'date',
             'created_at' => 'datetime',
@@ -50,5 +54,10 @@ class ToolIssuance extends Model
     public function issuedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
+    }
+
+    public function fieldToolAssignment(): HasOne
+    {
+        return $this->hasOne(FieldToolAssignment::class, 'tool_issuance_id');
     }
 }

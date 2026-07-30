@@ -17,6 +17,7 @@ class PurchaseOrderResource extends JsonResource
             'project_id' => $this->project_id,
             'requisition_id' => $this->requisition_id,
             'status' => $this->status?->value ?? $this->status,
+            'is_editable' => $this->isEditable(),
             'subtotal' => $this->subtotal,
             'tax' => $this->tax,
             'total' => $this->total,

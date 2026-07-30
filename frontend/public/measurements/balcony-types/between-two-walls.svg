@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" fill="none">
+  <rect width="200" height="150" fill="#F8FAFC"/>
+  <!-- Building face (top) -->
+  <rect x="20" y="8" width="160" height="28" fill="#64748B"/>
+  <!-- Entrance door (not a wall) -->
+  <rect x="86" y="14" width="28" height="22" fill="#FEF3C7" stroke="#B45309" stroke-width="1.5"/>
+  <text x="100" y="29" text-anchor="middle" font-size="7" fill="#92400E" font-family="system-ui,sans-serif">DOOR</text>
+  <!-- Full-height left & right walls -->
+  <rect x="28" y="36" width="16" height="78" fill="#334155"/>
+  <rect x="156" y="36" width="16" height="78" fill="#334155"/>
+  <!-- Balcony slab -->
+  <rect x="44" y="36" width="112" height="78" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+  <!-- Front barricade (open end) -->
+  <rect x="44" y="100" width="112" height="14" fill="#94A3B8"/>
+  <!-- Open height above barricade (interest) -->
+  <rect x="50" y="72" width="100" height="28" fill="#93C5FD" fill-opacity="0.55" stroke="#2563EB" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="100" y="90" text-anchor="middle" font-size="7" fill="#1E3A8A" font-family="system-ui,sans-serif">OPEN ↑</text>
+  <text x="36" y="78" text-anchor="middle" font-size="7" font-weight="700" fill="#FFFFFF" font-family="system-ui,sans-serif" transform="rotate(-90 36 78)">WALL</text>
+  <text x="164" y="78" text-anchor="middle" font-size="7" font-weight="700" fill="#FFFFFF" font-family="system-ui,sans-serif" transform="rotate(90 164 78)">WALL</text>
+  <text x="100" y="140" text-anchor="middle" font-size="8" fill="#475569" font-family="system-ui,sans-serif">Between two full walls</text>
+</svg>

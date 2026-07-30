@@ -79,6 +79,11 @@ class WarehouseOffcutsTest extends WarehouseFeatureTestCase
             ->getJson('/api/v1/warehouse/offcuts?profile=SLD&min_length=1000')
             ->assertOk()
             ->assertJsonFragment(['length_mm' => 1200]);
+
+        $this->actingAsSanctum($user)
+            ->getJson('/api/v1/warehouse/offcuts?sku=PROF-SLD')
+            ->assertOk()
+            ->assertJsonFragment(['offcut_number' => 'OFF-TEST-001']);
     }
 
     public function test_allocate_offcut_assigns_project(): void

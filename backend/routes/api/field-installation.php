@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\FieldInstallation\FieldDailyLogController;
 use App\Http\Controllers\FieldInstallation\FieldDeliveryRecordController;
+use App\Http\Controllers\FieldInstallation\FieldDesignChangeController;
 use App\Http\Controllers\FieldInstallation\FieldInstallationJobController;
 use App\Http\Controllers\FieldInstallation\FieldNonConformityController;
 use App\Http\Controllers\FieldInstallation\FieldPhotoController;
@@ -16,6 +17,7 @@ Route::middleware('permission:field_installation.view')->group(function () {
     Route::get('jobs/{fieldJob}/deliveries', [FieldDeliveryRecordController::class, 'index']);
     Route::get('jobs/{fieldJob}/units', [FieldUnitProgressController::class, 'index']);
     Route::get('jobs/{fieldJob}/non-conformities', [FieldNonConformityController::class, 'index']);
+    Route::get('jobs/{fieldJob}/tools', [FieldToolAssignmentController::class, 'index']);
     Route::get('photos', [FieldPhotoController::class, 'index']);
 });
 
@@ -24,6 +26,8 @@ Route::middleware('permission:field_installation.manage')->group(function () {
     Route::patch('jobs/{fieldJob}', [FieldInstallationJobController::class, 'update']);
     Route::post('jobs/{fieldJob}/start', [FieldInstallationJobController::class, 'start']);
     Route::post('jobs/{fieldJob}/complete', [FieldInstallationJobController::class, 'complete']);
+    Route::post('jobs/{fieldJob}/hold', [FieldInstallationJobController::class, 'hold']);
+    Route::post('jobs/{fieldJob}/cancel', [FieldInstallationJobController::class, 'cancel']);
     Route::post('jobs/{fieldJob}/members', [FieldInstallationJobController::class, 'storeMember']);
     Route::delete('jobs/{fieldJob}/members/{userId}', [FieldInstallationJobController::class, 'destroyMember'])
         ->whereNumber('userId');
@@ -32,13 +36,16 @@ Route::middleware('permission:field_installation.manage')->group(function () {
 
 Route::middleware('permission:field_installation.log')->group(function () {
     Route::post('jobs/{fieldJob}/daily-logs', [FieldDailyLogController::class, 'store']);
+    Route::patch('daily-logs/{dailyLog}', [FieldDailyLogController::class, 'update']);
     Route::post('photos', [FieldPhotoController::class, 'store']);
     Route::post('jobs/{fieldJob}/non-conformities', [FieldNonConformityController::class, 'store']);
+    Route::post('jobs/{fieldJob}/design-changes', [FieldDesignChangeController::class, 'store']);
     Route::patch('units/{unit}', [FieldUnitProgressController::class, 'update']);
 });
 
 Route::middleware('permission:field_installation.deliver')->group(function () {
     Route::post('jobs/{fieldJob}/deliveries', [FieldDeliveryRecordController::class, 'store']);
+    Route::patch('deliveries/{deliveryRecord}', [FieldDeliveryRecordController::class, 'update']);
 });
 
 Route::middleware('permission:field_installation.tools')->group(function () {

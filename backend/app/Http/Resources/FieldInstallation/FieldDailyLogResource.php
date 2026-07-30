@@ -26,6 +26,7 @@ class FieldDailyLogResource extends JsonResource
                 'id' => $this->submitter->id,
                 'name' => $this->submitter->name,
             ]),
+            'photos' => FieldInstallationPhotoResource::collection($this->whenLoaded('photos')),
         ];
     }
 }

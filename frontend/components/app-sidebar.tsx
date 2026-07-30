@@ -2,7 +2,7 @@
 
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
   ChevronLeft,
@@ -218,12 +218,14 @@ function WorkspaceContent({
 function DepartmentContent({
   department,
   pathname,
+  search = "",
   showWorkspaceLink = false,
   permissions,
   roles,
 }: {
   department: NonNullable<ReturnType<typeof getActiveDepartment>>;
   pathname: string;
+  search?: string;
   showWorkspaceLink?: boolean;
   permissions: string[];
   roles: string[];
@@ -258,7 +260,12 @@ function DepartmentContent({
                       href={sub.path}
                       name={sub.name}
                       icon={department.icon}
-                      isActive={isDepartmentNavItemActive(pathname, sub.path, sub.exact)}
+                      isActive={isDepartmentNavItemActive(
+                        pathname,
+                        sub.path,
+                        sub.exact,
+                        search,
+                      )}
                     />
                   ))}
                 </SidebarMenu>
@@ -282,7 +289,12 @@ function DepartmentContent({
               {workspaceLink}
               {nav.topItems.map((item) => {
                 const Icon = topItemIcons[item.name] ?? Home;
-                const isActive = isDepartmentNavItemActive(pathname, item.path, item.exact);
+                const isActive = isDepartmentNavItemActive(
+                  pathname,
+                  item.path,
+                  item.exact,
+                  search,
+                );
                 return (
                   <NavItem
                     key={item.name}
@@ -303,7 +315,7 @@ function DepartmentContent({
           {nav.groups.map((group) => {
             const GroupIcon = group.icon;
             const isGroupActive = group.items.some((item) =>
-              isDepartmentNavItemActive(pathname, item.path, item.exact),
+              isDepartmentNavItemActive(pathname, item.path, item.exact, search),
             );
 
             return (
@@ -332,23 +344,30 @@ function DepartmentContent({
 
                       <CollapsibleContent>
                         <SidebarMenuSub className="ml-4 border-l-0 px-0 pl-5">
-                          {group.items.map((item) => (
-                            <SidebarMenuSubItem key={item.path + item.name}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={isDepartmentNavItemActive(pathname, item.path, item.exact)}
-                                className={cn(
-                                  "text-neutral-600 hover:text-neutral-900",
-                                  isDepartmentNavItemActive(pathname, item.path, item.exact) &&
-                                    "sidebar-sub-active",
-                                )}
-                              >
-                                <Link href={item.path}>
-                                  <span>{item.name}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
+                          {group.items.map((item) => {
+                            const isActive = isDepartmentNavItemActive(
+                              pathname,
+                              item.path,
+                              item.exact,
+                              search,
+                            );
+                            return (
+                              <SidebarMenuSubItem key={item.path + item.name}>
+                                <SidebarMenuSubButton
+                                  asChild
+                                  isActive={isActive}
+                                  className={cn(
+                                    "text-neutral-600 hover:text-neutral-900",
+                                    isActive && "sidebar-sub-active",
+                                  )}
+                                >
+                                  <Link href={item.path}>
+                                    <span>{item.name}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     </SidebarMenu>
@@ -412,6 +431,8 @@ function DepartmentContent({
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const { roles, departments, permissions } = useAuth();
   const canWorkspace = canAccessWorkspaceHub(roles);
   const canWorkspaceInsights = canAccessWorkspaceInsights(roles);
@@ -467,6 +488,7 @@ export function AppSidebar() {
         <DepartmentContent
           department={sidebarDepartment}
           pathname={pathname}
+          search={search}
           showWorkspaceLink={isSuperAdmin && !isWorkspaceHubPath(pathname)}
           permissions={permissions}
           roles={roles}

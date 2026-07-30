@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Projects\ProjectFifoOrderService;
 use App\Support\ProjectStageGate;
 use App\Support\ProjectSiteLocation;
 use App\Support\SiteAssessmentImages;
@@ -15,6 +16,7 @@ class ProjectResource extends JsonResource
         return [
             'id' => $this->id,
             'reference' => $this->reference,
+            'client_portal_code' => $this->client_portal_code,
             'name' => $this->name,
             'deal_id' => $this->deal_id,
             'contact_id' => $this->contact_id,
@@ -25,6 +27,7 @@ class ProjectResource extends JsonResource
             'resolved_site_address' => ProjectSiteLocation::resolve($this->resource)['site_address'],
             'stage' => $this->stage?->value ?? $this->stage,
             'completion_percent' => $this->completion_percent,
+            'fifo_order' => app(ProjectFifoOrderService::class)->positionFor((int) $this->id),
             'priority' => $this->priority,
             'quoted_amount' => $this->quoted_amount,
             'deposit_received' => $this->deposit_received,
@@ -51,7 +54,11 @@ class ProjectResource extends JsonResource
                     'id' => $this->latestBom?->id,
                     'version' => $this->latestBom?->version,
                     'status' => $this->latestBom?->status,
-                    'line_count' => $this->latestBom?->lines?->count(),
+                    'line_count' => array_key_exists('lines_count', $this->latestBom?->getAttributes() ?? [])
+                        ? (int) $this->latestBom->lines_count
+                        : ($this->latestBom?->relationLoaded('lines')
+                            ? $this->latestBom->lines->count()
+                            : null),
                 ]
             ),
             'engineers' => $this->whenLoaded('engineers', fn () => $this->engineers->map(fn ($engineer) => [

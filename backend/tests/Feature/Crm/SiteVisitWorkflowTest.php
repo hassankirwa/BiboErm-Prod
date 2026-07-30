@@ -65,6 +65,74 @@ class SiteVisitWorkflowTest extends TestCase
             ->assertCreated();
     }
 
+    public function test_assignee_can_view_correction_notes_in_visit_history(): void
+    {
+        $visit = SiteVisit::query()->create([
+            'visit_number' => 'SV-HISTORY-001',
+            'title' => 'History test visit',
+            'assigned_field_officer_id' => $this->fieldOfficer->id,
+            'assigned_to_user_id' => $this->fieldOfficer->id,
+            'scheduled_by' => $this->salesRep->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::SubmittedForReview->value,
+            'measurement_form_status' => 'submitted',
+            'requires_measurements' => true,
+        ]);
+
+        Sanctum::actingAs($this->salesRep);
+
+        $this->postJson("/api/v1/crm/site-visits/{$visit->id}/request-changes", [
+            'action' => SiteVisitStatus::ClarificationNeeded->value,
+            'notes' => 'Confirm the bathroom corner and upload a clearer photo.',
+        ])->assertOk()
+            ->assertJsonPath('data.status', SiteVisitStatus::ClarificationNeeded->value)
+            ->assertJsonPath(
+                'data.review_notes',
+                'Confirm the bathroom corner and upload a clearer photo.',
+            );
+
+        Sanctum::actingAs($this->fieldOfficer);
+
+        $this->getJson('/api/v1/crm/site-visits/history')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $visit->id)
+            ->assertJsonPath('data.0.status', SiteVisitStatus::ClarificationNeeded->value)
+            ->assertJsonPath(
+                'data.0.review_notes',
+                'Confirm the bathroom corner and upload a clearer photo.',
+            );
+    }
+
+    public function test_scheduler_can_reassign_an_active_visit(): void
+    {
+        $visit = SiteVisit::query()->create([
+            'visit_number' => 'SV-REASSIGN-001',
+            'title' => 'Reassign test visit',
+            'assigned_field_officer_id' => $this->fieldOfficer->id,
+            'assigned_to_user_id' => $this->fieldOfficer->id,
+            'scheduled_by' => $this->salesRep->id,
+            'visit_date' => now()->toDateString(),
+            'status' => SiteVisitStatus::Assigned->value,
+        ]);
+
+        Sanctum::actingAs($this->salesRep);
+
+        $this->patchJson("/api/v1/crm/site-visits/{$visit->id}/reassign", [
+            'assigned_field_officer_id' => $this->otherFieldOfficer->id,
+        ])->assertOk()
+            ->assertJsonPath(
+                'data.assigned_field_officer_id',
+                $this->otherFieldOfficer->id,
+            );
+
+        $this->assertDatabaseHas('site_visits', [
+            'id' => $visit->id,
+            'assigned_field_officer_id' => $this->otherFieldOfficer->id,
+            'assigned_to_user_id' => $this->otherFieldOfficer->id,
+            'status' => SiteVisitStatus::Assigned->value,
+        ]);
+    }
+
     public function test_field_officer_can_complete_visit_and_advance_linked_lead(): void
     {
         Sanctum::actingAs($this->salesRep);

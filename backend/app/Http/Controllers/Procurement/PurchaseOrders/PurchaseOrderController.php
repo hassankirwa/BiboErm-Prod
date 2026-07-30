@@ -59,6 +59,7 @@ class PurchaseOrderController extends Controller
             'lines.*.unit_price' => ['required', 'numeric', 'min:0'],
             'lines.*.warehouse_item_id' => ['nullable', 'integer', 'exists:warehouse_items,id'],
             'lines.*.sku' => ['nullable', 'string'],
+            'lines.*.requisition_line_id' => ['nullable', 'integer', 'exists:purchase_requisition_lines,id'],
             'transport' => ['nullable', 'array'],
             'transport.transport_type' => ['required_with:transport', 'string', 'max:30'],
             'transport.driver_id' => ['nullable', 'integer', 'exists:procurement_drivers,id'],
@@ -98,12 +99,20 @@ class PurchaseOrderController extends Controller
         $this->authorize('update', $purchaseOrder);
 
         $validated = $request->validate([
+            'supplier_id' => ['sometimes', 'integer', 'exists:suppliers,id'],
             'expected_delivery' => ['nullable', 'date'],
             'tax' => ['nullable', 'numeric', 'min:0'],
+            'lines' => ['sometimes', 'array', 'min:1'],
+            'lines.*.id' => ['required', 'integer', 'exists:purchase_order_lines,id'],
+            'lines.*.quantity' => ['sometimes', 'numeric', 'min:0.001'],
+            'lines.*.unit_price' => ['sometimes', 'numeric', 'min:0'],
+            'lines.*.description' => ['sometimes', 'string', 'max:255'],
+            'lines.*.sku' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $purchaseOrder->update($validated);
+        $purchaseOrder = $this->service->updateEditable($purchaseOrder, $validated);
+        $purchaseOrder->loadCount('goodsReceipts');
 
-        return new PurchaseOrderResource($purchaseOrder->fresh(['supplier', 'lines']));
+        return new PurchaseOrderResource($purchaseOrder);
     }
 }

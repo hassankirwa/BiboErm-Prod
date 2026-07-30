@@ -4,10 +4,17 @@ namespace App\Services\Warehouse\Reservations;
 
 use App\Enums\ProjectStage;
 use App\Models\Project;
+use App\Services\Projects\ProjectFifoOrderService;
 
 class FifoSequenceResolver
 {
+    public function __construct(
+        protected ProjectFifoOrderService $fifoOrder,
+    ) {}
+
     /**
+     * Stages that participate in material demand / ahead-stock checks.
+     *
      * @return list<string>
      */
     public static function pipelineStages(): array
@@ -20,20 +27,25 @@ class FifoSequenceResolver
         ];
     }
 
+    /**
+     * Global FIFO tag (#) among all active incomplete projects.
+     */
     public function sequenceForProject(int $projectId): int
     {
-        $queue = $this->orderedQueueIncluding($projectId);
-        $position = array_search($projectId, $queue, true);
-
-        return $position === false ? 1 : $position + 1;
+        return $this->fifoOrder->positionFor($projectId)
+            ?? $this->fifoOrder->rankAmongActiveIncomplete($projectId)
+            ?? 1;
     }
 
     /**
+     * Projects ahead in the materials pipeline (by creation order) for stock demand.
+     * Design-phase projects do not consume ahead demand even if they have a lower global #.
+     *
      * @return list<int>
      */
     public function projectIdsAheadOf(int $projectId): array
     {
-        $queue = $this->orderedQueueIncluding($projectId);
+        $queue = $this->orderedMaterialsQueueIncluding($projectId);
         $position = array_search($projectId, $queue, true);
 
         if ($position === false || $position === 0) {
@@ -46,13 +58,12 @@ class FifoSequenceResolver
     /**
      * @return list<int>
      */
-    protected function orderedQueueIncluding(int $projectId): array
+    /**
+     * @return list<int>
+     */
+    protected function orderedMaterialsQueueIncluding(int $projectId): array
     {
-        $queue = Project::query()
-            ->whereIn('stage', self::pipelineStages())
-            ->orderBy('id')
-            ->pluck('id')
-            ->all();
+        $queue = $this->materialsPipelineQueue();
 
         if (! in_array($projectId, $queue, true)) {
             $queue[] = $projectId;
@@ -60,5 +71,20 @@ class FifoSequenceResolver
         }
 
         return $queue;
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function materialsPipelineQueue(): array
+    {
+        return once(function (): array {
+            return Project::query()
+                ->where('is_active', true)
+                ->whereIn('stage', self::pipelineStages())
+                ->orderBy('id')
+                ->pluck('id')
+                ->all();
+        });
     }
 }

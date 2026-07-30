@@ -39,12 +39,21 @@ class QcChecklistTemplate extends Model
     protected static function booted(): void
     {
         static::saving(function (self $template): void {
+            // Allow production_in_process templates to keep a sub-stage
+            // (cutting, fabrication, …). Only default when stage is empty.
+            if (filled($template->stage)) {
+                if (! $template->context && is_string($template->stage)) {
+                    $template->context = QcInspectionContext::tryFrom($template->stage)
+                        ?? $template->stage;
+                }
+
+                return;
+            }
+
             if ($template->context instanceof QcInspectionContext) {
                 $template->stage = $template->context->value;
             } elseif (is_string($template->context) && $template->context !== '') {
                 $template->stage = $template->context;
-            } elseif ($template->stage && ! $template->context) {
-                $template->context = $template->stage;
             }
         });
     }

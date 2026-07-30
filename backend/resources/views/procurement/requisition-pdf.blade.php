@@ -53,7 +53,7 @@
             </tr>
             <tr>
                 <td><strong>Supplier</strong><br>{{ $requisition->supplier?->name ?? '—' }}</td>
-                <td><strong>Admin approver</strong><br>{{ $requisition->approver?->name ?? 'Pending approval' }}</td>
+                <td><strong>Required by</strong><br>{{ $requisition->required_by?->format('d M Y') ?? '—' }}</td>
                 <td><strong>Approved</strong><br>{{ $requisition->approved_at?->format('d M Y H:i') ?? 'Pending approval' }}</td>
             </tr>
         </table>

@@ -73,6 +73,27 @@ class OffcutAllocationService
         ];
     }
 
+    /**
+     * Allocate specific offcut pieces to a project (marks Allocated).
+     *
+     * @param  list<int>  $offcutIds
+     * @return list<int>
+     */
+    public function allocatePieceIds(int $projectId, array $offcutIds): array
+    {
+        $allocated = [];
+        foreach (array_values(array_unique(array_filter(array_map('intval', $offcutIds)))) as $id) {
+            $offcut = OffcutPiece::query()->find($id);
+            if (! $offcut || $offcut->status !== \App\Enums\Warehouse\OffcutStatus::Available) {
+                continue;
+            }
+            $this->allocate($offcut, $projectId);
+            $allocated[] = $id;
+        }
+
+        return $allocated;
+    }
+
     public function allocate(OffcutPiece $offcut, int $projectId): OffcutPiece
     {
         if ($offcut->status !== OffcutStatus::Available) {

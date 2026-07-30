@@ -37,6 +37,8 @@ export type ProductionOrder = {
     name: string;
     stage: string;
     completion_percent?: number;
+    location_type?: string | null;
+    install_mode?: string | null;
   } | null;
   stage_logs?: ProductionStageLog[];
   teams?: ProductionOrderTeam[];
@@ -56,6 +58,10 @@ export type ProductionStageLog = {
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
+  evidence_path?: string | null;
+  evidence_url?: string | null;
+  evidence_paths?: string[];
+  evidence_urls?: string[];
 };
 
 export type GlassAssemblyContext = {
@@ -84,8 +90,14 @@ export type CuttingSheetLine = {
   project_bom_line_id: number;
   warehouse_item_id: number;
   profile_code: string;
+  bar_number: number;
+  cuts: Array<{ project_bom_line_id: number; length_mm: number }>;
   cut_length_mm: number;
   pieces: number;
+  needed_mm: number;
+  planned_used_mm: number;
+  planned_waste_mm: number | null;
+  expected_bar_length_mm: number;
   bar_length_mm: number | null;
   waste_mm: number | null;
   sort_order: number;
@@ -168,9 +180,12 @@ export const CUTTING_STAGES: ProductionStageValue[] = [
   "cutting",
 ];
 
-export const ASSEMBLY_STAGES: ProductionStageValue[] = [
+export const FABRICATION_STAGES: ProductionStageValue[] = [
   "fabrication",
   "sash",
+];
+
+export const ASSEMBLY_STAGES: ProductionStageValue[] = [
   "glass_assembly",
   "finishing",
   "qc_post_fabrication",
@@ -223,17 +238,56 @@ export async function completeProductionStage(
     stage: ProductionStageValue;
     notes?: string;
     offcuts?: OffcutInput[];
+    discard_waste_line_ids?: number[];
+    evidence?: File | File[] | null;
   },
 ) {
+  const evidenceFiles = Array.isArray(payload.evidence)
+    ? payload.evidence
+    : payload.evidence
+      ? [payload.evidence]
+      : [];
+
+  if (evidenceFiles.length > 0) {
+    const formData = new FormData();
+    formData.append("stage", payload.stage);
+    if (payload.notes) formData.append("notes", payload.notes);
+    if (payload.offcuts?.length) {
+      formData.append("offcuts", JSON.stringify(payload.offcuts));
+    }
+    if (payload.discard_waste_line_ids?.length) {
+      formData.append(
+        "discard_waste_line_ids",
+        JSON.stringify(payload.discard_waste_line_ids),
+      );
+    }
+    if (evidenceFiles.length === 1) {
+      formData.append("evidence", evidenceFiles[0]);
+    } else {
+      for (const file of evidenceFiles) {
+        formData.append("evidence[]", file);
+      }
+    }
+    return apiRequest<{ data: ProductionOrder }>(
+      `/production/orders/${orderId}/complete-stage`,
+      { method: "POST", formData },
+    );
+  }
+
   return apiRequest<{ data: ProductionOrder }>(`/production/orders/${orderId}/complete-stage`, {
     method: "POST",
-    body: payload,
+    body: {
+      stage: payload.stage,
+      notes: payload.notes,
+      offcuts: payload.offcuts,
+      discard_waste_line_ids: payload.discard_waste_line_ids,
+    },
   });
 }
 
 export async function skipProductionStage(
   orderId: number,
-  payload: { stage: "glass_assembly"; notes?: string },
+  payload: { stage: "glass_assembly" | "qc_pre_check"; notes?: string },
 ) {
   return apiRequest<{ data: ProductionOrder }>(`/production/orders/${orderId}/skip-stage`, {
     method: "POST",
@@ -265,7 +319,7 @@ export async function updateCuttingSheetLine(
     pieces?: number;
     bar_length_mm?: number | null;
     waste_mm?: number | null;
-    reason: string;
+    reason?: string;
   },
 ) {
   return apiRequest<{ data: CuttingSheetLine }>(

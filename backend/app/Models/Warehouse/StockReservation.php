@@ -20,8 +20,11 @@ class StockReservation extends Model
         'status',
         'reserved_at',
         'reserved_by',
+        'received_by',
+        'released_at',
         'fifo_sequence',
         'notes',
+        'release_notes',
     ];
 
     protected function casts(): array
@@ -29,6 +32,7 @@ class StockReservation extends Model
         return [
             'status' => ReservationStatus::class,
             'reserved_at' => 'datetime',
+            'released_at' => 'datetime',
         ];
     }
 
@@ -45,6 +49,11 @@ class StockReservation extends Model
     public function reservedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reserved_by');
+    }
+
+    public function receivedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 
     public function lines(): HasMany

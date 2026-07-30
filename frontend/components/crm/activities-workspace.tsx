@@ -144,9 +144,14 @@ function formatStatus(status: string): string {
 
 type Props = {
   typeFilter?: ActivityTypeFilter;
+  /** Hide the page title row when nested inside the Activities hub tabs. */
+  hidePageHeader?: boolean;
 };
 
-export function ActivitiesWorkspace({ typeFilter = "all" }: Props) {
+export function ActivitiesWorkspace({
+  typeFilter = "all",
+  hidePageHeader = false,
+}: Props) {
   const meta = PAGE_META[typeFilter];
   const [activities, setActivities] = useState<ApiActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -296,12 +301,19 @@ export function ActivitiesWorkspace({ typeFilter = "all" }: Props) {
   }, [activities, today]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={hidePageHeader ? "space-y-6" : "space-y-6 p-6"}>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">{meta.title}</h1>
-          <p className="text-sm text-muted-foreground">{meta.description}</p>
-        </div>
+        {hidePageHeader ? (
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{meta.title}</h2>
+            <p className="text-sm text-muted-foreground">{meta.description}</p>
+          </div>
+        ) : (
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">{meta.title}</h1>
+            <p className="text-sm text-muted-foreground">{meta.description}</p>
+          </div>
+        )}
         <Button
           className="rounded-[5px]"
           onClick={() => {

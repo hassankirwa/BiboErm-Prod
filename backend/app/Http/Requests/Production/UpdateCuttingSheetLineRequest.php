@@ -19,7 +19,7 @@ class UpdateCuttingSheetLineRequest extends FormRequest
             'pieces' => ['sometimes', 'integer', 'min:1'],
             'bar_length_mm' => ['nullable', 'integer', 'min:1'],
             'waste_mm' => ['nullable', 'integer', 'min:0'],
-            'reason' => ['required', 'string', 'max:500'],
+            'reason' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

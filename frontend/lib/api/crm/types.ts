@@ -193,6 +193,10 @@ export type ApiSiteVisit = {
   rough_sketch_url?: string | null;
   approved_by: number | null;
   approved_at: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: number | null;
+  review_notes?: string | null;
+  reviewer?: ApiUser | null;
   lead?: ApiLead | null;
   deal?: ApiDeal | null;
   project?: {

@@ -17,9 +17,11 @@ class LowStockAlertService
     ) {}
 
     /**
+     * Detect low-stock SKUs without writing audit/notification side effects.
+     *
      * @return list<array{item_id: int, sku: string, name: string, available: string, min_stock_qty: string}>
      */
-    public function scan(): array
+    public function findAlerts(): array
     {
         $alerts = [];
 
@@ -36,7 +38,28 @@ class LowStockAlertService
             }
 
             $alerts[] = $alert;
-            $this->recordLowStock($item, $alert['available']);
+        }
+
+        return $alerts;
+    }
+
+    public function countAlerts(): int
+    {
+        return count($this->findAlerts());
+    }
+
+    /**
+     * @return list<array{item_id: int, sku: string, name: string, available: string, min_stock_qty: string}>
+     */
+    public function scan(): array
+    {
+        $alerts = $this->findAlerts();
+
+        foreach ($alerts as $alert) {
+            $item = Item::query()->find($alert['item_id']);
+            if ($item) {
+                $this->recordLowStock($item, $alert['available']);
+            }
         }
 
         return $alerts;

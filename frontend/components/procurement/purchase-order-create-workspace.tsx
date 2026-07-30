@@ -99,7 +99,7 @@ export function PurchaseOrderCreateWorkspace() {
       .then(([draftRes, driversRes]) => {
         const editableGroups = draftRes.data.groups.map((group) => ({
           ...group,
-          expected_delivery: "",
+          expected_delivery: group.expected_delivery ?? "",
           tax: "0",
           transport_type: "supplier_delivery",
           driver_id: "",
@@ -243,9 +243,9 @@ export function PurchaseOrderCreateWorkspace() {
     <div className="space-y-6">
       {groups.length > 1 ? (
         <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">
-          <strong>{groups.length} suppliers detected.</strong> Requisitions were grouped by supplier for shared
-          transport details. Submitting will create {totalPoCount} purchase order
-          {totalPoCount === 1 ? "" : "s"} (one per requisition).
+          <strong>{groups.length} suppliers detected.</strong> Lines were grouped by preferred
+          supplier. Submitting will create {groups.length} purchase order
+          {groups.length === 1 ? "" : "s"} (one per supplier).
         </div>
       ) : totalPoCount > 1 ? (
         <div className="rounded-md border border-border bg-muted/30 p-4 text-sm">

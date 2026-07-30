@@ -23,6 +23,9 @@ class GlassOrderResource extends JsonResource
             'delivered_at' => $this->delivered_at?->toIso8601String(),
             'delivery_location' => $this->delivery_location,
             'notes' => $this->notes,
+            'total_cost' => $this->total_cost,
+            'total_area_m2' => $this->total_area_m2,
+            'currency' => $this->currency ?? 'KES',
             'created_at' => $this->created_at?->toIso8601String(),
             'project' => $this->whenLoaded('project', fn () => $this->project ? [
                 'id' => $this->project->id,
@@ -34,6 +37,14 @@ class GlassOrderResource extends JsonResource
                 'code' => $this->supplier->code,
                 'name' => $this->supplier->name,
                 'category' => $this->supplier->category,
+                'email' => $this->supplier->email,
+                'phone' => $this->supplier->phone,
+                'address' => $this->supplier->address,
+            ] : null),
+            'creator' => $this->whenLoaded('creator', fn () => $this->creator ? [
+                'id' => $this->creator->id,
+                'name' => $this->creator->name,
+                'email' => $this->creator->email,
             ] : null),
         ];
     }

@@ -2,11 +2,13 @@
 
 namespace App\Services\Procurement\Requisitions;
 
+use App\Enums\Procurement\RequisitionStatus;
 use App\Enums\Procurement\RequisitionTrigger;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Models\Procurement\PurchaseRequisition;
 use App\Models\User;
 use App\Models\Warehouse\Item;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AutoDraftRequisitionService
@@ -36,14 +38,36 @@ class AutoDraftRequisitionService
             ];
         }
 
-        return $this->requisitions->createDraft(
-            user: $user,
-            data: [
-                'project_id' => $event->projectId,
-                'notes' => 'Auto-drafted from material shortage',
-                'lines' => $lines,
-            ],
-            defaultTrigger: RequisitionTrigger::BomShortage,
-        );
+        $payload = [
+            'project_id' => $event->projectId,
+            'notes' => 'Auto-drafted from material shortage',
+            'lines' => $lines,
+        ];
+
+        return DB::transaction(function () use ($user, $payload, $event) {
+            $existing = $this->requisitions->findOpenBomShortageForProject($event->projectId, lock: true);
+
+            if ($existing) {
+                $status = $existing->status instanceof RequisitionStatus
+                    ? $existing->status
+                    : RequisitionStatus::tryFrom((string) $existing->status);
+
+                if ($status === RequisitionStatus::Draft) {
+                    return $this->requisitions->replaceDraftLines(
+                        $existing,
+                        $payload,
+                        RequisitionTrigger::BomShortage,
+                    );
+                }
+
+                return $existing->load(['lines.warehouseItem', 'project', 'supplier', 'requester', 'approver']);
+            }
+
+            return $this->requisitions->createDraft(
+                user: $user,
+                data: $payload,
+                defaultTrigger: RequisitionTrigger::BomShortage,
+            );
+        });
     }
 }

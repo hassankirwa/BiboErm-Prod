@@ -17,6 +17,10 @@ class ProjectStageGate
 
     public static function hasDesignDocument(Project $project): bool
     {
+        if (array_key_exists('design_documents_count', $project->getAttributes())) {
+            return (int) $project->getAttribute('design_documents_count') > 0;
+        }
+
         if ($project->relationLoaded('documents')) {
             return $project->documents->contains(
                 fn (ProjectDocument $document) => in_array($document->type, self::DESIGN_DOCUMENT_TYPES, true)
@@ -47,6 +51,10 @@ class ProjectStageGate
 
         if (! $bom) {
             return false;
+        }
+
+        if (array_key_exists('lines_count', $bom->getAttributes())) {
+            return (int) $bom->getAttribute('lines_count') > 0;
         }
 
         if ($bom->relationLoaded('lines')) {

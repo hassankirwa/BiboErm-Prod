@@ -31,10 +31,14 @@ class ProjectStageLabels
         $value = $stage instanceof ProjectStage ? $stage->value : $stage;
 
         if ($value === ProjectStage::MaterialsReserved->value) {
-            $fullyReserved = (int) ($materialSummary['fully_reserved'] ?? 0);
-            $warehouseLines = (int) ($materialSummary['warehouse_lines'] ?? 0);
+            $unitsTotal = (int) ($materialSummary['reservation_units_total']
+                ?? $materialSummary['warehouse_lines']
+                ?? 0);
+            $unitsReserved = (int) ($materialSummary['reservation_units_reserved']
+                ?? $materialSummary['fully_reserved']
+                ?? 0);
 
-            if ($warehouseLines > 0 && $fullyReserved < $warehouseLines) {
+            if ($unitsTotal > 0 && $unitsReserved < $unitsTotal) {
                 return 'Awaiting materials reservation';
             }
         }

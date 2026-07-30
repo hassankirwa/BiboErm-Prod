@@ -25,7 +25,7 @@ export const QC_INSPECTION_CONTEXTS = [
 
 export type QcInspectionContext = (typeof QC_INSPECTION_CONTEXTS)[number];
 
-export type QcInspectionResult = "pending" | "pass" | "fail" | "conditional_pass";
+export type QcInspectionResult = "pending" | "pass" | "fail" | "conditional_pass" | "skipped";
 
 /** Results the inspector may choose when submitting (excludes pending). */
 export const QC_INSPECTION_SUBMIT_RESULTS = [
@@ -135,6 +135,7 @@ export type QcInspection = {
   reference: string;
   context: QcInspectionContext;
   result: QcInspectionResult;
+  can_skip?: boolean;
   stage?: string | null;
   project_id?: number | null;
   production_order_id?: number | null;
@@ -209,6 +210,14 @@ export const QC_CONTEXT_LABELS: Record<QcInspectionContext, string> = {
   site_installation: "Site installation",
   snagging_signoff: "Snagging sign-off",
 };
+
+export const PRODUCTION_IN_PROCESS_STAGES = [
+  { value: "cutting", label: "Cutting" },
+  { value: "fabrication", label: "Fabrication" },
+  { value: "sash", label: "Sash fabrication" },
+  { value: "glass_assembly", label: "Glass assembly" },
+  { value: "finishing", label: "Finishing" },
+] as const;
 
 function buildQuery(params?: Record<string, string | number | boolean | null | undefined>) {
   const search = new URLSearchParams();
@@ -306,6 +315,8 @@ export async function createQcInspection(payload: {
   warehouse_deck_slug?: string | null;
   warehouse_section_id?: number | null;
   tool_id?: number | null;
+  stage?: string | null;
+  notes?: string | null;
 }) {
   return apiRequest<{ data: QcInspection }>("/qc/inspections", {
     method: "POST",
@@ -342,6 +353,13 @@ export async function submitQcInspection(
   return apiRequest<{ data: QcInspection }>(`/qc/inspections/${id}/submit`, {
     method: "POST",
     body: payload,
+  });
+}
+
+export async function skipQcInspection(id: number, notes?: string | null) {
+  return apiRequest<{ data: QcInspection }>(`/qc/inspections/${id}/skip`, {
+    method: "POST",
+    body: notes ? { notes } : {},
   });
 }
 

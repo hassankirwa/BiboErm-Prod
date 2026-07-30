@@ -10,9 +10,14 @@ use App\Models\Procurement\PurchaseRequisition;
 use App\Models\Procurement\PurchaseRequisitionLine;
 use App\Models\ProjectBomLine;
 use App\Models\Warehouse\Item;
+use App\Services\Warehouse\MasterData\WarehouseItemResolver;
 
 class ProcurementWarehouseItemResolver
 {
+    public function __construct(
+        protected WarehouseItemResolver $warehouseItems,
+    ) {}
+
     public function resolveFromRequisitionLine(?PurchaseRequisitionLine $line): ?int
     {
         if (! $line) {
@@ -39,13 +44,16 @@ class ProcurementWarehouseItemResolver
         }
 
         if ($bomLine->material_code) {
-            $bySku = Item::query()
-                ->where('sku', $bomLine->material_code)
-                ->where('is_active', true)
-                ->value('id');
+            $resolved = $this->warehouseItems->resolve(
+                code: $bomLine->material_code,
+                name: $bomLine->material_name,
+                sourceSystem: $bomLine->source_system ?? 'wincad',
+                series: $bomLine->series,
+                lineType: $bomLine->line_type,
+            );
 
-            if ($bySku) {
-                return (int) $bySku;
+            if ($resolved) {
+                return (int) $resolved;
             }
         }
 

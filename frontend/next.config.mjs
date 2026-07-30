@@ -17,46 +17,6 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: "/crm/site-visits/my-visits",
-        destination: "/site-ops/my-visits",
-        permanent: false,
-      },
-      {
-        source: "/crm/site-visits/my-visits/:path*",
-        destination: "/site-ops/my-visits/:path*",
-        permanent: false,
-      },
-      {
-        source: "/crm/site-visits/today",
-        destination: "/site-ops/today",
-        permanent: false,
-      },
-      {
-        source: "/crm/site-visits/today/:path*",
-        destination: "/site-ops/today/:path*",
-        permanent: false,
-      },
-      {
-        source: "/crm/site-visits",
-        destination: "/site-ops/visits",
-        permanent: false,
-      },
-      {
-        source: "/crm/site-visits/:path*",
-        destination: "/site-ops/visits/:path*",
-        permanent: false,
-      },
-      {
-        source: "/crm/field-day",
-        destination: "/site-ops/field-day",
-        permanent: false,
-      },
-      {
-        source: "/crm/field-day/:path*",
-        destination: "/site-ops/field-day/:path*",
-        permanent: false,
-      },
-      {
         source: "/design",
         destination: "/projects/design",
         permanent: false,

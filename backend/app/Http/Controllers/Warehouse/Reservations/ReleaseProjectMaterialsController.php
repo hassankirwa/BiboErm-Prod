@@ -18,12 +18,14 @@ class ReleaseProjectMaterialsController extends Controller
     public function __invoke(Request $request, Project $project): JsonResponse
     {
         $data = $request->validate([
+            'received_by' => ['required', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $result = $this->release->releaseForProduction(
             project: $project,
             performer: $request->user(),
+            receivedByUserId: (int) $data['received_by'],
             notes: $data['notes'] ?? null,
         );
 

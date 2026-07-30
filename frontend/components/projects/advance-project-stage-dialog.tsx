@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,14 +25,24 @@ import {
   PM_MANUAL_NEXT_STAGES,
   advanceProjectStage,
   canAdvanceFromFinalDesignApproval,
+  canAdvanceToFinalDesignApproval,
+  canAdvanceToMaterialsReady,
   formatProjectStage,
-  hasProductionMeasurementData,
+  getProjectMaterialStatus,
   projectHasBomFinalized,
+  projectHasBomUploaded,
   projectHasDesignDocument,
   type ProjectDetail,
+  type ProjectMaterialStatus,
   type ProjectStageDepositConfirmation,
 } from "@/lib/api/projects";
+import { listDrivers, type Driver } from "@/lib/api/procurement";
 import { ApiError } from "@/lib/api/errors";
+import {
+  projectSiteAssessmentPath,
+  projectTabPath,
+  type ProjectViewMode,
+} from "@/lib/projects/paths";
 import { Check, ExternalLink, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +52,7 @@ type AdvanceProjectStageDialogProps = {
   onOpenChange: (open: boolean) => void;
   onProjectUpdated: (project: ProjectDetail) => void;
   nextStages?: string[];
+  mode?: ProjectViewMode;
 };
 
 const EMPTY_DEPOSIT: ProjectStageDepositConfirmation = {
@@ -54,26 +66,95 @@ export function AdvanceProjectStageDialog({
   onOpenChange,
   onProjectUpdated,
   nextStages: nextStagesProp,
+  mode = "projects",
 }: AdvanceProjectStageDialogProps) {
+  const router = useRouter();
   const nextStages = nextStagesProp ?? PM_MANUAL_NEXT_STAGES[project.stage] ?? [];
   const [selectedStage, setSelectedStage] = useState("");
   const [depositConfirmation, setDepositConfirmation] = useState(EMPTY_DEPOSIT);
   const [advancing, setAdvancing] = useState(false);
+  const [materialStatus, setMaterialStatus] = useState<ProjectMaterialStatus | null>(null);
+  const [loadingMaterialStatus, setLoadingMaterialStatus] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState("");
 
-  const siteAssessmentComplete = hasProductionMeasurementData(project);
+  const toFinalDesignGate = canAdvanceToFinalDesignApproval(project);
 
-  const designsHref = `/projects/${project.id}?tab=designs`;
-  const bomHref = `/projects/${project.id}?tab=bom`;
+  const designsHref = projectTabPath(project.id, "designs", mode);
+  const bomHref = projectTabPath(project.id, "bom", mode);
 
   useEffect(() => {
     if (!open) {
       setDepositConfirmation(EMPTY_DEPOSIT);
       setSelectedStage(nextStages[0] ?? "");
+      setMaterialStatus(null);
+      setSelectedDriverId("");
+      setDrivers([]);
       return;
     }
 
     setSelectedStage(nextStages[0] ?? "");
+    setSelectedDriverId("");
   }, [open, project.stage, nextStages]);
+
+  const requiresMaterialsReadyGate = useMemo(
+    () => selectedStage === "materials_ready",
+    [selectedStage],
+  );
+
+  const requiresDriver = useMemo(
+    () => selectedStage === "in_transit",
+    [selectedStage],
+  );
+
+  useEffect(() => {
+    if (!open || !requiresDriver) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingDrivers(true);
+    void listDrivers({ available_only: true, per_page: 100 })
+      .then((response) => {
+        if (!cancelled) setDrivers(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setDrivers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDrivers(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, requiresDriver]);
+
+  useEffect(() => {
+    if (!open || !requiresMaterialsReadyGate) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingMaterialStatus(true);
+    void getProjectMaterialStatus(project.id)
+      .then((response) => {
+        if (!cancelled) setMaterialStatus(response.data);
+      })
+      .catch(() => {
+        if (!cancelled) setMaterialStatus(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMaterialStatus(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, requiresMaterialsReadyGate, project.id]);
+
+  const materialsReadyGate = canAdvanceToMaterialsReady(materialStatus?.summary);
 
   const requiresDepositConfirmation = useMemo(
     () =>
@@ -96,19 +177,23 @@ export function AdvanceProjectStageDialog({
 
   const finalDesignGate = canAdvanceFromFinalDesignApproval(project);
   const hasDesign = projectHasDesignDocument(project);
+  const hasBomUploaded = projectHasBomUploaded(project);
   const hasBomFinalized = projectHasBomFinalized(project);
 
-  const siteAssessmentHref = `/projects/${project.id}/site-assessment`;
+  const siteAssessmentHref = projectSiteAssessmentPath(project.id, mode);
 
   const dialogTitle = useMemo(() => {
     if (requiresDepositConfirmation) {
       return "Confirm deposit received";
     }
-    if (requiresSiteAssessmentComplete && !siteAssessmentComplete) {
-      return "Site assessment incomplete";
+    if (requiresSiteAssessmentComplete && !toFinalDesignGate.ok) {
+      return "Final design approval requirements";
     }
     if (requiresFinalDesignGates && !finalDesignGate.ok) {
       return "Design & BOM requirements";
+    }
+    if (requiresMaterialsReadyGate && !materialsReadyGate.ok) {
+      return "Materials ready requirements";
     }
     if (selectedStage) {
       return `Advance to ${formatProjectStage(selectedStage)}`;
@@ -117,17 +202,29 @@ export function AdvanceProjectStageDialog({
   }, [
     requiresDepositConfirmation,
     requiresSiteAssessmentComplete,
-    siteAssessmentComplete,
+    toFinalDesignGate.ok,
     requiresFinalDesignGates,
     finalDesignGate.ok,
+    requiresMaterialsReadyGate,
+    materialsReadyGate.ok,
     selectedStage,
   ]);
 
   async function handleSubmit() {
     if (!selectedStage) return;
 
-    if (requiresSiteAssessmentComplete && !siteAssessmentComplete) {
-      toast.error("Complete the site assessment on the dedicated page first.");
+    if (requiresSiteAssessmentComplete && !toFinalDesignGate.ok) {
+      if (toFinalDesignGate.missingMeasurement) {
+        toast.error("Complete the site assessment on the dedicated page first.");
+      } else if (toFinalDesignGate.missingDesign) {
+        toast.error("Upload at least one design document first.", {
+          action: { label: "Designs tab", onClick: () => { window.location.href = designsHref; } },
+        });
+      } else if (toFinalDesignGate.missingBomUpload) {
+        toast.error("Upload a BOM first.", {
+          action: { label: "BOM tab", onClick: () => { window.location.href = bomHref; } },
+        });
+      }
       return;
     }
 
@@ -144,6 +241,19 @@ export function AdvanceProjectStageDialog({
       return;
     }
 
+    if (requiresMaterialsReadyGate && !materialsReadyGate.ok) {
+      toast.error(
+        materialsReadyGate.reason ??
+          "Resolve material shortages and finish procurement before marking materials ready.",
+      );
+      return;
+    }
+
+    if (requiresDriver && !selectedDriverId) {
+      toast.error("Select an available driver before advancing to in transit.");
+      return;
+    }
+
     setAdvancing(true);
     try {
       const payload: Parameters<typeof advanceProjectStage>[1] = {
@@ -157,10 +267,18 @@ export function AdvanceProjectStageDialog({
         };
       }
 
+      if (requiresDriver) {
+        payload.driver_id = Number(selectedDriverId);
+      }
+
       const response = await advanceProjectStage(project.id, payload);
       onProjectUpdated(response.data);
       toast.success(`Stage updated to ${formatProjectStage(selectedStage)}.`);
       onOpenChange(false);
+
+      if (selectedStage === "site_assessment") {
+        router.push(projectSiteAssessmentPath(project.id, mode));
+      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to advance stage.");
     } finally {
@@ -196,19 +314,63 @@ export function AdvanceProjectStageDialog({
                 </SelectContent>
               </Select>
             </div>
-          ) : requiresSiteAssessmentComplete && !siteAssessmentComplete ? (
+          ) : requiresSiteAssessmentComplete && !toFinalDesignGate.ok ? (
             <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
               <p className="text-sm text-muted-foreground">
-                Operational site assessment data must be saved before advancing to
-                final design approval. Record opening counts, measurements, notes, or
-                photos on the dedicated site assessment page.
+                Before advancing to final design approval, complete the following:
               </p>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={siteAssessmentHref}>
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open site assessment
-                </Link>
-              </Button>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  {!toFinalDesignGate.missingMeasurement ? (
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                  ) : (
+                    <X className="h-4 w-4 text-destructive shrink-0" />
+                  )}
+                  Production measurement complete
+                </li>
+                <li className="flex items-center gap-2">
+                  {hasDesign ? (
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                  ) : (
+                    <X className="h-4 w-4 text-destructive shrink-0" />
+                  )}
+                  Design document uploaded
+                </li>
+                <li className="flex items-center gap-2">
+                  {hasBomUploaded ? (
+                    <Check className="h-4 w-4 text-success shrink-0" />
+                  ) : (
+                    <X className="h-4 w-4 text-destructive shrink-0" />
+                  )}
+                  BOM uploaded
+                </li>
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                {toFinalDesignGate.missingMeasurement ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={siteAssessmentHref}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open site assessment
+                    </Link>
+                  </Button>
+                ) : null}
+                {!hasDesign ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={designsHref}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Upload design
+                    </Link>
+                  </Button>
+                ) : null}
+                {!hasBomUploaded ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={bomHref}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open BOM tab
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ) : requiresFinalDesignGates && !finalDesignGate.ok ? (
             <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
@@ -256,7 +418,7 @@ export function AdvanceProjectStageDialog({
             <p className="text-sm text-muted-foreground">
               {requiresSiteAssessmentComplete ? (
                 <>
-                  Site assessment is complete. Advance this project to{" "}
+                  Measurement, design, and BOM are ready. Advance this project to{" "}
                   <span className="font-medium text-foreground">
                     {formatProjectStage(selectedStage)}
                   </span>
@@ -282,6 +444,57 @@ export function AdvanceProjectStageDialog({
               )}
             </p>
           )}
+
+          {requiresMaterialsReadyGate ? (
+            <div
+              className={
+                materialsReadyGate.ok
+                  ? "space-y-3 rounded-lg border border-border p-4"
+                  : "space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+              }
+            >
+              <p className="text-sm text-muted-foreground">
+                Materials ready requires every warehouse BOM line reserved to this project.
+                Stock reserved for other projects does not count.
+              </p>
+              {loadingMaterialStatus ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Checking material status…
+                </p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-center gap-2">
+                    {!materialsReadyGate.shortageLines && !materialsReadyGate.missingBom ? (
+                      <Check className="h-4 w-4 shrink-0 text-success" />
+                    ) : (
+                      <X className="h-4 w-4 shrink-0 text-destructive" />
+                    )}
+                    Warehouse lines fully reserved to this project
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {!materialsReadyGate.openRequisitions ? (
+                      <Check className="h-4 w-4 shrink-0 text-success" />
+                    ) : (
+                      <X className="h-4 w-4 shrink-0 text-destructive" />
+                    )}
+                    No open procurement requisitions
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {!materialsReadyGate.glassPending ? (
+                      <Check className="h-4 w-4 shrink-0 text-success" />
+                    ) : (
+                      <X className="h-4 w-4 shrink-0 text-destructive" />
+                    )}
+                    No pending glass orders
+                  </li>
+                </ul>
+              )}
+              {!loadingMaterialStatus && materialsReadyGate.reason ? (
+                <p className="text-sm text-destructive">{materialsReadyGate.reason}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           {requiresDepositConfirmation ? (
             <div className="space-y-3 rounded-lg border p-4">
@@ -320,15 +533,67 @@ export function AdvanceProjectStageDialog({
               </div>
             </div>
           ) : null}
+
+          {requiresDriver ? (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="text-sm text-muted-foreground">
+                Assign an available driver to dispatch this project to site.
+              </p>
+              {loadingDrivers ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading available drivers…
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="dispatch-driver">Driver</Label>
+                  <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+                    <SelectTrigger id="dispatch-driver">
+                      <SelectValue placeholder="Select available driver" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {drivers.map((driver) => (
+                        <SelectItem key={driver.id} value={String(driver.id)}>
+                          {driver.code} · {driver.name}
+                          {driver.vehicle_registration
+                            ? ` · ${driver.vehicle_registration}`
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {drivers.length === 0 ? (
+                    <p className="text-sm text-destructive">
+                      No available drivers. Free a driver or add one in procurement.
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={advancing}>
             Cancel
           </Button>
-          {requiresSiteAssessmentComplete && !siteAssessmentComplete ? (
+          {requiresSiteAssessmentComplete && !toFinalDesignGate.ok ? (
             <Button asChild>
-              <Link href={siteAssessmentHref}>Open site assessment</Link>
+              <Link
+                href={
+                  toFinalDesignGate.missingMeasurement
+                    ? siteAssessmentHref
+                    : toFinalDesignGate.missingDesign
+                      ? designsHref
+                      : bomHref
+                }
+              >
+                {toFinalDesignGate.missingMeasurement
+                  ? "Open site assessment"
+                  : toFinalDesignGate.missingDesign
+                    ? "Upload design"
+                    : "Open BOM tab"}
+              </Link>
             </Button>
           ) : requiresFinalDesignGates && !finalDesignGate.ok ? (
             <Button variant="outline" asChild>
@@ -342,8 +607,13 @@ export function AdvanceProjectStageDialog({
               disabled={
                 advancing ||
                 !selectedStage ||
+                loadingMaterialStatus ||
+                loadingDrivers ||
                 (requiresDepositConfirmation && !depositConfirmation.notes.trim()) ||
-                (requiresFinalDesignGates && !finalDesignGate.ok)
+                (requiresSiteAssessmentComplete && !toFinalDesignGate.ok) ||
+                (requiresFinalDesignGates && !finalDesignGate.ok) ||
+                (requiresMaterialsReadyGate && !materialsReadyGate.ok) ||
+                (requiresDriver && !selectedDriverId)
               }
             >
               {advancing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

@@ -61,6 +61,13 @@ function lineOverageSummary(requisition: PurchaseRequisition) {
   return `${withOverage.length} line${withOverage.length === 1 ? "" : "s"}`;
 }
 
+function canCreatePo(requisition: PurchaseRequisition) {
+  if (typeof requisition.can_create_purchase_order === "boolean") {
+    return requisition.can_create_purchase_order;
+  }
+  return requisition.status === "approved" && (requisition.purchase_orders_count ?? 0) === 0;
+}
+
 function hasPurchaseOrder(requisition: PurchaseRequisition) {
   return (requisition.purchase_orders_count ?? 0) > 0;
 }
@@ -84,7 +91,7 @@ export default function RequisitionsPage() {
       setSelectedApprovedIds((current) =>
         current.filter((id) => {
           const item = res.data.find((entry) => entry.id === id);
-          return item?.status === "approved" && !hasPurchaseOrder(item);
+          return item ? canCreatePo(item) : false;
         }),
       );
     } catch (error) {
@@ -99,7 +106,7 @@ export default function RequisitionsPage() {
   }, []);
 
   const approvableApproved = useMemo(
-    () => items.filter((item) => item.status === "approved" && !hasPurchaseOrder(item)),
+    () => items.filter((item) => canCreatePo(item)),
     [items],
   );
 
@@ -177,6 +184,7 @@ export default function RequisitionsPage() {
                   <TableHead className="w-10" />
                   <TableHead>Reference</TableHead>
                   <TableHead>Supplier</TableHead>
+                  <TableHead>Required by</TableHead>
                   <TableHead>Project</TableHead>
                   <TableHead>Trigger</TableHead>
                   <TableHead>Lines</TableHead>
@@ -187,13 +195,14 @@ export default function RequisitionsPage() {
               </TableHeader>
               <TableBody>
                 {items.map((pr) => {
-                  const canSelectForPo = pr.status === "approved" && !hasPurchaseOrder(pr);
+                  const eligibleForPo = canCreatePo(pr);
                   const isPending = pr.status === "pending_approval";
+                  const isDraft = pr.status === "draft" || pr.is_editable;
 
                   return (
                     <TableRow key={pr.id}>
                       <TableCell>
-                        {canSelectForPo ? (
+                        {eligibleForPo ? (
                           <Checkbox
                             checked={selectedApprovedIds.includes(pr.id)}
                             onCheckedChange={(checked) =>
@@ -221,6 +230,7 @@ export default function RequisitionsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{pr.supplier?.name ?? "—"}</TableCell>
+                      <TableCell>{pr.required_by ?? "—"}</TableCell>
                       <TableCell>
                         {pr.project ? `${pr.project.reference} · ${pr.project.name}` : "General procurement"}
                       </TableCell>
@@ -235,7 +245,16 @@ export default function RequisitionsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {isDraft ? (
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={`/procurement/requisitions/${pr.id}`}>Edit</Link>
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="ghost" asChild>
+                              <Link href={`/procurement/requisitions/${pr.id}`}>Open</Link>
+                            </Button>
+                          )}
                           {isPending ? (
                             <>
                               <Button
@@ -255,12 +274,12 @@ export default function RequisitionsPage() {
                               </Button>
                             </>
                           ) : null}
-                          {canSelectForPo ? (
+                          {eligibleForPo ? (
                             <Button size="sm" asChild>
                               <Link href={createPoHref([pr.id])}>Create PO</Link>
                             </Button>
                           ) : null}
-                          {hasPurchaseOrder(pr) ? (
+                          {hasPurchaseOrder(pr) && !eligibleForPo ? (
                             <Button size="sm" variant="outline" asChild>
                               <Link href="/procurement/orders">View POs</Link>
                             </Button>
@@ -276,7 +295,8 @@ export default function RequisitionsPage() {
         )}
         {approvableApproved.length > 0 ? (
           <p className="text-xs text-muted-foreground">
-            Select multiple approved requisitions to create separate purchase orders grouped by supplier.
+            Select approved requisitions to create purchase orders grouped by preferred supplier
+            (one PO per supplier).
           </p>
         ) : null}
       </div>

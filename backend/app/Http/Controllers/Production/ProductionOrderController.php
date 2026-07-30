@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Production\UpdateProductionOrderStatusRequest;
 use App\Http\Requests\Production\UpdateScheduleRequest;
 use App\Enums\Production\ProductionOrderStatus;
+use App\Enums\Production\ProductionStage;
 use App\Http\Resources\Production\ProductionOrderResource;
 use App\Models\Production\ProductionOrder;
 use App\Services\Production\ProductionOrderService;
+use App\Services\QualityControl\QcInspectionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -16,6 +18,7 @@ class ProductionOrderController extends Controller
 {
     public function __construct(
         protected ProductionOrderService $orders,
+        protected QcInspectionService $qcInspections,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -56,6 +59,15 @@ class ProductionOrderController extends Controller
     public function show(ProductionOrder $order): ProductionOrderResource
     {
         $this->authorize('view', $order);
+
+        // Backfill mandatory after-assembly QC if finishing already advanced the order.
+        if ($order->current_stage === ProductionStage::QcPostFabrication) {
+            $this->qcInspections->createFromProductionStage(
+                $order->project_id,
+                $order->id,
+                ProductionStage::QcPostFabrication->value,
+            );
+        }
 
         $order->load(['project', 'stageLogs', 'teams.user', 'cuttingSheets', 'materialReleases']);
 

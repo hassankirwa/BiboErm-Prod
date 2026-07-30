@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Events\FieldInstallation\FieldDeliveryRecorded;
 use App\Events\FieldInstallation\FieldInstallationCompleted;
 use App\Events\FieldInstallation\FieldNonConformityReported;
 use App\Events\Crm\DealProjectCreated;
@@ -10,18 +11,26 @@ use App\Events\Procurement\PurchaseRequisitionApproved;
 use App\Events\Production\ProductionStageCompleted;
 use App\Events\Projects\ProjectAddonRequested;
 use App\Events\Projects\ProjectBomFinalized;
+use App\Events\Projects\ProjectStageAdvanced;
 use App\Events\Warehouse\ProjectMaterialShortageDetected;
 use App\Events\Warehouse\ProjectMaterialsReady;
 use App\Events\Warehouse\ProjectMaterialsReserved;
+use App\Events\Warehouse\ToolReplacementRequired;
 use App\Events\Warehouse\WarehouseLowStockDetected;
+use App\Listeners\FieldInstallation\CreateFieldJobOnInstallationStage;
 use App\Listeners\FieldInstallation\NotifyPmOnFieldNonConformity;
 use App\Listeners\Procurement\CreateAddonRequisition;
 use App\Listeners\Procurement\DraftPurchaseRequisitionFromShortage;
+use App\Listeners\FieldInstallation\ForwardNairobiFieldOnSashComplete;
 use App\Listeners\Procurement\NotifyGlassProcurement;
 use App\Listeners\Procurement\UnlockPurchaseOrderCreation;
 use App\Listeners\Production\CreateProductionOrder;
 use App\Listeners\Production\NotifyProductionManagersOfNewOrder;
 use App\Listeners\QualityControl\CreateProductionQcInspection;
+use App\Listeners\QualityControl\CreateSiteInspectionOnFieldJobComplete;
+use App\Listeners\QualityControl\CreateSiteReceivingInspectionOnDelivery;
+use App\Listeners\Projects\AdvanceProjectOnFieldDeliveryAccepted;
+use App\Listeners\Projects\CreateDesignChangeOrderOnMeasurementNc;
 use App\Listeners\Projects\OnDealProjectCreated;
 use App\Listeners\Projects\OnFieldInstallationCompleted;
 use App\Listeners\Projects\OnProductionStageCompleted;
@@ -29,17 +38,22 @@ use App\Listeners\Projects\OnProjectBomFinalized;
 use App\Listeners\Projects\OnProjectMaterialShortageDetected;
 use App\Listeners\Projects\OnProjectMaterialsReady;
 use App\Listeners\Projects\OnProjectMaterialsReserved;
+use App\Listeners\Projects\OnSiteInstallationQcCompleted;
+use App\Events\QualityControl\QcInspectionCompleted;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\FieldInstallation\FieldInstallationUnit;
 use App\Models\FieldInstallation\FieldNonConformity;
 use App\Models\FieldInstallation\FieldToolAssignment;
 use App\Models\Project;
+use App\Listeners\Warehouse\CreateToolIncidentOnReplacementRequired;
 use App\Listeners\Warehouse\HandleProjectBomFinalized;
 use App\Listeners\Warehouse\NotifyProcurementOfficersOfLowStock;
 use App\Listeners\Warehouse\ReceiveGoodsIntoWarehouse;
 use App\Listeners\Warehouse\ReleaseMaterialsOnProductionStageCompleted;
 use App\Models\Production\CuttingSheet;
 use App\Models\Production\ProductionOrder;
+use App\Models\Projects\DesignChangeOrder;
+use App\Models\Projects\ProjectDispatch;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\Warehouse\Bin;
@@ -48,6 +62,7 @@ use App\Models\Warehouse\OffcutPiece;
 use App\Models\Warehouse\Section;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\Tool;
+use App\Models\Warehouse\ToolIncident;
 use App\Models\Warehouse\ToolIssuance;
 use App\Policies\FieldInstallation\FieldInstallationJobPolicy;
 use App\Policies\Production\ProductionOrderPolicy;
@@ -84,6 +99,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ProcurementAuditLogger::class);
         $this->app->singleton(FieldInstallationAuditLogger::class);
         $this->app->singleton(ProductionAuditLogger::class);
+        $this->app->singleton(\App\Services\Projects\ProjectFifoOrderService::class);
     }
 
     /**
@@ -97,12 +113,15 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('reservation', fn ($id) => StockReservation::query()->findOrFail($id));
         Route::bind('tool', fn ($id) => Tool::query()->findOrFail($id));
         Route::bind('issuance', fn ($id) => ToolIssuance::query()->findOrFail($id));
+        Route::bind('toolIncident', fn ($id) => ToolIncident::query()->findOrFail($id));
         Route::bind('fieldJob', fn ($id) => FieldInstallationJob::query()->findOrFail($id));
         Route::bind('nonConformity', fn ($id) => FieldNonConformity::query()->findOrFail($id));
         Route::bind('toolAssignment', fn ($id) => FieldToolAssignment::query()->findOrFail($id));
         Route::bind('unit', fn ($id) => FieldInstallationUnit::query()->findOrFail($id));
         Route::bind('order', fn ($id) => ProductionOrder::query()->findOrFail($id));
         Route::bind('line', fn ($id) => CuttingSheet::query()->findOrFail($id));
+        Route::bind('projectDispatch', fn ($id) => ProjectDispatch::query()->findOrFail($id));
+        Route::bind('dco', fn ($id) => DesignChangeOrder::query()->findOrFail($id));
 
         Gate::policy(ProductionOrder::class, ProductionOrderPolicy::class);
         Gate::define('production.schedule.viewAny', fn (User $user) => app(ProductionSchedulePolicy::class)->viewAny($user));
@@ -226,7 +245,11 @@ class AppServiceProvider extends ServiceProvider
     protected function registerFieldInstallationListeners(): void
     {
         Event::listen(FieldNonConformityReported::class, NotifyPmOnFieldNonConformity::class);
+        Event::listen(FieldNonConformityReported::class, CreateDesignChangeOrderOnMeasurementNc::class);
         Event::listen(FieldInstallationCompleted::class, OnFieldInstallationCompleted::class);
+        Event::listen(FieldDeliveryRecorded::class, AdvanceProjectOnFieldDeliveryAccepted::class);
+        Event::listen(ProductionStageCompleted::class, ForwardNairobiFieldOnSashComplete::class);
+        Event::listen(ProjectStageAdvanced::class, CreateFieldJobOnInstallationStage::class);
         $this->registerProductionListeners();
         $this->registerQualityControlListeners();
     }
@@ -255,6 +278,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(GoodsReceiptVerified::class, ReceiveGoodsIntoWarehouse::class);
         Event::listen(ProductionStageCompleted::class, ReleaseMaterialsOnProductionStageCompleted::class);
         Event::listen(WarehouseLowStockDetected::class, NotifyProcurementOfficersOfLowStock::class);
+        Event::listen(ToolReplacementRequired::class, CreateToolIncidentOnReplacementRequired::class);
     }
 
     protected function registerProductionListeners(): void
@@ -266,5 +290,8 @@ class AppServiceProvider extends ServiceProvider
     protected function registerQualityControlListeners(): void
     {
         Event::listen(ProductionStageCompleted::class, CreateProductionQcInspection::class);
+        Event::listen(FieldInstallationCompleted::class, CreateSiteInspectionOnFieldJobComplete::class);
+        Event::listen(FieldDeliveryRecorded::class, CreateSiteReceivingInspectionOnDelivery::class);
+        Event::listen(QcInspectionCompleted::class, OnSiteInstallationQcCompleted::class);
     }
 }

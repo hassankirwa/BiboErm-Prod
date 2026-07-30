@@ -26,6 +26,14 @@ import {
   Search,
   User,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const RESERVE_RELEASE_STAGES = new Set([
+  "material_check",
+  "awaiting_procurement",
+  "materials_reserved",
+  "materials_ready",
+]);
 
 const stageColors: Record<string, string> = {
   awaiting_deposit: "bg-muted",
@@ -113,14 +121,23 @@ function PipelineCard({
     project.deal?.reference ??
     "No client linked";
 
-  const card = (
+  const title = linkToDetail ? (
+    <Link href={`/projects/${project.id}`} className="min-w-0 flex-1 hover:underline">
+      <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
+      <p className="text-xs text-muted-foreground truncate">{project.reference}</p>
+    </Link>
+  ) : (
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
+      <p className="text-xs text-muted-foreground truncate">{project.reference}</p>
+    </div>
+  );
+
+  return (
     <Card className="border-border bg-card hover:shadow-md transition-shadow">
       <CardContent className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{project.reference}</p>
-          </div>
+          {title}
           {isDelayed ? (
             <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
           ) : null}
@@ -172,19 +189,17 @@ function PipelineCard({
             </span>
           ) : null}
         </div>
+
+        {RESERVE_RELEASE_STAGES.has(project.stage) ? (
+          <Button variant="outline" size="sm" className="h-7 w-full text-xs" asChild>
+            <Link href={`/warehouse/reservations?project_id=${project.id}`}>
+              Reserve / release
+            </Link>
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );
-
-  if (linkToDetail) {
-    return (
-      <Link href={`/projects/${project.id}`} className="block">
-        {card}
-      </Link>
-    );
-  }
-
-  return card;
 }
 
 export function ProjectsPipeline({ linkToDetail = false }: ProjectsPipelineProps) {

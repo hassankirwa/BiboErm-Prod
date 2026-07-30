@@ -86,6 +86,16 @@ export async function fetchOpenAssignedSiteVisits(params?: {
   );
 }
 
+export async function fetchAssignedSiteVisitHistory(params?: {
+  measurement_context?: "quotation" | "production";
+  page?: number;
+  per_page?: number;
+}): Promise<PaginatedResponse<ApiSiteVisit>> {
+  return apiFetch<PaginatedResponse<ApiSiteVisit>>(
+    `/api/v1/crm/site-visits/history${buildQuery(params)}`,
+  );
+}
+
 export async function fetchSiteVisit(id: number): Promise<ApiSiteVisit> {
   const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
     `/api/v1/crm/site-visits/${id}`,
@@ -169,6 +179,34 @@ export async function approveSiteVisit(id: number): Promise<ApiSiteVisit> {
   const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
     `/api/v1/crm/site-visits/${id}/approve`,
     { method: "POST" },
+  );
+  return unwrapResource(res);
+}
+
+export async function requestSiteVisitChanges(
+  id: number,
+  payload: {
+    action: "clarification_needed" | "revisit_required";
+    notes: string;
+  },
+): Promise<ApiSiteVisit> {
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/request-changes`,
+    { method: "POST", json: payload },
+  );
+  return unwrapResource(res);
+}
+
+export async function reassignSiteVisit(
+  id: number,
+  assignedFieldOfficerId: number,
+): Promise<ApiSiteVisit> {
+  const res = await apiFetch<ApiSiteVisit | { data: ApiSiteVisit }>(
+    `/api/v1/crm/site-visits/${id}/reassign`,
+    {
+      method: "PATCH",
+      json: { assigned_field_officer_id: assignedFieldOfficerId },
+    },
   );
   return unwrapResource(res);
 }

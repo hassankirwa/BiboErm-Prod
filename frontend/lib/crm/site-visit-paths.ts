@@ -1,6 +1,6 @@
 import { isFieldModuleRole } from "@/lib/auth/redirect";
 
-export type SiteVisitWorkspace = "crm" | "field";
+export type SiteVisitWorkspace = "user" | "crm" | "field";
 
 /** Permissions that allow capturing site visit measurements. */
 export const SITE_VISIT_MEASUREMENT_PERMISSIONS = [
@@ -45,33 +45,37 @@ export function prefersFieldMeasurementWorkspace(roles: string[]): boolean {
   return isFieldModuleRole(roles);
 }
 
-export function siteVisitWorkspaceForRoles(roles: string[]): SiteVisitWorkspace {
-  return prefersFieldMeasurementWorkspace(roles) ? "field" : "crm";
+export function siteVisitWorkspaceForRoles(_roles: string[]): SiteVisitWorkspace {
+  return "user";
 }
 
 export function siteVisitDetailPath(
   visitId: number,
   workspace: SiteVisitWorkspace,
 ): string {
-  return workspace === "field"
-    ? `/field/site-visits/${visitId}`
-    : `/site-ops/visits/${visitId}`;
+  if (workspace === "field") return `/field/site-visits/${visitId}`;
+  if (workspace === "crm") return `/crm/site-visits/${visitId}`;
+  return `/site-visits/${visitId}`;
+}
+
+export function projectSiteVisitDetailPath(visitId: number): string {
+  return `/projects/site-visits/${visitId}`;
 }
 
 export function siteVisitOpenVisitsPath(workspace: SiteVisitWorkspace): string {
-  return workspace === "field"
-    ? "/field/open-visits"
-    : "/site-ops/my-visits";
+  if (workspace === "field") return "/field/open-visits";
+  if (workspace === "crm") return "/crm/site-visits/my-visits";
+  return "/site-visits/my-visits";
 }
 
 export function siteVisitTodayPath(workspace: SiteVisitWorkspace): string {
-  return workspace === "field"
-    ? "/field/site-visits/today"
-    : "/site-ops/today";
+  if (workspace === "field") return "/field/site-visits/today";
+  if (workspace === "crm") return "/crm/site-visits/today";
+  return "/site-visits/today";
 }
 
 export function siteVisitListPath(workspace: SiteVisitWorkspace): string {
-  return workspace === "field"
-    ? "/field/site-visits"
-    : "/site-ops/visits";
+  if (workspace === "field") return "/field/site-visits";
+  if (workspace === "crm") return "/crm/site-visits";
+  return "/site-visits";
 }

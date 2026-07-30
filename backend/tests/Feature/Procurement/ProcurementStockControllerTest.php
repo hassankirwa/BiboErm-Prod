@@ -113,6 +113,7 @@ class ProcurementStockControllerTest extends TestCase
         $this->assertSame(1, $response->json('data.summary.low_stock_items'));
         $this->assertSame(1, $response->json('data.summary.out_of_stock_items'));
         $this->assertSame(2, $response->json('data.summary.alert_items'));
+        $this->assertSame(3, $response->json('data.meta.total'));
 
         $itemsBySku = collect($response->json('data.items'))->keyBy('sku');
 

@@ -187,6 +187,8 @@ class SiteVisitWorkflowService
         if (! in_array($current, [
             SiteVisitStatus::InProgress->value,
             SiteVisitStatus::MeasurementsCaptured->value,
+            SiteVisitStatus::ClarificationNeeded->value,
+            SiteVisitStatus::RevisitRequired->value,
         ], true)) {
             throw ValidationException::withMessages([
                 'visit' => ["Cannot save measurements while visit status is {$current}."],
@@ -307,6 +309,7 @@ class SiteVisitWorkflowService
                 'approved_by' => $user->id,
                 'approved_at' => now(),
                 'reviewed_at' => now(),
+                'reviewed_by' => $user->id,
             ]);
 
             if ($this->isQuotationContext($visit)) {
@@ -370,6 +373,7 @@ class SiteVisitWorkflowService
                 'assignedFieldOfficer',
                 'assignedToUser',
                 'approvedBy',
+                'reviewedBy',
                 'photos',
                 'project',
                 'measurementLines',
@@ -381,6 +385,47 @@ class SiteVisitWorkflowService
 
             return $visit;
         });
+    }
+
+    public function requestChanges(
+        SiteVisit $visit,
+        User $user,
+        string $action,
+        string $notes,
+    ): SiteVisit {
+        $current = $this->visitStatusValue($visit);
+
+        if ($current !== SiteVisitStatus::SubmittedForReview->value) {
+            throw ValidationException::withMessages([
+                'visit' => ["Cannot review a visit while status is {$current}."],
+            ]);
+        }
+
+        if (! in_array($action, [
+            SiteVisitStatus::ClarificationNeeded->value,
+            SiteVisitStatus::RevisitRequired->value,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'action' => ['Select a valid correction action.'],
+            ]);
+        }
+
+        $visit->update([
+            'status' => $action,
+            'measurement_form_status' => MeasurementFormStatus::Draft->value,
+            'reviewed_at' => now(),
+            'reviewed_by' => $user->id,
+            'review_notes' => trim($notes),
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
+        return $visit->fresh()->load([
+            'assignedFieldOfficer',
+            'reviewedBy',
+            'photos',
+            'project',
+        ]);
     }
 
     protected function syncProductionMeasurementToProject(SiteVisit $visit, User $user): void

@@ -25,6 +25,10 @@ class Item extends Model
         'door_type_id',
         'min_stock_qty',
         'is_active',
+        'catalog_tier',
+        'description',
+        'image_path',
+        'catalog_metadata',
     ];
 
     protected function casts(): array
@@ -32,6 +36,7 @@ class Item extends Model
         return [
             'min_stock_qty' => 'decimal:3',
             'is_active' => 'boolean',
+            'catalog_metadata' => 'array',
         ];
     }
 
@@ -80,5 +85,10 @@ class Item extends Model
     public function stockLevels(): HasMany
     {
         return $this->hasMany(StockLevel::class, 'item_id');
+    }
+
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(ItemAlias::class, 'warehouse_item_id');
     }
 }

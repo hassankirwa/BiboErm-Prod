@@ -43,6 +43,7 @@ class FieldInstallationJobResource extends JsonResource
             ]),
             'members' => FieldInstallationJobMemberResource::collection($this->whenLoaded('activeMembers')),
             'units' => FieldUnitProgressResource::collection($this->whenLoaded('units')),
+            'tool_assignments' => FieldToolAssignmentResource::collection($this->whenLoaded('toolAssignments')),
         ];
     }
 }

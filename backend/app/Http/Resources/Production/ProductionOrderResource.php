@@ -17,12 +17,17 @@ class ProductionOrderResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'project_id' => $this->project_id,
+            'parent_production_order_id' => $this->parent_production_order_id,
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project->id,
                 'reference' => $this->project->reference,
                 'name' => $this->project->name,
                 'stage' => $this->project->stage?->value,
                 'completion_percent' => (int) $this->project->completion_percent,
+                'location_type' => $this->project->location_type,
+                'install_mode' => $this->project->install_mode instanceof \BackedEnum
+                    ? $this->project->install_mode->value
+                    : $this->project->install_mode,
             ]),
             'status' => $this->status?->value,
             'current_stage' => $this->current_stage?->value,

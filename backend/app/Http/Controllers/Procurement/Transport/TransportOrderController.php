@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Procurement\TransportOrderResource;
 use App\Models\Procurement\Driver;
 use App\Models\Procurement\TransportOrder;
+use App\Services\Procurement\DriverOccupancyService;
 use App\Services\Procurement\ProcurementAuditLogger;
 use App\Services\Procurement\ProcurementReferenceGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TransportOrderController extends Controller
 {
@@ -19,6 +22,7 @@ class TransportOrderController extends Controller
     public function __construct(
         protected ProcurementReferenceGenerator $refs,
         protected ProcurementAuditLogger $audit,
+        protected DriverOccupancyService $occupancy,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -43,19 +47,37 @@ class TransportOrderController extends Controller
             'driver_phone' => ['nullable', 'string'],
             'expected_arrival' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
+            'status' => ['nullable', 'string', 'in:'.implode(',', self::STATUSES)],
         ]);
+
+        $status = $validated['status'] ?? 'scheduled';
+
+        if ($status === 'in_transit' && empty($validated['driver_id'])) {
+            throw ValidationException::withMessages([
+                'driver_id' => ['A driver is required when transport is in transit.'],
+            ]);
+        }
 
         $driverDetails = $this->resolveDriverDetails($validated);
 
-        $order = TransportOrder::query()->create([
-            ...$validated,
-            ...$driverDetails,
-            'transport_number' => $this->refs->transport(),
-            'status' => 'scheduled',
-            'created_by' => $request->user()->id,
-        ]);
+        $order = DB::transaction(function () use ($request, $validated, $driverDetails, $status) {
+            $order = TransportOrder::query()->create([
+                ...$validated,
+                ...$driverDetails,
+                'transport_number' => $this->refs->transport(),
+                'status' => $status,
+                'created_by' => $request->user()->id,
+            ]);
 
-        $this->audit->log('transport.scheduled', $order);
+            if ($status === 'in_transit' && $order->driver_id) {
+                $driver = Driver::query()->findOrFail($order->driver_id);
+                $this->occupancy->occupy($driver, 'transport_order');
+            }
+
+            $this->audit->log('transport.scheduled', $order);
+
+            return $order;
+        });
 
         return (new TransportOrderResource($order))->response()->setStatusCode(201);
     }
@@ -67,26 +89,68 @@ class TransportOrderController extends Controller
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:'.implode(',', self::STATUSES)],
             'actual_arrival' => ['nullable', 'date'],
+            'driver_id' => ['nullable', 'integer', 'exists:procurement_drivers,id'],
+            'driver_name' => ['nullable', 'string'],
+            'driver_phone' => ['nullable', 'string'],
+            'vehicle' => ['nullable', 'string'],
         ]);
+
+        $newStatus = $validated['status'];
+        $driverId = $validated['driver_id'] ?? $transportOrder->driver_id;
+
+        if ($newStatus === 'in_transit' && empty($driverId)) {
+            throw ValidationException::withMessages([
+                'driver_id' => ['A driver is required when transport is in transit.'],
+            ]);
+        }
 
         $oldValues = [
             'status' => $transportOrder->status,
             'actual_arrival' => $transportOrder->actual_arrival?->toIso8601String(),
+            'driver_id' => $transportOrder->driver_id,
         ];
 
-        $transportOrder->update([
-            'status' => $validated['status'],
-            'actual_arrival' => $validated['status'] === 'arrived'
-                ? ($validated['actual_arrival'] ?? now())
-                : null,
+        $order = DB::transaction(function () use ($transportOrder, $validated, $newStatus, $driverId) {
+            $previousStatus = $transportOrder->status;
+            $updates = [
+                'status' => $newStatus,
+                'actual_arrival' => $newStatus === 'arrived'
+                    ? ($validated['actual_arrival'] ?? now())
+                    : $transportOrder->actual_arrival,
+            ];
+
+            if ($newStatus === 'in_transit' && $previousStatus !== 'in_transit') {
+                $driverDetails = $this->resolveDriverDetails([
+                    'driver_id' => $driverId,
+                    'driver_name' => $validated['driver_name'] ?? $transportOrder->driver_name,
+                    'driver_phone' => $validated['driver_phone'] ?? $transportOrder->driver_phone,
+                    'vehicle' => $validated['vehicle'] ?? $transportOrder->vehicle,
+                ]);
+                $updates = [...$updates, ...$driverDetails];
+
+                $driver = Driver::query()->findOrFail($driverId);
+                $this->occupancy->occupy($driver, 'transport_order');
+            }
+
+            if ($newStatus === 'arrived' && $previousStatus === 'in_transit' && $transportOrder->driver_id) {
+                $driver = Driver::query()->find($transportOrder->driver_id);
+                if ($driver) {
+                    $this->occupancy->release($driver);
+                }
+            }
+
+            $transportOrder->update($updates);
+
+            return $transportOrder->fresh(['purchaseOrder', 'driver']);
+        });
+
+        $this->audit->log('transport.status_updated', $order, $oldValues, [
+            'status' => $order->status,
+            'actual_arrival' => $order->actual_arrival?->toIso8601String(),
+            'driver_id' => $order->driver_id,
         ]);
 
-        $this->audit->log('transport.status_updated', $transportOrder, $oldValues, [
-            'status' => $transportOrder->status,
-            'actual_arrival' => $transportOrder->actual_arrival?->toIso8601String(),
-        ]);
-
-        return new TransportOrderResource($transportOrder->fresh(['purchaseOrder', 'driver']));
+        return new TransportOrderResource($order);
     }
 
     /**
@@ -103,6 +167,8 @@ class TransportOrderController extends Controller
             ->whereKey($validated['driver_id'])
             ->where('is_active', true)
             ->firstOrFail();
+
+        $this->occupancy->assertAvailable($driver);
 
         return [
             'driver_id' => $driver->id,

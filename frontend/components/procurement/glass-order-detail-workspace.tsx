@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PermissionGate } from "@/components/auth/permission-gate";
+import { GlassOrderPdfPreviewDialog } from "@/components/procurement/glass-order-pdf-preview-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,21 @@ import {
   type GlassOrderSpecs,
   type Supplier,
 } from "@/lib/api/procurement";
+import {
+  GLASS_ORDER_CUSTOM_VALUE,
+  GLASS_ORDER_TINT_OPTIONS,
+  GLASS_ORDER_TYPE_OPTIONS,
+  isKnownGlassOrderOption,
+  resolveGlassOrderSelectValue,
+} from "@/lib/procurement/glass-defaults";
+import {
+  formatKes,
+  formatPricePerSqm,
+  glassLineBuyingTotal,
+  glassPaneAreaM2,
+  glassPricePerSqm,
+} from "@/lib/procurement/glass-pricing";
+import { Eye } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -78,7 +94,24 @@ function normalizePanes(panes?: GlassOrderPane[]): GlassOrderPane[] {
     tint: pane.tint ?? "",
     notes: pane.notes ?? "",
     bom_line_id: pane.bom_line_id ?? null,
+    unit_buying_price: pane.unit_buying_price ?? null,
+    buying_price: pane.buying_price ?? null,
+    area_m2: pane.area_m2 ?? null,
+    price_per_sqm: pane.price_per_sqm ?? null,
+    currency: pane.currency ?? null,
   }));
+}
+
+function resolveUnitBuyingPrice(pane: GlassOrderPane): number | null {
+  if (pane.unit_buying_price != null && Number.isFinite(Number(pane.unit_buying_price))) {
+    return Number(pane.unit_buying_price);
+  }
+  const qty = Number(pane.quantity);
+  const lineTotal = Number(pane.buying_price);
+  if (qty > 0 && Number.isFinite(lineTotal)) {
+    return lineTotal / qty;
+  }
+  return null;
 }
 
 function paneHasDimensions(pane: GlassOrderPane) {
@@ -107,9 +140,15 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
   const [expectedDelivery, setExpectedDelivery] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [paneBuyingPrices, setPaneBuyingPrices] = useState<string[]>([]);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfPreviewOrder, setPdfPreviewOrder] = useState<GlassOrder | null>(null);
 
   const isDraft = order?.status === "draft";
   const canEdit = isDraft;
+  const canReceive =
+    order?.status === "ordered" || order?.status === "in_transit";
+  const isDelivered = order?.status === "delivered";
 
   const load = useCallback(() => {
     if (!Number.isFinite(orderId)) {
@@ -124,13 +163,20 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
     ])
       .then(([orderRes, supplierRes]) => {
         const row = orderRes.data;
+        const nextPanes = normalizePanes(row.specs?.panes);
         setOrder(row);
         setSupplierId(row.supplier_id ? String(row.supplier_id) : "");
         setRequirements(row.specs?.requirements ?? "");
-        setPanes(normalizePanes(row.specs?.panes));
+        setPanes(nextPanes);
         setExpectedDelivery(row.expected_delivery ?? "");
         setDeliveryLocation(row.delivery_location ?? "");
         setNotes(row.notes ?? "");
+        setPaneBuyingPrices(
+          nextPanes.map((pane) => {
+            const unit = resolveUnitBuyingPrice(pane);
+            return unit != null ? String(unit) : "";
+          }),
+        );
         setSuppliers(supplierRes.data);
       })
       .catch((err) => {
@@ -167,6 +213,33 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
     }
     return hints;
   }, [panes, requirements, supplierId]);
+
+  const deliveryPricingReady = useMemo(() => {
+    if (!canReceive || panes.length === 0) return false;
+    return panes.every((pane, index) => {
+      if (!paneHasDimensions(pane)) return false;
+      const raw = paneBuyingPrices[index] ?? "";
+      if (raw.trim() === "") return false;
+      const price = Number(raw);
+      return Number.isFinite(price) && price >= 0;
+    });
+  }, [canReceive, paneBuyingPrices, panes]);
+
+  const deliveryTotals = useMemo(() => {
+    let area = 0;
+    let spend = 0;
+    panes.forEach((pane, index) => {
+      const paneArea = glassPaneAreaM2(pane.width_mm, pane.height_mm, pane.quantity);
+      area += paneArea;
+      const lineTotal = glassLineBuyingTotal(paneBuyingPrices[index], pane.quantity);
+      if (lineTotal != null) spend += lineTotal;
+    });
+    return {
+      area,
+      spend,
+      avgPerSqm: glassPricePerSqm(spend, area),
+    };
+  }, [paneBuyingPrices, panes]);
 
   async function handleSave() {
     if (!order || !canEdit) return;
@@ -210,12 +283,28 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
   }
 
   async function handleMarkDelivered() {
-    if (!order) return;
+    if (!order || !deliveryPricingReady) {
+      toast.error("Enter a buying price for each glass component before marking delivered.");
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await markGlassOrderDelivered(order.id);
+      const res = await markGlassOrderDelivered(order.id, {
+        currency: "KES",
+        panes: panes.map((_, index) => ({
+          unit_buying_price: Number(paneBuyingPrices[index]),
+        })),
+      });
       setOrder(res.data);
-      toast.success("Glass marked as delivered");
+      const nextPanes = normalizePanes(res.data.specs?.panes);
+      setPanes(nextPanes);
+      setPaneBuyingPrices(
+        nextPanes.map((pane) => {
+          const unit = resolveUnitBuyingPrice(pane);
+          return unit != null ? String(unit) : "";
+        }),
+      );
+      toast.success("Glass marked as delivered with buying prices recorded");
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to mark delivered"));
     } finally {
@@ -223,10 +312,44 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
     }
   }
 
+  function handlePreviewPdf() {
+    if (!order) return;
+    const selected = suppliers.find((s) => String(s.id) === supplierId);
+    setPdfPreviewOrder({
+      ...order,
+      supplier_id: supplierId ? Number(supplierId) : order.supplier_id,
+      expected_delivery: expectedDelivery || order.expected_delivery,
+      delivery_location: deliveryLocation || order.delivery_location,
+      notes: notes || order.notes,
+      specs: canEdit ? specsPayload : order.specs,
+      supplier: selected
+        ? {
+            id: selected.id,
+            code: selected.code,
+            name: selected.name,
+            category: selected.category,
+            email: selected.email,
+            phone: selected.phone,
+            address: selected.address,
+          }
+        : (order.supplier ?? null),
+    });
+    setPdfPreviewOpen(true);
+  }
+
   function updatePane(index: number, patch: Partial<GlassOrderPane>) {
     setPanes((current) =>
       current.map((pane, i) => (i === index ? { ...pane, ...patch } : pane)),
     );
+  }
+
+  function updateBuyingPrice(index: number, value: string) {
+    setPaneBuyingPrices((current) => {
+      const next = [...current];
+      while (next.length < panes.length) next.push("");
+      next[index] = value;
+      return next;
+    });
   }
 
   if (loading) {
@@ -259,6 +382,14 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
               {projectReference ? `${projectLabel} · ${projectReference}` : projectLabel}
             </Link>
           </p>
+          {order.supplier ? (
+            <p className="text-sm text-muted-foreground">
+              Supplier:{" "}
+              <span className="font-medium text-foreground">
+                {order.supplier.code} · {order.supplier.name}
+              </span>
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {returnTo ? (
@@ -266,6 +397,13 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
               <Link href={returnTo}>Back to production order</Link>
             </Button>
           ) : null}
+          <Button variant="outline" size="sm" onClick={handlePreviewPdf}>
+            <Eye className="mr-2 h-4 w-4" />
+            Preview supplier PDF
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/procurement/glass-price-analytics">Glass price analytics</Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/procurement/dashboard">Procurement dashboard</Link>
           </Button>
@@ -363,7 +501,10 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setPanes((current) => [...current, emptyPane()])}
+              onClick={() => {
+                setPanes((current) => [...current, emptyPane()]);
+                setPaneBuyingPrices((current) => [...current, ""]);
+              }}
             >
               Add pane
             </Button>
@@ -434,19 +575,109 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
                       disabled={!canEdit}
                     />
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      value={pane.glass_type ?? ""}
-                      onChange={(e) => updatePane(index, { glass_type: e.target.value })}
-                      disabled={!canEdit}
-                    />
+                  <TableCell className="min-w-[10rem]">
+                    {canEdit ? (
+                      <div className="space-y-1.5">
+                        <Select
+                          value={
+                            resolveGlassOrderSelectValue(
+                              GLASS_ORDER_TYPE_OPTIONS,
+                              pane.glass_type,
+                            ) || undefined
+                          }
+                          onValueChange={(value) => {
+                            if (value === GLASS_ORDER_CUSTOM_VALUE) {
+                              updatePane(index, {
+                                glass_type: isKnownGlassOrderOption(
+                                  GLASS_ORDER_TYPE_OPTIONS,
+                                  pane.glass_type,
+                                )
+                                  ? ""
+                                  : (pane.glass_type ?? ""),
+                              });
+                              return;
+                            }
+                            updatePane(index, { glass_type: value });
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GLASS_ORDER_TYPE_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {resolveGlassOrderSelectValue(
+                          GLASS_ORDER_TYPE_OPTIONS,
+                          pane.glass_type,
+                        ) === GLASS_ORDER_CUSTOM_VALUE ? (
+                          <Input
+                            placeholder="Specify type"
+                            value={pane.glass_type ?? ""}
+                            onChange={(e) =>
+                              updatePane(index, { glass_type: e.target.value })
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-sm">{pane.glass_type || "—"}</span>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      value={pane.tint ?? ""}
-                      onChange={(e) => updatePane(index, { tint: e.target.value })}
-                      disabled={!canEdit}
-                    />
+                  <TableCell className="min-w-[9rem]">
+                    {canEdit ? (
+                      <div className="space-y-1.5">
+                        <Select
+                          value={
+                            resolveGlassOrderSelectValue(
+                              GLASS_ORDER_TINT_OPTIONS,
+                              pane.tint,
+                            ) || undefined
+                          }
+                          onValueChange={(value) => {
+                            if (value === GLASS_ORDER_CUSTOM_VALUE) {
+                              updatePane(index, {
+                                tint: isKnownGlassOrderOption(
+                                  GLASS_ORDER_TINT_OPTIONS,
+                                  pane.tint,
+                                )
+                                  ? ""
+                                  : (pane.tint ?? ""),
+                              });
+                              return;
+                            }
+                            updatePane(index, { tint: value });
+                          }}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select tint" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GLASS_ORDER_TINT_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {resolveGlassOrderSelectValue(
+                          GLASS_ORDER_TINT_OPTIONS,
+                          pane.tint,
+                        ) === GLASS_ORDER_CUSTOM_VALUE ? (
+                          <Input
+                            placeholder="Specify tint"
+                            value={pane.tint ?? ""}
+                            onChange={(e) => updatePane(index, { tint: e.target.value })}
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-sm">{pane.tint || "—"}</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input
@@ -462,9 +693,12 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
                         variant="ghost"
                         size="sm"
                         disabled={panes.length <= 1}
-                        onClick={() =>
-                          setPanes((current) => current.filter((_, i) => i !== index))
-                        }
+                        onClick={() => {
+                          setPanes((current) => current.filter((_, i) => i !== index));
+                          setPaneBuyingPrices((current) =>
+                            current.filter((_, i) => i !== index),
+                          );
+                        }}
                       >
                         Remove
                       </Button>
@@ -483,6 +717,115 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
         </CardContent>
       </Card>
 
+      {canReceive || isDelivered ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {isDelivered ? "Receival pricing (recorded)" : "Receival pricing"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Enter the unit buying price for one piece. Line total, area, and KES/m² multiply by
+              each glass quantity (area = width × height × qty).
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Component</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Size</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Area (m²)</TableHead>
+                  <TableHead className="text-right">Unit price (KES)</TableHead>
+                  <TableHead className="text-right">Line total</TableHead>
+                  <TableHead className="text-right">KES / m²</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {panes.map((pane, index) => {
+                  const qty = Number(pane.quantity) || 0;
+                  const area = glassPaneAreaM2(pane.width_mm, pane.height_mm, pane.quantity);
+                  const unitPrice = Number(paneBuyingPrices[index] ?? "");
+                  const lineTotal =
+                    Number.isFinite(unitPrice) && unitPrice >= 0
+                      ? glassLineBuyingTotal(unitPrice, pane.quantity)
+                      : pane.buying_price ?? null;
+                  const perSqm =
+                    lineTotal != null
+                      ? glassPricePerSqm(lineTotal, area)
+                      : pane.price_per_sqm ?? null;
+                  return (
+                    <TableRow key={`price-${index}`}>
+                      <TableCell className="font-medium">
+                        {pane.name || `Pane ${index + 1}`}
+                      </TableCell>
+                      <TableCell>{pane.glass_type || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {pane.width_mm ?? "—"} × {pane.height_mm ?? "—"} mm
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{qty || "—"}</TableCell>
+                      <TableCell className="text-right">{area > 0 ? area.toFixed(4) : "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {canReceive ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="ml-auto max-w-[9rem] text-right"
+                            value={paneBuyingPrices[index] ?? ""}
+                            onChange={(e) => updateBuyingPrice(index, e.target.value)}
+                            placeholder="0.00"
+                            aria-label={`Unit buying price for ${pane.name || `pane ${index + 1}`}`}
+                          />
+                        ) : (
+                          formatKes(resolveUnitBuyingPrice(pane))
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatKes(lineTotal)}
+                        {canReceive && qty > 1 && Number.isFinite(unitPrice) && unitPrice > 0 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatKes(unitPrice)} × {qty}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatPricePerSqm(perSqm)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="flex flex-wrap gap-4 rounded-lg border bg-muted/30 p-3 text-sm">
+              <p>
+                Total area:{" "}
+                <span className="font-medium">
+                  {(isDelivered ? order.total_area_m2 ?? deliveryTotals.area : deliveryTotals.area).toFixed(4)} m²
+                </span>
+              </p>
+              <p>
+                Total spend:{" "}
+                <span className="font-medium">
+                  {formatKes(isDelivered ? order.total_cost ?? deliveryTotals.spend : deliveryTotals.spend)}
+                </span>
+              </p>
+              <p>
+                Avg:{" "}
+                <span className="font-medium">
+                  {formatPricePerSqm(
+                    isDelivered && order.total_cost != null && order.total_area_m2
+                      ? glassPricePerSqm(order.total_cost, order.total_area_m2)
+                      : deliveryTotals.avgPerSqm,
+                  )}
+                </span>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <PermissionGate anyOf={["procurement.glass.manage", "procurement.manage"]}>
         <div className="flex flex-wrap gap-2">
           {canEdit ? (
@@ -495,13 +838,24 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
               </Button>
             </>
           ) : null}
-          {order.status === "ordered" || order.status === "in_transit" ? (
-            <Button type="button" onClick={handleMarkDelivered} disabled={submitting}>
+          {canReceive ? (
+            <Button
+              type="button"
+              onClick={handleMarkDelivered}
+              disabled={submitting || !deliveryPricingReady}
+            >
               {submitting ? "Updating…" : "Mark delivered"}
             </Button>
           ) : null}
         </div>
       </PermissionGate>
+      {pdfPreviewOrder ? (
+        <GlassOrderPdfPreviewDialog
+          order={pdfPreviewOrder}
+          open={pdfPreviewOpen}
+          onOpenChange={setPdfPreviewOpen}
+        />
+      ) : null}
     </div>
   );
 }

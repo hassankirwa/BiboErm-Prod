@@ -7,6 +7,8 @@ use App\Enums\Production\ProductionStage;
 use App\Enums\ProjectStage;
 use App\Models\Production\ProductionOrder;
 use App\Models\Project;
+use App\Models\Projects\DesignChangeOrder;
+use App\Models\User;
 use App\Models\Warehouse\StockReservation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +24,10 @@ class ProductionOrderService
     {
         $project = Project::query()->find($projectId);
 
-        if (! $project || $project->stage !== ProjectStage::MaterialsReady) {
+        if (! $project || ! in_array($project->stage, [
+            ProjectStage::MaterialsReady,
+            ProjectStage::MaterialsReleased,
+        ], true)) {
             return null;
         }
 
@@ -46,6 +51,16 @@ class ProductionOrderService
 
             return $order->load('project');
         });
+    }
+
+    public function ensureActiveOrder(int $projectId, int $fifoSequence): ?ProductionOrder
+    {
+        $existing = $this->findActiveForProject($projectId);
+        if ($existing) {
+            return $existing;
+        }
+
+        return $this->createFromMaterialsReady($projectId, max(1, $fifoSequence));
     }
 
     public function hasActiveOrderForProject(int $projectId): bool
@@ -151,5 +166,61 @@ class ProductionOrderService
         ]);
 
         return $order->fresh();
+    }
+
+    public function createRemakeFromDesignChange(DesignChangeOrder $dco, User $actor): ProductionOrder
+    {
+        $projectId = (int) $dco->project_id;
+
+        if ($this->hasActiveOrderForProject($projectId)) {
+            throw ValidationException::withMessages([
+                'production_order' => ['Project already has an active production order. Hold or complete it before creating a remake.'],
+            ]);
+        }
+
+        $parent = null;
+        if ($dco->parent_production_order_id) {
+            $parent = ProductionOrder::query()->find($dco->parent_production_order_id);
+        }
+
+        if (! $parent) {
+            $parent = ProductionOrder::query()
+                ->where('project_id', $projectId)
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if ($parent && ! in_array($parent->status, [
+            ProductionOrderStatus::Completed,
+            ProductionOrderStatus::OnHold,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'parent_production_order_id' => ['Parent production order must be completed or on hold before creating a remake.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($dco, $projectId, $parent, $actor) {
+            $fifo = $this->fifoSequenceForProject($projectId);
+
+            $order = ProductionOrder::query()->create([
+                'reference' => $this->references->next(),
+                'project_id' => $projectId,
+                'parent_production_order_id' => $parent?->id,
+                'status' => ProductionOrderStatus::Scheduled,
+                'current_stage' => ProductionStage::MaterialPrep,
+                'fifo_position' => max(1, $fifo),
+            ]);
+
+            $this->audit->orderCreated($order, [
+                'project_id' => $projectId,
+                'fifo_position' => $order->fifo_position,
+                'design_change_order_id' => $dco->id,
+                'parent_production_order_id' => $parent?->id,
+                'created_by' => $actor->id,
+                'remake' => true,
+            ]);
+
+            return $order->load('project');
+        });
     }
 }

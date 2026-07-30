@@ -5,18 +5,32 @@ namespace App\Http\Controllers\FieldInstallation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FieldInstallation\ReturnFieldToolAssignmentRequest;
 use App\Http\Requests\FieldInstallation\StoreFieldToolIssueRequest;
+use App\Http\Resources\FieldInstallation\FieldToolAssignmentResource;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\FieldInstallation\FieldToolAssignment;
 use App\Models\Warehouse\Tool;
 use App\Models\User;
 use App\Services\FieldInstallation\FieldToolAssignmentService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class FieldToolAssignmentController extends Controller
 {
     public function __construct(
         protected FieldToolAssignmentService $service,
     ) {}
+
+    public function index(FieldInstallationJob $fieldJob): AnonymousResourceCollection
+    {
+        $this->authorize('view', $fieldJob);
+
+        $assignments = $fieldJob->toolAssignments()
+            ->with(['toolIssuance.tool', 'toolIssuance.issuedToUser', 'assignedByUser'])
+            ->latest('created_at')
+            ->get();
+
+        return FieldToolAssignmentResource::collection($assignments);
+    }
 
     public function issue(StoreFieldToolIssueRequest $request, FieldInstallationJob $fieldJob): JsonResponse
     {
@@ -34,14 +48,9 @@ class FieldToolAssignmentController extends Controller
             data: $data,
         );
 
-        return response()->json([
-            'data' => [
-                'id' => $assignment->id,
-                'job_id' => $assignment->job_id,
-                'tool_issuance_id' => $assignment->tool_issuance_id,
-                'expected_return_date' => $assignment->expected_return_date?->toDateString(),
-            ],
-        ], 201);
+        return (new FieldToolAssignmentResource($assignment))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function returnTool(ReturnFieldToolAssignmentRequest $request, FieldToolAssignment $toolAssignment): JsonResponse
@@ -54,11 +63,6 @@ class FieldToolAssignmentController extends Controller
             $request->validated(),
         );
 
-        return response()->json([
-            'data' => [
-                'id' => $assignment->id,
-                'returned_at' => $assignment->returned_at?->toIso8601String(),
-            ],
-        ]);
+        return (new FieldToolAssignmentResource($assignment))->response();
     }
 }

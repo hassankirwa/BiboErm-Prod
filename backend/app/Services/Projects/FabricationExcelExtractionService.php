@@ -337,30 +337,45 @@ class FabricationExcelExtractionService
         }
 
         $results = array_fill(0, $itemCount, $this->emptyEmbeddedMedia('none_found'));
-        $sheetIndex = 0;
+        $ordered = [];
 
+        // WinCAD fabrication lists often stack every opening on one sheet with
+        // multiple MemoryDrawings (e.g. Beatrice SD-1..SD-4 at B2/B40/B79/B122).
+        // Collect all drawings, sort by anchor row, assign in document order.
         foreach ($spreadsheet->getAllSheets() as $sheet) {
-            if ($sheetIndex >= $itemCount) {
-                break;
-            }
-
             foreach ($sheet->getDrawingCollection() as $drawing) {
                 $dataUrl = $this->drawingToDataUrl($drawing);
                 if ($dataUrl === null) {
                     continue;
                 }
 
-                $results[$sheetIndex] = [
-                    'status' => 'extracted',
-                    'files' => [],
+                $row = 0;
+                if (preg_match('/(\d+)/', (string) $drawing->getCoordinates(), $matches)) {
+                    $row = (int) $matches[1];
+                }
+
+                $ordered[] = [
+                    'row' => $row,
                     'data_url' => $dataUrl,
                     'mime_type' => $this->mimeFromDataUrl($dataUrl),
-                    'note' => null,
                 ];
+            }
+        }
+
+        usort($ordered, fn (array $a, array $b): int => $a['row'] <=> $b['row']);
+
+        foreach ($ordered as $index => $drawing) {
+            if ($index >= $itemCount) {
                 break;
             }
 
-            $sheetIndex++;
+            $results[$index] = [
+                'status' => 'extracted',
+                'files' => [],
+                'data_url' => $drawing['data_url'],
+                'mime_type' => $drawing['mime_type'],
+                'note' => null,
+            ];
         }
 
         return $results;

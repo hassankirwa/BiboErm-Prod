@@ -41,7 +41,11 @@ import {
 
   getLocationTree,
 
+  getPutawayOptions,
+
   listWarehouseItems,
+
+  type PutawayOptionsForItem,
 
   type WarehouseItem,
 
@@ -141,6 +145,10 @@ export default function GoodsReceiptDetailPage() {
 
   const [itemsLoading, setItemsLoading] = useState(true);
 
+  const [putawayByItemId, setPutawayByItemId] = useState<
+    Record<number, PutawayOptionsForItem>
+  >({});
+
 
 
   const fetchStorageLocations = useCallback(async () => {
@@ -221,8 +229,23 @@ export default function GoodsReceiptDetailPage() {
 
         setQualityNotes(data.quality_inspection_notes ?? "");
 
-        setLines(mapGrnLines(data));
+        const mappedLines = mapGrnLines(data);
+        setLines(mappedLines);
 
+        const itemIds = mappedLines
+          .map((line) => line.warehouse_item_id)
+          .filter((itemId): itemId is number => typeof itemId === "number" && itemId > 0);
+
+        try {
+          const putawayRes = await getPutawayOptions(itemIds);
+          setPutawayByItemId(
+            Object.fromEntries(
+              (putawayRes.data ?? []).map((entry) => [entry.warehouse_item_id, entry]),
+            ),
+          );
+        } catch {
+          setPutawayByItemId({});
+        }
       } catch (error) {
 
         toast.error(error instanceof Error ? error.message : "Failed to load goods receipt.");
@@ -449,6 +472,8 @@ export default function GoodsReceiptDetailPage() {
             warehouseItems={warehouseItems}
 
             itemsLoading={itemsLoading}
+
+            putawayByItemId={putawayByItemId}
 
             uploadingAttachment={uploadingAttachment}
 

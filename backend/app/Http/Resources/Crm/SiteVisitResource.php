@@ -47,6 +47,10 @@ class SiteVisitResource extends JsonResource
                 : null,
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toIso8601String(),
+            'reviewed_at' => $this->reviewed_at?->toIso8601String(),
+            'review_notes' => $this->review_notes,
+            'reviewed_by' => $this->reviewed_by,
+            'reviewer' => new UserResource($this->whenLoaded('reviewedBy')),
             'lead' => new LeadResource($this->whenLoaded('lead')),
             'deal' => new DealResource($this->whenLoaded('deal')),
             'project' => $this->whenLoaded('project', fn () => [

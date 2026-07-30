@@ -39,6 +39,8 @@ const getResultBadge = (result: QcInspectionResult | string) => {
       return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Fail</Badge>;
     case "conditional_pass":
       return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Conditional</Badge>;
+    case "skipped":
+      return <Badge variant="secondary">Skipped</Badge>;
     case "pending":
       return <Badge variant="outline">Pending</Badge>;
     default:

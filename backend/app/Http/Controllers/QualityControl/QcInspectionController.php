@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\QualityControl;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\QualityControl\SkipQcInspectionRequest;
 use App\Http\Requests\QualityControl\StoreQcInspectionRequest;
 use App\Http\Requests\QualityControl\SubmitQcInspectionRequest;
 use App\Http\Resources\QualityControl\QcInspectionResource;
@@ -69,6 +70,8 @@ class QcInspectionController extends Controller
     {
         $this->authorize('view', $inspection);
 
+        $inspection = $this->service->ensureDefaultTemplate($inspection);
+
         return new QcInspectionResource(
             $inspection->load(['template', 'defects', 'photos', 'inspector', 'completedByUser', 'project.projectManager', 'project.account'])
         );
@@ -108,6 +111,19 @@ class QcInspectionController extends Controller
         $this->authorize('submit', $inspection);
 
         $updated = $this->service->submit($inspection, $request->user(), $request->validated());
+
+        return new QcInspectionResource($updated);
+    }
+
+    public function skip(SkipQcInspectionRequest $request, QcInspection $inspection): QcInspectionResource
+    {
+        $this->authorize('submit', $inspection);
+
+        $updated = $this->service->skip(
+            $inspection,
+            $request->user(),
+            $request->validated('notes'),
+        );
 
         return new QcInspectionResource($updated);
     }

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Projects;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Projects\ProjectDesignQueueResource;
+use App\Models\Project;
 use App\Services\Projects\ProjectDesignService;
+use App\Services\Projects\ProjectFabricationImportService;
 use App\Services\Projects\QuotationExcelExtractionService;
 use App\Services\Projects\QuotationWorkspaceService;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +18,7 @@ class ProjectDesignController extends Controller
         protected QuotationWorkspaceService $workspace,
         protected QuotationExcelExtractionService $fabricationExcel,
         protected ProjectDesignService $designService,
+        protected ProjectFabricationImportService $fabricationImport,
     ) {}
 
     public function queue(Request $request): JsonResponse
@@ -49,5 +52,33 @@ class ProjectDesignController extends Controller
         $payload = $this->fabricationExcel->extractFromUpload($request->file('file'));
 
         return response()->json(['data' => $payload]);
+    }
+
+    /**
+     * Upload a fabrication list to a project: extract openings, persist elevation
+     * images and descriptions as design documents for production.
+     */
+    public function importFabrication(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('update', $project);
+        abort_unless(
+            $request->user()->can('projects.documents.upload') || $request->user()->can('projects.manage'),
+            403,
+        );
+
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
+        $request->validate([
+            'file' => ['required', 'file', 'max:51200'],
+        ]);
+
+        $result = $this->fabricationImport->import(
+            $project,
+            $request->file('file'),
+            $request->user(),
+        );
+
+        return response()->json(['data' => $result], 201);
     }
 }

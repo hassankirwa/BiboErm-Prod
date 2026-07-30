@@ -27,7 +27,15 @@ class ProjectDesignService
             ->visibleTo($user)
             ->where('is_active', true)
             ->whereIn('stage', self::DESIGN_QUEUE_STAGES)
-            ->with(['projectManager', 'account', 'documents'])
+            ->with([
+                'projectManager',
+                'account',
+                'documents',
+                'latestBom' => fn ($query) => $query->withCount('lines'),
+                'siteVisits' => fn ($query) => $query
+                    ->where('measurement_context', 'production')
+                    ->latest('updated_at'),
+            ])
             ->orderByDesc('updated_at')
             ->get();
     }

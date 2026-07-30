@@ -69,6 +69,71 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
         ]);
     }
 
+    public function test_quantity_tool_issue_return_and_damaged_incident(): void
+    {
+        $manager = $this->warehouseAluminiumManager();
+        $employee = $this->warehouseAccessoriesManager();
+
+        $create = $this->actingAsSanctum($manager)
+            ->postJson('/api/v1/warehouse/tools', [
+                'tool_code' => 'TL-QTY-API',
+                'name' => 'Cable Ties Pack',
+                'tool_type' => 'Consumable',
+                'tracking_mode' => 'quantity',
+                'total_qty' => 20,
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $toolId = $create['id'];
+
+        $this->actingAsSanctum($manager)
+            ->postJson("/api/v1/warehouse/tools/{$toolId}/issue", [
+                'issued_to' => $employee->id,
+                'quantity' => 5,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.available_qty', 15)
+            ->assertJsonPath('data.issued_qty', 5);
+
+        $issuance = ToolIssuance::query()
+            ->where('tool_id', $toolId)
+            ->whereNull('return_date')
+            ->firstOrFail();
+
+        $this->assertSame(5, (int) $issuance->quantity);
+
+        $this->actingAsSanctum($manager)
+            ->postJson("/api/v1/warehouse/tools/issuances/{$issuance->id}/return", [
+                'condition_in' => 'damaged',
+                'damage_notes' => 'Sun-brittle batch',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('tool_incidents', [
+            'tool_id' => $toolId,
+            'issuance_id' => $issuance->id,
+            'type' => 'damage',
+            'status' => 'open',
+            'responsible_user_id' => $employee->id,
+            'quantity' => 5,
+        ]);
+
+        $this->actingAsSanctum($manager)
+            ->getJson('/api/v1/warehouse/tools/incidents?tool_id='.$toolId)
+            ->assertOk()
+            ->assertJsonFragment(['tool_id' => $toolId, 'type' => 'damage']);
+
+        $this->actingAsSanctum($manager)
+            ->getJson('/api/v1/warehouse/tools')
+            ->assertOk()
+            ->assertJsonFragment([
+                'tool_code' => 'TL-QTY-API',
+                'qty_in_repair' => 5,
+                'available_qty' => 15,
+            ]);
+    }
+
     public function test_procurement_officer_cannot_issue_tools(): void
     {
         $user = $this->procurementOfficer();

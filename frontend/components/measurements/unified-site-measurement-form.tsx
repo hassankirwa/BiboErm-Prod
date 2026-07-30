@@ -19,7 +19,6 @@ import { AutoSketchPanel } from "@/components/measurements/auto-sketch-panel";
 import { MeasurementFormHeader } from "@/components/measurements/measurement-form-header";
 import { MeasurementFormSpecs } from "@/components/measurements/measurement-form-specs";
 import { MeasurementLineGrid } from "@/components/measurements/measurement-line-grid";
-import { RoughSketchPanel } from "@/components/measurements/rough-sketch-panel";
 import {
   saveSiteMeasurementForm,
   submitSiteVisit,
@@ -315,27 +314,6 @@ export function UnifiedSiteMeasurementForm({
           <MeasurementFormSpecs form={form} readOnly={readOnly} onChange={updateForm} />
         </section>
 
-        <section id="measurement-sketch" className="scroll-mt-24 space-y-3">
-          <h3 className="text-sm font-semibold">Sketch</h3>
-          <AutoSketchPanel
-            lines={form.lines}
-            context={context}
-            sketchUrl={visit.rough_sketch_url}
-            readOnly={readOnly}
-            onUpload={handleUploadSketch}
-          />
-          {context === "production" && (
-            <div className="space-y-2 pt-2">
-              <p className="text-xs text-muted-foreground">Optional manual sketch</p>
-              <RoughSketchPanel
-                sketchUrl={visit.rough_sketch_url}
-                readOnly={readOnly}
-                onUpload={handleUploadSketch}
-              />
-            </div>
-          )}
-        </section>
-
         <section className="space-y-3">
           <h3 className="text-sm font-semibold">Measurement lines</h3>
           <MeasurementLineGrid
@@ -345,6 +323,17 @@ export function UnifiedSiteMeasurementForm({
             onChange={(lines) => updateForm({ lines })}
             onLinePhotoUpload={handleLinePhotoUpload}
             onLinePhotoRemove={handleLinePhotoRemove}
+          />
+        </section>
+
+        <section id="measurement-sketch" className="scroll-mt-24 space-y-3">
+          <h3 className="text-sm font-semibold">System sketch</h3>
+          <AutoSketchPanel
+            lines={form.lines}
+            context={context}
+            sketchUrl={visit.rough_sketch_url}
+            readOnly={readOnly}
+            onUpload={handleUploadSketch}
           />
         </section>
 

@@ -1,11 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import type { StockLevel } from "@/lib/api/warehouse";
+import type { CatalogInventoryItem } from "@/lib/api/warehouse";
 import { Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 
-export function InventoryStats({ items }: { items: StockLevel[] }) {
+export function InventoryStats({ items }: { items: CatalogInventoryItem[] }) {
   const totalItems = items.length;
   const lowStockItems = items.filter(
-    (item) => Number(item.quantity_available) < Number(item.item?.min_stock_qty ?? 0),
+    (item) =>
+      item.stock_status === "low_stock" ||
+      Number(item.quantity_available) < Number(item.min_stock_qty ?? 0),
   );
   const totalReserved = items.reduce(
     (acc, item) => acc + Number(item.quantity_reserved),
@@ -20,7 +22,7 @@ export function InventoryStats({ items }: { items: StockLevel[] }) {
     {
       label: "Total Items",
       value: totalItems,
-      subtext: "Active stock rows",
+      subtext: "Catalog materials",
       icon: Package,
       color: "text-primary",
       bgColor: "bg-primary/10",

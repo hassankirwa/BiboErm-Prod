@@ -5,15 +5,24 @@ use App\Http\Controllers\Crm\Quotations\ReviseQuotationController;
 use App\Http\Controllers\Crm\Quotations\ApproveQuotationController;
 use App\Http\Controllers\Crm\Quotations\SendQuotationController;
 use App\Http\Controllers\Crm\Quotations\SubmitQuotationForReviewController;
+use App\Http\Controllers\Projects\DesignChangeOrderController;
 use App\Http\Controllers\Projects\ProjectBomController;
 use App\Http\Controllers\Projects\ProjectController;
 use App\Http\Controllers\Projects\ProjectDesignController;
+use App\Http\Controllers\Projects\ProjectDispatchController;
 use App\Http\Controllers\Projects\ProjectDocumentController;
 use App\Http\Controllers\Projects\ProjectOperationsController;
 use App\Http\Controllers\Projects\ProjectQuotationWorkspaceController;
 use App\Http\Controllers\Projects\ProjectSiteAssessmentController;
 use App\Http\Controllers\Projects\ScheduleProjectMeasurementVisitController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('project-dispatches/{projectDispatch}/delivered', [ProjectDispatchController::class, 'markDelivered']);
+
+Route::get('design-change-orders/{dco}', [DesignChangeOrderController::class, 'show']);
+Route::post('design-change-orders/{dco}/approve', [DesignChangeOrderController::class, 'approve']);
+Route::post('design-change-orders/{dco}/create-remake', [DesignChangeOrderController::class, 'createRemake']);
+Route::post('design-change-orders/{dco}/close', [DesignChangeOrderController::class, 'close']);
 
 Route::get('dashboard', [ProjectController::class, 'dashboard']);
 Route::get('pipeline', [ProjectController::class, 'pipeline']);
@@ -51,6 +60,10 @@ Route::prefix('{project}')->group(function () {
     Route::patch('/', [ProjectController::class, 'update']);
     Route::post('assign-pm', [ProjectController::class, 'assignProjectManager']);
     Route::post('advance-stage', [ProjectController::class, 'advanceStage']);
+    Route::post('dispatch', [ProjectDispatchController::class, 'store']);
+    Route::get('dispatches', [ProjectDispatchController::class, 'index']);
+    Route::get('design-change-orders', [DesignChangeOrderController::class, 'index']);
+    Route::post('design-change-orders', [DesignChangeOrderController::class, 'store']);
     Route::patch('site-assessment-notes', [ProjectController::class, 'updateSiteAssessmentNotes']);
     Route::post('measurement-visits', ScheduleProjectMeasurementVisitController::class);
     Route::get('measurement-visits', [ProjectController::class, 'measurementVisits']);
@@ -59,6 +72,7 @@ Route::prefix('{project}')->group(function () {
     Route::get('timeline', [ProjectController::class, 'timeline']);
 
     Route::get('bom', [ProjectBomController::class, 'show']);
+    Route::get('bom/export', [ProjectBomController::class, 'export']);
     Route::post('bom/extract', [ProjectBomController::class, 'extract']);
     Route::post('bom/import', [ProjectBomController::class, 'import']);
     Route::post('bom', [ProjectBomController::class, 'store']);
@@ -67,7 +81,9 @@ Route::prefix('{project}')->group(function () {
 
     Route::get('documents', [ProjectDocumentController::class, 'index']);
     Route::post('documents', [ProjectDocumentController::class, 'store']);
+    Route::patch('documents/{document}', [ProjectDocumentController::class, 'update']);
     Route::get('documents/{document}/download', [ProjectDocumentController::class, 'download']);
+    Route::post('designs/fabrication', [ProjectDesignController::class, 'importFabrication']);
 
     Route::get('material-status', [ProjectOperationsController::class, 'materialStatus']);
     Route::post('reserve-materials', [ProjectOperationsController::class, 'reserveMaterials']);

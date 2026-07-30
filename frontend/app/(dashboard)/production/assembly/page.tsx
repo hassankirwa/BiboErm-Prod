@@ -71,7 +71,7 @@ export default function ProductionAssemblyPage() {
         title="Assembly Queue"
         subtitle={
           manager
-            ? "Fabrication through post-fabrication QC (server-filtered by stage)"
+            ? "Glass assembly, finishing, and post-fabrication QC"
             : "Orders assigned to you in assembly stages"
         }
       />

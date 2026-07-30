@@ -51,7 +51,12 @@ export function canScheduleLeadSiteVisit(
 }
 
 export function canExecuteFieldVisit(status: string | null): boolean {
-  return status === "in_progress" || status === "measurements_captured";
+  return (
+    status === "in_progress" ||
+    status === "measurements_captured" ||
+    status === "clarification_needed" ||
+    status === "revisit_required"
+  );
 }
 
 export function canStartFieldVisit(status: string | null): boolean {

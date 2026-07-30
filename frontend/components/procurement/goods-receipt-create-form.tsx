@@ -18,7 +18,10 @@ import {
 } from "@/lib/api/procurement";
 import {
   getLocationTree,
+  getPutawayOptions,
   listWarehouseItems,
+  suggestedPutawayBinId,
+  type PutawayOptionsForItem,
   type WarehouseItem,
   type WarehouseLocationTree,
 } from "@/lib/api/warehouse";
@@ -73,19 +76,32 @@ export function GoodsReceiptCreateForm({
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [locationsError, setLocationsError] = useState<string | null>(null);
   const [warehouseItems, setWarehouseItems] = useState<WarehouseItem[]>([]);
+  const [putawayByItemId, setPutawayByItemId] = useState<
+    Record<number, PutawayOptionsForItem>
+  >({});
 
   useEffect(() => {
     setLocationsLoading(true);
-    Promise.all([getLocationTree({ for_putaway: true }), listWarehouseItems()])
-      .then(([locationRes, items]) => {
-        setLocationTree(locationRes.data ?? []);
-        setWarehouseItems(items);
-        setLocationsError(null);
-      })
-      .catch((error: Error) => {
-        setLocationTree([]);
-        setWarehouseItems([]);
-        setLocationsError(error.message || "Failed to load storage locations.");
+    Promise.allSettled([getLocationTree({ for_putaway: true }), listWarehouseItems()])
+      .then(([locationRes, itemsRes]) => {
+        if (locationRes.status === "fulfilled") {
+          setLocationTree(locationRes.value.data ?? []);
+          setLocationsError(null);
+        } else {
+          setLocationTree([]);
+          setLocationsError(
+            locationRes.reason instanceof Error
+              ? locationRes.reason.message
+              : "Failed to load storage locations.",
+          );
+        }
+
+        if (itemsRes.status === "fulfilled") {
+          setWarehouseItems(itemsRes.value);
+        } else {
+          // Procurement users often lack master-data.view; putaway-options covers bins.
+          setWarehouseItems([]);
+        }
       })
       .finally(() => setLocationsLoading(false));
   }, []);
@@ -115,31 +131,57 @@ export function GoodsReceiptCreateForm({
     if (!selectedPoId) {
       setOrder(null);
       setLines([]);
+      setPutawayByItemId({});
       return;
     }
 
     setLoadingPo(true);
     getPurchaseOrder(Number(selectedPoId))
-      .then((res) => {
+      .then(async (res) => {
         const po = res.data;
         setOrder(po);
+
+        const itemIds = (po.lines ?? [])
+          .map((line) => line.warehouse_item_id)
+          .filter((id): id is number => typeof id === "number" && id > 0);
+
+        let putawayMap: Record<number, PutawayOptionsForItem> = {};
+        try {
+          const putawayRes = await getPutawayOptions(itemIds);
+          putawayMap = Object.fromEntries(
+            (putawayRes.data ?? []).map((entry) => [entry.warehouse_item_id, entry]),
+          );
+          setPutawayByItemId(putawayMap);
+        } catch (error) {
+          setPutawayByItemId({});
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Failed to load Master Data putaway bins.",
+          );
+        }
+
         setLines(
           (po.lines ?? [])
             .map((line) => {
               const remaining = remainingQty(line);
               const itemId = line.warehouse_item_id ?? null;
               const item = warehouseItems.find((entry) => entry.id === itemId);
+              const putaway = itemId ? putawayMap[itemId] : undefined;
 
               return {
                 purchase_order_line_id: line.id,
                 warehouse_item_id: itemId,
-                warehouse_item_category: item?.category ?? null,
+                warehouse_item_category:
+                  putaway?.category ?? item?.category ?? null,
                 description: line.description,
                 sku: line.sku ?? null,
                 order_qty: Number(line.quantity),
                 already_received: Number(line.received_qty ?? 0),
                 qty_received: remaining,
-                to_bin_id: null,
+                to_bin_id:
+                  putaway?.suggested_bin_id ??
+                  suggestedPutawayBinId(item, locationTree),
                 line_notes: "",
               };
             })
@@ -148,7 +190,7 @@ export function GoodsReceiptCreateForm({
       })
       .catch((error: Error) => toast.error(error.message || "Failed to load purchase order."))
       .finally(() => setLoadingPo(false));
-  }, [selectedPoId, warehouseItems]);
+  }, [selectedPoId, warehouseItems, locationTree]);
 
   const selectedLines = useMemo(() => lines.filter((line) => line.qty_received > 0), [lines]);
 
@@ -286,7 +328,12 @@ export function GoodsReceiptCreateForm({
                           toBinId={line.to_bin_id}
                           locationTree={locationTree}
                           warehouseItems={warehouseItems}
-                          locationsLoading={locationsLoading}
+                          putawayOptions={
+                            line.warehouse_item_id
+                              ? putawayByItemId[line.warehouse_item_id] ?? null
+                              : null
+                          }
+                          locationsLoading={locationsLoading || loadingPo}
                           locationsError={locationsError}
                           onChange={(toBinId) =>
                             setLines((current) =>

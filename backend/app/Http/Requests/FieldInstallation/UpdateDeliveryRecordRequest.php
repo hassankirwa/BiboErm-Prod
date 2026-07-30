@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Http\Requests\FieldInstallation;
+
+use App\Enums\FieldInstallation\DeliveryCondition;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class UpdateDeliveryRecordRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /** @return array<string, mixed> */
+    public function rules(): array
+    {
+        return [
+            'received_at' => ['sometimes', 'nullable', 'date'],
+            'delivery_condition' => ['sometimes', Rule::enum(DeliveryCondition::class)],
+            'vehicle_reg' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'driver_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'packing_list_ref' => ['sometimes', 'nullable', 'string', 'max:60'],
+            'expected_units' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'received_units' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'notes' => ['sometimes', 'nullable', 'string'],
+        ];
+    }
+}

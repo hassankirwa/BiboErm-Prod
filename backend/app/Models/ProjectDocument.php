@@ -13,6 +13,7 @@ class ProjectDocument extends Model
         'filename',
         'path',
         'version',
+        'metadata',
         'uploaded_by',
     ];
 
@@ -20,6 +21,7 @@ class ProjectDocument extends Model
     {
         return [
             'version' => 'integer',
+            'metadata' => 'array',
         ];
     }
 

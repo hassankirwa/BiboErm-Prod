@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { UnifiedSiteMeasurementForm } from "@/components/measurements/unified-site-measurement-form";
@@ -11,7 +11,16 @@ import { SiteVisitDealContext } from "@/components/crm/site-visit-deal-context";
 import { SiteVisitStatusBadge } from "@/components/crm/site-visit-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Calendar,
   CheckCircle2,
@@ -24,6 +33,7 @@ import {
 import {
   approveSiteVisit,
   fetchSiteVisit,
+  requestSiteVisitChanges,
   startSiteVisit,
   type ApiSiteVisit,
 } from "@/lib/api/crm/site-visits";
@@ -49,6 +59,7 @@ function scrollToLogDetails() {
 
 export default function SiteVisitDetailPage() {
   const params = useParams<{ id: string }>();
+  const pathname = usePathname();
   const { user, roles } = useAuth();
   const visitId = Number(params.id);
   const [visit, setVisit] = useState<ApiSiteVisit | null>(null);
@@ -56,6 +67,20 @@ export default function SiteVisitDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const isCrmRoute = pathname.startsWith("/crm/");
+  const isProjectRoute = pathname.startsWith("/projects/");
+  const myVisitsPath = isCrmRoute
+    ? "/crm/site-visits/my-visits"
+    : "/site-visits/my-visits";
+  const allVisitsPath =
+    isProjectRoute && project
+      ? `/projects/${project.id}/site-assessment`
+      : isCrmRoute
+        ? "/crm/site-visits"
+        : "/site-visits";
+  const hasScrolledToLogDetails = useRef(false);
 
   const loadVisit = useCallback(async () => {
     if (!Number.isFinite(visitId) || visitId <= 0) {
@@ -93,8 +118,9 @@ export default function SiteVisitDetailPage() {
   }, [loadVisit]);
 
   useEffect(() => {
-    if (!visit || isLoading) return;
+    if (!visit || isLoading || hasScrolledToLogDetails.current) return;
     if (window.location.hash === "#log-details" && canExecuteFieldVisit(visit.status)) {
+      hasScrolledToLogDetails.current = true;
       scrollToLogDetails();
     }
   }, [visit, isLoading]);
@@ -143,6 +169,34 @@ export default function SiteVisitDetailPage() {
     }
   }
 
+  async function handleRequestChanges(
+    action: "clarification_needed" | "revisit_required",
+  ) {
+    if (!visit || !reviewNotes.trim()) return;
+    setActionLoading(true);
+    try {
+      await ensureCsrfCookie();
+      const updated = await requestSiteVisitChanges(visit.id, {
+        action,
+        notes: reviewNotes.trim(),
+      });
+      setVisit(updated);
+      setReviewOpen(false);
+      setReviewNotes("");
+      toast.success(
+        action === "revisit_required"
+          ? "Revisit requested."
+          : "Corrections requested.",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to request changes.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   const status = visit?.status ?? "scheduled";
   const showLogDetails = canExecuteFieldVisit(status);
   const showStart = canStartFieldVisit(status);
@@ -164,6 +218,15 @@ export default function SiteVisitDetailPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {awaitingApproval && canApprove && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={actionLoading}
+                  onClick={() => setReviewOpen(true)}
+                >
+                  Request changes
+                </Button>
                 <Button
                   size="sm"
                   disabled={actionLoading}
@@ -176,6 +239,7 @@ export default function SiteVisitDetailPage() {
                   )}
                   Approve visit
                 </Button>
+              </>
             )}
             {showLogDetails && (
               <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
@@ -200,12 +264,12 @@ export default function SiteVisitDetailPage() {
               </Button>
             )}
             <Button variant="outline" size="sm" asChild>
-              <Link href="/crm/site-visits/my-visits">My visits</Link>
+              <Link href={myVisitsPath}>My visits</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/crm/site-visits">
+              <Link href={allVisitsPath}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
-                All visits
+                {isProjectRoute ? "Site assessment" : "All visits"}
               </Link>
             </Button>
           </div>
@@ -222,7 +286,7 @@ export default function SiteVisitDetailPage() {
             {error ?? "Site visit not found."}
           </div>
         ) : (
-          <div className="mx-auto max-w-6xl space-y-4">
+          <div className="w-full space-y-4">
             <Card className="border-border">
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -336,6 +400,27 @@ export default function SiteVisitDetailPage() {
 
             {visit.deal_id && <SiteVisitDealContext visit={visit} />}
 
+            {visit.review_notes ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">
+                  {status === "revisit_required"
+                    ? "Revisit required"
+                    : status === "clarification_needed"
+                      ? "Corrections requested"
+                      : "Review notes"}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap">{visit.review_notes}</p>
+                <p className="mt-1 text-xs">
+                  {visit.reviewer?.name
+                    ? `Reviewed by ${visit.reviewer.name}`
+                    : "Reviewer feedback"}
+                  {visit.reviewed_at
+                    ? ` · ${new Date(visit.reviewed_at).toLocaleString()}`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
+
             {showMeasurementForm &&
               (showLogDetails ? (
                 <PermissionGate anyOf={["site_visits.execute", "field_installation.log"]}>
@@ -367,6 +452,44 @@ export default function SiteVisitDetailPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Request measurement changes</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="site-visit-review-notes">
+              Correction or revisit notes
+            </Label>
+            <Textarea
+              id="site-visit-review-notes"
+              rows={5}
+              value={reviewNotes}
+              onChange={(event) => setReviewNotes(event.target.value)}
+              placeholder="Explain exactly what must be corrected or measured again."
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleRequestChanges("clarification_needed")}
+              disabled={actionLoading || !reviewNotes.trim()}
+            >
+              Request correction
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleRequestChanges("revisit_required")}
+              disabled={actionLoading || !reviewNotes.trim()}
+            >
+              Require revisit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -9,6 +9,7 @@ use App\Http\Resources\Warehouse\StockLevelResource;
 use App\Models\Warehouse\Item;
 use App\Models\Warehouse\StockLevel;
 use App\Services\Warehouse\Inventory\ItemLocationResolver;
+use App\Services\Warehouse\MasterData\SkuNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -16,14 +17,25 @@ class ItemSearchController extends Controller
 {
     public function __construct(
         protected ItemLocationResolver $locationResolver,
+        protected SkuNormalizer $skuNormalizer,
     ) {}
 
     public function __invoke(Request $request): AnonymousResourceCollection
     {
         $search = (string) $request->query('q', '');
+        $code = (string) $request->query('code', '');
+        $codeVariants = $this->skuNormalizer->variants($code);
 
         $items = Item::query()
             ->where('is_active', true)
+            ->when($codeVariants !== [], function ($q) use ($codeVariants, $code) {
+                $q->where(function ($inner) use ($codeVariants, $code) {
+                    $inner->whereIn('sku', $codeVariants);
+                    if ($code !== '') {
+                        $inner->orWhere('sku', 'like', trim($code).'%');
+                    }
+                });
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($inner) use ($search) {
                     $inner->where('sku', 'like', "%{$search}%")
@@ -40,10 +52,20 @@ class ItemSearchController extends Controller
     public function withLocations(Request $request): AnonymousResourceCollection
     {
         $search = (string) $request->query('q', '');
+        $code = (string) $request->query('code', '');
+        $codeVariants = $this->skuNormalizer->variants($code);
 
         $levels = StockLevel::query()
             ->with(['item', 'bin.section.deck.warehouse'])
-            ->whereHas('item', function ($q) use ($search) {
+            ->whereHas('item', function ($q) use ($search, $code, $codeVariants) {
+                if ($codeVariants !== []) {
+                    $q->where(function ($inner) use ($code, $codeVariants) {
+                        $inner->whereIn('sku', $codeVariants);
+                        if ($code !== '') {
+                            $inner->orWhere('sku', 'like', trim($code).'%');
+                        }
+                    });
+                }
                 if ($search !== '') {
                     $q->where('sku', 'like', "%{$search}%")
                         ->orWhere('name', 'like', "%{$search}%");

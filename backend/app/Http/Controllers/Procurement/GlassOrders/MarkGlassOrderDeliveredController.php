@@ -16,6 +16,18 @@ class MarkGlassOrderDeliveredController extends Controller
     {
         $this->authorize('update', $glassOrder);
 
-        return new GlassOrderResource($this->service->markDelivered($glassOrder));
+        $validated = $request->validate([
+            'currency' => ['sometimes', 'string', 'size:3'],
+            'panes' => ['required', 'array', 'min:1'],
+            'panes.*.unit_buying_price' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        return new GlassOrderResource(
+            $this->service->markDelivered(
+                $glassOrder,
+                $validated['panes'],
+                strtoupper($validated['currency'] ?? 'KES'),
+            )
+        );
     }
 }

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" fill="none">
+  <rect width="200" height="150" fill="#F8FAFC"/>
+  <rect x="20" y="8" width="160" height="28" fill="#64748B"/>
+  <rect x="86" y="14" width="28" height="22" fill="#FEF3C7" stroke="#B45309" stroke-width="1.5"/>
+  <text x="100" y="29" text-anchor="middle" font-size="7" fill="#92400E" font-family="system-ui,sans-serif">DOOR</text>
+  <path d="M36 36h128v36H132v46H68V72H36V36z" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="1.5"/>
+  <rect x="36" y="100" width="32" height="14" fill="#94A3B8"/>
+  <rect x="132" y="100" width="32" height="14" fill="#94A3B8"/>
+  <rect x="68" y="104" width="64" height="14" fill="#94A3B8"/>
+  <rect x="72" y="76" width="56" height="28" fill="#93C5FD" fill-opacity="0.5" stroke="#2563EB" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="100" y="140" text-anchor="middle" font-size="8" fill="#475569" font-family="system-ui,sans-serif">U-shaped</text>
+</svg>

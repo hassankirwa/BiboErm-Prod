@@ -22,6 +22,7 @@ class FifoReservationService
         protected BomStockCheckService $bomStockCheck,
         protected OffcutAllocationService $offcutAllocation,
         protected FifoSequenceResolver $fifoSequence,
+        protected AluminiumBarDemandService $aluminiumDemand,
     ) {}
 
     /**
@@ -37,60 +38,65 @@ class FifoReservationService
         }
 
         try {
-            $reservation = DB::transaction(function () use ($user, $projectId, $bomLines, $notes) {
+            $reservation = DB::transaction(function () use ($user, $projectId, $bomLines, $notes, $check) {
                 $allocations = [];
+                $aluminiumPlans = $check['aluminium_plans'] ?? [];
+                $aluminiumReserved = [];
+
+                $items = Item::query()
+                    ->whereIn('id', array_unique(array_map(fn ($l) => (int) $l['item_id'], $bomLines)))
+                    ->with('aluminiumProfile')
+                    ->get()
+                    ->keyBy('id');
 
                 foreach ($bomLines as $bomLine) {
-                    $item = Item::query()->findOrFail($bomLine['item_id']);
-                    $remaining = (string) $bomLine['quantity'];
-
-                    if ($item->category === ItemCategory::AluminiumProfile) {
-                        $requiredLength = (int) ($bomLine['required_length_mm'] ?? 0);
-                        if ($requiredLength > 0 && bccomp($remaining, '0', 3) === 1) {
-                            $offcutResult = $this->offcutAllocation->allocateMetresForProject(
-                                projectId: $projectId,
-                                itemId: $item->id,
-                                requiredLengthMm: $requiredLength,
-                                requiredMetres: $remaining,
-                            );
-                            $remaining = bcsub($remaining, $offcutResult['metres_allocated'], 3);
-                        }
+                    $item = $items->get((int) $bomLine['item_id']);
+                    if (! $item) {
+                        throw new InvalidArgumentException('Unknown warehouse item on BOM line.');
                     }
 
+                    if ($item->category === ItemCategory::AluminiumProfile) {
+                        if (isset($aluminiumReserved[$item->id])) {
+                            continue;
+                        }
+                        $aluminiumReserved[$item->id] = true;
+
+                        $plan = $aluminiumPlans[$item->id]
+                            ?? $this->aluminiumDemand->planForItem($item, array_values(array_filter(
+                                $bomLines,
+                                fn ($l) => (int) $l['item_id'] === $item->id
+                            )));
+
+                        if (($plan['offcut_piece_ids'] ?? []) !== []) {
+                            $this->offcutAllocation->allocatePieceIds($projectId, $plan['offcut_piece_ids']);
+                        }
+
+                        $remaining = (string) ($plan['reserve_qty'] ?? '0');
+                        if (bccomp($remaining, '0', 3) !== 1) {
+                            continue;
+                        }
+
+                        $this->allocateFromBins(
+                            $item,
+                            $remaining,
+                            $bomLine['bom_line_ref'] ?? null,
+                            $allocations,
+                        );
+
+                        continue;
+                    }
+
+                    $remaining = (string) $bomLine['quantity'];
                     if (bccomp($remaining, '0', 3) !== 1) {
                         continue;
                     }
 
-                    $preferredBinId = $this->bomStockCheck->preferredBinIdForItem($item);
-                    $bins = $this->stockLevels->binsWithAvailableStock($item->id, $preferredBinId);
-
-                    foreach ($bins as $level) {
-                        if (bccomp($remaining, '0', 3) !== 1) {
-                            break;
-                        }
-
-                        $available = $level->availableQuantity();
-                        $take = bccomp($available, $remaining, 3) >= 0 ? $remaining : $available;
-
-                        if (bccomp($take, '0', 3) !== 1) {
-                            continue;
-                        }
-
-                        $this->stockLevels->incrementReserved($item->id, $level->bin_id, $take);
-
-                        $allocations[] = [
-                            'item_id' => $item->id,
-                            'bin_id' => $level->bin_id,
-                            'quantity' => $take,
-                            'bom_line_ref' => $bomLine['bom_line_ref'] ?? null,
-                        ];
-
-                        $remaining = bcsub($remaining, $take, 3);
-                    }
-
-                    if (bccomp($remaining, '0', 3) === 1) {
-                        throw new InvalidArgumentException("Unable to fully reserve item {$item->sku}.");
-                    }
+                    $this->allocateFromBins(
+                        $item,
+                        $remaining,
+                        $bomLine['bom_line_ref'] ?? null,
+                        $allocations,
+                    );
                 }
 
                 $reservation = StockReservation::query()->create([
@@ -128,6 +134,47 @@ class FifoReservationService
             'reservation' => $reservation,
             'check' => $check,
         ];
+    }
+
+    /**
+     * @param  array<int, array{item_id: int, bin_id: int, quantity: string, bom_line_ref: string|null}>  $allocations
+     */
+    protected function allocateFromBins(
+        Item $item,
+        string $remaining,
+        ?string $bomLineRef,
+        array &$allocations,
+    ): void {
+        $preferredBinId = $this->bomStockCheck->preferredBinIdForItem($item);
+        $bins = $this->stockLevels->binsWithAvailableStock($item->id, $preferredBinId);
+
+        foreach ($bins as $level) {
+            if (bccomp($remaining, '0', 3) !== 1) {
+                break;
+            }
+
+            $available = $level->availableQuantity();
+            $take = bccomp($available, $remaining, 3) >= 0 ? $remaining : $available;
+
+            if (bccomp($take, '0', 3) !== 1) {
+                continue;
+            }
+
+            $this->stockLevels->incrementReserved($item->id, $level->bin_id, $take);
+
+            $allocations[] = [
+                'item_id' => $item->id,
+                'bin_id' => $level->bin_id,
+                'quantity' => $take,
+                'bom_line_ref' => $bomLineRef,
+            ];
+
+            $remaining = bcsub($remaining, $take, 3);
+        }
+
+        if (bccomp($remaining, '0', 3) === 1) {
+            throw new InvalidArgumentException("Unable to fully reserve item {$item->sku}.");
+        }
     }
 
     public function release(StockReservation $reservation, ?string $quantity = null, ?array $itemIds = null): StockReservation

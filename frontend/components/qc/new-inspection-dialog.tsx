@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   createQcInspection,
   listQcTemplates,
+  PRODUCTION_IN_PROCESS_STAGES,
   QC_CONTEXT_LABELS,
   QC_INSPECTION_CONTEXTS,
   type QcChecklistTemplate,
@@ -37,6 +38,11 @@ type NewInspectionDialogProps = {
   defaultGoodsReceiptId?: number;
   defaultProjectId?: number;
   defaultProductionOrderId?: number;
+  defaultStage?: string;
+  /** When true, context select is disabled (e.g. mandatory after-assembly QC). */
+  lockContext?: boolean;
+  /** Limit which contexts appear in the picker. */
+  allowedContexts?: QcInspectionContext[];
 };
 
 export function NewInspectionDialog({
@@ -47,6 +53,9 @@ export function NewInspectionDialog({
   defaultGoodsReceiptId,
   defaultProjectId,
   defaultProductionOrderId,
+  defaultStage,
+  lockContext = false,
+  allowedContexts,
 }: NewInspectionDialogProps) {
   const [context, setContext] = useState<QcInspectionContext>(
     defaultContext ?? "warehouse_receiving",
@@ -57,14 +66,20 @@ export function NewInspectionDialog({
     defaultGoodsReceiptId ? String(defaultGoodsReceiptId) : "",
   );
   const [productionOrderId, setProductionOrderId] = useState("");
+  const [stage, setStage] = useState(defaultStage ?? "cutting");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [templates, setTemplates] = useState<QcChecklistTemplate[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const contextOptions = allowedContexts?.length
+    ? QC_INSPECTION_CONTEXTS.filter((ctx) => allowedContexts.includes(ctx))
+    : QC_INSPECTION_CONTEXTS;
 
   const needsProject =
     context === "site_installation" ||
     context === "snagging_signoff" ||
     context.startsWith("production_");
+  const needsProductionStage = context === "production_in_process";
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +94,10 @@ export function NewInspectionDialog({
     if (defaultProductionOrderId) {
       setProductionOrderId(String(defaultProductionOrderId));
     }
-  }, [open, defaultContext, defaultGoodsReceiptId, defaultProjectId, defaultProductionOrderId]);
+    if (defaultStage) {
+      setStage(defaultStage);
+    }
+  }, [open, defaultContext, defaultGoodsReceiptId, defaultProjectId, defaultProductionOrderId, defaultStage]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,12 +116,18 @@ export function NewInspectionDialog({
       per_page: 50,
     })
       .then((res) => {
-        setTemplates(res.data);
-        const active = res.data.find((t) => t.is_active);
+        const filtered =
+          needsProductionStage
+            ? res.data.filter((t) => t.stage === stage || !t.stage)
+            : res.data;
+        setTemplates(filtered);
+        const active =
+          filtered.find((t) => t.is_active && (!needsProductionStage || t.stage === stage)) ??
+          filtered.find((t) => t.is_active);
         setTemplateId(active ? String(active.id) : "");
       })
       .catch(() => setTemplates([]));
-  }, [open, context, projectId]);
+  }, [open, context, projectId, stage, needsProductionStage]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -114,6 +138,7 @@ export function NewInspectionDialog({
         project_id: projectId ? Number(projectId) : undefined,
         goods_receipt_id: goodsReceiptId ? Number(goodsReceiptId) : undefined,
         production_order_id: productionOrderId ? Number(productionOrderId) : undefined,
+        stage: needsProductionStage ? stage : undefined,
       });
       toast.success("Inspection started.");
       onOpenChange(false);
@@ -137,21 +162,45 @@ export function NewInspectionDialog({
             <Select
               value={context}
               onValueChange={(v) => setContext(v as QcInspectionContext)}
+              disabled={lockContext}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {QC_INSPECTION_CONTEXTS.map((ctx) => (
+                {contextOptions.map((ctx) => (
                   <SelectItem key={ctx} value={ctx}>
                     {QC_CONTEXT_LABELS[ctx]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {lockContext ? (
+              <p className="text-xs text-muted-foreground">
+                After-assembly QC is locked for this production stage and cannot use receiving or
+                pre-cutting templates.
+              </p>
+            ) : null}
           </div>
+          {needsProductionStage && (
+            <div className="space-y-2">
+              <Label>Production stage</Label>
+              <Select value={stage} onValueChange={setStage}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCTION_IN_PROCESS_STAGES.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-2">
-            <Label>Template (optional)</Label>
+            <Label>Template</Label>
             <Select value={templateId || "auto"} onValueChange={(v) => setTemplateId(v === "auto" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Auto-resolve" />
@@ -165,6 +214,11 @@ export function NewInspectionDialog({
                 ))}
               </SelectContent>
             </Select>
+            {templates[0]?.name && !templateId ? (
+              <p className="text-xs text-muted-foreground">
+                Will use: {templates.find((t) => t.is_active)?.name ?? templates[0].name}
+              </p>
+            ) : null}
           </div>
           {(needsProject || projectId || defaultProjectId) && (
             <div className="space-y-2">

@@ -41,6 +41,7 @@ import {
   type ProjectMaterialLine,
   type ProjectMaterialShortageEntry,
 } from "@/lib/api/projects";
+import { MaterialCodeSearch } from "@/components/warehouse/material-code-search";
 import { toast } from "sonner";
 
 type DraftLine = {
@@ -595,28 +596,43 @@ export function RequisitionCreateWorkspace() {
                         </TableCell>
                         <TableCell>
                           {line.source === "project_material" && !line.warehouseItemId ? (
-                            <select
-                              className="h-9 w-full min-w-[200px] rounded-md border border-input bg-background px-2 text-sm"
-                              value={line.warehouseItemId ?? ""}
-                              onChange={(event) => {
-                                const itemId = Number(event.target.value);
-                                if (!itemId) return;
-                                setDraftLines((current) =>
-                                  current.map((entry) =>
-                                    entry.key === line.key
-                                      ? { ...entry, warehouseItemId: itemId }
-                                      : entry,
-                                  ),
-                                );
-                              }}
-                            >
-                              <option value="">Select catalog item…</option>
-                              {warehouseItems.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {warehouseItemLabel(item)}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="space-y-2">
+                              <MaterialCodeSearch
+                                value={line.sku ?? ""}
+                                onSelect={(item) => {
+                                  setDraftLines((current) =>
+                                    current.map((entry) =>
+                                      entry.key === line.key
+                                        ? { ...entry, warehouseItemId: item.id }
+                                        : entry,
+                                    ),
+                                  );
+                                }}
+                                placeholder="Find by code"
+                              />
+                              <select
+                                className="h-9 w-full min-w-[200px] rounded-md border border-input bg-background px-2 text-sm"
+                                value={line.warehouseItemId ?? ""}
+                                onChange={(event) => {
+                                  const itemId = Number(event.target.value);
+                                  if (!itemId) return;
+                                  setDraftLines((current) =>
+                                    current.map((entry) =>
+                                      entry.key === line.key
+                                        ? { ...entry, warehouseItemId: itemId }
+                                        : entry,
+                                    ),
+                                  );
+                                }}
+                              >
+                                <option value="">Select catalog item…</option>
+                                {warehouseItems.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {warehouseItemLabel(item)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           ) : line.warehouseItemId ? (
                             <span className="text-xs text-muted-foreground">
                               #{line.warehouseItemId}

@@ -101,6 +101,8 @@ enum ProductionStage: string
      */
     public function emitsProductionStageCompleted(): bool
     {
-        return $this->emitsProjectStageSync() || $this === self::QcPreCheck;
+        return $this->emitsProjectStageSync()
+            || $this === self::QcPreCheck
+            || $this === self::Finishing;
     }
 }

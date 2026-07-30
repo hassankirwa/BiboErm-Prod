@@ -147,6 +147,7 @@ export function ProjectDetailQc({ project }: ProjectDetailQcProps) {
           open={newOpen}
           onOpenChange={setNewOpen}
           defaultProjectId={project.id}
+          defaultContext={relevantHint?.contexts[0] ?? "production_qc_post_fabrication"}
           onCreated={(id) => {
             load();
             router.push(`/qc/inspections/${id}`);

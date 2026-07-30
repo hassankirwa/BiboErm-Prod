@@ -35,26 +35,43 @@ import {
   stockStatusLabel,
 } from "@/lib/procurement-stock";
 import { toast } from "sonner";
+import { MaterialCodeSearch } from "@/components/warehouse/material-code-search";
 
 type StockStatusFilter = "all" | ProcurementStockItem["stock_status"];
 
 export default function ProcurementStockPage() {
   const [overview, setOverview] = useState<ProcurementStockOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState<StockStatusFilter>("all");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const load = useCallback(() => {
     setLoading(true);
 
-    getProcurementStockOverview()
+    getProcurementStockOverview({
+      page,
+      per_page: 100,
+      search: search || undefined,
+      category: category === "all" ? undefined : category,
+      stock_status: status === "all" ? undefined : status,
+    })
       .then((response) => setOverview(response.data))
       .catch((error: Error) => {
         toast.error(error.message || "Failed to load procurement stock.");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [category, page, search, status]);
 
   useEffect(() => {
     load();
@@ -65,30 +82,28 @@ export default function ProcurementStockPage() {
     [overview],
   );
 
-  const filteredItems = useMemo(() => {
-    const items = overview?.items ?? [];
+  const filteredItems = overview?.items ?? [];
+  const meta = overview?.meta ?? { current_page: 1, last_page: 1, per_page: 100, total: 0 };
+
+  const filteredAlerts = useMemo(() => {
+    const alerts = overview?.alerts ?? [];
     const searchTerm = search.trim().toLowerCase();
 
-    return items.filter((item) => {
-      const matchesSearch =
-        searchTerm.length === 0 ||
-        item.name.toLowerCase().includes(searchTerm) ||
-        item.sku.toLowerCase().includes(searchTerm);
-
-      const matchesCategory = category === "all" || item.category_label === category;
-      const matchesStatus = status === "all" || item.stock_status === status;
-
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
+    return alerts
+      .filter((item) => {
+        const matchesSearch =
+          searchTerm.length === 0 ||
+          item.name.toLowerCase().includes(searchTerm) ||
+          item.sku.toLowerCase().includes(searchTerm);
+        const matchesCategory = category === "all" || item.category_label === category;
+        const matchesStatus = status === "all" || item.stock_status === status;
+        return matchesSearch && matchesCategory && matchesStatus;
+      })
+      .sort(
+        (left, right) =>
+          Number.parseFloat(right.shortage_qty ?? "0") - Number.parseFloat(left.shortage_qty ?? "0"),
+      );
   }, [category, overview, search, status]);
-
-  const filteredAlerts = useMemo(
-    () =>
-      filteredItems
-        .filter((item) => item.low_stock_alert)
-        .sort((left, right) => Number.parseFloat(right.shortage_qty ?? "0") - Number.parseFloat(left.shortage_qty ?? "0")),
-    [filteredItems],
-  );
 
   const summary = overview?.summary;
   const categoryCoverage = overview?.categories ?? [];
@@ -175,12 +190,29 @@ export default function ProcurementStockPage() {
             <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center">
                 <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder="Search by material or SKU"
                   className="max-w-sm"
                 />
-                <Select value={category} onValueChange={setCategory}>
+                <div className="w-full max-w-sm">
+                  <MaterialCodeSearch
+                    value={searchInput}
+                    placeholder="Find by code"
+                    onSelect={(item) => {
+                      setSearchInput(item.sku);
+                      setSearch(item.sku);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <Select
+                  value={category}
+                  onValueChange={(value) => {
+                    setCategory(value);
+                    setPage(1);
+                  }}
+                >
                   <SelectTrigger className="w-full md:w-[220px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
@@ -193,7 +225,13 @@ export default function ProcurementStockPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={status} onValueChange={(value) => setStatus(value as StockStatusFilter)}>
+                <Select
+                  value={status}
+                  onValueChange={(value) => {
+                    setStatus(value as StockStatusFilter);
+                    setPage(1);
+                  }}
+                >
                   <SelectTrigger className="w-full md:w-[180px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -307,6 +345,9 @@ export default function ProcurementStockPage() {
                           <TableHead className="text-right">On Hand</TableHead>
                           <TableHead className="text-right">Reserved</TableHead>
                           <TableHead className="text-right">Available</TableHead>
+                          <TableHead className="text-right" title="Document reference total from catalog import">
+                            Doc ref
+                          </TableHead>
                           <TableHead className="text-right">Min</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
@@ -336,6 +377,11 @@ export default function ProcurementStockPage() {
                             <TableCell className="text-right font-medium">
                               {formatQuantity(item.quantity_available, item.unit_of_measure)}
                             </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {item.reference_total_qty != null
+                                ? formatQuantity(item.reference_total_qty, item.unit_of_measure)
+                                : "—"}
+                            </TableCell>
                             <TableCell className="text-right">
                               {formatQuantity(item.min_stock_qty, item.unit_of_measure)}
                             </TableCell>
@@ -348,7 +394,7 @@ export default function ProcurementStockPage() {
                         ))}
                         {filteredItems.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                            <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                               No materials match the current filters.
                             </TableCell>
                           </TableRow>
@@ -357,6 +403,31 @@ export default function ProcurementStockPage() {
                     </Table>
                   </div>
                 )}
+                {(meta.last_page ?? 1) > 1 ? (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Page {meta.current_page ?? page} of {meta.last_page ?? 1} · {meta.total ?? 0} materials
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1 || loading}
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= (meta.last_page ?? 1) || loading}
+                        onClick={() => setPage((current) => current + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>

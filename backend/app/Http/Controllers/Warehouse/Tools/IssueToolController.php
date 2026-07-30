@@ -21,13 +21,18 @@ class IssueToolController extends Controller
 
         $issuedTo = User::query()->findOrFail($data['issued_to']);
 
-        $this->toolIssuance->issue(
-            tool: $tool,
-            issuedTo: $issuedTo,
-            issuedBy: $request->user(),
-            projectId: $data['project_id'] ?? null,
-            conditionOut: $data['condition_out'] ?? null,
-        );
+        try {
+            $this->toolIssuance->issue(
+                tool: $tool,
+                issuedTo: $issuedTo,
+                issuedBy: $request->user(),
+                projectId: $data['project_id'] ?? null,
+                conditionOut: $data['condition_out'] ?? null,
+                quantity: (int) ($data['quantity'] ?? 1),
+            );
+        } catch (\InvalidArgumentException $e) {
+            abort(422, $e->getMessage());
+        }
 
         return new ToolResource($tool->fresh());
     }

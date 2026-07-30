@@ -37,6 +37,7 @@ export type FieldInstallationJob = {
   team_lead?: { id: number; name: string } | null;
   members?: FieldJobMember[];
   units?: FieldInstallationUnit[];
+  tool_assignments?: FieldToolAssignment[];
 };
 
 export type FieldJobMember = {
@@ -55,6 +56,42 @@ export type FieldInstallationUnit = {
   sort_order: number;
 };
 
+export type FieldToolAssignment = {
+  id: number;
+  job_id: number;
+  tool_issuance_id: number;
+  assigned_by: number;
+  expected_return_date: string | null;
+  returned_at: string | null;
+  notes: string | null;
+  created_at?: string | null;
+  tool_issuance?: {
+    id: number;
+    tool_id: number;
+    quantity: number;
+    issued_to: number;
+    issue_date: string | null;
+    return_date: string | null;
+    condition_out: string | null;
+    condition_in: string | null;
+    damage_notes: string | null;
+    tool?: {
+      id: number;
+      tool_code: string;
+      name: string;
+      tool_type: string | null;
+      condition: string | null;
+      tracking_mode?: string;
+      total_qty?: number;
+      available_qty?: number;
+      on_site_qty?: number;
+      qty_in_repair?: number;
+    } | null;
+    issued_to_user?: { id: number; name: string } | null;
+  } | null;
+  assigned_by_user?: { id: number; name: string } | null;
+};
+
 export type FieldDailyLog = {
   id: number;
   job_id: number;
@@ -66,6 +103,7 @@ export type FieldDailyLog = {
   site_conditions: string | null;
   blockers: string | null;
   submitted_at: string;
+  photos?: FieldPhoto[];
 };
 
 export type FieldDeliveryRecord = {
@@ -74,12 +112,16 @@ export type FieldDeliveryRecord = {
   received_at: string;
   vehicle_reg: string | null;
   driver_name: string | null;
+  packing_list_ref?: string | null;
+  expected_units?: number | null;
+  received_units?: number | null;
   notes: string | null;
   lines?: Array<{
     id: number;
     description: string;
     qty_expected: string;
     qty_received: string;
+    condition_notes?: string | null;
   }>;
 };
 
@@ -91,6 +133,18 @@ export type FieldNonConformity = {
   title: string;
   description: string;
   reported_at: string;
+};
+
+export type FieldPhoto = {
+  id: number;
+  job_id: number;
+  attachable_type: string;
+  attachable_id: number;
+  file_path: string;
+  firebase_url?: string | null;
+  url?: string | null;
+  caption: string | null;
+  taken_at: string | null;
 };
 
 export async function listFieldJobs(params?: {
@@ -136,6 +190,20 @@ export async function startFieldJob(id: number) {
   );
 }
 
+export async function holdFieldJob(id: number) {
+  return apiRequest<{ data: FieldInstallationJob }>(
+    `/field-installation/jobs/${id}/hold`,
+    { method: "POST" },
+  );
+}
+
+export async function cancelFieldJob(id: number) {
+  return apiRequest<{ data: FieldInstallationJob }>(
+    `/field-installation/jobs/${id}/cancel`,
+    { method: "POST" },
+  );
+}
+
 export async function completeFieldJob(id: number) {
   return apiRequest<{ data: FieldInstallationJob }>(
     `/field-installation/jobs/${id}/complete`,
@@ -155,6 +223,7 @@ export async function submitDailyLog(
     log_date: string;
     summary: string;
     units_completed?: number;
+    percent_today?: number;
     weather?: string;
     site_conditions?: string;
     blockers?: string;
@@ -163,6 +232,24 @@ export async function submitDailyLog(
   return apiRequest<{ data: FieldDailyLog }>(
     `/field-installation/jobs/${jobId}/daily-logs`,
     { method: "POST", body: payload },
+  );
+}
+
+export async function updateDailyLog(
+  id: number,
+  payload: Partial<{
+    log_date: string;
+    summary: string;
+    units_completed: number;
+    percent_today: number;
+    weather: string;
+    site_conditions: string;
+    blockers: string;
+  }>,
+) {
+  return apiRequest<{ data: FieldDailyLog }>(
+    `/field-installation/daily-logs/${id}`,
+    { method: "PATCH", body: payload },
   );
 }
 
@@ -179,18 +266,43 @@ export async function recordDelivery(
     received_at?: string;
     vehicle_reg?: string;
     driver_name?: string;
+    packing_list_ref?: string;
+    expected_units?: number;
+    received_units?: number;
     notes?: string;
+    acknowledge_partial_without_nc?: boolean;
+    skip_nc_check?: boolean;
     lines?: Array<{
       description: string;
       qty_expected: number;
       qty_received: number;
       unit?: string;
+      condition_notes?: string;
     }>;
   },
 ) {
   return apiRequest<{ data: FieldDeliveryRecord }>(
     `/field-installation/jobs/${jobId}/deliveries`,
     { method: "POST", body: payload },
+  );
+}
+
+export async function updateDelivery(
+  id: number,
+  payload: Partial<{
+    delivery_condition: string;
+    received_at: string;
+    vehicle_reg: string;
+    driver_name: string;
+    packing_list_ref: string;
+    expected_units: number;
+    received_units: number;
+    notes: string;
+  }>,
+) {
+  return apiRequest<{ data: FieldDeliveryRecord }>(
+    `/field-installation/deliveries/${id}`,
+    { method: "PATCH", body: payload },
   );
 }
 
@@ -216,6 +328,91 @@ export async function reportNonConformity(
   );
 }
 
+export type FieldDesignChangeResult = {
+  non_conformity: FieldNonConformity;
+  design_change_order: {
+    id: number;
+    project_id: number;
+    field_non_conformity_id: number | null;
+    status: string;
+    reason: string | null;
+    measurement_notes?: Record<string, unknown> | null;
+    scope_bom_line_ids?: number[] | null;
+    parent_production_order_id?: number | null;
+    remake_production_order_id?: number | null;
+    requested_by?: number | null;
+    approved_by?: number | null;
+  };
+};
+
+export async function createDesignChange(
+  jobId: number,
+  payload: {
+    /** Required by backend: wrong_measurement | dimension_mismatch */
+    nc_type: "wrong_measurement" | "dimension_mismatch";
+    severity: string;
+    title: string;
+    description: string;
+    qty_affected?: number;
+    project_bom_line_id?: number;
+    delivery_record_id?: number;
+    daily_log_id?: number;
+    warehouse_item_id?: number;
+    reason?: string;
+    measurement_notes?: Record<string, unknown> | string;
+    scope_bom_line_ids?: number[];
+  },
+) {
+  return apiRequest<{ data: FieldDesignChangeResult }>(
+    `/field-installation/jobs/${jobId}/design-changes`,
+    { method: "POST", body: payload },
+  );
+}
+
+export async function updateNonConformityStatus(
+  id: number,
+  payload: { status: "acknowledged" | "resolved" | "waived"; resolution_notes?: string },
+) {
+  return apiRequest<{ data: FieldNonConformity }>(
+    `/field-installation/non-conformities/${id}`,
+    { method: "PATCH", body: payload },
+  );
+}
+
+export async function listFieldPhotos(params?: {
+  job_id?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.job_id) search.set("job_id", String(params.job_id));
+  const q = search.toString();
+
+  return apiRequest<{ data: FieldPhoto[] }>(
+    `/field-installation/photos${q ? `?${q}` : ""}`,
+  );
+}
+
+export async function uploadFieldPhoto(payload: {
+  job_id: number;
+  file: File;
+  attachable_type: "daily_log" | "delivery" | "non_conformity" | "unit_progress" | "general";
+  attachable_id: number;
+  caption?: string;
+  taken_at?: string;
+}) {
+  const formData = new FormData();
+  formData.append("job_id", String(payload.job_id));
+  formData.append("file", payload.file);
+  formData.append("attachable_type", payload.attachable_type);
+  formData.append("attachable_id", String(payload.attachable_id));
+  if (payload.caption) formData.append("caption", payload.caption);
+  if (payload.taken_at) formData.append("taken_at", payload.taken_at);
+
+  return apiRequest<{ data: FieldPhoto }>("/field-installation/photos", {
+    method: "POST",
+    formData,
+  });
+}
+
 export async function updateUnit(
   unitId: number,
   payload: { status: string; snag_notes?: string },
@@ -223,5 +420,38 @@ export async function updateUnit(
   return apiRequest<{ data: FieldInstallationUnit }>(
     `/field-installation/units/${unitId}`,
     { method: "PATCH", body: payload },
+  );
+}
+
+export async function listToolAssignments(jobId: number) {
+  return apiRequest<{ data: FieldToolAssignment[] }>(
+    `/field-installation/jobs/${jobId}/tools`,
+  );
+}
+
+export async function issueTool(
+  jobId: number,
+  payload: {
+    tool_id: number;
+    issued_to: number;
+    quantity?: number;
+    condition_out?: string;
+    expected_return_date?: string;
+    notes?: string;
+  },
+) {
+  return apiRequest<{ data: FieldToolAssignment }>(
+    `/field-installation/jobs/${jobId}/tools/issue`,
+    { method: "POST", body: payload },
+  );
+}
+
+export async function returnTool(
+  assignmentId: number,
+  payload?: { condition_in?: string; damage_notes?: string },
+) {
+  return apiRequest<{ data: FieldToolAssignment }>(
+    `/field-installation/tool-assignments/${assignmentId}/return`,
+    { method: "POST", body: payload ?? {} },
   );
 }

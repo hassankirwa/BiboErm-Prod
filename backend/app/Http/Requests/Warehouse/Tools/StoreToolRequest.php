@@ -21,6 +21,8 @@ class StoreToolRequest extends FormRequest
             'tool_type' => ['nullable', 'string', 'max:100'],
             'condition' => ['nullable', Rule::in(['good', 'fair', 'damaged', 'retired'])],
             'purchase_date' => ['nullable', 'date'],
+            'tracking_mode' => ['nullable', Rule::in(['serialized', 'quantity'])],
+            'total_qty' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

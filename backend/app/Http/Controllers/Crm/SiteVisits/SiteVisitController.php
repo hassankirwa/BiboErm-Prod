@@ -95,6 +95,7 @@ class SiteVisitController extends Controller
                 'project.account',
                 'project.contact',
                 'assignedFieldOfficer',
+                'reviewedBy',
                 'photos',
             ])
         );

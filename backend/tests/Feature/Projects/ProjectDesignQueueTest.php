@@ -6,6 +6,7 @@ use App\Enums\ProjectStage;
 use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Project;
+use App\Models\SiteVisit;
 use App\Models\User;
 use Database\Seeders\CrmLookupSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -70,6 +71,19 @@ class ProjectDesignQueueTest extends TestCase
             'project_manager_id' => $this->user->id,
         ]);
 
+        SiteVisit::query()->create([
+            'visit_number' => 'SV-DESIGN-001',
+            'title' => 'Production measurement',
+            'project_id' => $inQueue->id,
+            'assigned_field_officer_id' => $this->user->id,
+            'assigned_to_user_id' => $this->user->id,
+            'scheduled_by' => $this->user->id,
+            'visit_date' => now()->toDateString(),
+            'measurement_context' => 'production',
+            'status' => 'submitted_for_review',
+            'measurement_form_status' => 'submitted',
+        ]);
+
         Project::query()->create([
             'reference' => 'PR-DESIGN-002',
             'name' => 'Awaiting Deposit Project',
@@ -100,6 +114,8 @@ class ProjectDesignQueueTest extends TestCase
             ->assertJsonPath('data.0.stage', ProjectStage::DepositReceived->value)
             ->assertJsonPath('data.0.stage_label', 'Awaiting design')
             ->assertJsonPath('data.0.has_production_measurement', false)
+            ->assertJsonPath('data.0.measurement_status', 'submitted_for_review')
+            ->assertJsonPath('data.0.measurement_status_label', 'Pending approval')
             ->assertJsonPath('data.0.has_design_document', false)
             ->assertJsonPath('data.0.account.name', 'Design Client Residence');
     }

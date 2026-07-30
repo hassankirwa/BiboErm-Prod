@@ -3,8 +3,12 @@
 namespace App\Services\Projects;
 
 use App\Enums\ProjectStage;
+use App\Enums\QualityControl\QcInspectionContext;
+use App\Enums\QualityControl\QcInspectionResult;
+use App\Events\Projects\ProjectStageAdvanced;
 use App\Models\Project;
 use App\Models\ProjectStageLog;
+use App\Models\QualityControl\QcInspection;
 use App\Models\User;
 use App\Services\Audit\OwenAuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +96,17 @@ class ProjectStageService
             ]);
         }
 
+        if (
+            ! $force
+            && $fromStage === ProjectStage::SiteQc
+            && in_array($toStage, [ProjectStage::Snagging, ProjectStage::ProjectComplete], true)
+            && ! $this->hasPassedSiteInstallationQc($project)
+        ) {
+            throw ValidationException::withMessages([
+                'stage' => ['Site QC inspection must pass before leaving site_qc.'],
+            ]);
+        }
+
         return DB::transaction(function () use ($project, $fromStage, $toStage, $actor, $context) {
             $updates = [
                 'stage' => $toStage->value,
@@ -143,7 +158,16 @@ class ProjectStageService
                 ]
             );
 
-            return $project->fresh(['stageLogs']);
+            $fresh = $project->fresh(['stageLogs']);
+
+            event(new ProjectStageAdvanced(
+                projectId: $project->id,
+                fromStage: $fromStage->value,
+                toStage: $toStage->value,
+                changedByUserId: $actor?->id,
+            ));
+
+            return $fresh;
         });
     }
 
@@ -251,5 +275,17 @@ class ProjectStageService
         }
 
         return 0;
+    }
+
+    protected function hasPassedSiteInstallationQc(Project $project): bool
+    {
+        return QcInspection::query()
+            ->where('project_id', $project->id)
+            ->where('context', QcInspectionContext::SiteInstallation)
+            ->whereIn('result', [
+                QcInspectionResult::Pass->value,
+                QcInspectionResult::ConditionalPass->value,
+            ])
+            ->exists();
     }
 }

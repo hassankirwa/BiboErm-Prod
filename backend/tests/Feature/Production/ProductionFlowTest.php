@@ -10,9 +10,11 @@ use App\Events\Warehouse\ProjectMaterialsReady;
 use App\Listeners\Production\CreateProductionOrder;
 use App\Listeners\Projects\OnProductionStageCompleted;
 use App\Listeners\Projects\OnProjectMaterialsReady;
+use App\Models\Production\CuttingSheet;
 use App\Models\Production\ProductionOrder;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\Warehouse\Item;
 use App\Models\Warehouse\OffcutPiece;
 use App\Services\Production\ProductionOrderService;
 use App\Services\Warehouse\Offcuts\OffcutLoggingService;
@@ -147,9 +149,71 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(10, $order->fifo_position);
     }
 
-    public function test_complete_cutting_without_offcuts_succeeds(): void
+    public function test_complete_cutting_without_sheet_is_rejected(): void
     {
         $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'cutting',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['cutting_sheet']);
+    }
+
+    public function test_complete_cutting_requires_bar_and_waste_on_sheet(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+        $item = $this->createAluminiumItem('ALU-CUT-INCOMPLETE');
+
+        CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'cutting',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['cutting_sheet']);
+    }
+
+    public function test_complete_cutting_with_filled_sheet_auto_logs_waste_offcuts(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+        $item = $this->createAluminiumItem('ALU-CUT-WASTE');
+
+        CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'bar_length_mm' => 6000,
+            'waste_mm' => 450,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->mock(OffcutLoggingService::class)
+            ->shouldReceive('logFromArray')
+            ->once()
+            ->withArgs(function ($user, array $data, $projectId) use ($order, $item) {
+                return (int) $data['item_id'] === $item->id
+                    && (int) $data['length_mm'] === 450
+                    && $projectId === $order->project_id;
+            })
+            ->andReturn(new OffcutPiece(['id' => 99]));
 
         $this->actingAs($this->manager, 'sanctum')
             ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
@@ -161,11 +225,158 @@ class ProductionFlowTest extends TestCase
         $this->assertSame(ProductionStage::Fabrication, $order->current_stage);
     }
 
+    public function test_complete_cutting_skips_discarded_waste_offcuts(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+        $item = $this->createAluminiumItem('ALU-CUT-DISCARD');
+
+        $line = CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'bar_length_mm' => 6000,
+            'waste_mm' => 50,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->mock(OffcutLoggingService::class)
+            ->shouldReceive('logFromArray')
+            ->never();
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'cutting',
+                'discard_waste_line_ids' => [$line->id],
+            ])
+            ->assertOk();
+    }
+
+    public function test_material_prep_complete_requires_assignee_and_notes(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::MaterialPrep, started: true);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'material_prep',
+                'notes' => 'Materials staged at cutting bay',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['assignee']);
+
+        \App\Models\Production\ProductionOrderTeam::query()->create([
+            'production_order_id' => $order->id,
+            'user_id' => $this->manager->id,
+            'stage' => ProductionStage::MaterialPrep->value,
+            'role' => 'cutting_lead',
+            'assigned_at' => now(),
+            'assigned_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'material_prep',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['notes']);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'material_prep',
+                'notes' => 'Materials staged at cutting bay',
+            ])
+            ->assertOk();
+
+        $order->refresh();
+        $this->assertSame(ProductionStage::QcPreCheck, $order->current_stage);
+
+        $log = $order->stageLogs()->where('stage', 'material_prep')->where('status', 'completed')->first();
+        $this->assertNotNull($log);
+        $this->assertSame('Materials staged at cutting bay', $log->notes);
+    }
+
+    public function test_material_prep_complete_accepts_optional_evidence_photo(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::MaterialPrep, started: true);
+
+        \App\Models\Production\ProductionOrderTeam::query()->create([
+            'production_order_id' => $order->id,
+            'user_id' => $this->manager->id,
+            'stage' => ProductionStage::MaterialPrep->value,
+            'role' => 'cutting_lead',
+            'assigned_at' => now(),
+            'assigned_by' => $this->manager->id,
+        ]);
+
+        $photo = \Illuminate\Http\UploadedFile::fake()->image('prep-evidence.jpg', 400, 300);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->post("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'material_prep',
+                'notes' => 'Prep complete with photo',
+                'evidence' => $photo,
+            ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $log = \App\Models\Production\ProductionStageLog::query()
+            ->where('production_order_id', $order->id)
+            ->where('stage', 'material_prep')
+            ->where('status', 'completed')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertNotNull($log->evidence_path);
+        $this->assertStringContainsString('production-stage-evidence', $log->evidence_path);
+    }
+
+    public function test_fabrication_complete_requires_notes_and_accepts_photos(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Fabrication, started: true);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'fabrication',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['notes']);
+
+        $photos = [
+            \Illuminate\Http\UploadedFile::fake()->image('fab-1.jpg', 400, 300),
+            \Illuminate\Http\UploadedFile::fake()->image('fab-2.jpg', 400, 300),
+        ];
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->post("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'fabrication',
+                'notes' => 'Frame welded and checked',
+                'evidence' => $photos,
+            ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        $log = \App\Models\Production\ProductionStageLog::query()
+            ->where('production_order_id', $order->id)
+            ->where('stage', 'fabrication')
+            ->where('status', 'completed')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertSame('Frame welded and checked', $log->notes);
+        $paths = $log->evidencePaths();
+        $this->assertCount(2, $paths);
+        $this->assertSame(ProductionStage::Sash, $order->fresh()->current_stage);
+    }
+
     public function test_complete_cutting_dispatches_production_stage_completed_with_user(): void
     {
         Event::fake([ProductionStageCompleted::class]);
 
         $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+        $item = $this->createAluminiumItem('ALU-EVT');
+        $this->attachReadyCuttingSheet($order, $item, wasteMm: 500);
 
         $this->mock(OffcutLoggingService::class)
             ->shouldReceive('logFromArray')
@@ -177,7 +388,7 @@ class ProductionFlowTest extends TestCase
             stage: ProductionStage::Cutting,
             user: $this->manager,
             offcuts: [
-                ['item_id' => 1, 'length_mm' => 500],
+                ['item_id' => $item->id, 'length_mm' => 500],
             ],
         );
 
@@ -211,11 +422,95 @@ class ProductionFlowTest extends TestCase
                 'pieces' => 3,
                 'reason' => 'Shop floor remeasure',
             ])
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.expected_bar_length_mm', 6000)
+            ->assertJsonPath('data.needed_mm', 3540);
 
         $line->refresh();
         $this->assertSame(1180, $line->cut_length_mm);
         $this->assertSame(3, $line->pieces);
+    }
+
+    public function test_cutting_sheet_line_can_be_updated_without_reason(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting);
+        $item = $this->createAluminiumItem('ALU-CUT-NO-REASON');
+
+        $line = CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->patchJson("/api/v1/production/orders/{$order->id}/cutting-sheet/{$line->id}", [
+                'bar_length_mm' => 6000,
+                'waste_mm' => 4800,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.bar_length_mm', 6000)
+            ->assertJsonPath('data.waste_mm', 4800);
+    }
+
+    public function test_cutting_sheet_rejects_cut_longer_than_bar(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting);
+        $item = $this->createAluminiumItem('ALU-CUT-OVERSIZE');
+
+        $line = CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->patchJson("/api/v1/production/orders/{$order->id}/cutting-sheet/{$line->id}", [
+                'cut_length_mm' => 6500,
+                'bar_length_mm' => 6000,
+                'waste_mm' => 0,
+                'reason' => 'Too long for bar',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['bar_length_mm']);
+    }
+
+    public function test_complete_cutting_rejects_waste_longer_than_bar(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting, started: true);
+        $item = $this->createAluminiumItem('ALU-CUT-WASTE-OVER');
+
+        CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => 'ALU-CUT',
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'bar_length_mm' => 6000,
+            'waste_mm' => 7000,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/complete-stage", [
+                'stage' => 'cutting',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['cutting_sheet']);
     }
 
     public function test_assigned_to_me_filter_limits_orders_for_team_members(): void
@@ -498,6 +793,25 @@ class ProductionFlowTest extends TestCase
             ->assertJsonValidationErrors(['glass']);
     }
 
+    public function test_skip_qc_pre_check_advances_to_cutting(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::QcPreCheck);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/skip-stage", [
+                'stage' => 'qc_pre_check',
+                'notes' => 'Inspect after assembly',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.current_stage', 'cutting');
+
+        $this->assertDatabaseHas('production_stage_logs', [
+            'production_order_id' => $order->id,
+            'stage' => 'qc_pre_check',
+            'status' => 'skipped',
+        ]);
+    }
+
     public function test_skip_glass_assembly_advances_to_finishing_when_no_glass(): void
     {
         $order = $this->createOrderInStage(ProductionStage::GlassAssembly);
@@ -541,6 +855,38 @@ class ProductionFlowTest extends TestCase
             ->assertJsonPath('data.glass_assembly.requires_glass', false)
             ->assertJsonPath('data.glass_assembly.can_skip', true)
             ->assertJsonPath('data.glass_assembly.can_start', false);
+    }
+
+    protected function createAluminiumItem(string $sku): Item
+    {
+        return Item::query()->create([
+            'sku' => $sku,
+            'name' => 'Aluminium '.$sku,
+            'category' => \App\Enums\Warehouse\ItemCategory::AluminiumProfile,
+            'unit_of_measure' => 'm',
+            'is_active' => true,
+        ]);
+    }
+
+    protected function attachReadyCuttingSheet(
+        ProductionOrder $order,
+        Item $item,
+        int $wasteMm = 400,
+        int $barLengthMm = 6000,
+    ): CuttingSheet {
+        return CuttingSheet::query()->create([
+            'production_order_id' => $order->id,
+            'project_bom_line_id' => 1,
+            'warehouse_item_id' => $item->id,
+            'profile_code' => $item->sku,
+            'cut_length_mm' => 1200,
+            'pieces' => 1,
+            'bar_length_mm' => $barLengthMm,
+            'waste_mm' => $wasteMm,
+            'sort_order' => 0,
+            'generated_at' => now(),
+            'generated_by' => $this->manager->id,
+        ]);
     }
 
     protected function createWarehouseBin(): int

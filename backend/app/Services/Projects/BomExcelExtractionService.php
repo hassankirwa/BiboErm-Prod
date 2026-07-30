@@ -3,6 +3,8 @@
 namespace App\Services\Projects;
 
 use App\Models\Warehouse\Item;
+use App\Services\Warehouse\MasterData\SkuNormalizer;
+use App\Services\Warehouse\MasterData\WarehouseItemResolver;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
@@ -20,6 +22,11 @@ class BomExcelExtractionService
 
     /** @var array<string, int> */
     protected array $skuToWarehouseItemId = [];
+
+    public function __construct(
+        protected WarehouseItemResolver $warehouseItems,
+        protected SkuNormalizer $skuNormalizer,
+    ) {}
 
     /**
      * @return array{
@@ -103,8 +110,14 @@ class BomExcelExtractionService
         $warehouseItemId = null;
         $warehouseMatch = false;
 
-        if (! $isProcurementOnlyType && $materialCode !== null) {
-            $warehouseItemId = $this->resolveWarehouseItemId($materialCode);
+        if (! $isProcurementOnlyType && ($materialCode !== null || $materialName !== '')) {
+            $warehouseItemId = $this->resolveWarehouseItemId(
+                $materialCode,
+                $materialName !== '' ? $materialName : null,
+                $rawLine['source_system'] ?? null,
+                $rawLine['series'] ?? null,
+                $lineType,
+            );
             $warehouseMatch = $warehouseItemId !== null;
         }
 
@@ -122,6 +135,19 @@ class BomExcelExtractionService
             'quantity' => $quantity,
             'line_type' => $lineType,
             'measurement_mm' => $measurementMm,
+            'unit_of_measure' => $this->normalizeMaterialCode($rawLine['unit_of_measure'] ?? $rawLine['uom'] ?? null),
+            'width_mm' => isset($rawLine['width_mm']) && $rawLine['width_mm'] !== ''
+                ? (int) $rawLine['width_mm']
+                : null,
+            'height_mm' => isset($rawLine['height_mm']) && $rawLine['height_mm'] !== ''
+                ? (int) $rawLine['height_mm']
+                : null,
+            'opening_code' => $this->normalizeMaterialCode($rawLine['opening_code'] ?? null),
+            'source_system' => $this->normalizeMaterialCode($rawLine['source_system'] ?? null),
+            'series' => isset($rawLine['series']) && trim((string) $rawLine['series']) !== ''
+                ? trim((string) $rawLine['series'])
+                : null,
+            'compatible_profile_code' => $this->normalizeMaterialCode($rawLine['compatible_profile_code'] ?? null),
             'notes' => $notes,
             'warehouse_item_id' => $warehouseItemId,
             'warehouse_match' => $warehouseMatch,
@@ -198,7 +224,9 @@ class BomExcelExtractionService
 
             $code = $this->normalizeMaterialCode($rawLine['material_code'] ?? null);
             if ($code !== null) {
-                $codes[] = $code;
+                foreach ($this->skuNormalizer->variants($code) as $variant) {
+                    $codes[] = $variant;
+                }
             }
         }
 
@@ -215,11 +243,29 @@ class BomExcelExtractionService
             ->all();
     }
 
-    protected function resolveWarehouseItemId(string $materialCode): ?int
+    protected function resolveWarehouseItemId(
+        ?string $materialCode,
+        ?string $materialName = null,
+        ?string $sourceSystem = null,
+        ?string $series = null,
+        ?string $lineType = null,
+    ): ?int
     {
-        $id = $this->skuToWarehouseItemId[$materialCode] ?? null;
+        $id = null;
+        foreach ($this->skuNormalizer->variants($materialCode) as $variant) {
+            $id = $this->skuToWarehouseItemId[$variant] ?? null;
+            if ($id !== null) {
+                return (int) $id;
+            }
+        }
 
-        return $id !== null ? (int) $id : null;
+        return $this->warehouseItems->resolve(
+            code: $materialCode,
+            name: $materialName,
+            sourceSystem: $sourceSystem ?: 'wincad',
+            series: $series,
+            lineType: $lineType,
+        );
     }
 
     /**

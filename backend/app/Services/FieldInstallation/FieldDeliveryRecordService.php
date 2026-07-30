@@ -9,6 +9,7 @@ use App\Models\FieldInstallation\FieldDeliveryLine;
 use App\Models\FieldInstallation\FieldDeliveryRecord;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\User;
+use App\Services\Projects\ProjectDispatchService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -16,6 +17,7 @@ class FieldDeliveryRecordService
 {
     public function __construct(
         protected FieldInstallationAuditLogger $audit,
+        protected ProjectDispatchService $dispatches,
     ) {}
 
     public function record(FieldInstallationJob $job, User $actor, array $data): FieldDeliveryRecord
@@ -67,6 +69,10 @@ class FieldDeliveryRecordService
 
             if ($condition === DeliveryCondition::Partial) {
                 $this->assertQtyMismatchDocumented($record, $data);
+            }
+
+            if ($condition === DeliveryCondition::Complete && $job->project) {
+                $this->dispatches->completeOpenDispatchesForProject($job->project);
             }
 
             event(new FieldDeliveryRecorded(

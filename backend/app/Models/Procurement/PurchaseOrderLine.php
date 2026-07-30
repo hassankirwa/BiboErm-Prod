@@ -12,6 +12,7 @@ class PurchaseOrderLine extends Model
     protected $fillable = [
         'purchase_order_id',
         'warehouse_item_id',
+        'requisition_line_id',
         'description',
         'sku',
         'quantity',
@@ -38,6 +39,11 @@ class PurchaseOrderLine extends Model
     public function warehouseItem(): BelongsTo
     {
         return $this->belongsTo(Item::class, 'warehouse_item_id');
+    }
+
+    public function requisitionLine(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseRequisitionLine::class, 'requisition_line_id');
     }
 
     public function goodsReceiptLines(): HasMany

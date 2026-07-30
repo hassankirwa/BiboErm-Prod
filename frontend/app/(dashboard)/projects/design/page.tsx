@@ -20,6 +20,7 @@ import {
   type DesignQueueProject,
 } from "@/lib/api/projects/design";
 import { ApiError } from "@/lib/api/errors";
+import { projectSiteVisitDetailPath } from "@/lib/crm/site-visit-paths";
 import { projectSiteAssessmentPath, projectTabPath } from "@/lib/projects/paths";
 import { cn } from "@/lib/utils";
 import { ExternalLink, Layers, PencilRuler, Upload } from "lucide-react";
@@ -44,16 +45,35 @@ function primaryAction(project: DesignQueueProject): {
   icon: typeof PencilRuler;
 } | null {
   if (!project.has_production_measurement) {
+    const label =
+      project.measurement_status === "submitted_for_review"
+        ? "Review measurements"
+        : project.measurement_status === "measurements_captured"
+          ? "View measurements"
+          : ["clarification_needed", "revisit_required"].includes(
+                project.measurement_status ?? "",
+              )
+            ? "Resolve measurement issues"
+            : "Production measurements";
     return {
-      label: "Production measurements",
-      href: projectSiteAssessmentPath(project.id, "projects"),
+      label,
+      href:
+        project.measurement_visit_id &&
+        [
+          "measurements_captured",
+          "submitted_for_review",
+          "clarification_needed",
+          "revisit_required",
+        ].includes(project.measurement_status ?? "")
+          ? projectSiteVisitDetailPath(project.measurement_visit_id)
+          : projectSiteAssessmentPath(project.id, "projects"),
       icon: PencilRuler,
     };
   }
 
   if (!project.has_design_document) {
     return {
-      label: "Upload WINCAD",
+      label: "Upload design",
       href: projectTabPath(project.id, "designs", "projects"),
       icon: Upload,
     };
@@ -66,6 +86,23 @@ function primaryAction(project: DesignQueueProject): {
   };
 }
 
+function measurementBadgeVariant(
+  status: string | null,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "approved") return "default";
+  if (
+    status === "submitted_for_review" ||
+    status === "measurements_captured" ||
+    status === "in_progress"
+  ) {
+    return "secondary";
+  }
+  if (status === "clarification_needed" || status === "revisit_required") {
+    return "destructive";
+  }
+  return "outline";
+}
+
 function secondaryAction(project: DesignQueueProject): {
   label: string;
   href: string;
@@ -76,7 +113,9 @@ function secondaryAction(project: DesignQueueProject): {
 
   return {
     label: "View measurements",
-    href: projectSiteAssessmentPath(project.id, "projects"),
+    href: project.measurement_visit_id
+      ? projectSiteVisitDetailPath(project.measurement_visit_id)
+      : projectSiteAssessmentPath(project.id, "projects"),
   };
 }
 
@@ -101,7 +140,7 @@ export default function ProjectDesignPage() {
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title="Design"
-        subtitle="After production measurements, upload WINCAD and design files per project"
+        subtitle="After production measurements, upload design files per project"
       />
       <div className="space-y-6 p-6">
         <Card>
@@ -130,7 +169,7 @@ export default function ProjectDesignPage() {
                     <TableHead>Stage</TableHead>
                     <TableHead>Measurements</TableHead>
                     <TableHead>Design files</TableHead>
-                    <TableHead>PM</TableHead>
+                    <TableHead>Project Manager</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -163,11 +202,11 @@ export default function ProjectDesignPage() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            variant={
-                              project.has_production_measurement ? "default" : "outline"
-                            }
+                            variant={measurementBadgeVariant(
+                              project.measurement_status,
+                            )}
                           >
-                            {project.has_production_measurement ? "Done" : "Pending"}
+                            {project.measurement_status_label}
                           </Badge>
                         </TableCell>
                         <TableCell>

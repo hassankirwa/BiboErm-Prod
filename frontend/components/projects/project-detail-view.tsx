@@ -8,18 +8,24 @@ import { PermissionGate } from "@/components/auth/permission-gate";
 import { ProjectDetailActionBar } from "@/components/projects/project-detail-action-bar";
 import { ProjectDetailBom } from "@/components/projects/project-detail-bom";
 import { ProjectDetailDesigns } from "@/components/projects/project-detail-designs";
+import { ProjectDetailFabrication } from "@/components/projects/project-detail-fabrication";
 import { ProjectDetailOverview } from "@/components/projects/project-detail-overview";
 import { ProjectDetailProduction } from "@/components/projects/project-detail-production";
+import { ProjectDetailDesignChanges } from "@/components/projects/project-detail-design-changes";
 import { ProjectDetailQc } from "@/components/projects/project-detail-qc";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatProjectStage,
+  fetchProjectMeasurementVisits,
   getProject,
+  hasAssignedProductionMeasurementVisit,
   hasProductionMeasurementData,
+  projectStageAllowsProductionMeasurements,
   type ProjectDetail,
 } from "@/lib/api/projects";
+import type { ApiSiteVisit } from "@/lib/api/crm/types";
 import { ApiError } from "@/lib/api/errors";
 import {
   projectDetailPath,
@@ -28,13 +34,30 @@ import {
   projectSiteAssessmentPath,
   type ProjectViewMode,
 } from "@/lib/projects/paths";
+import { usePermissions } from "@/hooks/use-permissions";
 import { ChevronLeft, ClipboardList, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-type ProjectTab = "overview" | "bom" | "designs" | "production" | "qc";
+type ProjectTab =
+  | "overview"
+  | "bom"
+  | "designs"
+  | "production"
+  | "fabrication"
+  | "qc"
+  | "changes";
 
 function parseProjectTab(tab: string | null): ProjectTab {
-  if (tab === "bom" || tab === "designs" || tab === "production" || tab === "qc") return tab;
+  if (
+    tab === "bom" ||
+    tab === "designs" ||
+    tab === "production" ||
+    tab === "fabrication" ||
+    tab === "qc" ||
+    tab === "changes"
+  ) {
+    return tab;
+  }
   return "overview";
 }
 
@@ -57,10 +80,12 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
   const isCrmMode = mode === "crm";
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { canAny } = usePermissions();
   const activeTab = parseProjectTab(searchParams.get("tab"));
   const savedFlag = searchParams.get("saved");
   const tabsRef = useRef<HTMLDivElement>(null);
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [measurementVisits, setMeasurementVisits] = useState<ApiSiteVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [designUploadTrigger, setDesignUploadTrigger] = useState(0);
@@ -100,8 +125,26 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
     setError(null);
 
     getProject(projectId)
-      .then((response) => {
-        if (!cancelled) setProject(response.data);
+      .then(async (response) => {
+        if (cancelled) return;
+        setProject(response.data);
+
+        const stageAllows =
+          projectStageAllowsProductionMeasurements(response.data.stage) ||
+          hasProductionMeasurementData(response.data);
+        if (!stageAllows) {
+          setMeasurementVisits([]);
+          return;
+        }
+
+        try {
+          const visitsResponse = await fetchProjectMeasurementVisits(projectId);
+          if (!cancelled) {
+            setMeasurementVisits(visitsResponse.data ?? []);
+          }
+        } catch {
+          if (!cancelled) setMeasurementVisits([]);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -129,6 +172,19 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
     try {
       const response = await getProject(projectId);
       setProject(response.data);
+      if (
+        projectStageAllowsProductionMeasurements(response.data.stage) ||
+        hasProductionMeasurementData(response.data)
+      ) {
+        try {
+          const visitsResponse = await fetchProjectMeasurementVisits(projectId);
+          setMeasurementVisits(visitsResponse.data ?? []);
+        } catch {
+          setMeasurementVisits([]);
+        }
+      } else {
+        setMeasurementVisits([]);
+      }
     } catch {
       // Keep current project state if refresh fails.
     }
@@ -165,18 +221,16 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
     );
   }
 
-  const DESIGN_MEASUREMENT_STAGES = new Set([
-    "deposit_received",
-    "site_assessment",
-    "final_design_approval",
-  ]);
-
-  const showSiteAssessmentLink =
-    project.stage !== "awaiting_deposit" &&
-    (hasProductionMeasurementData(project) ||
-      (isCrmMode
-        ? DESIGN_MEASUREMENT_STAGES.has(project.stage)
-        : project.stage === "site_assessment"));
+  const stageOk =
+    projectStageAllowsProductionMeasurements(project.stage) ||
+    hasProductionMeasurementData(project);
+  const assigned = hasAssignedProductionMeasurementVisit(measurementVisits);
+  const canSchedule = canAny(
+    "site_visits.schedule",
+    "projects.manage",
+    "projects.advance_stage",
+  );
+  const showProductionMeasurementsLink = stageOk && (assigned || canSchedule);
 
   return (
     <div className="flex min-w-0 w-full flex-col">
@@ -189,17 +243,19 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
               <PermissionGate permission="projects.documents.upload">
                 <Button variant="default" size="sm" type="button" onClick={handleUploadDesignClick}>
                   <Upload className="mr-1 h-4 w-4" />
-                  Upload design
+                  Import fabrication list
                 </Button>
               </PermissionGate>
             ) : null}
-            {showSiteAssessmentLink ? (
+            {showProductionMeasurementsLink ? (
               <PermissionGate
                 anyOf={[
                   "projects.site_assessment_notes",
                   "projects.advance_stage",
                   "projects.manage",
                   "projects.view",
+                  "site_visits.schedule",
+                  "site_visits.execute",
                 ]}
               >
                 <Button variant="default" size="sm" asChild>
@@ -244,9 +300,13 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
                 <PermissionGate permission="production.view">
                   <TabsTrigger value="production">Production</TabsTrigger>
                 </PermissionGate>
+                <PermissionGate permission="production.view">
+                  <TabsTrigger value="fabrication">Fabrication</TabsTrigger>
+                </PermissionGate>
                 <PermissionGate permission="qc.view">
                   <TabsTrigger value="qc">Quality</TabsTrigger>
                 </PermissionGate>
+                <TabsTrigger value="changes">Design changes</TabsTrigger>
               </TabsList>
               <TabsContent value="overview" className="mt-6">
                 <ProjectDetailOverview
@@ -279,11 +339,19 @@ export function ProjectDetailView({ projectId, mode }: ProjectDetailViewProps) {
                   />
                 </TabsContent>
               </PermissionGate>
+              <PermissionGate permission="production.view">
+                <TabsContent value="fabrication" className="mt-6">
+                  <ProjectDetailFabrication project={project} />
+                </TabsContent>
+              </PermissionGate>
               <PermissionGate permission="qc.view">
                 <TabsContent value="qc" className="mt-6">
                   <ProjectDetailQc project={project} />
                 </TabsContent>
               </PermissionGate>
+              <TabsContent value="changes" className="mt-6">
+                <ProjectDetailDesignChanges projectId={project.id} />
+              </TabsContent>
             </Tabs>
           </div>
         </div>

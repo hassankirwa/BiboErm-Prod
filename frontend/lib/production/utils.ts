@@ -1,15 +1,29 @@
 import {
   ASSEMBLY_STAGES,
   CUTTING_STAGES,
+  FABRICATION_STAGES,
   PRODUCTION_STAGE_LABELS,
   type ProductionOrder,
   type ProductionStageValue,
   type ScheduleOrder,
 } from "@/lib/api/production";
 
-export const PRODUCTION_STAGE_OPTIONS = (
-  Object.entries(PRODUCTION_STAGE_LABELS) as [ProductionStageValue, string][]
-).map(([value, label]) => ({ value, label }));
+/** Production flow order — use this instead of Object.entries so dropdown order stays stable. */
+export const PRODUCTION_STAGE_ORDER: ProductionStageValue[] = [
+  "material_prep",
+  "qc_pre_check",
+  "cutting",
+  "fabrication",
+  "sash",
+  "glass_assembly",
+  "finishing",
+  "qc_post_fabrication",
+];
+
+export const PRODUCTION_STAGE_OPTIONS = PRODUCTION_STAGE_ORDER.map((value) => ({
+  value,
+  label: PRODUCTION_STAGE_LABELS[value],
+}));
 
 export const TEAM_ROLE_OPTIONS = [
   { value: "cutting_lead", label: "Cutting lead" },
@@ -17,6 +31,28 @@ export const TEAM_ROLE_OPTIONS = [
   { value: "assembly_lead", label: "Assembly lead" },
   { value: "qc_liaison", label: "QC liaison" },
 ] as const;
+
+export type TeamRoleValue = (typeof TEAM_ROLE_OPTIONS)[number]["value"];
+
+/** Default team role for a production stage. */
+export function defaultRoleForStage(stage: ProductionStageValue): TeamRoleValue {
+  switch (stage) {
+    case "material_prep":
+    case "cutting":
+      return "cutting_lead";
+    case "fabrication":
+    case "sash":
+      return "fabrication_lead";
+    case "glass_assembly":
+    case "finishing":
+      return "assembly_lead";
+    case "qc_pre_check":
+    case "qc_post_fabrication":
+      return "qc_liaison";
+    default:
+      return "cutting_lead";
+  }
+}
 
 export function formatProductionStage(stage: string): string {
   return (
@@ -27,6 +63,10 @@ export function formatProductionStage(stage: string): string {
 
 export function isCuttingQueueOrder(order: ProductionOrder): boolean {
   return CUTTING_STAGES.includes(order.current_stage);
+}
+
+export function isFabricationQueueOrder(order: ProductionOrder): boolean {
+  return FABRICATION_STAGES.includes(order.current_stage);
 }
 
 export function isAssemblyQueueOrder(order: ProductionOrder): boolean {
@@ -78,17 +118,7 @@ export function materialReadinessLabel(
 }
 
 export function stageProgressPercent(stage: ProductionStageValue): number {
-  const order: ProductionStageValue[] = [
-    "material_prep",
-    "qc_pre_check",
-    "cutting",
-    "fabrication",
-    "sash",
-    "glass_assembly",
-    "finishing",
-    "qc_post_fabrication",
-  ];
-  const index = order.indexOf(stage);
+  const index = PRODUCTION_STAGE_ORDER.indexOf(stage);
   if (index < 0) return 0;
-  return Math.round(((index + 1) / order.length) * 100);
+  return Math.round(((index + 1) / PRODUCTION_STAGE_ORDER.length) * 100);
 }

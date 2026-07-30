@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Pencil, Lock, PackageCheck } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { GrnPutawaySelect } from "@/components/procurement/grn-putaway-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,12 +23,15 @@ import {
 import { listProjects, type ProjectSummary } from "@/lib/api/projects";
 import {
   getLocationTree,
+  getPutawayOptions,
   listWarehouseItems,
   receiveStock,
   warehouseItemLabel,
+  type PutawayOptionsForItem,
   type WarehouseItem,
   type WarehouseLocationTree,
 } from "@/lib/api/warehouse";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type ReceiveLine = {
@@ -59,6 +63,19 @@ function isPutawayLine(line: GoodsReceiptLine): boolean {
   );
 }
 
+function categoryBadgeLabel(category: string | null): string | null {
+  switch (category) {
+    case "aluminium_profile":
+      return "Aluminium";
+    case "accessory":
+      return "Accessory";
+    case "rubber":
+      return "Rubber";
+    default:
+      return category;
+  }
+}
+
 export default function WarehouseReceivePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,6 +85,9 @@ export default function WarehouseReceivePage() {
   const [projectId, setProjectId] = useState("");
   const [notes, setNotes] = useState("");
   const [locationTree, setLocationTree] = useState<WarehouseLocationTree[]>([]);
+  const [putawayByItemId, setPutawayByItemId] = useState<
+    Record<number, PutawayOptionsForItem>
+  >({});
   const [locationsLoading, setLocationsLoading] = useState(true);
   const [locationsError, setLocationsError] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -75,6 +95,8 @@ export default function WarehouseReceivePage() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [grnLoading, setGrnLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** When false, line qty/bin fields are confirmation-only. */
+  const [editingPutaway, setEditingPutaway] = useState(false);
 
   useEffect(() => {
     setLocationsLoading(true);
@@ -105,30 +127,72 @@ export default function WarehouseReceivePage() {
     if (!Number.isFinite(grnId) || grnId <= 0) {
       setGrn(null);
       setLines([]);
+      setPutawayByItemId({});
       return;
     }
 
     setGrnLoading(true);
     getGoodsReceipt(grnId)
-      .then((res) => {
+      .then(async (res) => {
         const data = res.data;
         setGrn(data);
         setProjectId(data.project_id ? String(data.project_id) : "");
         setNotes(data.notes?.trim() || `GRN ${data.grn_number} putaway`);
+        setEditingPutaway(false);
+
+        const putawayLines = (data.lines ?? []).filter(isPutawayLine);
+        const itemIds = putawayLines
+          .map((line) => Number(line.warehouse_item_id))
+          .filter((id) => Number.isFinite(id) && id > 0);
+
+        let putawayMap: Record<number, PutawayOptionsForItem> = {};
+        if (itemIds.length > 0) {
+          try {
+            const putawayRes = await getPutawayOptions(itemIds);
+            putawayMap = Object.fromEntries(
+              (putawayRes.data ?? []).map((entry) => [
+                entry.warehouse_item_id,
+                entry,
+              ]),
+            );
+          } catch {
+            putawayMap = {};
+          }
+        }
+        setPutawayByItemId(putawayMap);
+
         setLines(
-          (data.lines ?? [])
-            .filter(isPutawayLine)
-            .map((line) => ({
+          putawayLines.map((line) => {
+            const itemId = Number(line.warehouse_item_id);
+            const options = putawayMap[itemId];
+            const category =
+              (line.warehouse_item_category as string | null | undefined) ??
+              options?.category ??
+              null;
+            const allowedBinIds = new Set(
+              (options?.bins ?? []).map((bin) => bin.id),
+            );
+            // Drop stale bins from a wrong deck (e.g. aluminium cage on an accessory).
+            const savedBinId = line.to_bin_id;
+            const toBinId =
+              savedBinId != null &&
+              (allowedBinIds.size === 0 || allowedBinIds.has(savedBinId))
+                ? savedBinId
+                : (options?.suggested_bin_id ?? null);
+
+            return {
               grn_line_id: line.id,
-              item_id: Number(line.warehouse_item_id),
-              warehouse_item_category:
-                (line.warehouse_item_category as string | null | undefined) ?? null,
+              item_id: itemId,
+              warehouse_item_category: category,
               quantity: Number(line.qty_accepted || line.qty_received),
-              to_bin_id: line.to_bin_id,
-            })),
+              to_bin_id: toBinId,
+            };
+          }),
         );
       })
-      .catch((error: Error) => toast.error(error.message || "Failed to load GRN receive payload."))
+      .catch((error: Error) =>
+        toast.error(error.message || "Failed to load GRN receive payload."),
+      )
       .finally(() => setGrnLoading(false));
   }, [grnId]);
 
@@ -167,6 +231,13 @@ export default function WarehouseReceivePage() {
   const submit = async () => {
     if (!grn) {
       toast.error("No goods receipt loaded.");
+      return;
+    }
+
+    const missingBin = lines.find((line) => !line.to_bin_id);
+    if (missingBin) {
+      toast.error("Every putaway line needs a storage location.");
+      setEditingPutaway(true);
       return;
     }
 
@@ -215,47 +286,105 @@ export default function WarehouseReceivePage() {
       permissions={["warehouse.stock.receive"]}
       fallback={
         <div className="flex min-w-0 w-full flex-col">
-          <AppHeader title="Receive Stock" subtitle="Put away inbound stock and optionally clear project shortages" />
-          <div className="p-6 text-sm text-muted-foreground">
+          <AppHeader
+            title="Receive Stock"
+            subtitle="Confirm putaway locations and receive inbound stock"
+          />
+          <div className="p-4 text-sm text-muted-foreground sm:p-6">
             Stock receiving is only available to warehouse staff with receive permission.
           </div>
         </div>
       }
     >
       <div className="flex min-w-0 w-full flex-col">
-        <AppHeader title="Receive Stock" subtitle="Put away inbound stock and optionally clear project shortages" />
-        <div className="space-y-6 p-6">
+        <AppHeader
+          title="Receive Stock"
+          subtitle="Confirm putaway from receiving — edit only if you need a last-minute change"
+        />
+        <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:space-y-5 sm:p-6">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/warehouse/receive/create">Create GRN from PO</Link>
             </Button>
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" asChild>
               <Link href="/warehouse/receiving-logs">Receiving logs</Link>
             </Button>
             {grn ? (
-              <Button variant="outline" asChild>
+              <Button variant="outline" size="sm" asChild>
                 <Link href={`/procurement/goods-receipts/${grn.id}`}>Open GRN</Link>
               </Button>
             ) : null}
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>{grn ? `Receive for ${grn.grn_number}` : "Manual receive"}</CardTitle>
+
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="space-y-3 border-b bg-muted/20 pb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-lg sm:text-xl">
+                    <PackageCheck className="h-5 w-5 shrink-0 text-primary" />
+                    <span className="min-w-0 break-words">
+                      {grn ? `Putaway · ${grn.grn_number}` : "Manual receive"}
+                    </span>
+                  </CardTitle>
+                  <CardDescription>
+                    Locations were set when the GRN was verified. Confirm below, then receive into
+                    stock.
+                  </CardDescription>
+                </div>
+                {lines.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant={editingPutaway ? "secondary" : "outline"}
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => setEditingPutaway((value) => !value)}
+                  >
+                    {editingPutaway ? (
+                      <>
+                        <Lock className="h-3.5 w-3.5" />
+                        Lock putaway
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit putaway
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+              </div>
+              {lines.length > 0 ? (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant={editingPutaway ? "default" : "secondary"}>
+                    {editingPutaway ? "Editing enabled" : "Confirmation mode"}
+                  </Badge>
+                  <Badge variant="outline">{lines.length} line{lines.length === 1 ? "" : "s"}</Badge>
+                </div>
+              ) : null}
             </CardHeader>
-            <CardContent className="space-y-4">
+
+            <CardContent className="space-y-5 pt-5">
               {grnLoading ? (
                 <p className="text-sm text-muted-foreground">Loading goods receipt…</p>
               ) : null}
               {locationsError ? (
                 <p className="text-sm text-destructive">{locationsError}</p>
               ) : null}
-              <div className="grid gap-4 md:grid-cols-2">
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="receive-grn">Goods receipt</Label>
                   <Input
                     id="receive-grn"
-                    value={grn ? grn.grn_number : grnId > 0 ? `GRN #${grnId}` : "No GRN linked"}
+                    value={
+                      grn
+                        ? grn.grn_number
+                        : grnId > 0
+                          ? `GRN #${grnId}`
+                          : "No GRN linked"
+                    }
                     readOnly
+                    className="bg-muted/40"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -264,7 +393,7 @@ export default function WarehouseReceivePage() {
                     id="receive-project"
                     className={selectClassName}
                     value={projectId}
-                    disabled={optionsLoading}
+                    disabled={optionsLoading || (!editingPutaway && Boolean(grn))}
                     onChange={(event) => setProjectId(event.target.value)}
                   >
                     <option value="">
@@ -278,13 +407,16 @@ export default function WarehouseReceivePage() {
                   </select>
                 </div>
               </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="receive-notes">Putaway notes</Label>
                 <Textarea
                   id="receive-notes"
                   value={notes}
+                  readOnly={!editingPutaway && Boolean(grn)}
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder="Reference GRN, carrier, or reservation notes…"
+                  className={cn(!editingPutaway && grn && "bg-muted/40")}
                 />
               </div>
 
@@ -301,7 +433,7 @@ export default function WarehouseReceivePage() {
                         key={line.id}
                         className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                       >
-                        <span>{poLineDescription(grn, line)}</span>
+                        <span className="min-w-0 break-words">{poLineDescription(grn, line)}</span>
                         <Badge variant="outline">Procurement only</Badge>
                       </li>
                     ))}
@@ -317,57 +449,98 @@ export default function WarehouseReceivePage() {
               ) : null}
 
               <div className="space-y-3">
-                {lines.map((line, index) => (
-                  <div
-                    key={`${line.grn_line_id}-${line.item_id}`}
-                    className="grid gap-4 rounded-lg border bg-muted/20 p-4 md:grid-cols-3"
-                  >
-                    <div className="space-y-1.5 md:col-span-1">
-                      <Label htmlFor={`receive-item-${index}`}>Warehouse item</Label>
-                      <Input
-                        id={`receive-item-${index}`}
-                        readOnly
-                        value={getItemLabel(line.item_id)}
-                      />
+                {lines.map((line, index) => {
+                  const category =
+                    line.warehouse_item_category ??
+                    putawayByItemId[line.item_id]?.category ??
+                    null;
+                  const categoryLabel = categoryBadgeLabel(category);
+
+                  return (
+                    <div
+                      key={`${line.grn_line_id}-${line.item_id}`}
+                      className={cn(
+                        "min-w-0 space-y-3 rounded-lg border p-3 sm:p-4",
+                        editingPutaway ? "border-primary/30 bg-background" : "bg-muted/15",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Line {index + 1}
+                        </span>
+                        {categoryLabel ? (
+                          <Badge variant="outline" className="font-normal">
+                            {categoryLabel}
+                          </Badge>
+                        ) : null}
+                        {putawayByItemId[line.item_id]?.source === "accessories_deck" ? (
+                          <Badge variant="secondary" className="font-normal">
+                            Accessories bins
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-12">
+                        <div className="min-w-0 space-y-1.5 md:col-span-5">
+                          <Label htmlFor={`receive-item-${index}`}>Warehouse item</Label>
+                          <Input
+                            id={`receive-item-${index}`}
+                            readOnly
+                            value={getItemLabel(line.item_id)}
+                            className="bg-muted/40"
+                            title={getItemLabel(line.item_id)}
+                          />
+                        </div>
+                        <div className="min-w-0 space-y-1.5 md:col-span-2">
+                          <Label htmlFor={`receive-qty-${index}`}>Qty</Label>
+                          <Input
+                            id={`receive-qty-${index}`}
+                            type="number"
+                            min={0}
+                            value={line.quantity}
+                            readOnly={!editingPutaway}
+                            className={cn(!editingPutaway && "bg-muted/40")}
+                            onChange={(event) =>
+                              setLines((current) =>
+                                current.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, quantity: Number(event.target.value) }
+                                    : entry,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="min-w-0 md:col-span-5">
+                          <GrnPutawaySelect
+                            id={`receive-bin-${index}`}
+                            warehouseItemId={line.item_id}
+                            warehouseItemCategory={category}
+                            toBinId={line.to_bin_id}
+                            locationTree={locationTree}
+                            warehouseItems={warehouseItems}
+                            putawayOptions={putawayByItemId[line.item_id] ?? null}
+                            locationsLoading={locationsLoading}
+                            locationsError={locationsError}
+                            readOnly={!editingPutaway}
+                            disabled={!editingPutaway}
+                            onChange={(toBinId) =>
+                              setLines((current) =>
+                                current.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, to_bin_id: toBinId }
+                                    : entry,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`receive-qty-${index}`}>Quantity to receive</Label>
-                      <Input
-                        id={`receive-qty-${index}`}
-                        type="number"
-                        min={0}
-                        value={line.quantity}
-                        onChange={(event) =>
-                          setLines((current) =>
-                            current.map((entry, entryIndex) =>
-                              entryIndex === index
-                                ? { ...entry, quantity: Number(event.target.value) }
-                                : entry,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                    <GrnPutawaySelect
-                      id={`receive-bin-${index}`}
-                      warehouseItemId={line.item_id}
-                      warehouseItemCategory={line.warehouse_item_category}
-                      toBinId={line.to_bin_id}
-                      locationTree={locationTree}
-                      warehouseItems={warehouseItems}
-                      locationsLoading={locationsLoading}
-                      locationsError={locationsError}
-                      onChange={(toBinId) =>
-                        setLines((current) =>
-                          current.map((entry, entryIndex) =>
-                            entryIndex === index ? { ...entry, to_bin_id: toBinId } : entry,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
               {!grn ? (
                 <Button
                   variant="outline"
@@ -387,15 +560,16 @@ export default function WarehouseReceivePage() {
                   Add line
                 </Button>
               ) : null}
+
               <Button
-                className="w-full"
+                className="w-full sm:w-auto sm:min-w-[240px]"
                 disabled={submitting || !canSubmit}
                 onClick={() => void submit()}
               >
                 {submitting
                   ? "Saving…"
                   : lines.length > 0
-                    ? "Save putaway & receive stock"
+                    ? "Confirm putaway & receive stock"
                     : "Save putaway notes & project link"}
               </Button>
             </CardContent>

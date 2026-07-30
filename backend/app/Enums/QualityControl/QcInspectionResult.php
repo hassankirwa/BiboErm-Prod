@@ -8,4 +8,5 @@ enum QcInspectionResult: string
     case Pass = 'pass';
     case Fail = 'fail';
     case ConditionalPass = 'conditional_pass';
+    case Skipped = 'skipped';
 }

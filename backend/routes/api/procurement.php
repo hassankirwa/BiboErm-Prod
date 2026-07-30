@@ -4,6 +4,7 @@ use App\Http\Controllers\Procurement\Addons\ProjectAddonRequestController;
 use App\Http\Controllers\Procurement\Dashboard\ProcurementDashboardController;
 use App\Http\Controllers\Procurement\Delays\ProcurementDelayController;
 use App\Http\Controllers\Procurement\GlassOrders\GlassOrderController;
+use App\Http\Controllers\Procurement\GlassOrders\GlassPriceAnalyticsController;
 use App\Http\Controllers\Procurement\GlassOrders\MarkGlassOrderDeliveredController;
 use App\Http\Controllers\Procurement\GlassOrders\MarkGlassOrderOrderedController;
 use App\Http\Controllers\Procurement\GoodsReceipts\GoodsReceiptAttachmentController;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('permission:procurement.requisition.view|procurement.view')->get('requisitions', [PurchaseRequisitionController::class, 'index']);
 Route::middleware('permission:procurement.requisition.view|procurement.view')->get('requisitions/{requisition}', [PurchaseRequisitionController::class, 'show']);
+Route::middleware('permission:procurement.requisition.view|procurement.view')->get('requisitions/{requisition}/export', [PurchaseRequisitionController::class, 'export']);
 Route::middleware('permission:procurement.requisition.view|procurement.view')
     ->get('requisitions/{requisition}/pdf', PurchaseRequisitionPdfController::class)
     ->name('procurement.requisitions.pdf');
@@ -62,6 +64,7 @@ Route::middleware('permission:procurement.grn.verify|procurement.manage|warehous
 Route::middleware('permission:procurement.grn.verify|procurement.manage|warehouse.stock.receive')->post('goods-receipts/{goodsReceipt}/verify', VerifyGoodsReceiptController::class);
 
 Route::middleware('permission:procurement.glass.view|procurement.view')->get('glass-orders', [GlassOrderController::class, 'index']);
+Route::middleware('permission:procurement.glass.view|procurement.view')->get('glass-price-analytics', GlassPriceAnalyticsController::class);
 Route::middleware('permission:procurement.glass.view|procurement.view')->get('glass-orders/{glassOrder}', [GlassOrderController::class, 'show']);
 Route::middleware('permission:procurement.glass.manage|procurement.manage')->post('glass-orders', [GlassOrderController::class, 'store']);
 Route::middleware('permission:procurement.glass.manage|procurement.manage')->patch('glass-orders/{glassOrder}', [GlassOrderController::class, 'update']);

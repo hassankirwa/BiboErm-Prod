@@ -10,6 +10,7 @@ use App\Models\ProjectBomLine;
 use App\Models\ProjectDelay;
 use App\Models\ProjectEngineer;
 use App\Models\ProjectFloor;
+use App\Services\Projects\ProjectFifoOrderService;
 use App\Services\Projects\ProjectMaterialStatusService;
 use App\Services\Projects\ProjectStageService;
 use App\Services\Warehouse\Reservations\ProjectMaterialReservationOrchestrator;
@@ -23,6 +24,7 @@ class ProjectOperationsController extends Controller
         protected ProjectMaterialStatusService $materialStatus,
         protected ProjectStageService $stages,
         protected ProjectMaterialReservationOrchestrator $reservations,
+        protected ProjectFifoOrderService $fifoOrder,
     ) {}
 
     public function materialStatus(Project $project): JsonResponse
@@ -44,7 +46,11 @@ class ProjectOperationsController extends Controller
 
         $current = $this->stages->currentStage($project);
 
-        if (! in_array($current, [ProjectStage::MaterialCheck, ProjectStage::MaterialsReserved], true)) {
+        if (! in_array($current, [
+            ProjectStage::MaterialCheck,
+            ProjectStage::MaterialsReserved,
+            ProjectStage::AwaitingProcurement,
+        ], true)) {
             throw ValidationException::withMessages([
                 'stage' => ['Materials can only be reserved while the project is awaiting warehouse reservation.'],
             ]);
@@ -118,10 +124,14 @@ class ProjectOperationsController extends Controller
 
         $projects = Project::query()
             ->visibleTo($request->user())
-            ->with(['account', 'projectManager', 'latestBom'])
+            ->with(['account', 'projectManager', 'latestBom.lines.warehouseItem'])
             ->whereNotIn('stage', [ProjectStage::ProjectComplete->value])
-            ->latest()
-            ->get();
+            // Skip projects with no BOM lines — they cannot produce shortages.
+            ->whereHas('latestBom.lines')
+            ->limit(200);
+
+        $this->fifoOrder->applyListOrdering($projects);
+        $projects = $projects->get();
 
         $data = [];
 
@@ -150,6 +160,7 @@ class ProjectOperationsController extends Controller
                     'name' => $project->name,
                     'stage' => $project->stage?->value ?? $project->stage,
                     'priority' => $project->priority,
+                    'fifo_order' => $this->fifoOrder->positionFor((int) $project->id),
                     'account' => $project->account ? [
                         'id' => $project->account->id,
                         'name' => $project->account->name,
@@ -181,6 +192,8 @@ class ProjectOperationsController extends Controller
             'data' => $data,
             'meta' => [
                 'total_projects' => count($data),
+                'scanned_projects' => $projects->count(),
+                'scan_limit' => 200,
             ],
         ]);
     }

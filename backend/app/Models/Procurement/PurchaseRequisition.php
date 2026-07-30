@@ -18,6 +18,7 @@ class PurchaseRequisition extends Model
         'supplier_id',
         'status',
         'notes',
+        'required_by',
         'requested_by',
         'submitted_at',
         'approved_by',
@@ -29,6 +30,7 @@ class PurchaseRequisition extends Model
     {
         return [
             'status' => RequisitionStatus::class,
+            'required_by' => 'date',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
         ];
@@ -85,5 +87,84 @@ class PurchaseRequisition extends Model
             RequisitionTrigger::LowStock,
             RequisitionTrigger::ProjectMaterial,
         ], true);
+    }
+
+    public function isEditable(): bool
+    {
+        $status = $this->status instanceof RequisitionStatus
+            ? $this->status
+            : RequisitionStatus::tryFrom((string) $this->status);
+
+        return $status === RequisitionStatus::Draft;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function orderedRequisitionLineIds(): array
+    {
+        if ($this->relationLoaded('purchaseOrders')) {
+            return $this->purchaseOrders
+                ->flatMap(function (PurchaseOrder $order) {
+                    return $order->relationLoaded('lines')
+                        ? $order->lines->pluck('requisition_line_id')
+                        : $order->lines()->pluck('requisition_line_id');
+                })
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return PurchaseOrderLine::query()
+            ->whereHas('purchaseOrder', fn ($q) => $q->where('requisition_id', $this->id))
+            ->whereNotNull('requisition_line_id')
+            ->pluck('requisition_line_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Lines not yet covered by a purchase order.
+     *
+     * @return \Illuminate\Support\Collection<int, PurchaseRequisitionLine>
+     */
+    public function uncoveredLines()
+    {
+        $this->loadMissing(['lines', 'purchaseOrders.lines']);
+        $ordered = $this->orderedRequisitionLineIds();
+
+        // Legacy single-PO path: older POs may lack requisition_line_id links.
+        if ($ordered === [] && $this->purchaseOrders->isNotEmpty()) {
+            $hasLinkedLines = $this->purchaseOrders
+                ->flatMap(fn (PurchaseOrder $order) => $order->lines)
+                ->contains(fn ($line) => $line->requisition_line_id);
+
+            if (! $hasLinkedLines) {
+                return collect();
+            }
+        }
+
+        $orderedLookup = array_flip($ordered);
+
+        return $this->lines
+            ->reject(fn (PurchaseRequisitionLine $line) => isset($orderedLookup[$line->id]))
+            ->values();
+    }
+
+    public function canCreatePurchaseOrder(): bool
+    {
+        $status = $this->status instanceof RequisitionStatus
+            ? $this->status
+            : RequisitionStatus::tryFrom((string) $this->status);
+
+        if ($status !== RequisitionStatus::Approved) {
+            return false;
+        }
+
+        return $this->uncoveredLines()->isNotEmpty();
     }
 }

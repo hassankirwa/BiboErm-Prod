@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Crm\SiteVisits\ApproveSiteVisitController;
+use App\Http\Controllers\Crm\SiteVisits\AssignedSiteVisitHistoryController;
+use App\Http\Controllers\Crm\SiteVisits\RequestSiteVisitChangesController;
+use App\Http\Controllers\Crm\SiteVisits\ReassignSiteVisitController;
 use App\Http\Controllers\Crm\SiteVisits\SiteVisitController;
 use App\Http\Controllers\Crm\SiteVisits\StartSiteVisitController;
 use App\Http\Controllers\Crm\SiteVisits\StoreSiteMeasurementSketchController;
@@ -20,6 +23,7 @@ $executeSiteVisit = 'site_visits.execute|field_installation.log|site_visits.view
 Route::middleware("permission:{$viewSiteVisits}")->get('site-visits', [SiteVisitController::class, 'index']);
 Route::middleware("permission:{$viewSiteVisits}")->get('site-visits/today', TodaySiteVisitsController::class);
 Route::middleware("permission:{$viewSiteVisits}")->get('site-visits/open', OpenAssignedSiteVisitsController::class);
+Route::middleware("permission:{$viewSiteVisits}")->get('site-visits/history', AssignedSiteVisitHistoryController::class);
 Route::middleware('permission:site_visits.schedule|crm.manage')->post('site-visits', [SiteVisitController::class, 'store']);
 Route::middleware("permission:{$viewSiteVisits}")->get('site-visits/{siteVisit}', [SiteVisitController::class, 'show']);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/start', StartSiteVisitController::class);
@@ -27,4 +31,6 @@ Route::middleware("permission:{$executeSiteVisit}")->patch('site-visits/{siteVis
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/measurement-form/sketch', StoreSiteMeasurementSketchController::class);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/submit', SubmitSiteVisitController::class);
 Route::middleware("permission:{$viewSiteVisits}")->post('site-visits/{siteVisit}/approve', ApproveSiteVisitController::class);
+Route::middleware("permission:{$viewSiteVisits}")->post('site-visits/{siteVisit}/request-changes', RequestSiteVisitChangesController::class);
+Route::middleware('permission:site_visits.schedule|projects.manage|crm.manage')->patch('site-visits/{siteVisit}/reassign', ReassignSiteVisitController::class);
 Route::middleware("permission:{$executeSiteVisit}")->post('site-visits/{siteVisit}/photos', StoreSiteVisitPhotoController::class);

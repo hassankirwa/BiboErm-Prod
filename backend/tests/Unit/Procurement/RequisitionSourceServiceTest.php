@@ -77,7 +77,7 @@ class RequisitionSourceServiceTest extends TestCase
         $this->assertCount(1, $requisition->lines);
         $this->assertSame(RequisitionTrigger::ProjectMaterial, $requisition->lines->first()->trigger_type);
         $this->assertSame($line->id, $requisition->lines->first()->project_bom_line_id);
-        $this->assertSame('5.000', $requisition->lines->first()->quantity);
+        $this->assertSame('3.000', $requisition->lines->first()->quantity);
     }
 
     public function test_glass_order_source_creates_pending_approval_requisition(): void

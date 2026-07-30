@@ -12,6 +12,7 @@ import {
   fetchCrmAssignableUsers,
   type CrmAssignableUser,
 } from "@/lib/api/crm/lookups";
+import { fetchUsers } from "@/lib/api/users";
 import { cn } from "@/lib/utils";
 
 type SiteVisitAssigneeSelectProps = {
@@ -21,6 +22,8 @@ type SiteVisitAssigneeSelectProps = {
   currentUserName?: string | null;
   placeholder?: string;
   className?: string;
+  /** When true, list every active user (not only field/CRM site-visit roles). */
+  allActiveUsers?: boolean;
 };
 
 export function defaultSiteVisitAssigneeId(
@@ -39,14 +42,25 @@ export function SiteVisitAssigneeSelect({
   currentUserName,
   placeholder = "Assigned To",
   className,
+  allActiveUsers = false,
 }: SiteVisitAssigneeSelectProps) {
   const [assignees, setAssignees] = useState<CrmAssignableUser[]>([]);
 
   useEffect(() => {
-    fetchCrmAssignableUsers({ context: "site_visits" })
-      .then((res) => setAssignees(res.data))
-      .catch(() => setAssignees([]));
-  }, []);
+    const load = allActiveUsers
+      ? fetchUsers({ status: "active" }).then((res) =>
+          (res.data ?? []).map((user) => ({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          })),
+        )
+      : fetchCrmAssignableUsers({ context: "site_visits" }).then(
+          (res) => res.data,
+        );
+
+    load.then(setAssignees).catch(() => setAssignees([]));
+  }, [allActiveUsers]);
 
   const meLabel = useMemo(() => {
     if (!currentUserId) return null;

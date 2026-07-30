@@ -9,6 +9,38 @@ use Illuminate\Support\Collection;
 
 class StockLevelCalculator
 {
+    /**
+     * @param  list<int>  $itemIds
+     * @return array<int, array{on_hand: string, reserved: string, available: string}>
+     */
+    public function totalsForItemIds(array $itemIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $itemIds))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $rows = StockLevel::query()
+            ->selectRaw('item_id, coalesce(sum(quantity_on_hand), 0) as on_hand, coalesce(sum(quantity_reserved), 0) as reserved')
+            ->whereIn('item_id', $ids)
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        $totals = [];
+        foreach ($ids as $id) {
+            $onHand = number_format((float) ($rows->get($id)?->on_hand ?? 0), 3, '.', '');
+            $reserved = number_format((float) ($rows->get($id)?->reserved ?? 0), 3, '.', '');
+            $totals[$id] = [
+                'on_hand' => $onHand,
+                'reserved' => $reserved,
+                'available' => bcsub($onHand, $reserved, 3),
+            ];
+        }
+
+        return $totals;
+    }
+
     public function availableForItem(Item $item): string
     {
         $levels = StockLevel::query()

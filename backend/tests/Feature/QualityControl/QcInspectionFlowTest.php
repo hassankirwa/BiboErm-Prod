@@ -62,6 +62,201 @@ class QcInspectionFlowTest extends TestCase
         $this->assertGreaterThanOrEqual(9, $contextCount);
     }
 
+    public function test_grn_receiving_template_has_practical_checklist_items(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $template = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::WarehouseReceiving)
+            ->where('is_system', true)
+            ->where('is_active', true)
+            ->orderByDesc('version')
+            ->firstOrFail();
+
+        $this->assertSame('GRN Receiving', $template->name);
+
+        $keys = collect($template->items)->pluck('key')->all();
+        $this->assertContains('docs_delivery_packing_list', $keys);
+        $this->assertContains('qty_matches_po_grn', $keys);
+        $this->assertContains('sku_profile_identity', $keys);
+        $this->assertContains('dimensions_length_profile', $keys);
+        $this->assertContains('finish_color_coating_tier', $keys);
+        $this->assertContains('visible_damage', $keys);
+        $this->assertContains('packing_condition', $keys);
+        $this->assertContains('accessories_completeness', $keys);
+        $this->assertContains('putaway_ready_labelling', $keys);
+        $this->assertGreaterThanOrEqual(8, count($template->items));
+    }
+
+    public function test_production_stage_templates_are_seeded(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $pre = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::ProductionQcPreCheck)
+            ->where('is_system', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+        $this->assertGreaterThanOrEqual(8, count($pre->items));
+        $this->assertContains('cutting_sheet_ready', collect($pre->items)->pluck('key'));
+
+        $cutting = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::ProductionInProcess)
+            ->where('stage', 'cutting')
+            ->where('is_system', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+        $this->assertSame('Cutting QC', $cutting->name);
+        $this->assertContains('cut_length_tolerance', collect($cutting->items)->pluck('key'));
+
+        foreach (['fabrication', 'sash', 'glass_assembly', 'finishing'] as $stage) {
+            $this->assertTrue(
+                QcChecklistTemplate::query()
+                    ->where('context', QcInspectionContext::ProductionInProcess)
+                    ->where('stage', $stage)
+                    ->where('is_active', true)
+                    ->exists(),
+                "Missing in-process template for {$stage}",
+            );
+        }
+
+        $post = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+            ->where('is_system', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+        $this->assertGreaterThanOrEqual(8, count($post->items));
+    }
+
+    public function test_in_process_inspection_resolves_stage_specific_template(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+        Sanctum::actingAs($this->inspector);
+
+        $project = Project::query()->create([
+            'reference' => 'PRJ-QC-CUT-'.uniqid(),
+            'name' => 'Cutting QC Project',
+            'stage' => 'cutting_stage',
+            'type' => 'residential',
+            'location_type' => 'nairobi',
+        ]);
+
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-QC-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'cutting',
+            'fifo_position' => 1,
+        ]);
+
+        $response = $this->postJson('/api/v1/qc/inspections', [
+            'context' => QcInspectionContext::ProductionInProcess->value,
+            'stage' => 'cutting',
+            'project_id' => $project->id,
+            'production_order_id' => $order->id,
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame('cutting', $response->json('data.stage'));
+        $this->assertSame('Cutting QC', $response->json('data.template.name'));
+        $this->assertNotEmpty($response->json('data.template.items'));
+    }
+
+    public function test_seeder_backfills_pending_receiving_inspection_without_template(): void
+    {
+        $supplier = Supplier::query()->create([
+            'code' => 'SUP-BF',
+            'name' => 'Backfill Supplier',
+        ]);
+
+        $order = PurchaseOrder::query()->create([
+            'reference' => 'PO-BF-0001',
+            'supplier_id' => $supplier->id,
+            'status' => 'sent',
+            'created_by' => $this->inspector->id,
+        ]);
+
+        $grn = GoodsReceipt::query()->create([
+            'grn_number' => 'GRN-BF-0001',
+            'purchase_order_id' => $order->id,
+            'status' => 'verifying',
+            'received_at' => now(),
+            'created_by' => $this->inspector->id,
+        ]);
+
+        $inspection = QcInspection::query()->create([
+            'reference' => 'QC-2026-0001',
+            'goods_receipt_id' => $grn->id,
+            'context' => QcInspectionContext::WarehouseReceiving,
+            'stage' => QcInspectionContext::WarehouseReceiving->value,
+            'template_id' => null,
+            'result' => QcInspectionResult::Pending,
+            'inspector_id' => $this->inspector->id,
+            'checklist_responses' => [],
+            'custom_items' => [],
+        ]);
+
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $inspection->refresh();
+        $this->assertNotNull($inspection->template_id);
+
+        $template = QcChecklistTemplate::query()->findOrFail($inspection->template_id);
+        $this->assertSame(QcInspectionContext::WarehouseReceiving, $template->context);
+        $this->assertNotEmpty($template->items);
+    }
+
+    public function test_show_inspection_auto_assigns_default_template(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+        Sanctum::actingAs($this->inspector);
+
+        $template = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::WarehouseReceiving)
+            ->where('is_system', true)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $supplier = Supplier::query()->create([
+            'code' => 'SUP-SHOW',
+            'name' => 'Show Supplier',
+        ]);
+
+        $order = PurchaseOrder::query()->create([
+            'reference' => 'PO-SHOW-0001',
+            'supplier_id' => $supplier->id,
+            'status' => 'sent',
+            'created_by' => $this->inspector->id,
+        ]);
+
+        $grn = GoodsReceipt::query()->create([
+            'grn_number' => 'GRN-SHOW-0001',
+            'purchase_order_id' => $order->id,
+            'status' => 'verifying',
+            'received_at' => now(),
+            'created_by' => $this->inspector->id,
+        ]);
+
+        $inspection = QcInspection::query()->create([
+            'reference' => 'QC-SHOW-0001',
+            'goods_receipt_id' => $grn->id,
+            'context' => QcInspectionContext::WarehouseReceiving,
+            'stage' => QcInspectionContext::WarehouseReceiving->value,
+            'template_id' => null,
+            'result' => QcInspectionResult::Pending,
+            'inspector_id' => $this->inspector->id,
+            'checklist_responses' => [],
+            'custom_items' => [],
+        ]);
+
+        $response = $this->getJson("/api/v1/qc/inspections/{$inspection->id}");
+
+        $response->assertOk();
+        $this->assertSame($template->id, $response->json('data.template_id'));
+        $this->assertNotEmpty($response->json('data.template.items'));
+        $this->assertSame('GRN Receiving', $response->json('data.template.name'));
+    }
+
     public function test_clone_template_to_project_override(): void
     {
         $this->seed(QcDefaultChecklistsSeeder::class);
@@ -181,12 +376,9 @@ class QcInspectionFlowTest extends TestCase
 
         $this->postJson("/api/v1/qc/inspections/{$inspection->id}/submit", [
             'result' => QcInspectionResult::Pass->value,
-            'checklist_responses' => [
-                'bom_match' => ['value' => 'pass'],
-                'profile_length' => ['value' => 'pass'],
-                'accessory_kit' => ['value' => 'pass'],
-                'glass_not_required_yet' => ['value' => 'pass'],
-            ],
+            'checklist_responses' => collect($template->items)->mapWithKeys(
+                fn (array $item) => [$item['key'] => ['value' => 'pass']],
+            )->all(),
         ])->assertOk();
 
         $inspection->refresh();
@@ -355,6 +547,13 @@ class QcInspectionFlowTest extends TestCase
             'context' => QcInspectionContext::WarehouseReceiving->value,
             'result' => QcInspectionResult::Pending->value,
         ]);
+
+        $inspection = QcInspection::query()
+            ->where('goods_receipt_id', $grn->id)
+            ->where('context', QcInspectionContext::WarehouseReceiving)
+            ->firstOrFail();
+
+        $this->assertNotNull($inspection->template_id);
     }
 
     public function test_grn_linked_receiving_inspection(): void
@@ -390,6 +589,9 @@ class QcInspectionFlowTest extends TestCase
 
         $response->assertCreated();
         $this->assertSame($grn->id, $response->json('data.goods_receipt_id'));
+        $this->assertNotNull($response->json('data.template_id'));
+        $this->assertSame('GRN Receiving', $response->json('data.template.name'));
+        $this->assertNotEmpty($response->json('data.template.items'));
     }
 
     public function test_schedule_run_recalculates_next_due_at(): void
@@ -438,6 +640,148 @@ class QcInspectionFlowTest extends TestCase
 
         $project->refresh();
         $this->assertSame($originalStage, $project->stage);
+    }
+
+    public function test_pre_cutting_inspection_can_be_skipped(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+        Sanctum::actingAs($this->inspector);
+
+        $inspection = $this->createPendingInspection(QcInspectionContext::ProductionQcPreCheck);
+
+        $this->postJson("/api/v1/qc/inspections/{$inspection->id}/skip", [
+            'notes' => 'Will inspect after assembly',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.result', QcInspectionResult::Skipped->value)
+            ->assertJsonPath('data.notes', 'Will inspect after assembly');
+
+        $inspection->refresh();
+        $this->assertSame(QcInspectionResult::Skipped, $inspection->result);
+    }
+
+    public function test_post_fabrication_inspection_cannot_be_skipped(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+        Sanctum::actingAs($this->inspector);
+
+        $inspection = $this->createPendingInspection(QcInspectionContext::ProductionQcPostFabrication);
+
+        $this->postJson("/api/v1/qc/inspections/{$inspection->id}/skip")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['inspection']);
+    }
+
+    public function test_finishing_complete_creates_post_fabrication_inspection_without_inspector_user(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject();
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-POST-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'qc_post_fabrication',
+            'fifo_position' => 1,
+        ]);
+
+        $created = app(\App\Services\QualityControl\QcInspectionService::class)
+            ->createFromProductionStage($project->id, $order->id, 'finishing');
+
+        $this->assertNotNull($created);
+        $this->assertSame(QcInspectionContext::ProductionQcPostFabrication, $created->context);
+        $this->assertSame(QcInspectionResult::Pending, $created->result);
+        $this->assertNotNull($created->template_id);
+        $this->assertSame('Post-fabrication QC', $created->template?->name ?? QcChecklistTemplate::query()->find($created->template_id)?->name);
+    }
+
+    public function test_create_from_production_stage_does_not_reopen_completed_inspection(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject();
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-POST-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'qc_post_fabrication',
+            'fifo_position' => 1,
+        ]);
+
+        $service = app(\App\Services\QualityControl\QcInspectionService::class);
+        $first = $service->createFromProductionStage($project->id, $order->id, 'finishing');
+        $this->assertNotNull($first);
+
+        $first->update(['result' => QcInspectionResult::Pass]);
+
+        $second = $service->createFromProductionStage($project->id, $order->id, 'qc_post_fabrication');
+        $third = $service->createFromProductionStage($project->id, $order->id, 'finishing');
+
+        $this->assertSame($first->id, $second?->id);
+        $this->assertSame($first->id, $third?->id);
+        $this->assertSame(
+            1,
+            QcInspection::query()
+                ->where('production_order_id', $order->id)
+                ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+                ->count(),
+        );
+    }
+
+    public function test_create_from_production_stage_reuses_pending_before_completed(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject();
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-POST-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'qc_post_fabrication',
+            'fifo_position' => 1,
+        ]);
+
+        $template = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+            ->where('is_system', true)
+            ->firstOrFail();
+
+        $completed = QcInspection::query()->create([
+            'reference' => 'QC-DONE-'.uniqid(),
+            'project_id' => $project->id,
+            'production_order_id' => $order->id,
+            'context' => QcInspectionContext::ProductionQcPostFabrication,
+            'stage' => QcInspectionContext::ProductionQcPostFabrication->value,
+            'template_id' => $template->id,
+            'result' => QcInspectionResult::Fail,
+            'checklist_responses' => [],
+            'custom_items' => [],
+        ]);
+
+        $pending = QcInspection::query()->create([
+            'reference' => 'QC-PEND-'.uniqid(),
+            'project_id' => $project->id,
+            'production_order_id' => $order->id,
+            'context' => QcInspectionContext::ProductionQcPostFabrication,
+            'stage' => QcInspectionContext::ProductionQcPostFabrication->value,
+            'template_id' => $template->id,
+            'result' => QcInspectionResult::Pending,
+            'checklist_responses' => [],
+            'custom_items' => [],
+        ]);
+
+        $found = app(\App\Services\QualityControl\QcInspectionService::class)
+            ->createFromProductionStage($project->id, $order->id, 'qc_post_fabrication');
+
+        $this->assertSame($pending->id, $found?->id);
+        $this->assertNotSame($completed->id, $found?->id);
+        $this->assertSame(
+            2,
+            QcInspection::query()
+                ->where('production_order_id', $order->id)
+                ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+                ->count(),
+        );
     }
 
     protected function createProject(array $overrides = []): Project

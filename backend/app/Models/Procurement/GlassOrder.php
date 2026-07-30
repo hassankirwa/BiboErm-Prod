@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GlassOrder extends Model
 {
@@ -23,6 +24,9 @@ class GlassOrder extends Model
         'delivered_at',
         'delivery_location',
         'notes',
+        'total_cost',
+        'total_area_m2',
+        'currency',
         'created_by',
     ];
 
@@ -34,6 +38,8 @@ class GlassOrder extends Model
             'expected_delivery' => 'date',
             'ordered_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'total_cost' => 'float',
+            'total_area_m2' => 'float',
         ];
     }
 
@@ -60,5 +66,10 @@ class GlassOrder extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function priceRecords(): HasMany
+    {
+        return $this->hasMany(GlassPriceRecord::class);
     }
 }

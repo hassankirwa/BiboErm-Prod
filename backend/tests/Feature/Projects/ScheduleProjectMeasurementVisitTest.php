@@ -91,4 +91,28 @@ class ScheduleProjectMeasurementVisitTest extends TestCase
             'measurement_context' => 'production',
         ]);
     }
+
+    public function test_schedule_allows_any_active_user_as_assignee(): void
+    {
+        $project = Project::query()->create([
+            'reference' => 'PR-SITE-002',
+            'name' => 'Any Assignee Windows',
+            'stage' => ProjectStage::SiteAssessment->value,
+            'is_active' => true,
+            'project_manager_id' => $this->user->id,
+        ]);
+
+        $assignee = User::factory()->create(['status' => User::STATUS_ACTIVE]);
+        $assignee->assignRole('warehouse_manager_aluminium');
+
+        Sanctum::actingAs($this->user);
+
+        $response = $this->postJson("/api/v1/projects/{$project->id}/measurement-visits", [
+            'assigned_field_officer_id' => $assignee->id,
+            'visit_date' => now()->toDateString(),
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.assigned_field_officer_id', $assignee->id);
+    }
 }

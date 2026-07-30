@@ -1,577 +1,3890 @@
 {
     "data": {
-        "project": {
-            "name": "BEATRICE",
-            "number": null,
-            "order_no": null
+        "project_id": 1,
+        "stage": "fabrication_stage",
+        "bom_version": 1,
+        "summary": {
+            "total_lines": 48,
+            "warehouse_lines": 43,
+            "procurement_only_lines": 5,
+            "fully_reserved": 28,
+            "shortage_lines": 0,
+            "open_requisitions": 4,
+            "glass_orders_pending": 1,
+            "can_fully_reserve": true,
+            "can_reserve_now": true
         },
-        "project_name": "BEATRICE",
-        "project_number": null,
+        "stock_check": {
+            "can_fully_reserve": true,
+            "lines": [
+                {
+                    "item_id": 786,
+                    "project_bom_line_id": null,
+                    "sku": "PY08",
+                    "name": "OUTER FRAME",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "18.000",
+                    "required_cuts": 8,
+                    "bars_needed": 3,
+                    "bar_length_mm": 6000,
+                    "on_hand": "202.000",
+                    "reserved_by_others": "20.000",
+                    "available": "182.000",
+                    "offcut_usable": "4.184",
+                    "offcut_piece_ids": [
+                        4
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "182.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 786,
+                        "sku": "PY08",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2090,
+                            2090,
+                            2090,
+                            2090,
+                            1825,
+                            1825,
+                            1816,
+                            1816
+                        ],
+                        "cuts_total": 8,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 4,
+                                "length_mm": 4184,
+                                "cuts": [
+                                    2090,
+                                    1825
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            4
+                        ],
+                        "bars_needed": 3,
+                        "bar_pack": [
+                            [
+                                2090,
+                                2090
+                            ],
+                            [
+                                2090,
+                                1825,
+                                1816
+                            ],
+                            [
+                                1816
+                            ]
+                        ],
+                        "reserve_qty": "18.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "4.184"
+                    }
+                },
+                {
+                    "item_id": 785,
+                    "project_bom_line_id": null,
+                    "sku": "PY06",
+                    "name": "TOP RAIL",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "12.000",
+                    "required_cuts": 4,
+                    "bars_needed": 2,
+                    "bar_length_mm": 6000,
+                    "on_hand": "78.000",
+                    "reserved_by_others": "30.000",
+                    "available": "48.000",
+                    "offcut_usable": "0.000",
+                    "offcut_piece_ids": [],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "48.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 785,
+                        "sku": "PY06",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            3683,
+                            2868,
+                            2828,
+                            1408
+                        ],
+                        "cuts_total": 4,
+                        "offcut_assignments": [],
+                        "offcut_piece_ids": [],
+                        "bars_needed": 2,
+                        "bar_pack": [
+                            [
+                                3683,
+                                1408
+                            ],
+                            [
+                                2868,
+                                2828
+                            ]
+                        ],
+                        "reserve_qty": "12.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "0.000"
+                    }
+                },
+                {
+                    "item_id": 796,
+                    "project_bom_line_id": null,
+                    "sku": "PY43",
+                    "name": "BOTTOM RAIL",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "6.000",
+                    "required_cuts": 3,
+                    "bars_needed": 1,
+                    "bar_length_mm": 6000,
+                    "on_hand": "68.000",
+                    "reserved_by_others": "10.000",
+                    "available": "58.000",
+                    "offcut_usable": "3.132",
+                    "offcut_piece_ids": [
+                        8
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "58.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 796,
+                        "sku": "PY43",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            3683,
+                            2868,
+                            1408
+                        ],
+                        "cuts_total": 3,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 8,
+                                "length_mm": 3132,
+                                "cuts": [
+                                    2868
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            8
+                        ],
+                        "bars_needed": 1,
+                        "bar_pack": [
+                            [
+                                3683,
+                                1408
+                            ]
+                        ],
+                        "reserve_qty": "6.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "3.132"
+                    }
+                },
+                {
+                    "item_id": 791,
+                    "project_bom_line_id": null,
+                    "sku": "PY24",
+                    "name": "SASH",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "30.000",
+                    "required_cuts": 14,
+                    "bars_needed": 5,
+                    "bar_length_mm": 6000,
+                    "on_hand": "310.000",
+                    "reserved_by_others": "80.000",
+                    "available": "230.000",
+                    "offcut_usable": "2.466",
+                    "offcut_piece_ids": [
+                        10
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "230.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 791,
+                        "sku": "PY24",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            1791,
+                            1791,
+                            1791,
+                            1791,
+                            1767,
+                            1767,
+                            1767,
+                            1767
+                        ],
+                        "cuts_total": 14,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 10,
+                                "length_mm": 2466,
+                                "cuts": [
+                                    2041
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            10
+                        ],
+                        "bars_needed": 5,
+                        "bar_pack": [
+                            [
+                                2041,
+                                2041,
+                                1791
+                            ],
+                            [
+                                2041,
+                                2041,
+                                1791
+                            ],
+                            [
+                                2041,
+                                1791,
+                                1791
+                            ],
+                            [
+                                1767,
+                                1767,
+                                1767
+                            ],
+                            [
+                                1767
+                            ]
+                        ],
+                        "reserve_qty": "30.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "2.466"
+                    }
+                },
+                {
+                    "item_id": 793,
+                    "project_bom_line_id": null,
+                    "sku": "PY25",
+                    "name": "INTERLOCK",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "30.000",
+                    "required_cuts": 14,
+                    "bars_needed": 5,
+                    "bar_length_mm": 6000,
+                    "on_hand": "350.003",
+                    "reserved_by_others": "40.000",
+                    "available": "310.003",
+                    "offcut_usable": "2.466",
+                    "offcut_piece_ids": [
+                        12
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "310.003",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 793,
+                        "sku": "PY25",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            2041,
+                            1791,
+                            1791,
+                            1791,
+                            1791,
+                            1767,
+                            1767,
+                            1767,
+                            1767
+                        ],
+                        "cuts_total": 14,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 12,
+                                "length_mm": 2466,
+                                "cuts": [
+                                    2041
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            12
+                        ],
+                        "bars_needed": 5,
+                        "bar_pack": [
+                            [
+                                2041,
+                                2041,
+                                1791
+                            ],
+                            [
+                                2041,
+                                2041,
+                                1791
+                            ],
+                            [
+                                2041,
+                                1791,
+                                1791
+                            ],
+                            [
+                                1767,
+                                1767,
+                                1767
+                            ],
+                            [
+                                1767
+                            ]
+                        ],
+                        "reserve_qty": "30.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "2.466"
+                    }
+                },
+                {
+                    "item_id": 1255,
+                    "project_bom_line_id": null,
+                    "sku": "PY52",
+                    "name": "Panel\/sash frame",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "18.000",
+                    "required_cuts": 28,
+                    "bars_needed": 3,
+                    "bar_length_mm": 6000,
+                    "on_hand": "775.997",
+                    "reserved_by_others": "40.000",
+                    "available": "735.997",
+                    "offcut_usable": "3.428",
+                    "offcut_piece_ids": [
+                        15
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "735.997",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 1255,
+                        "sku": "PY52",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            860,
+                            860,
+                            860,
+                            860,
+                            860,
+                            860,
+                            860,
+                            860,
+                            656,
+                            656,
+                            656,
+                            656,
+                            656,
+                            656,
+                            656,
+                            656,
+                            646,
+                            646,
+                            646,
+                            646,
+                            646,
+                            646,
+                            646,
+                            646,
+                            643,
+                            643,
+                            643,
+                            643
+                        ],
+                        "cuts_total": 28,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 15,
+                                "length_mm": 3428,
+                                "cuts": [
+                                    860,
+                                    860,
+                                    860,
+                                    656
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            15
+                        ],
+                        "bars_needed": 3,
+                        "bar_pack": [
+                            [
+                                860,
+                                860,
+                                860,
+                                860,
+                                860,
+                                656,
+                                656
+                            ],
+                            [
+                                656,
+                                656,
+                                656,
+                                656,
+                                656,
+                                646,
+                                646,
+                                646,
+                                646
+                            ],
+                            [
+                                646,
+                                646,
+                                646,
+                                646,
+                                643,
+                                643,
+                                643,
+                                643
+                            ]
+                        ],
+                        "reserve_qty": "18.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "3.428"
+                    }
+                },
+                {
+                    "item_id": 1373,
+                    "project_bom_line_id": 7,
+                    "sku": "ROLLER-90-SD",
+                    "name": "Roller 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "7",
+                    "required": "2.000",
+                    "on_hand": "266.000",
+                    "reserved_by_others": "140.000",
+                    "available": "126.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "126.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1374,
+                    "project_bom_line_id": 8,
+                    "sku": "LOCK-90-SD",
+                    "name": "Lock 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "8",
+                    "required": "2.000",
+                    "on_hand": "366.000",
+                    "reserved_by_others": "40.000",
+                    "available": "326.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "326.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1375,
+                    "project_bom_line_id": 9,
+                    "sku": "CILICOM-GLASS-GLUE",
+                    "name": "Cilicom Glass Glue",
+                    "category": "accessory",
+                    "bom_line_ref": "9",
+                    "required": "2.000",
+                    "on_hand": "306.000",
+                    "reserved_by_others": "100.000",
+                    "available": "206.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "206.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1256,
+                    "project_bom_line_id": 16,
+                    "sku": "PY-35",
+                    "name": "INTERSEAL",
+                    "category": "rubber",
+                    "bom_line_ref": "16",
+                    "required": "1.000",
+                    "on_hand": "56.998",
+                    "reserved_by_others": "29.999",
+                    "available": "26.999",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "26.999",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1373,
+                    "project_bom_line_id": 18,
+                    "sku": "ROLLER-90-SD",
+                    "name": "Roller 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "18",
+                    "required": "4.000",
+                    "on_hand": "266.000",
+                    "reserved_by_others": "140.000",
+                    "available": "126.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "126.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1374,
+                    "project_bom_line_id": 19,
+                    "sku": "LOCK-90-SD",
+                    "name": "Lock 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "19",
+                    "required": "4.000",
+                    "on_hand": "366.000",
+                    "reserved_by_others": "40.000",
+                    "available": "326.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "326.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1375,
+                    "project_bom_line_id": 20,
+                    "sku": "CILICOM-GLASS-GLUE",
+                    "name": "Cilicom Glass Glue",
+                    "category": "accessory",
+                    "bom_line_ref": "20",
+                    "required": "4.000",
+                    "on_hand": "306.000",
+                    "reserved_by_others": "100.000",
+                    "available": "206.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "206.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 789,
+                    "project_bom_line_id": null,
+                    "sku": "PY10",
+                    "name": "Top frame",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "12.000",
+                    "required_cuts": 8,
+                    "bars_needed": 2,
+                    "bar_length_mm": 6000,
+                    "on_hand": "188.000",
+                    "reserved_by_others": "40.000",
+                    "available": "148.000",
+                    "offcut_usable": "0.000",
+                    "offcut_piece_ids": [],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "148.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 789,
+                        "sku": "PY10",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2090,
+                            2090,
+                            2090,
+                            2090,
+                            848,
+                            848,
+                            848,
+                            848
+                        ],
+                        "cuts_total": 8,
+                        "offcut_assignments": [],
+                        "offcut_piece_ids": [],
+                        "bars_needed": 2,
+                        "bar_pack": [
+                            [
+                                2090,
+                                2090,
+                                848,
+                                848
+                            ],
+                            [
+                                2090,
+                                2090,
+                                848,
+                                848
+                            ]
+                        ],
+                        "reserve_qty": "12.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "0.000"
+                    }
+                },
+                {
+                    "item_id": 1127,
+                    "project_bom_line_id": null,
+                    "sku": "WY-82827",
+                    "name": "BEAD",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "12.000",
+                    "required_cuts": 8,
+                    "bars_needed": 2,
+                    "bar_length_mm": 6000,
+                    "on_hand": "189.998",
+                    "reserved_by_others": "40.999",
+                    "available": "148.999",
+                    "offcut_usable": "0.000",
+                    "offcut_piece_ids": [],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "148.999",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 1127,
+                        "sku": "WY-82827",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2035,
+                            2035,
+                            2035,
+                            2035,
+                            848,
+                            848,
+                            848,
+                            848
+                        ],
+                        "cuts_total": 8,
+                        "offcut_assignments": [],
+                        "offcut_piece_ids": [],
+                        "bars_needed": 2,
+                        "bar_pack": [
+                            [
+                                2035,
+                                2035,
+                                848,
+                                848
+                            ],
+                            [
+                                2035,
+                                2035,
+                                848,
+                                848
+                            ]
+                        ],
+                        "reserve_qty": "12.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "0.000"
+                    }
+                },
+                {
+                    "item_id": 1256,
+                    "project_bom_line_id": 31,
+                    "sku": "PY-35",
+                    "name": "INTERSEAL",
+                    "category": "rubber",
+                    "bom_line_ref": "31",
+                    "required": "1.000",
+                    "on_hand": "56.998",
+                    "reserved_by_others": "29.999",
+                    "available": "26.999",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "26.999",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1373,
+                    "project_bom_line_id": 33,
+                    "sku": "ROLLER-90-SD",
+                    "name": "Roller 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "33",
+                    "required": "4.000",
+                    "on_hand": "266.000",
+                    "reserved_by_others": "140.000",
+                    "available": "126.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "126.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1374,
+                    "project_bom_line_id": 34,
+                    "sku": "LOCK-90-SD",
+                    "name": "Lock 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "34",
+                    "required": "4.000",
+                    "on_hand": "366.000",
+                    "reserved_by_others": "40.000",
+                    "available": "326.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "326.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1375,
+                    "project_bom_line_id": 35,
+                    "sku": "CILICOM-GLASS-GLUE",
+                    "name": "Cilicom Glass Glue",
+                    "category": "accessory",
+                    "bom_line_ref": "35",
+                    "required": "4.000",
+                    "on_hand": "306.000",
+                    "reserved_by_others": "100.000",
+                    "available": "206.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "206.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 799,
+                    "project_bom_line_id": null,
+                    "sku": "PY51",
+                    "name": "LOW BOTTOM TRACK",
+                    "category": "aluminium_profile",
+                    "bom_line_ref": null,
+                    "required": "0.000",
+                    "required_cuts": 1,
+                    "bars_needed": 0,
+                    "bar_length_mm": 6000,
+                    "on_hand": "24.000",
+                    "reserved_by_others": "0.000",
+                    "available": "24.000",
+                    "offcut_usable": "3.172",
+                    "offcut_piece_ids": [
+                        17
+                    ],
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "24.000",
+                    "shortage": "0.000",
+                    "aluminium_plan": {
+                        "item_id": 799,
+                        "sku": "PY51",
+                        "bar_length_mm": 6000,
+                        "cuts": [
+                            2828
+                        ],
+                        "cuts_total": 1,
+                        "offcut_assignments": [
+                            {
+                                "offcut_id": 17,
+                                "length_mm": 3172,
+                                "cuts": [
+                                    2828
+                                ]
+                            }
+                        ],
+                        "offcut_piece_ids": [
+                            17
+                        ],
+                        "bars_needed": 0,
+                        "bar_pack": [],
+                        "reserve_qty": "0.000",
+                        "reserve_uom": "metre",
+                        "offcut_usable_metres": "3.172"
+                    }
+                },
+                {
+                    "item_id": 1256,
+                    "project_bom_line_id": 43,
+                    "sku": "PY-35",
+                    "name": "INTERSEAL",
+                    "category": "rubber",
+                    "bom_line_ref": "43",
+                    "required": "1.000",
+                    "on_hand": "56.998",
+                    "reserved_by_others": "29.999",
+                    "available": "26.999",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "26.999",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1373,
+                    "project_bom_line_id": 45,
+                    "sku": "ROLLER-90-SD",
+                    "name": "Roller 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "45",
+                    "required": "4.000",
+                    "on_hand": "266.000",
+                    "reserved_by_others": "140.000",
+                    "available": "126.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "126.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1374,
+                    "project_bom_line_id": 46,
+                    "sku": "LOCK-90-SD",
+                    "name": "Lock 90 SD",
+                    "category": "accessory",
+                    "bom_line_ref": "46",
+                    "required": "4.000",
+                    "on_hand": "366.000",
+                    "reserved_by_others": "40.000",
+                    "available": "326.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "326.000",
+                    "shortage": "0.000"
+                },
+                {
+                    "item_id": 1375,
+                    "project_bom_line_id": 47,
+                    "sku": "CILICOM-GLASS-GLUE",
+                    "name": "Cilicom Glass Glue",
+                    "category": "accessory",
+                    "bom_line_ref": "47",
+                    "required": "4.000",
+                    "on_hand": "306.000",
+                    "reserved_by_others": "100.000",
+                    "available": "206.000",
+                    "offcut_usable": "0.000",
+                    "ahead_unreserved_demand": "0.000",
+                    "effective_available": "206.000",
+                    "shortage": "0.000"
+                }
+            ]
+        },
         "lines": [
             {
-                "series": "S90 Sliding \u63a8\u62c9\u95e8",
-                "code": "SD-1",
-                "glass_type": "Bronze Reflective glass 6mm",
-                "width_mm": 1450,
-                "height_mm": 2100,
-                "sqm_per_pcs": 3.05,
-                "quantity": 1,
-                "total_sqm": 3.05,
-                "unit_price": 392.24,
-                "line_total": 392.24,
-                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-1 \u2014 Bronze Reflective glass 6mm",
-                "metadata": {
-                    "accounting": {
-                        "layout": "tabular",
-                        "currency": "USD",
-                        "usd_per_sqm": 128.60342784000002,
-                        "line_total_usd": 392.24,
-                        "unit_price_usd": 392.24,
-                        "material_cost_usd": 100.245,
-                        "glass_cost_usd": 52.567,
-                        "hardware_cost_usd": 18.8,
-                        "in_colour": "\u6df1\u7070\u8272",
-                        "out_colour": "\u6df1\u7070\u8272",
-                        "mark": "392.24045491200002",
-                        "source_price": 392.240454912,
-                        "vat_amount": 53.041305600000015,
-                        "commission_amount": 7.690989312,
-                        "profit_amount": 55.25136000000001,
-                        "cost_breakdown": {
-                            "direct_cost": {
-                                "aluminum_profile": {
-                                    "items": [
-                                        {
-                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
-                                            "specification": "",
-                                            "weight": 14.32,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 7
-                                        }
-                                    ],
-                                    "subtotal": 100.24000000000001
-                                },
-                                "glass_mesh": {
-                                    "items": [
-                                        {
-                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
-                                            "specification": "\u975e\u94a2\u5316",
-                                            "qty": 2.5,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 21
-                                        }
-                                    ],
-                                    "subtotal": 52.5
-                                },
-                                "hardware": {
-                                    "items": [
-                                        {
-                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
-                                            "specification": "",
-                                            "qty": 2,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.8
-                                        },
-                                        {
-                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
-                                            "specification": "",
-                                            "qty": 2,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.9
-                                        },
-                                        {
-                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
-                                            "specification": "",
-                                            "qty": 2,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 1.7
-                                        }
-                                    ],
-                                    "subtotal": 18.8
-                                },
-                                "materials_total": 171.54000000000002,
-                                "labor": {
-                                    "items": [],
-                                    "subtotal": 54.9
-                                },
-                                "subtotal": 226.44000000000003
-                            },
-                            "indirect_cost": {
-                                "items": [
-                                    {
-                                        "name": "Management Cost",
-                                        "note": "\uff08\u4e00\uff09*10%",
-                                        "total_price": 22.64400000000001
-                                    },
-                                    {
-                                        "name": "Wastage cost",
-                                        "note": "(\u4e00\uff09*12%",
-                                        "total_price": 27.1728
-                                    },
-                                    {
-                                        "name": "\u56db\u3001\u5176\u4ed6",
-                                        "note": "",
-                                        "total_price": null
-                                    }
-                                ],
-                                "subtotal": 49.8168
-                            },
-                            "profit": 55.25136000000001,
-                            "vat": 53.041305600000015,
-                            "commission": 7.690989312,
-                            "total_cost": 392.240454912
-                        },
-                        "drawing": {
-                            "elevation": {
-                                "width_mm": 1450,
-                                "height_mm": 2100,
-                                "source": "accounting"
-                            },
-                            "embedded_media": {
-                                "status": "extracted",
-                                "files": [
-                                    "image1.jpg"
-                                ],
-                                "mime_type": "image\/jpeg",
-                                "note": null,
-                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg",
-                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg"
-                            }
-                        }
+                "bom_line_id": 1,
+                "line_type": "aluminium_profile",
+                "material_code": "PY08",
+                "material_name": "Side frame \u8fb9\u5c01",
+                "warehouse_item_id": 786,
+                "required_qty": "2.000",
+                "reserved_qty": "20.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "182.000",
+                "offcut_usable": "4.184",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2090,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
                     }
-                },
-                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-1.jpg"
+                ],
+                "can_create_requisition": false
             },
             {
-                "series": "S90 Sliding \u63a8\u62c9\u95e8",
-                "code": "SD-2",
-                "glass_type": "Bronze Reflective glass 6mm",
-                "width_mm": 2910,
-                "height_mm": 1820,
-                "sqm_per_pcs": 5.3,
-                "quantity": 1,
-                "total_sqm": 5.3,
-                "unit_price": 681.93,
-                "line_total": 681.93,
-                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-2 \u2014 Bronze Reflective glass 6mm",
-                "metadata": {
-                    "accounting": {
-                        "layout": "tabular",
-                        "currency": "USD",
-                        "usd_per_sqm": 128.66686521962262,
-                        "line_total_usd": 681.93,
-                        "unit_price_usd": 681.93,
-                        "material_cost_usd": 168.273,
-                        "glass_cost_usd": 92.045,
-                        "hardware_cost_usd": 37.6,
-                        "in_colour": "\u6df1\u7070\u8272",
-                        "out_colour": "\u6df1\u7070\u8272",
-                        "mark": "681.93438566399993",
-                        "source_price": 681.9343856639999,
-                        "vat_amount": 92.21560319999999,
-                        "commission_amount": 13.371262464,
-                        "profit_amount": 96.05792,
-                        "cost_breakdown": {
-                            "direct_cost": {
-                                "aluminum_profile": {
-                                    "items": [
-                                        {
-                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
-                                            "specification": "",
-                                            "weight": 24.04,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 7
-                                        }
-                                    ],
-                                    "subtotal": 168.28
-                                },
-                                "glass_mesh": {
-                                    "items": [
-                                        {
-                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
-                                            "specification": "\u975e\u94a2\u5316",
-                                            "qty": 4.4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 21
-                                        }
-                                    ],
-                                    "subtotal": 92.4
-                                },
-                                "hardware": {
-                                    "items": [
-                                        {
-                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.8
-                                        },
-                                        {
-                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.9
-                                        },
-                                        {
-                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 1.7
-                                        }
-                                    ],
-                                    "subtotal": 37.59999999999999
-                                },
-                                "materials_total": 298.28,
-                                "labor": {
-                                    "items": [],
-                                    "subtotal": 95.39999999999999
-                                },
-                                "subtotal": 393.67999999999995
-                            },
-                            "indirect_cost": {
-                                "items": [
-                                    {
-                                        "name": "Management Cost",
-                                        "note": "\uff08\u4e00\uff09*10%",
-                                        "total_price": 39.36799999999999
-                                    },
-                                    {
-                                        "name": "Wastage cost",
-                                        "note": "(\u4e00\uff09*12%",
-                                        "total_price": 47.24159999999999
-                                    },
-                                    {
-                                        "name": "\u56db\u3001\u5176\u4ed6",
-                                        "note": "",
-                                        "total_price": null
-                                    }
-                                ],
-                                "subtotal": 86.6096
-                            },
-                            "profit": 96.05792,
-                            "vat": 92.21560319999999,
-                            "commission": 13.371262464,
-                            "total_cost": 681.9343856639999
-                        },
-                        "drawing": {
-                            "elevation": {
-                                "width_mm": 2910,
-                                "height_mm": 1820,
-                                "source": "accounting"
-                            },
-                            "embedded_media": {
-                                "status": "extracted",
-                                "files": [
-                                    "image2.jpg"
-                                ],
-                                "mime_type": "image\/jpeg",
-                                "note": null,
-                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg",
-                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg"
-                            }
-                        }
+                "bom_line_id": 2,
+                "line_type": "aluminium_profile",
+                "material_code": "PY06",
+                "material_name": "Top rail \u5e73\u4e0a\u6ed1",
+                "warehouse_item_id": 785,
+                "required_qty": "1.000",
+                "reserved_qty": "30.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 4,
+                "shortage_qty": "0.000",
+                "warehouse_available": "48.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1408,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
                     }
-                },
-                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-2.jpg"
+                ],
+                "can_create_requisition": false
             },
             {
-                "series": "S90 Sliding \u63a8\u62c9\u95e8",
-                "code": "SD-3",
-                "glass_type": "Bronze Reflective glass 6mm",
-                "width_mm": 5520,
-                "height_mm": 2100,
-                "sqm_per_pcs": 11.59,
-                "quantity": 1,
-                "total_sqm": 11.59,
-                "unit_price": 1262.67,
-                "line_total": 1262.67,
-                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-3 \u2014 Bronze Reflective glass 6mm",
-                "metadata": {
-                    "accounting": {
-                        "layout": "tabular",
-                        "currency": "USD",
-                        "usd_per_sqm": 108.94507048421052,
-                        "line_total_usd": 1262.67,
-                        "unit_price_usd": 1262.67,
-                        "material_cost_usd": 269.399,
-                        "glass_cost_usd": 212.943,
-                        "hardware_cost_usd": 37.6,
-                        "in_colour": "\u6df1\u7070\u8272",
-                        "out_colour": "\u6df1\u7070\u8272",
-                        "mark": "1262.67336691199989",
-                        "source_price": 1262.673366912,
-                        "vat_amount": 170.7469056,
-                        "commission_amount": 24.758301312,
-                        "profit_amount": 177.86136,
-                        "cost_breakdown": {
-                            "direct_cost": {
-                                "aluminum_profile": {
-                                    "items": [
-                                        {
-                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
-                                            "specification": "",
-                                            "weight": 38.48,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 7
-                                        }
-                                    ],
-                                    "subtotal": 269.35999999999996
-                                },
-                                "glass_mesh": {
-                                    "items": [
-                                        {
-                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
-                                            "specification": "\u975e\u94a2\u5316",
-                                            "qty": 10.16,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 21
-                                        }
-                                    ],
-                                    "subtotal": 213.36
-                                },
-                                "hardware": {
-                                    "items": [
-                                        {
-                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.8
-                                        },
-                                        {
-                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.9
-                                        },
-                                        {
-                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 1.7
-                                        }
-                                    ],
-                                    "subtotal": 37.59999999999999
-                                },
-                                "materials_total": 520.3199999999999,
-                                "labor": {
-                                    "items": [],
-                                    "subtotal": 208.62
-                                },
-                                "subtotal": 728.9399999999999
-                            },
-                            "indirect_cost": {
-                                "items": [
-                                    {
-                                        "name": "Management Cost",
-                                        "note": "\uff08\u4e00\uff09*10%",
-                                        "total_price": 72.89399999999999
-                                    },
-                                    {
-                                        "name": "Wastage cost",
-                                        "note": "(\u4e00\uff09*12%",
-                                        "total_price": 87.47279999999999
-                                    },
-                                    {
-                                        "name": "\u56db\u3001\u5176\u4ed6",
-                                        "note": "",
-                                        "total_price": null
-                                    }
-                                ],
-                                "subtotal": 160.3668
-                            },
-                            "profit": 177.86136,
-                            "vat": 170.7469056,
-                            "commission": 24.758301312,
-                            "total_cost": 1262.673366912
-                        },
-                        "drawing": {
-                            "elevation": {
-                                "width_mm": 5520,
-                                "height_mm": 2100,
-                                "source": "accounting"
-                            },
-                            "embedded_media": {
-                                "status": "extracted",
-                                "files": [
-                                    "image3.jpg"
-                                ],
-                                "mime_type": "image\/jpeg",
-                                "note": null,
-                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg",
-                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg"
-                            }
-                        }
+                "bom_line_id": 3,
+                "line_type": "aluminium_profile",
+                "material_code": "PY43",
+                "material_name": "Bottom track \u4e0b\u6ed1",
+                "warehouse_item_id": 796,
+                "required_qty": "1.000",
+                "reserved_qty": "10.000",
+                "reservation_target_qty": "6.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 3,
+                "shortage_qty": "0.000",
+                "warehouse_available": "58.000",
+                "offcut_usable": "3.132",
+                "bars_needed": 1,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1408,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
                     }
-                },
-                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-3.jpg"
+                ],
+                "can_create_requisition": false
             },
             {
-                "series": "S90 Sliding \u63a8\u62c9\u95e8",
-                "code": "SD-4",
-                "glass_type": "Bronze Reflective glass 6mm",
-                "width_mm": 2870,
-                "height_mm": 1820,
-                "sqm_per_pcs": 5.22,
-                "quantity": 1,
-                "total_sqm": 5.22,
-                "unit_price": 672.53,
-                "line_total": 672.53,
-                "description": "S90 Sliding \u63a8\u62c9\u95e8 \u2014 SD-4 \u2014 Bronze Reflective glass 6mm",
-                "metadata": {
-                    "accounting": {
-                        "layout": "tabular",
-                        "currency": "USD",
-                        "usd_per_sqm": 128.83688,
-                        "line_total_usd": 672.53,
-                        "unit_price_usd": 672.53,
-                        "material_cost_usd": 165.126,
-                        "glass_cost_usd": 91.428,
-                        "hardware_cost_usd": 37.6,
-                        "in_colour": "\u6df1\u7070\u8272",
-                        "out_colour": "\u6df1\u7070\u8272",
-                        "mark": "672.5285136",
-                        "source_price": 672.5285136,
-                        "vat_amount": 90.94367999999999,
-                        "commission_amount": 13.1868336,
-                        "profit_amount": 94.733,
-                        "cost_breakdown": {
-                            "direct_cost": {
-                                "aluminum_profile": {
-                                    "items": [
-                                        {
-                                            "name": "\u7c89\u672b\u55b7\u6d82\u94dd\u578b\u6750",
-                                            "specification": "",
-                                            "weight": 23.59,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 7
-                                        }
-                                    ],
-                                    "subtotal": 165.13
-                                },
-                                "glass_mesh": {
-                                    "items": [
-                                        {
-                                            "name": "Reflective glass (6mm brown \u9540\u819c\u68d5\u73bb)",
-                                            "specification": "\u975e\u94a2\u5316",
-                                            "qty": 4.36,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 21
-                                        }
-                                    ],
-                                    "subtotal": 91.56
-                                },
-                                "hardware": {
-                                    "items": [
-                                        {
-                                            "name": "Cilicom\u73bb\u7483\u80f6(\u73bb\u7483\u80f6570g)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.8
-                                        },
-                                        {
-                                            "name": "Lock 90 SD(90\u63a8\u62c9\u95e8 \u4e00\u5b57\u52fe\u9501 \u53cc\u9762\u94a9\u9501 1locks)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 3.9
-                                        },
-                                        {
-                                            "name": "Roller 90 SD(90\u63a8\u62c9\u95e8 \u53cc\u8f6e 2pcs)",
-                                            "specification": "",
-                                            "qty": 4,
-                                            "unit": "1.00",
-                                            "unit_price": null,
-                                            "total_price": 1.7
-                                        }
-                                    ],
-                                    "subtotal": 37.59999999999999
-                                },
-                                "materials_total": 294.28999999999996,
-                                "labor": {
-                                    "items": [],
-                                    "subtotal": 93.96
-                                },
-                                "subtotal": 388.24999999999994
-                            },
-                            "indirect_cost": {
-                                "items": [
-                                    {
-                                        "name": "Management Cost",
-                                        "note": "\uff08\u4e00\uff09*10%",
-                                        "total_price": 38.825
-                                    },
-                                    {
-                                        "name": "Wastage cost",
-                                        "note": "(\u4e00\uff09*12%",
-                                        "total_price": 46.58999999999999
-                                    },
-                                    {
-                                        "name": "\u56db\u3001\u5176\u4ed6",
-                                        "note": "",
-                                        "total_price": null
-                                    }
-                                ],
-                                "subtotal": 85.415
-                            },
-                            "profit": 94.733,
-                            "vat": 90.94367999999999,
-                            "commission": 13.1868336,
-                            "total_cost": 672.5285136
-                        },
-                        "drawing": {
-                            "elevation": {
-                                "width_mm": 2870,
-                                "height_mm": 1820,
-                                "source": "accounting"
-                            },
-                            "embedded_media": {
-                                "status": "extracted",
-                                "files": [
-                                    "image4.jpg"
-                                ],
-                                "mime_type": "image\/jpeg",
-                                "note": null,
-                                "storage_path": "private\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg",
-                                "url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg"
-                            }
-                        }
+                "bom_line_id": 4,
+                "line_type": "aluminium_profile",
+                "material_code": "PY24",
+                "material_name": "Lock profile \u5355\u73bb\u5149\u4f01",
+                "warehouse_item_id": 791,
+                "required_qty": "2.000",
+                "reserved_qty": "80.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "230.000",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2041,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
                     }
-                },
-                "picture_url": "http:\/\/localhost:8000\/api\/v1\/files\/quotation-drawings\/temp-01ktmnb3h5hk5d1h4nheee47nh\/SD-4.jpg"
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 5,
+                "line_type": "aluminium_profile",
+                "material_code": "PY25",
+                "material_name": "Interlock Profile \u5355\u73bb\u52fe\u4f01",
+                "warehouse_item_id": 793,
+                "required_qty": "2.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "310.003",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2041,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 6,
+                "line_type": "aluminium_profile",
+                "material_code": "PY52",
+                "material_name": "Sash Frame \u5355\u73bb\u4e0a\u4e0b\u65b9",
+                "warehouse_item_id": 1255,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 28,
+                "shortage_qty": "0.000",
+                "warehouse_available": "735.997",
+                "offcut_usable": "3.428",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 643,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 7,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Roller 90 SD",
+                "warehouse_item_id": 1373,
+                "required_qty": "2.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "2.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "126.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 8,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Lock 90 SD",
+                "warehouse_item_id": 1374,
+                "required_qty": "2.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "2.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "326.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 9,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Cilicom\u73bb\u7483\u80f6",
+                "warehouse_item_id": 1375,
+                "required_qty": "2.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "2.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "206.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 10,
+                "line_type": "glass",
+                "material_code": null,
+                "material_name": "Reflective glass",
+                "warehouse_item_id": null,
+                "required_qty": "2.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "2.000",
+                "reservation_uom": "pcs",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": null,
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": null,
+                "is_fully_reserved": false,
+                "measurement_mm": 1961,
+                "is_procurement_only": true,
+                "is_glass": true,
+                "is_addon": false,
+                "quantity_to_requisition": "2.000",
+                "requisition_ids": [],
+                "requisitions": [],
+                "can_create_requisition": true
+            },
+            {
+                "bom_line_id": 11,
+                "line_type": "aluminium_profile",
+                "material_code": "PY08",
+                "material_name": "Side frame \u8fb9\u5c01",
+                "warehouse_item_id": 786,
+                "required_qty": "2.000",
+                "reserved_qty": "20.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "182.000",
+                "offcut_usable": "4.184",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1816,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 12,
+                "line_type": "aluminium_profile",
+                "material_code": "PY06",
+                "material_name": "Top rail \u5e73\u4e0a\u6ed1",
+                "warehouse_item_id": 785,
+                "required_qty": "1.000",
+                "reserved_qty": "30.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 4,
+                "shortage_qty": "0.000",
+                "warehouse_available": "48.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2868,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 13,
+                "line_type": "aluminium_profile",
+                "material_code": "PY43",
+                "material_name": "Bottom track \u4e0b\u6ed1",
+                "warehouse_item_id": 796,
+                "required_qty": "1.000",
+                "reserved_qty": "10.000",
+                "reservation_target_qty": "6.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 3,
+                "shortage_qty": "0.000",
+                "warehouse_available": "58.000",
+                "offcut_usable": "3.132",
+                "bars_needed": 1,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2868,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 14,
+                "line_type": "aluminium_profile",
+                "material_code": "PY24",
+                "material_name": "Lock profile \u5355\u73bb\u5149\u4f01",
+                "warehouse_item_id": 791,
+                "required_qty": "4.000",
+                "reserved_qty": "80.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "230.000",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1767,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 15,
+                "line_type": "aluminium_profile",
+                "material_code": "PY25",
+                "material_name": "Interlock Profile \u5355\u73bb\u52fe\u4f01",
+                "warehouse_item_id": 793,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "310.003",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1767,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 16,
+                "line_type": "aluminium_profile",
+                "material_code": "PY35",
+                "material_name": "Inter seal \u6536\u53e3",
+                "warehouse_item_id": 1256,
+                "required_qty": "1.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "1.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 0,
+                "shortage_qty": "0.000",
+                "warehouse_available": "26.999",
+                "offcut_usable": "0.000",
+                "bars_needed": 0,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": 1767,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 17,
+                "line_type": "aluminium_profile",
+                "material_code": "PY52",
+                "material_name": "Sash Frame \u5355\u73bb\u4e0a\u4e0b\u65b9",
+                "warehouse_item_id": 1255,
+                "required_qty": "8.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 28,
+                "shortage_qty": "0.000",
+                "warehouse_available": "735.997",
+                "offcut_usable": "3.428",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 656,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 18,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Roller 90 SD",
+                "warehouse_item_id": 1373,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "126.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 19,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Lock 90 SD",
+                "warehouse_item_id": 1374,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "326.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 20,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Cilicom\u73bb\u7483\u80f6",
+                "warehouse_item_id": 1375,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "206.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 21,
+                "line_type": "glass",
+                "material_code": null,
+                "material_name": "Reflective glass",
+                "warehouse_item_id": null,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "pcs",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": null,
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": null,
+                "is_fully_reserved": false,
+                "measurement_mm": 1687,
+                "is_procurement_only": true,
+                "is_glass": true,
+                "is_addon": false,
+                "quantity_to_requisition": "4.000",
+                "requisition_ids": [],
+                "requisitions": [],
+                "can_create_requisition": true
+            },
+            {
+                "bom_line_id": 22,
+                "line_type": "aluminium_profile",
+                "material_code": "PY08",
+                "material_name": "Side frame \u8fb9\u5c01",
+                "warehouse_item_id": 786,
+                "required_qty": "2.000",
+                "reserved_qty": "20.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "182.000",
+                "offcut_usable": "4.184",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2090,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 23,
+                "line_type": "aluminium_profile",
+                "material_code": "PY10",
+                "material_name": "Top frame \u4e0a\u56fa\u5b9a",
+                "warehouse_item_id": 789,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "148.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2090,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 24,
+                "line_type": "aluminium_profile",
+                "material_code": "PY10",
+                "material_name": "Top frame \u4e0a\u56fa\u5b9a",
+                "warehouse_item_id": 789,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "148.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 848,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 25,
+                "line_type": "aluminium_profile",
+                "material_code": "PY06",
+                "material_name": "Top rail \u5e73\u4e0a\u6ed1",
+                "warehouse_item_id": 785,
+                "required_qty": "1.000",
+                "reserved_qty": "30.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 4,
+                "shortage_qty": "0.000",
+                "warehouse_available": "48.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 3683,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 26,
+                "line_type": "aluminium_profile",
+                "material_code": "PY43",
+                "material_name": "Bottom track \u4e0b\u6ed1",
+                "warehouse_item_id": 796,
+                "required_qty": "1.000",
+                "reserved_qty": "10.000",
+                "reservation_target_qty": "6.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 3,
+                "shortage_qty": "0.000",
+                "warehouse_available": "58.000",
+                "offcut_usable": "3.132",
+                "bars_needed": 1,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 3683,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 27,
+                "line_type": "aluminium_profile",
+                "material_code": "WY-82827",
+                "material_name": "Bead \u5355\u73bb\u538b\u7ebf",
+                "warehouse_item_id": 1127,
+                "required_qty": "4.000",
+                "reserved_qty": "40.999",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "148.999",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2035,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 28,
+                "line_type": "aluminium_profile",
+                "material_code": "WY-82827",
+                "material_name": "Bead \u5355\u73bb\u538b\u7ebf",
+                "warehouse_item_id": 1127,
+                "required_qty": "4.000",
+                "reserved_qty": "40.999",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "148.999",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 848,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 29,
+                "line_type": "aluminium_profile",
+                "material_code": "PY24",
+                "material_name": "Lock profile \u5355\u73bb\u5149\u4f01",
+                "warehouse_item_id": 791,
+                "required_qty": "4.000",
+                "reserved_qty": "80.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "230.000",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2041,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 30,
+                "line_type": "aluminium_profile",
+                "material_code": "PY25",
+                "material_name": "Interlock Profile \u5355\u73bb\u52fe\u4f01",
+                "warehouse_item_id": 793,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "310.003",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2041,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 31,
+                "line_type": "aluminium_profile",
+                "material_code": "PY35",
+                "material_name": "Inter seal \u6536\u53e3",
+                "warehouse_item_id": 1256,
+                "required_qty": "1.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "1.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 0,
+                "shortage_qty": "0.000",
+                "warehouse_available": "26.999",
+                "offcut_usable": "0.000",
+                "bars_needed": 0,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": 2041,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 32,
+                "line_type": "aluminium_profile",
+                "material_code": "PY52",
+                "material_name": "Sash Frame \u5355\u73bb\u4e0a\u4e0b\u65b9",
+                "warehouse_item_id": 1255,
+                "required_qty": "8.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 28,
+                "shortage_qty": "0.000",
+                "warehouse_available": "735.997",
+                "offcut_usable": "3.428",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 860,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 33,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Roller 90 SD",
+                "warehouse_item_id": 1373,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "126.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 34,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Lock 90 SD",
+                "warehouse_item_id": 1374,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "326.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 35,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Cilicom\u73bb\u7483\u80f6",
+                "warehouse_item_id": 1375,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "206.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 36,
+                "line_type": "glass",
+                "material_code": null,
+                "material_name": "Reflective glass",
+                "warehouse_item_id": null,
+                "required_qty": "2.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "2.000",
+                "reservation_uom": "pcs",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": null,
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": null,
+                "is_fully_reserved": false,
+                "measurement_mm": 2032,
+                "is_procurement_only": true,
+                "is_glass": true,
+                "is_addon": false,
+                "quantity_to_requisition": "2.000",
+                "requisition_ids": [],
+                "requisitions": [],
+                "can_create_requisition": true
+            },
+            {
+                "bom_line_id": 37,
+                "line_type": "glass",
+                "material_code": null,
+                "material_name": "Reflective glass",
+                "warehouse_item_id": null,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "pcs",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": null,
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": null,
+                "is_fully_reserved": false,
+                "measurement_mm": 1961,
+                "is_procurement_only": true,
+                "is_glass": true,
+                "is_addon": false,
+                "quantity_to_requisition": "4.000",
+                "requisition_ids": [],
+                "requisitions": [],
+                "can_create_requisition": true
+            },
+            {
+                "bom_line_id": 38,
+                "line_type": "aluminium_profile",
+                "material_code": "PY08",
+                "material_name": "Side frame \u8fb9\u5c01",
+                "warehouse_item_id": 786,
+                "required_qty": "2.000",
+                "reserved_qty": "20.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 8,
+                "shortage_qty": "0.000",
+                "warehouse_available": "182.000",
+                "offcut_usable": "4.184",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1825,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 39,
+                "line_type": "aluminium_profile",
+                "material_code": "PY06",
+                "material_name": "Top rail \u5e73\u4e0a\u6ed1",
+                "warehouse_item_id": 785,
+                "required_qty": "1.000",
+                "reserved_qty": "30.000",
+                "reservation_target_qty": "12.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 4,
+                "shortage_qty": "0.000",
+                "warehouse_available": "48.000",
+                "offcut_usable": "0.000",
+                "bars_needed": 2,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2828,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 40,
+                "line_type": "aluminium_profile",
+                "material_code": "PY51",
+                "material_name": "Bottom flat track \u5e73\u4e0b\u8f68",
+                "warehouse_item_id": 799,
+                "required_qty": "1.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "0.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 1,
+                "shortage_qty": "0.000",
+                "warehouse_available": "24.000",
+                "offcut_usable": "3.172",
+                "bars_needed": 0,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 2828,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 41,
+                "line_type": "aluminium_profile",
+                "material_code": "PY24",
+                "material_name": "Lock profile \u5355\u73bb\u5149\u4f01",
+                "warehouse_item_id": 791,
+                "required_qty": "4.000",
+                "reserved_qty": "80.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "230.000",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1791,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 42,
+                "line_type": "aluminium_profile",
+                "material_code": "PY25",
+                "material_name": "Interlock Profile \u5355\u73bb\u52fe\u4f01",
+                "warehouse_item_id": 793,
+                "required_qty": "4.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "30.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 14,
+                "shortage_qty": "0.000",
+                "warehouse_available": "310.003",
+                "offcut_usable": "2.466",
+                "bars_needed": 5,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 1791,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 43,
+                "line_type": "aluminium_profile",
+                "material_code": "PY35",
+                "material_name": "Inter seal \u6536\u53e3",
+                "warehouse_item_id": 1256,
+                "required_qty": "1.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "1.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 0,
+                "shortage_qty": "0.000",
+                "warehouse_available": "26.999",
+                "offcut_usable": "0.000",
+                "bars_needed": 0,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": 1791,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 44,
+                "line_type": "aluminium_profile",
+                "material_code": "PY52",
+                "material_name": "Sash Frame \u5355\u73bb\u4e0a\u4e0b\u65b9",
+                "warehouse_item_id": 1255,
+                "required_qty": "8.000",
+                "reserved_qty": "40.000",
+                "reservation_target_qty": "18.000",
+                "reservation_uom": "metre",
+                "sku_cuts_total": 28,
+                "shortage_qty": "0.000",
+                "warehouse_available": "735.997",
+                "offcut_usable": "3.428",
+                "bars_needed": 3,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": true,
+                "measurement_mm": 646,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 45,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Roller 90 SD",
+                "warehouse_item_id": 1373,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "126.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 46,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Lock 90 SD",
+                "warehouse_item_id": 1374,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "326.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 47,
+                "line_type": "accessory",
+                "material_code": null,
+                "material_name": "Cilicom\u73bb\u7483\u80f6",
+                "warehouse_item_id": 1375,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "each",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": "206.000",
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": "0.000",
+                "is_fully_reserved": false,
+                "measurement_mm": null,
+                "is_procurement_only": false,
+                "is_glass": false,
+                "is_addon": false,
+                "quantity_to_requisition": "0.000",
+                "requisition_ids": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "requisitions": [
+                    {
+                        "id": 1,
+                        "reference": "PR-2026-0001",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 2,
+                        "reference": "PR-2026-0002",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 3,
+                        "reference": "PR-2026-0003",
+                        "status": "draft"
+                    },
+                    {
+                        "id": 4,
+                        "reference": "PR-2026-0004",
+                        "status": "approved"
+                    }
+                ],
+                "can_create_requisition": false
+            },
+            {
+                "bom_line_id": 48,
+                "line_type": "glass",
+                "material_code": null,
+                "material_name": "Reflective glass",
+                "warehouse_item_id": null,
+                "required_qty": "4.000",
+                "reserved_qty": "0.000",
+                "reservation_target_qty": "4.000",
+                "reservation_uom": "pcs",
+                "sku_cuts_total": null,
+                "shortage_qty": "0.000",
+                "warehouse_available": null,
+                "offcut_usable": null,
+                "bars_needed": null,
+                "stock_check_shortage": null,
+                "is_fully_reserved": false,
+                "measurement_mm": 1711,
+                "is_procurement_only": true,
+                "is_glass": true,
+                "is_addon": false,
+                "quantity_to_requisition": "4.000",
+                "requisition_ids": [],
+                "requisitions": [],
+                "can_create_requisition": true
             }
         ],
-        "summary": {
-            "total_items": 4,
-            "subtotal": 672.5285136,
-            "tax": 406.9474944,
-            "grand_total": 1079.48,
-            "source_filename": "BEATRICE20260423.xlsx"
-        },
-        "extract_session_id": "01ktmnb3h5hk5d1h4nheee47nh"
+        "glass_orders": [
+            {
+                "id": 1,
+                "order_number": "GL-2026-0001",
+                "status": "draft",
+                "expected_delivery": "2026-07-31",
+                "delivered_at": null
+            }
+        ],
+        "fifo_position": 1,
+        "goods_receipts": [
+            {
+                "id": 2,
+                "grn_number": "GRN-2026-0002",
+                "status": "verified",
+                "received_at": "2026-07-28T14:59:47+00:00",
+                "verified_at": "2026-07-29T10:31:12+00:00",
+                "notes": "GRN GRN-2026-0002 putaway",
+                "quality_inspection_notes": null,
+                "putaway_notes": "GRN GRN-2026-0002 putaway",
+                "purchase_order": {
+                    "id": 2,
+                    "reference": "PO-2026-0002",
+                    "supplier_name": "Accessories Kenya"
+                },
+                "lines": [
+                    {
+                        "id": 23,
+                        "description": "SASH",
+                        "warehouse_item_id": 791,
+                        "warehouse_item_sku": "PY24",
+                        "warehouse_item_name": "SASH",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 24,
+                        "description": "INTERLOCK",
+                        "warehouse_item_id": 793,
+                        "warehouse_item_sku": "PY25",
+                        "warehouse_item_name": "INTERLOCK",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 26,
+                        "description": "OUTER FRAME",
+                        "warehouse_item_id": 786,
+                        "warehouse_item_sku": "PY08",
+                        "warehouse_item_name": "OUTER FRAME",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 27,
+                        "description": "TOP RAIL",
+                        "warehouse_item_id": 785,
+                        "warehouse_item_sku": "PY06",
+                        "warehouse_item_name": "TOP RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 28,
+                        "description": "BOTTOM RAIL",
+                        "warehouse_item_id": 796,
+                        "warehouse_item_sku": "PY43",
+                        "warehouse_item_name": "BOTTOM RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 35,
+                        "description": "BEAD",
+                        "warehouse_item_id": 1127,
+                        "warehouse_item_sku": "WY-82827",
+                        "warehouse_item_name": "BEAD",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    },
+                    {
+                        "id": 39,
+                        "description": "OUTER FRAME",
+                        "warehouse_item_id": 786,
+                        "warehouse_item_sku": "PY08",
+                        "warehouse_item_name": "OUTER FRAME",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 48,
+                        "notes": null
+                    },
+                    {
+                        "id": 40,
+                        "description": "LOW BOTTOM TRACK",
+                        "warehouse_item_id": 799,
+                        "warehouse_item_sku": "PY51",
+                        "warehouse_item_name": "LOW BOTTOM TRACK",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 41,
+                        "description": "SASH",
+                        "warehouse_item_id": 791,
+                        "warehouse_item_sku": "PY24",
+                        "warehouse_item_name": "SASH",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 48,
+                        "notes": null
+                    },
+                    {
+                        "id": 42,
+                        "description": "Panel\/sash frame",
+                        "warehouse_item_id": 1255,
+                        "warehouse_item_sku": "PY52",
+                        "warehouse_item_name": "Panel\/sash frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "80.000",
+                        "qty_accepted": "80.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 29,
+                        "description": "INTERLOCK",
+                        "warehouse_item_id": 793,
+                        "warehouse_item_sku": "PY25",
+                        "warehouse_item_name": "INTERLOCK",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    },
+                    {
+                        "id": 30,
+                        "description": "Panel\/sash frame",
+                        "warehouse_item_id": 1255,
+                        "warehouse_item_sku": "PY52",
+                        "warehouse_item_name": "Panel\/sash frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "79.999",
+                        "qty_accepted": "79.999",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 48,
+                        "notes": null
+                    },
+                    {
+                        "id": 32,
+                        "description": "OUTER FRAME",
+                        "warehouse_item_id": 786,
+                        "warehouse_item_sku": "PY08",
+                        "warehouse_item_name": "OUTER FRAME",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    },
+                    {
+                        "id": 33,
+                        "description": "Top frame",
+                        "warehouse_item_id": 789,
+                        "warehouse_item_sku": "PY10",
+                        "warehouse_item_name": "Top frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 48,
+                        "notes": null
+                    },
+                    {
+                        "id": 34,
+                        "description": "BOTTOM RAIL",
+                        "warehouse_item_id": 796,
+                        "warehouse_item_sku": "PY43",
+                        "warehouse_item_name": "BOTTOM RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 36,
+                        "description": "INTERLOCK",
+                        "warehouse_item_id": 793,
+                        "warehouse_item_sku": "PY25",
+                        "warehouse_item_name": "INTERLOCK",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.001",
+                        "qty_accepted": "40.001",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    },
+                    {
+                        "id": 37,
+                        "description": "Panel\/sash frame",
+                        "warehouse_item_id": 1255,
+                        "warehouse_item_sku": "PY52",
+                        "warehouse_item_name": "Panel\/sash frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "80.000",
+                        "qty_accepted": "80.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    },
+                    {
+                        "id": 25,
+                        "description": "Lock 90 SD",
+                        "warehouse_item_id": 1374,
+                        "warehouse_item_sku": "LOCK-90-SD",
+                        "warehouse_item_name": "Lock 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 31,
+                        "description": "Lock 90 SD",
+                        "warehouse_item_id": 1374,
+                        "warehouse_item_sku": "LOCK-90-SD",
+                        "warehouse_item_name": "Lock 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 38,
+                        "description": "Cilicom Glass Glue",
+                        "warehouse_item_id": 1375,
+                        "warehouse_item_sku": "CILICOM-GLASS-GLUE",
+                        "warehouse_item_name": "Cilicom Glass Glue",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 43,
+                        "description": "Lock 90 SD",
+                        "warehouse_item_id": 1374,
+                        "warehouse_item_sku": "LOCK-90-SD",
+                        "warehouse_item_name": "Lock 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 47,
+                        "notes": null
+                    }
+                ]
+            },
+            {
+                "id": 1,
+                "grn_number": "GRN-2026-0001",
+                "status": "verified",
+                "received_at": "2026-07-28T13:16:34+00:00",
+                "verified_at": "2026-07-28T13:19:29+00:00",
+                "notes": null,
+                "quality_inspection_notes": null,
+                "putaway_notes": "GRN #1 verified",
+                "purchase_order": {
+                    "id": 1,
+                    "reference": "PO-2026-0001",
+                    "supplier_name": "Aluminium Profiles Ltd"
+                },
+                "lines": [
+                    {
+                        "id": 1,
+                        "description": "OUTER FRAME",
+                        "warehouse_item_id": 786,
+                        "warehouse_item_sku": "PY08",
+                        "warehouse_item_name": "OUTER FRAME",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 2,
+                        "description": "TOP RAIL",
+                        "warehouse_item_id": 785,
+                        "warehouse_item_sku": "PY06",
+                        "warehouse_item_name": "TOP RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 3,
+                        "description": "BOTTOM RAIL",
+                        "warehouse_item_id": 796,
+                        "warehouse_item_sku": "PY43",
+                        "warehouse_item_name": "BOTTOM RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 4,
+                        "description": "Panel\/sash frame",
+                        "warehouse_item_id": 1255,
+                        "warehouse_item_sku": "PY52",
+                        "warehouse_item_name": "Panel\/sash frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 5,
+                        "description": "Roller 90 SD",
+                        "warehouse_item_id": 1373,
+                        "warehouse_item_sku": "ROLLER-90-SD",
+                        "warehouse_item_name": "Roller 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 6,
+                        "description": "Cilicom Glass Glue",
+                        "warehouse_item_id": 1375,
+                        "warehouse_item_sku": "CILICOM-GLASS-GLUE",
+                        "warehouse_item_name": "Cilicom Glass Glue",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "20.000",
+                        "qty_accepted": "20.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 7,
+                        "description": "SASH",
+                        "warehouse_item_id": 791,
+                        "warehouse_item_sku": "PY24",
+                        "warehouse_item_name": "SASH",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 8,
+                        "description": "INTERSEAL",
+                        "warehouse_item_id": 1256,
+                        "warehouse_item_sku": "PY-35",
+                        "warehouse_item_name": "INTERSEAL",
+                        "warehouse_item_category": "rubber",
+                        "is_procurement_only": false,
+                        "qty_received": "9.999",
+                        "qty_accepted": "9.999",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 9,
+                        "description": "Roller 90 SD",
+                        "warehouse_item_id": 1373,
+                        "warehouse_item_sku": "ROLLER-90-SD",
+                        "warehouse_item_name": "Roller 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 10,
+                        "description": "Cilicom Glass Glue",
+                        "warehouse_item_id": 1375,
+                        "warehouse_item_sku": "CILICOM-GLASS-GLUE",
+                        "warehouse_item_name": "Cilicom Glass Glue",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 11,
+                        "description": "Top frame",
+                        "warehouse_item_id": 789,
+                        "warehouse_item_sku": "PY10",
+                        "warehouse_item_name": "Top frame",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 12,
+                        "description": "TOP RAIL",
+                        "warehouse_item_id": 785,
+                        "warehouse_item_sku": "PY06",
+                        "warehouse_item_name": "TOP RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 13,
+                        "description": "BEAD",
+                        "warehouse_item_id": 1127,
+                        "warehouse_item_sku": "WY-82827",
+                        "warehouse_item_name": "BEAD",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.999",
+                        "qty_accepted": "40.999",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 14,
+                        "description": "SASH",
+                        "warehouse_item_id": 791,
+                        "warehouse_item_sku": "PY24",
+                        "warehouse_item_name": "SASH",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 15,
+                        "description": "INTERSEAL",
+                        "warehouse_item_id": 1256,
+                        "warehouse_item_sku": "PY-35",
+                        "warehouse_item_name": "INTERSEAL",
+                        "warehouse_item_category": "rubber",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 16,
+                        "description": "Roller 90 SD",
+                        "warehouse_item_id": 1373,
+                        "warehouse_item_sku": "ROLLER-90-SD",
+                        "warehouse_item_name": "Roller 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 17,
+                        "description": "Lock 90 SD",
+                        "warehouse_item_id": 1374,
+                        "warehouse_item_sku": "LOCK-90-SD",
+                        "warehouse_item_name": "Lock 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 18,
+                        "description": "TOP RAIL",
+                        "warehouse_item_id": 785,
+                        "warehouse_item_sku": "PY06",
+                        "warehouse_item_name": "TOP RAIL",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 19,
+                        "description": "INTERLOCK",
+                        "warehouse_item_id": 793,
+                        "warehouse_item_sku": "PY25",
+                        "warehouse_item_name": "INTERLOCK",
+                        "warehouse_item_category": "aluminium_profile",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 20,
+                        "description": "INTERSEAL",
+                        "warehouse_item_id": 1256,
+                        "warehouse_item_sku": "PY-35",
+                        "warehouse_item_name": "INTERSEAL",
+                        "warehouse_item_category": "rubber",
+                        "is_procurement_only": false,
+                        "qty_received": "10.000",
+                        "qty_accepted": "10.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 42,
+                        "notes": null
+                    },
+                    {
+                        "id": 21,
+                        "description": "Roller 90 SD",
+                        "warehouse_item_id": 1373,
+                        "warehouse_item_sku": "ROLLER-90-SD",
+                        "warehouse_item_name": "Roller 90 SD",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    },
+                    {
+                        "id": 22,
+                        "description": "Cilicom Glass Glue",
+                        "warehouse_item_id": 1375,
+                        "warehouse_item_sku": "CILICOM-GLASS-GLUE",
+                        "warehouse_item_name": "Cilicom Glass Glue",
+                        "warehouse_item_category": "accessory",
+                        "is_procurement_only": false,
+                        "qty_received": "40.000",
+                        "qty_accepted": "40.000",
+                        "qty_rejected": "0.000",
+                        "to_bin_id": 26,
+                        "notes": null
+                    }
+                ]
+            }
+        ]
     }
 }

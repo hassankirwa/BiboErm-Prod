@@ -10,10 +10,12 @@ import { usePermissions } from "@/hooks/use-permissions";
 import {
   AUTO_PROJECT_STAGES,
   canAdvanceFromFinalDesignApproval,
+  canAdvanceToFinalDesignApproval,
+  canAdvanceToMaterialsReady,
   formatProjectStage,
   getManualNextStages,
+  getProjectMaterialStatus,
   getStageWaitingMessage,
-  hasProductionMeasurementData,
   type ProjectDetail,
 } from "@/lib/api/projects";
 import {
@@ -61,19 +63,43 @@ export function ProjectDetailActionBar({
   const waitingMessage = isAutoStage ? getStageWaitingMessage(project.stage) : null;
 
   function handleAdvanceClick() {
-    if (
-      project.stage === "site_assessment" &&
-      !hasProductionMeasurementData(project)
-    ) {
-      toast.error("Complete the site assessment on the dedicated page first.", {
-        action: {
-          label: "Open site assessment",
-          onClick: () => {
-            window.location.href = siteAssessmentHref;
-          },
-        },
-      });
-      return;
+    if (project.stage === "site_assessment") {
+      const gate = canAdvanceToFinalDesignApproval(project);
+      if (!gate.ok) {
+        if (gate.missingMeasurement) {
+          toast.error("Complete the site assessment on the dedicated page first.", {
+            action: {
+              label: "Open site assessment",
+              onClick: () => {
+                window.location.href = siteAssessmentHref;
+              },
+            },
+          });
+          return;
+        }
+        if (gate.missingDesign) {
+          toast.error("Upload at least one design document before advancing.", {
+            action: {
+              label: "Designs tab",
+              onClick: () => {
+                window.location.href = designsHref;
+              },
+            },
+          });
+          return;
+        }
+        if (gate.missingBomUpload) {
+          toast.error("Upload a BOM before advancing to final design approval.", {
+            action: {
+              label: "BOM tab",
+              onClick: () => {
+                window.location.href = bomHref;
+              },
+            },
+          });
+          return;
+        }
+      }
     }
 
     if (project.stage === "final_design_approval") {
@@ -102,6 +128,24 @@ export function ProjectDetailActionBar({
           return;
         }
       }
+    }
+
+    if (nextStages[0] === "materials_ready") {
+      void getProjectMaterialStatus(project.id)
+        .then((response) => {
+          const gate = canAdvanceToMaterialsReady(response.data.summary);
+          if (!gate.ok) {
+            toast.error(
+              gate.reason ??
+                "Resolve material shortages and finish procurement before marking materials ready.",
+            );
+          }
+          setAdvanceOpen(true);
+        })
+        .catch(() => {
+          setAdvanceOpen(true);
+        });
+      return;
     }
 
     setAdvanceOpen(true);
@@ -195,6 +239,7 @@ export function ProjectDetailActionBar({
           onOpenChange={setAdvanceOpen}
           onProjectUpdated={onProjectUpdated}
           nextStages={nextStages}
+          mode={mode}
         />
       ) : null}
     </>

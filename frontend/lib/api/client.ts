@@ -143,6 +143,77 @@ export async function apiRequest<T>(
   return data as T;
 }
 
+export async function apiBlobRequest(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<Blob> {
+  const {
+    method = "GET",
+    body,
+    formData,
+    skipCsrf = false,
+    skipRefresh = false,
+    headers: extraHeaders = {},
+  } = options;
+
+  const isMutating = method !== "GET" && method !== "HEAD";
+
+  if (isMutating && !skipCsrf) {
+    await ensureCsrfCookie();
+  }
+
+  const xsrf = getXsrfToken();
+  const headers: Record<string, string> = {
+    Accept: "*/*",
+    "X-Requested-With": "XMLHttpRequest",
+    "X-Device-Id": getDeviceId(),
+    ...extraHeaders,
+  };
+
+  if (isMutating && xsrf) {
+    headers["X-XSRF-TOKEN"] = xsrf;
+  }
+
+  if (body !== undefined && !formData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${getApiBaseUrl()}/api/v1${normalizedPath}`;
+
+  const doFetch = () =>
+    fetch(url, {
+      method,
+      credentials: "include",
+      headers,
+      body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
+    });
+
+  let response = await doFetch();
+
+  if (response.status === 401 && !skipRefresh && path !== "/auth/refresh") {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      response = await doFetch();
+    }
+  }
+
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+    const errorBody = contentType.includes("application/json")
+      ? ((await response.json().catch(() => ({}))) as ApiErrorBody)
+      : {};
+
+    throw new ApiError(
+      response.status,
+      errorBody.message ?? `Request failed with status ${response.status}`,
+      errorBody as Record<string, unknown>,
+    );
+  }
+
+  return response.blob();
+}
+
 export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {},

@@ -18,8 +18,21 @@ class OffcutController extends Controller
             ->with(['item', 'bin.section.deck'])
             ->latest('logged_at');
 
-        if ($profile = $request->query('profile')) {
-            $query->whereHas('item', fn ($q) => $q->where('sku', 'like', "%{$profile}%"));
+        $skuSearch = trim((string) ($request->query('sku')
+            ?? $request->query('profile')
+            ?? $request->query('q')
+            ?? ''));
+
+        if ($skuSearch !== '') {
+            $like = '%'.$skuSearch.'%';
+            $query->where(function ($outer) use ($like) {
+                $outer->where('offcut_number', 'like', $like)
+                    ->orWhere('notes', 'like', $like)
+                    ->orWhereHas('item', function ($q) use ($like) {
+                        $q->where('sku', 'like', $like)
+                            ->orWhere('name', 'like', $like);
+                    });
+            });
         }
 
         if ($itemId = $request->query('item_id')) {

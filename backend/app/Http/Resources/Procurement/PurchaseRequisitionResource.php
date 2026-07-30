@@ -17,12 +17,15 @@ class PurchaseRequisitionResource extends JsonResource
             'supplier_id' => $this->supplier_id,
             'status' => $this->status?->value ?? $this->status,
             'notes' => $this->notes,
+            'required_by' => $this->required_by?->format('Y-m-d'),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'approved_at' => $this->approved_at?->toIso8601String(),
             'rejection_reason' => $this->rejection_reason,
             'requested_by' => $this->requested_by,
             'approved_by' => $this->approved_by,
             'requires_admin_approval' => $this->requiresAdminApproval(),
+            'is_editable' => $this->isEditable(),
+            'can_create_purchase_order' => $this->canCreatePurchaseOrder(),
             'trigger_type' => $this->primaryTrigger()?->value,
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project?->id,
@@ -47,29 +50,41 @@ class PurchaseRequisitionResource extends JsonResource
                 'category' => $this->supplier->category,
             ] : null),
             'lines' => $this->whenLoaded('lines', fn () => $this->lines->map(
-                fn (PurchaseRequisitionLine $line) => [
-                    'id' => $line->id,
-                    'description' => $line->description,
-                    'quantity' => $line->quantity,
-                    'required_quantity' => $line->required_quantity,
-                    'overage_quantity' => $line->required_quantity !== null
-                        && \bccomp((string) $line->quantity, (string) $line->required_quantity, 3) === 1
-                        ? \bcsub((string) $line->quantity, (string) $line->required_quantity, 3)
-                        : null,
-                    'trigger_type' => $line->trigger_type?->value ?? $line->trigger_type,
-                    'warehouse_item_id' => $line->warehouse_item_id,
-                    'project_bom_line_id' => $line->project_bom_line_id,
-                    'unit_of_measure' => $line->unit_of_measure,
-                    'sku' => $line->sku,
-                    'estimated_unit_price' => $line->estimated_unit_price,
-                    'notes' => $line->notes,
-                    'warehouse_item' => $line->relationLoaded('warehouseItem') ? [
-                        'id' => $line->warehouseItem?->id,
-                        'sku' => $line->warehouseItem?->sku,
-                        'name' => $line->warehouseItem?->name,
-                        'unit_of_measure' => $line->warehouseItem?->unit_of_measure,
-                    ] : null,
-                ]
+                function (PurchaseRequisitionLine $line) {
+                    $headerSupplierId = $this->supplier_id ? (int) $this->supplier_id : null;
+
+                    return [
+                        'id' => $line->id,
+                        'description' => $line->description,
+                        'quantity' => $line->quantity,
+                        'required_quantity' => $line->required_quantity,
+                        'overage_quantity' => $line->required_quantity !== null
+                            && \bccomp((string) $line->quantity, (string) $line->required_quantity, 3) === 1
+                            ? \bcsub((string) $line->quantity, (string) $line->required_quantity, 3)
+                            : null,
+                        'trigger_type' => $line->trigger_type?->value ?? $line->trigger_type,
+                        'warehouse_item_id' => $line->warehouse_item_id,
+                        'project_bom_line_id' => $line->project_bom_line_id,
+                        'unit_of_measure' => $line->unit_of_measure,
+                        'sku' => $line->sku,
+                        'estimated_unit_price' => $line->estimated_unit_price,
+                        'notes' => $line->notes,
+                        'preferred_supplier_id' => $line->preferred_supplier_id,
+                        'effective_supplier_id' => $line->effectiveSupplierId($headerSupplierId),
+                        'preferred_supplier' => $line->relationLoaded('preferredSupplier') && $line->preferredSupplier ? [
+                            'id' => $line->preferredSupplier->id,
+                            'code' => $line->preferredSupplier->code,
+                            'name' => $line->preferredSupplier->name,
+                            'category' => $line->preferredSupplier->category,
+                        ] : null,
+                        'warehouse_item' => $line->relationLoaded('warehouseItem') ? [
+                            'id' => $line->warehouseItem?->id,
+                            'sku' => $line->warehouseItem?->sku,
+                            'name' => $line->warehouseItem?->name,
+                            'unit_of_measure' => $line->warehouseItem?->unit_of_measure,
+                        ] : null,
+                    ];
+                }
             )->values()),
             'purchase_orders_count' => $this->when(
                 $this->relationLoaded('purchaseOrders') || isset($this->purchase_orders_count),
@@ -77,6 +92,12 @@ class PurchaseRequisitionResource extends JsonResource
                     ? $this->purchaseOrders->count()
                     : (int) ($this->purchase_orders_count ?? 0),
             ),
+            'purchase_orders' => $this->whenLoaded('purchaseOrders', fn () => $this->purchaseOrders->map(fn ($order) => [
+                'id' => $order->id,
+                'reference' => $order->reference,
+                'supplier_id' => $order->supplier_id,
+                'status' => $order->status?->value ?? $order->status,
+            ])->values()),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

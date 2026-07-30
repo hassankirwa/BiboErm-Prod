@@ -32,10 +32,13 @@ class QcInspectionService
     {
         $context = QcInspectionContext::from($data['context']);
         $projectId = $data['project_id'] ?? null;
+        $stage = is_string($data['stage'] ?? null) && $data['stage'] !== ''
+            ? $data['stage']
+            : $context->value;
 
         $this->validateLinkedEntities($data, $context);
 
-        $template = $this->templates->resolve($context, $projectId);
+        $template = $this->templates->resolve($context, $projectId, $stage);
 
         $inspection = QcInspection::query()->create([
             'reference' => $this->refs->inspection(),
@@ -47,7 +50,7 @@ class QcInspectionService
             'warehouse_section_id' => $data['warehouse_section_id'] ?? null,
             'tool_id' => $data['tool_id'] ?? null,
             'context' => $context,
-            'stage' => $context->value,
+            'stage' => $stage,
             'template_id' => $template?->id,
             'result' => QcInspectionResult::Pending,
             'inspector_id' => $user->id,
@@ -93,10 +96,62 @@ class QcInspectionService
         return $inspection->fresh(['template', 'defects', 'photos']);
     }
 
+    /**
+     * Early production QC (pre-cutting / in-process) can be skipped —
+     * formal inspection is expected after assembly (post-fabrication).
+     */
+    public function skip(QcInspection $inspection, User $user, ?string $notes = null): QcInspection
+    {
+        $this->assertPending($inspection);
+        $this->assertInspector($inspection, $user);
+
+        if (! $this->isSkippable($inspection)) {
+            throw ValidationException::withMessages([
+                'inspection' => [
+                    'Only pre-cutting and in-process production inspections can be skipped. Complete post-assembly QC normally.',
+                ],
+            ]);
+        }
+
+        return DB::transaction(function () use ($inspection, $user, $notes) {
+            $inspection->update([
+                'result' => QcInspectionResult::Skipped,
+                'notes' => $notes
+                    ?? $inspection->notes
+                    ?? 'Skipped — formal QC after assembly',
+                'completed_by' => $user->id,
+                'completed_at' => now(),
+                'inspected_at' => now(),
+            ]);
+
+            $this->audit->log('qc.inspection_skipped', $inspection->fresh());
+
+            return $inspection->fresh(['template', 'defects', 'photos', 'inspector', 'completedByUser']);
+        });
+    }
+
+    public function isSkippable(QcInspection $inspection): bool
+    {
+        $context = $inspection->context instanceof QcInspectionContext
+            ? $inspection->context
+            : QcInspectionContext::tryFrom((string) $inspection->context);
+
+        return in_array($context, [
+            QcInspectionContext::ProductionQcPreCheck,
+            QcInspectionContext::ProductionInProcess,
+        ], true);
+    }
+
     public function submit(QcInspection $inspection, User $user, array $data): QcInspection
     {
         $this->assertPending($inspection);
         $this->assertInspector($inspection, $user);
+
+        $requestedResult = QcInspectionResult::from($data['result'] ?? QcInspectionResult::Pass->value);
+
+        if ($requestedResult === QcInspectionResult::Skipped) {
+            return $this->skip($inspection, $user, $data['notes'] ?? null);
+        }
 
         $inspection = $this->ensureDefaultTemplate($inspection);
 
@@ -111,8 +166,6 @@ class QcInspectionService
         if (array_key_exists('notes', $data)) {
             $inspection->notes = $data['notes'];
         }
-
-        $requestedResult = QcInspectionResult::from($data['result'] ?? QcInspectionResult::Pass->value);
 
         $this->validateChecklistResponses($inspection);
         $this->validatePhotoRequirements($inspection);
@@ -198,34 +251,45 @@ class QcInspectionService
         int $productionOrderId,
         string $productionStage,
     ): ?QcInspection {
-        $context = match ($productionStage) {
-            'qc_pre_check' => QcInspectionContext::ProductionQcPreCheck,
-            'qc_post_fabrication' => QcInspectionContext::ProductionQcPostFabrication,
+        $mapped = match ($productionStage) {
+            'finishing', 'qc_post_fabrication' => [
+                QcInspectionContext::ProductionQcPostFabrication,
+                QcInspectionContext::ProductionQcPostFabrication->value,
+            ],
             default => null,
         };
 
-        if (! $context instanceof QcInspectionContext) {
+        if ($mapped === null) {
             return null;
         }
 
+        [$context, $stage] = $mapped;
+
+        // One auto-created inspection per order/context. Completing it must not
+        // spawn another — reopen only via the normal create inspection API.
         $existing = QcInspection::query()
             ->where('production_order_id', $productionOrderId)
             ->where('context', $context)
-            ->where('result', QcInspectionResult::Pending)
+            ->where('stage', $stage)
+            ->orderByRaw(
+                "CASE WHEN result = ? THEN 0 ELSE 1 END",
+                [QcInspectionResult::Pending->value],
+            )
+            ->orderByDesc('id')
             ->first();
 
         if ($existing) {
             return $existing;
         }
 
-        $template = $this->templates->resolve($context, $projectId);
+        $template = $this->templates->resolve($context, $projectId, $stage);
 
         return QcInspection::query()->create([
             'reference' => $this->refs->inspection(),
             'project_id' => $projectId,
             'production_order_id' => $productionOrderId,
             'context' => $context,
-            'stage' => $context->value,
+            'stage' => $stage,
             'template_id' => $template?->id,
             'result' => QcInspectionResult::Pending,
             'checklist_responses' => [],
@@ -251,6 +315,27 @@ class QcInspectionService
         ]);
     }
 
+    public function createSiteReceiving(int $projectId, int $fieldJobId, ?int $deliveryRecordId = null): QcInspection
+    {
+        $context = QcInspectionContext::SiteReceiving;
+        $template = $this->templates->resolve($context, $projectId);
+
+        return QcInspection::query()->create([
+            'reference' => $this->refs->inspection(),
+            'project_id' => $projectId,
+            'field_installation_job_id' => $fieldJobId,
+            'context' => $context,
+            'stage' => $context->value,
+            'template_id' => $template?->id,
+            'result' => QcInspectionResult::Pending,
+            'checklist_responses' => [],
+            'custom_items' => [],
+            'notes' => $deliveryRecordId !== null
+                ? "field_delivery_record_id:{$deliveryRecordId}"
+                : null,
+        ]);
+    }
+
     public function ensureReceivingInspection(int $goodsReceiptId, ?int $projectId = null): QcInspection
     {
         $existing = QcInspection::query()
@@ -260,7 +345,7 @@ class QcInspectionService
             ->first();
 
         if ($existing) {
-            return $existing;
+            return $this->ensureDefaultTemplate($existing);
         }
 
         return $this->createReceivingInspection($goodsReceiptId, $projectId);
@@ -315,22 +400,31 @@ class QcInspectionService
         }
     }
 
-    protected function ensureDefaultTemplate(QcInspection $inspection): QcInspection
+    /**
+     * Attach the active system (or project override) template when an inspection has none.
+     */
+    public function ensureDefaultTemplate(QcInspection $inspection): QcInspection
     {
         if ($inspection->template_id) {
-            return $inspection;
+            return $inspection->relationLoaded('template')
+                ? $inspection
+                : $inspection->load('template');
         }
 
         $context = $inspection->context instanceof QcInspectionContext
             ? $inspection->context
             : QcInspectionContext::from((string) $inspection->context);
 
-        $template = $this->templates->resolve($context, $inspection->project_id);
+        $template = $this->templates->resolve(
+            $context,
+            $inspection->project_id,
+            is_string($inspection->stage) ? $inspection->stage : null,
+        );
 
         if ($template) {
             $inspection->update(['template_id' => $template->id]);
 
-            return $inspection->fresh();
+            return $inspection->fresh(['template']);
         }
 
         return $inspection;

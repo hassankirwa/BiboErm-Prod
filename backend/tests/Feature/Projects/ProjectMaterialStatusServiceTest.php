@@ -173,18 +173,26 @@ class ProjectMaterialStatusServiceTest extends TestCase
         $this->assertSame(3, $status['summary']['total_lines']);
         $this->assertSame(2, $status['summary']['warehouse_lines']);
         $this->assertSame(1, $status['summary']['procurement_only_lines']);
-        $this->assertSame(1, $status['summary']['fully_reserved']);
-        $this->assertSame(1, $status['summary']['shortage_lines']);
+        // Aluminium 5×2400mm packs to 3 bars; reserved 3 pcs covers the bar target.
+        $this->assertSame(2, $status['summary']['fully_reserved']);
+        $this->assertSame(2, $status['summary']['reservation_units_total']);
+        $this->assertSame(2, $status['summary']['reservation_units_reserved']);
+        $this->assertTrue($status['summary']['reservation_complete']);
+        $this->assertSame(0, $status['summary']['shortage_lines']);
         $this->assertSame(1, $status['summary']['open_requisitions']);
         $this->assertSame(1, $status['summary']['glass_orders_pending']);
-        $this->assertSame(7, $status['fifo_position']);
+        $this->assertSame(1, $status['fifo_position']);
+        $this->assertArrayHasKey('can_reserve_now', $status['summary']);
+        $this->assertArrayHasKey('warehouse_available', $status['lines'][0]);
 
         $shortageLineStatus = collect($status['lines'])->firstWhere('bom_line_id', $shortageLine->id);
         $reservedLineStatus = collect($status['lines'])->firstWhere('bom_line_id', $reservedLine->id);
         $glassLineStatus = collect($status['lines'])->firstWhere('bom_line_id', $glassLine->id);
 
         $this->assertSame('3.000', $shortageLineStatus['reserved_qty']);
-        $this->assertSame('2.000', $shortageLineStatus['shortage_qty']);
+        $this->assertSame('3.000', $shortageLineStatus['reservation_target_qty']);
+        $this->assertSame('0.000', $shortageLineStatus['shortage_qty']);
+        $this->assertSame(3, $shortageLineStatus['bars_needed']);
         $this->assertSame([$requisition->id], $shortageLineStatus['requisition_ids']);
 
         $this->assertSame('4.000', $reservedLineStatus['reserved_qty']);
@@ -193,6 +201,183 @@ class ProjectMaterialStatusServiceTest extends TestCase
         $this->assertTrue($glassLineStatus['is_procurement_only']);
         $this->assertSame('0.000', $glassLineStatus['reserved_qty']);
         $this->assertSame('0.000', $glassLineStatus['shortage_qty']);
+    }
+
+    public function test_live_warehouse_availability_without_prior_reserve(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->makeProject([
+            'stage' => ProjectStage::AwaitingProcurement->value,
+        ]);
+
+        $warehouse = Warehouse::query()->create([
+            'code' => 'MAIN-LIVE',
+            'name' => 'Main Live Warehouse',
+        ]);
+
+        $deck = Deck::query()->create([
+            'warehouse_id' => $warehouse->id,
+            'slug' => 'accessories',
+            'name' => 'Accessories Deck',
+        ]);
+
+        $section = Section::query()->create([
+            'deck_id' => $deck->id,
+            'code' => 'L1',
+            'name' => 'Section L1',
+            'section_type' => 'general_accessories',
+        ]);
+
+        $bin = Bin::query()->create([
+            'section_id' => $section->id,
+            'code' => 'BIN-LIVE-01',
+        ]);
+
+        $accessoryItem = Item::query()->create([
+            'sku' => 'ACC-LIVE-001',
+            'name' => 'Live Handle',
+            'category' => ItemCategory::Accessory->value,
+            'unit_of_measure' => 'pcs',
+        ]);
+
+        \App\Models\Warehouse\StockLevel::query()->create([
+            'item_id' => $accessoryItem->id,
+            'bin_id' => $bin->id,
+            'quantity_on_hand' => 10,
+            'quantity_reserved' => 0,
+        ]);
+
+        $bom = ProjectBom::query()->create([
+            'project_id' => $project->id,
+            'version' => 1,
+            'status' => 'finalized',
+            'uploaded_by' => $user->id,
+        ]);
+
+        $line = ProjectBomLine::query()->create([
+            'bom_id' => $bom->id,
+            'line_type' => 'accessory',
+            'warehouse_item_id' => $accessoryItem->id,
+            'material_code' => $accessoryItem->sku,
+            'material_name' => $accessoryItem->name,
+            'quantity' => 4,
+            'sort_order' => 1,
+        ]);
+
+        $status = app(ProjectMaterialStatusService::class)->build($project->fresh());
+        $lineStatus = collect($status['lines'])->firstWhere('bom_line_id', $line->id);
+
+        $this->assertSame(0, $status['summary']['fully_reserved']);
+        $this->assertSame(0, $status['summary']['shortage_lines']);
+        $this->assertTrue($status['summary']['can_fully_reserve']);
+        $this->assertTrue($status['summary']['can_reserve_now']);
+        $this->assertSame('0.000', $lineStatus['reserved_qty']);
+        $this->assertSame('0.000', $lineStatus['shortage_qty']);
+        $this->assertGreaterThanOrEqual(4.0, (float) $lineStatus['warehouse_available']);
+    }
+
+    public function test_combined_aluminium_sku_counts_as_one_reservation_unit(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->makeProject([
+            'stage' => ProjectStage::MaterialsReserved->value,
+        ]);
+
+        $warehouse = Warehouse::query()->create([
+            'code' => 'MAIN-ALU',
+            'name' => 'Alu Warehouse',
+        ]);
+        $deck = Deck::query()->create([
+            'warehouse_id' => $warehouse->id,
+            'slug' => 'accessories',
+            'name' => 'Profiles',
+        ]);
+        $section = Section::query()->create([
+            'deck_id' => $deck->id,
+            'code' => 'P1',
+            'name' => 'Profiles',
+            'section_type' => 'general_accessories',
+        ]);
+        $bin = Bin::query()->create([
+            'section_id' => $section->id,
+            'code' => 'BIN-ALU-01',
+        ]);
+
+        $profileItem = Item::query()->create([
+            'sku' => 'PY08',
+            'name' => 'OUTER FRAME',
+            'category' => ItemCategory::AluminiumProfile->value,
+            'unit_of_measure' => 'metre',
+        ]);
+
+        $accessoryItem = Item::query()->create([
+            'sku' => 'ROLLER-90',
+            'name' => 'Roller 90 SD',
+            'category' => ItemCategory::Accessory->value,
+            'unit_of_measure' => 'pcs',
+        ]);
+
+        $bom = ProjectBom::query()->create([
+            'project_id' => $project->id,
+            'version' => 1,
+            'status' => 'finalized',
+            'uploaded_by' => $user->id,
+        ]);
+
+        // Three cut lines for the same profile across openings — reserved once as nested metres.
+        foreach ([[2090, 2], [1816, 2], [1825, 2]] as $index => [$mm, $qty]) {
+            ProjectBomLine::query()->create([
+                'bom_id' => $bom->id,
+                'line_type' => 'aluminium_profile',
+                'warehouse_item_id' => $profileItem->id,
+                'material_code' => $profileItem->sku,
+                'material_name' => $profileItem->name,
+                'quantity' => $qty,
+                'measurement_mm' => $mm,
+                'sort_order' => $index + 1,
+            ]);
+        }
+
+        ProjectBomLine::query()->create([
+            'bom_id' => $bom->id,
+            'line_type' => 'accessory',
+            'warehouse_item_id' => $accessoryItem->id,
+            'material_code' => $accessoryItem->sku,
+            'material_name' => $accessoryItem->name,
+            'quantity' => 2,
+            'sort_order' => 10,
+        ]);
+
+        // Combined aluminium reserve qty from packing ≈ metres of bars needed.
+        StockReservation::query()->create([
+            'reservation_number' => 'RSV-ALU-COMBINED',
+            'project_id' => $project->id,
+            'status' => ReservationStatus::Pending->value,
+            'reserved_at' => now(),
+            'reserved_by' => $user->id,
+            'fifo_sequence' => 1,
+        ]);
+
+        $reservation = StockReservation::query()->where('project_id', $project->id)->firstOrFail();
+
+        // Enough metres to cover nested bar demand for the three cuts.
+        StockReservationLine::query()->create([
+            'reservation_id' => $reservation->id,
+            'item_id' => $profileItem->id,
+            'bin_id' => $bin->id,
+            'quantity_reserved' => 18,
+            'quantity_released' => 0,
+            'bom_line_ref' => (string) $bom->lines()->orderBy('id')->value('id'),
+        ]);
+
+        $status = app(ProjectMaterialStatusService::class)->build($project->fresh(['latestBom.lines.warehouseItem']));
+
+        $this->assertSame(4, $status['summary']['warehouse_lines']);
+        $this->assertSame(2, $status['summary']['reservation_units_total']);
+        // Aluminium SKU covered; accessory still open → 1/2 units.
+        $this->assertSame(1, $status['summary']['reservation_units_reserved']);
+        $this->assertFalse($status['summary']['reservation_complete']);
+        $this->assertSame(3, $status['summary']['fully_reserved']);
     }
 
     /**

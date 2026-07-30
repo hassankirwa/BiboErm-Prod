@@ -22,6 +22,7 @@ class PurchaseRequisitionLine extends Model
         'trigger_type',
         'estimated_unit_price',
         'notes',
+        'preferred_supplier_id',
     ];
 
     protected function casts(): array
@@ -47,5 +48,30 @@ class PurchaseRequisitionLine extends Model
     public function projectBomLine(): BelongsTo
     {
         return $this->belongsTo(ProjectBomLine::class, 'project_bom_line_id');
+    }
+
+    public function preferredSupplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'preferred_supplier_id');
+    }
+
+    /**
+     * Effective supplier for PO grouping: line preferred, else requisition header.
+     */
+    public function effectiveSupplierId(?int $requisitionSupplierId = null): ?int
+    {
+        if ($this->preferred_supplier_id) {
+            return (int) $this->preferred_supplier_id;
+        }
+
+        if ($requisitionSupplierId !== null) {
+            return $requisitionSupplierId ?: null;
+        }
+
+        $headerId = $this->relationLoaded('requisition')
+            ? $this->requisition?->supplier_id
+            : $this->requisition()->value('supplier_id');
+
+        return $headerId ? (int) $headerId : null;
     }
 }

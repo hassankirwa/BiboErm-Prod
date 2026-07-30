@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiBlobRequest, apiRequest } from "./client";
 
 export type Paginated<T> = {
   data: T[];
@@ -33,6 +33,7 @@ export type Driver = {
   vehicle_type: string | null;
   notes: string | null;
   is_active: boolean;
+  status: "available" | "occupied" | "inactive";
 };
 
 export type PurchaseRequisition = {
@@ -42,8 +43,11 @@ export type PurchaseRequisition = {
   supplier_id?: number | null;
   status: string;
   notes: string | null;
+  required_by?: string | null;
   trigger_type?: string | null;
   requires_admin_approval?: boolean;
+  is_editable?: boolean;
+  can_create_purchase_order?: boolean;
   submitted_at?: string | null;
   approved_at?: string | null;
   rejection_reason?: string | null;
@@ -64,6 +68,12 @@ export type PurchaseRequisition = {
   approver?: { id: number; name: string; email: string } | null;
   lines?: PurchaseRequisitionLine[];
   purchase_orders_count?: number;
+  purchase_orders?: Array<{
+    id: number;
+    reference: string;
+    supplier_id: number;
+    status: string;
+  }>;
 };
 
 export type PurchaseRequisitionLine = {
@@ -79,6 +89,14 @@ export type PurchaseRequisitionLine = {
   sku?: string | null;
   estimated_unit_price?: string | null;
   notes?: string | null;
+  preferred_supplier_id?: number | null;
+  effective_supplier_id?: number | null;
+  preferred_supplier?: {
+    id: number;
+    code: string;
+    name: string;
+    category: string | null;
+  } | null;
   warehouse_item?: {
     id: number;
     sku: string;
@@ -109,6 +127,7 @@ export type PurchaseOrder = {
   project_id: number | null;
   requisition_id: number | null;
   status: string;
+  is_editable?: boolean;
   subtotal: string;
   tax: string;
   total: string;
@@ -143,6 +162,7 @@ export type PurchaseOrderLine = {
   id: number;
   warehouse_item_id?: number | null;
   description: string;
+  sku?: string | null;
   quantity: string;
   unit_price: string;
   line_total: string;
@@ -203,6 +223,13 @@ export type GlassOrderPane = {
   tint?: string | null;
   notes?: string | null;
   bom_line_id?: number | null;
+  /** Unit buying price for one piece (KES). */
+  unit_buying_price?: number | null;
+  /** Line total = unit_buying_price × quantity. */
+  buying_price?: number | null;
+  area_m2?: number | null;
+  price_per_sqm?: number | null;
+  currency?: string | null;
 };
 
 export type GlassOrderSpecs = {
@@ -217,6 +244,7 @@ export type GlassOrder = {
   project_id: number;
   supplier_id: number | null;
   purchase_order_id: number | null;
+  purchase_requisition_id?: number | null;
   specs?: GlassOrderSpecs;
   status: string;
   ordered_at: string | null;
@@ -224,6 +252,9 @@ export type GlassOrder = {
   delivered_at: string | null;
   delivery_location: string | null;
   notes: string | null;
+  total_cost?: number | null;
+  total_area_m2?: number | null;
+  currency?: string | null;
   created_at?: string | null;
   project?: {
     id: number;
@@ -235,7 +266,75 @@ export type GlassOrder = {
     code: string;
     name: string;
     category: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
   } | null;
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+};
+
+export type GlassPriceAnalyticsSummary = {
+  total_spend: number;
+  total_area_m2: number;
+  avg_price_per_sqm: number | null;
+  this_month_spend: number;
+  last_month_spend: number;
+  spend_change_pct: number | null;
+  deliveries_count: number;
+  records_count: number;
+  currency: string;
+  from: string;
+  to: string;
+};
+
+export type GlassPriceAnalytics = {
+  summary: GlassPriceAnalyticsSummary;
+  monthly_spend: Array<{
+    month: string;
+    label: string;
+    spend: number;
+    area_m2: number;
+    avg_price_per_sqm: number | null;
+  }>;
+  price_by_type: Array<{
+    glass_type: string;
+    records: number;
+    total_spend: number;
+    total_area_m2: number;
+    avg_price_per_sqm: number | null;
+    latest_price_per_sqm: number | null;
+    previous_price_per_sqm: number | null;
+    change_pct: number | null;
+  }>;
+  price_trends: Array<{
+    month: string;
+    label: string;
+    glass_type: string;
+    avg_price_per_sqm: number;
+    area_m2: number;
+  }>;
+  recent_records: Array<{
+    id: number;
+    glass_order_id: number;
+    order_number?: string | null;
+    project?: { id: number; reference: string; name: string } | null;
+    supplier?: { id: number; code: string; name: string } | null;
+    pane_name?: string | null;
+    glass_type?: string | null;
+    tint?: string | null;
+    width_mm: number;
+    height_mm: number;
+    quantity: number;
+    area_m2: number;
+    buying_price: number;
+    price_per_sqm: number;
+    currency: string;
+    recorded_at: string | null;
+  }>;
 };
 
 export type TransportOrder = {
@@ -291,6 +390,8 @@ export type ProcurementStockItem = {
   quantity_on_hand: string;
   quantity_reserved: string;
   quantity_available: string;
+  reference_total_qty?: string | null;
+  doc_vs_system_delta?: string | null;
   stock_status: ProcurementStockStatus;
   low_stock_alert: boolean;
   locations_count: number;
@@ -335,6 +436,12 @@ export type ProcurementStockOverview = {
   categories: ProcurementStockCategorySummary[];
   alerts: ProcurementStockItem[];
   items: ProcurementStockItem[];
+  meta?: {
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
+    total?: number;
+  };
 };
 
 export type ProcurementStockAnalytics = {
@@ -384,6 +491,8 @@ export async function createSupplier(payload: {
 export async function listDrivers(params?: {
   search?: string;
   active_only?: boolean;
+  available_only?: boolean;
+  status?: string;
   per_page?: number;
 }) {
   return apiRequest<Paginated<Driver>>(`/procurement/drivers${buildQuery(params)}`);
@@ -448,6 +557,7 @@ export type PurchaseOrderDraftGroup = {
   requisition_references: string[];
   project_id: number | null;
   project?: { id: number; reference: string; name: string } | null;
+  expected_delivery?: string | null;
   notes?: string;
   lines: PurchaseOrderDraftLine[];
 };
@@ -463,6 +573,27 @@ export async function listPurchaseOrders(params?: {
 
 export async function getPurchaseOrder(id: number) {
   return apiRequest<{ data: PurchaseOrder }>(`/procurement/purchase-orders/${id}`);
+}
+
+export async function updatePurchaseOrder(
+  id: number,
+  payload: {
+    supplier_id?: number;
+    expected_delivery?: string | null;
+    tax?: number | null;
+    lines?: Array<{
+      id: number;
+      quantity?: number;
+      unit_price?: number;
+      description?: string;
+      sku?: string | null;
+    }>;
+  },
+) {
+  return apiRequest<{ data: PurchaseOrder }>(`/procurement/purchase-orders/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export async function approvePurchaseOrder(id: number) {
@@ -522,6 +653,8 @@ export async function createPurchaseOrdersBatch(payload: {
       unit_price: number;
       warehouse_item_id?: number;
       sku?: string;
+      requisition_id?: number;
+      requisition_line_id?: number;
     }>;
     transport?: {
       transport_type: string;
@@ -548,6 +681,10 @@ export async function getRequisition(id: number) {
   return apiRequest<{ data: PurchaseRequisition }>(`/procurement/requisitions/${id}`);
 }
 
+export async function exportRequisitionXlsx(id: number) {
+  return apiBlobRequest(`/procurement/requisitions/${id}/export`);
+}
+
 export async function getLowStockRequisitionSource(params?: {
   category?: WarehouseItemCategory;
 }) {
@@ -566,8 +703,17 @@ export async function getProcurementDashboard() {
   return apiRequest<{ data: ProcurementDashboard }>("/procurement/dashboard");
 }
 
-export async function getProcurementStockOverview() {
-  return apiRequest<{ data: ProcurementStockOverview }>("/procurement/stock");
+export async function getProcurementStockOverview(params?: {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  category?: string;
+  stock_status?: string;
+  status?: string;
+}) {
+  return apiRequest<{ data: ProcurementStockOverview }>(
+    `/procurement/stock${buildQuery(params)}`,
+  );
 }
 
 export async function getProcurementStockAnalytics() {
@@ -717,10 +863,23 @@ export async function markGlassOrderOrdered(id: number) {
   });
 }
 
-export async function markGlassOrderDelivered(id: number) {
+export async function markGlassOrderDelivered(
+  id: number,
+  payload: {
+    currency?: string;
+    panes: Array<{ unit_buying_price: number }>;
+  },
+) {
   return apiRequest<{ data: GlassOrder }>(`/procurement/glass-orders/${id}/mark-delivered`, {
     method: "POST",
+    body: payload,
   });
+}
+
+export async function getGlassPriceAnalytics(params?: { from?: string; to?: string }) {
+  return apiRequest<{ data: GlassPriceAnalytics }>(
+    `/procurement/glass-price-analytics${buildQuery(params)}`,
+  );
 }
 
 export async function listTransportOrders(params?: { per_page?: number }) {
@@ -761,16 +920,43 @@ export async function createRequisition(payload: {
   notes?: string;
   project_id?: number;
   supplier_id?: number;
+  required_by?: string;
   lines: Array<{
     description: string;
     quantity: number;
     required_quantity?: number;
     trigger_type?: string;
     warehouse_item_id?: number;
+    preferred_supplier_id?: number;
   }>;
 }) {
   return apiRequest<{ data: PurchaseRequisition }>("/procurement/requisitions", {
     method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateRequisition(
+  id: number,
+  payload: {
+    notes?: string | null;
+    supplier_id?: number | null;
+    required_by?: string | null;
+    lines?: Array<{
+      id?: number;
+      description?: string;
+      quantity: number;
+      required_quantity?: number | null;
+      warehouse_item_id?: number | null;
+      sku?: string | null;
+      preferred_supplier_id?: number | null;
+      estimated_unit_price?: number | null;
+      notes?: string | null;
+    }>;
+  },
+) {
+  return apiRequest<{ data: PurchaseRequisition }>(`/procurement/requisitions/${id}`, {
+    method: "PATCH",
     body: payload,
   });
 }

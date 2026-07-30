@@ -10,6 +10,9 @@ use App\Models\ProjectDelay;
 use App\Models\User;
 use App\Services\Projects\ProjectDashboardService;
 use App\Services\Projects\ProjectDealSyncService;
+use App\Services\Projects\ProjectDispatchService;
+use App\Services\Projects\ProjectFifoOrderService;
+use App\Services\Projects\ProjectMaterialStatusService;
 use App\Services\Projects\ProjectStageService;
 use App\Support\BiboStorage;
 use App\Support\ProjectStageAdvance;
@@ -37,6 +40,9 @@ class ProjectController extends Controller
         protected ProjectStageService $stages,
         protected ProjectDashboardService $dashboard,
         protected ProjectDealSyncService $dealSync,
+        protected ProjectFifoOrderService $fifoOrder,
+        protected ProjectMaterialStatusService $materialStatus,
+        protected ProjectDispatchService $dispatches,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -45,8 +51,19 @@ class ProjectController extends Controller
 
         $query = Project::query()
             ->visibleTo($request->user())
-            ->with(['projectManager', 'salesRep', 'latestBom.lines'])
-            ->latest();
+            ->with([
+                'projectManager',
+                'salesRep',
+                'account.sourceLead',
+                'deal',
+                'latestBom' => fn ($builder) => $builder->withCount('lines'),
+            ])
+            ->withCount([
+                'documents as design_documents_count' => fn ($builder) => $builder
+                    ->whereIn('type', ProjectStageGate::DESIGN_DOCUMENT_TYPES),
+            ]);
+
+        $this->fifoOrder->applyListOrdering($query);
 
         if ($search = $request->query('search')) {
             $query->where(function ($builder) use ($search) {
@@ -110,6 +127,7 @@ class ProjectController extends Controller
         $project = Project::query()->create([
             ...$validated,
             'reference' => 'PR-'.strtoupper(Str::random(8)),
+            'client_portal_code' => $this->generateClientPortalCode(),
             'stage' => ProjectStage::AwaitingDeposit->value,
         ]);
 
@@ -492,6 +510,10 @@ class ProjectController extends Controller
             'stage' => ['required', 'string'],
             'reason' => ['nullable', 'string'],
             'force' => ['sometimes', 'boolean'],
+            'driver_id' => ['nullable', 'integer', 'exists:procurement_drivers,id'],
+            'vehicle_reg' => ['nullable', 'string', 'max:100'],
+            'vehicle_details' => ['nullable', 'string'],
+            'packing_notes' => ['nullable', 'string'],
             'deposit_confirmation' => ['sometimes', 'array'],
             'deposit_confirmation.notes' => ['required_with:deposit_confirmation', 'string'],
             'deposit_confirmation.confirmed_at' => ['nullable', 'date'],
@@ -520,11 +542,28 @@ class ProjectController extends Controller
 
         $this->validateStageRequirements($project, $fromStage, $target, $validated);
 
-        $project = $this->stages->transition($project, $target, $user, [
-            'reason' => $validated['reason'] ?? null,
-            'force' => $force,
-            'stage_data' => $stageData,
-        ]);
+        if ($target === ProjectStage::InTransit) {
+            $this->dispatches->dispatchToSite($project, $user, (int) $validated['driver_id'], [
+                'vehicle_reg' => $validated['vehicle_reg'] ?? null,
+                'vehicle_details' => $validated['vehicle_details'] ?? null,
+                'packing_notes' => $validated['packing_notes'] ?? null,
+                'reason' => $validated['reason'] ?? null,
+                'force' => $force,
+                'stage_data' => $stageData,
+            ]);
+
+            $project = $project->fresh(['projectManager', 'salesRep', 'latestBom.lines']);
+        } else {
+            $project = $this->stages->transition($project, $target, $user, [
+                'reason' => $validated['reason'] ?? null,
+                'force' => $force,
+                'stage_data' => $stageData,
+            ]);
+
+            if ($fromStage === ProjectStage::InTransit && $target === ProjectStage::Installation) {
+                $this->dispatches->completeOpenDispatchesForProject($project);
+            }
+        }
 
         return new ProjectResource(
             $project->load(['projectManager', 'salesRep', 'latestBom.lines'])
@@ -586,6 +625,22 @@ class ProjectController extends Controller
                     ],
                 ]);
             }
+
+            if (! ProjectStageGate::hasDesignDocument($project)) {
+                throw ValidationException::withMessages([
+                    'documents' => [
+                        'Upload at least one design document on the Designs tab before advancing to final design approval.',
+                    ],
+                ]);
+            }
+
+            if (! ProjectStageGate::hasBomUploaded($project)) {
+                throw ValidationException::withMessages([
+                    'bom' => [
+                        'Upload a BOM with at least one line on the BOM tab before advancing to final design approval.',
+                    ],
+                ]);
+            }
         }
 
         if ($fromStage === ProjectStage::FinalDesignApproval && $target === ProjectStage::BomFinalized) {
@@ -604,6 +659,16 @@ class ProjectController extends Controller
                     ],
                 ]);
             }
+        }
+
+        if ($target === ProjectStage::MaterialsReady) {
+            $this->materialStatus->assertCanAdvanceToMaterialsReady($project);
+        }
+
+        if ($target === ProjectStage::InTransit && empty($validated['driver_id'])) {
+            throw ValidationException::withMessages([
+                'driver_id' => ['A driver is required to advance to in transit.'],
+            ]);
         }
     }
 
@@ -723,5 +788,14 @@ class ProjectController extends Controller
             'completed' => $query->where('stage', ProjectStage::ProjectComplete->value),
             default => null,
         };
+    }
+
+    protected function generateClientPortalCode(): string
+    {
+        do {
+            $code = 'CP-'.strtoupper(Str::random(8));
+        } while (Project::query()->where('client_portal_code', $code)->exists());
+
+        return $code;
     }
 }

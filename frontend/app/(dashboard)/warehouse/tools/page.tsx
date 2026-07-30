@@ -42,14 +42,18 @@ export default function WarehouseToolsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [issuingToolId, setIssuingToolId] = useState<number | null>(null);
-  const [issueForm, setIssueForm] = useState({ issued_to: "", project_id: "" });
+  const [issueForm, setIssueForm] = useState({ issued_to: "", project_id: "", quantity: "1" });
   const [form, setForm] = useState({
     tool_code: "",
     name: "",
     tool_type: "",
     condition: "good",
     purchase_date: "",
+    tracking_mode: "serialized" as "serialized" | "quantity",
+    total_qty: "1",
   });
+
+  const issuingTool = items.find((tool) => tool.id === issuingToolId) ?? null;
 
   const load = () => {
     setLoading(true);
@@ -81,9 +85,19 @@ export default function WarehouseToolsPage() {
         tool_type: form.tool_type || undefined,
         condition: form.condition,
         purchase_date: form.purchase_date || undefined,
+        tracking_mode: form.tracking_mode,
+        total_qty: form.tracking_mode === "quantity" ? Number(form.total_qty) || 1 : 1,
       });
       toast.success("Tool created.");
-      setForm({ tool_code: "", name: "", tool_type: "", condition: "good", purchase_date: "" });
+      setForm({
+        tool_code: "",
+        name: "",
+        tool_type: "",
+        condition: "good",
+        purchase_date: "",
+        tracking_mode: "serialized",
+        total_qty: "1",
+      });
       load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create tool.");
@@ -99,10 +113,11 @@ export default function WarehouseToolsPage() {
       await issueTool(issuingToolId, {
         issued_to: Number(issueForm.issued_to),
         project_id: issueForm.project_id ? Number(issueForm.project_id) : undefined,
+        quantity: Number(issueForm.quantity) || 1,
       });
       toast.success("Tool issued.");
       setIssuingToolId(null);
-      setIssueForm({ issued_to: "", project_id: "" });
+      setIssueForm({ issued_to: "", project_id: "", quantity: "1" });
       load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to issue tool.");
@@ -132,6 +147,9 @@ export default function WarehouseToolsPage() {
     }
   };
 
+  const canIssue = (tool: Tool) => (tool.available_qty ?? 0) > 0;
+  const canReturn = (tool: Tool) => Boolean(tool.active_issuance?.id);
+
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader title="Tools" subtitle="Register, issue, and return warehouse tools" />
@@ -145,6 +163,28 @@ export default function WarehouseToolsPage() {
             <Input placeholder="Tool name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
             <Input placeholder="Tool type" value={form.tool_type} onChange={(event) => setForm((current) => ({ ...current, tool_type: event.target.value }))} />
             <Input placeholder="Condition" value={form.condition} onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))} />
+            <select
+              className={selectClassName}
+              value={form.tracking_mode}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  tracking_mode: event.target.value as "serialized" | "quantity",
+                }))
+              }
+            >
+              <option value="serialized">Serialized (1 unit)</option>
+              <option value="quantity">Quantity tracked</option>
+            </select>
+            {form.tracking_mode === "quantity" ? (
+              <Input
+                type="number"
+                min={1}
+                placeholder="Total quantity"
+                value={form.total_qty}
+                onChange={(event) => setForm((current) => ({ ...current, total_qty: event.target.value }))}
+              />
+            ) : null}
             <Input type="date" value={form.purchase_date} onChange={(event) => setForm((current) => ({ ...current, purchase_date: event.target.value }))} />
             <Button className="w-full" disabled={!form.tool_code || !form.name} onClick={submit}>
               Register tool
@@ -166,6 +206,11 @@ export default function WarehouseToolsPage() {
                     <TableRow>
                       <TableHead>Tool</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Avail</TableHead>
+                      <TableHead>On site</TableHead>
+                      <TableHead>Repair</TableHead>
                       <TableHead>Condition</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
@@ -179,27 +224,33 @@ export default function WarehouseToolsPage() {
                           <div className="text-xs text-muted-foreground">{tool.tool_code}</div>
                         </TableCell>
                         <TableCell>{tool.tool_type ?? "—"}</TableCell>
+                        <TableCell className="capitalize">{tool.tracking_mode ?? "serialized"}</TableCell>
+                        <TableCell>{tool.total_qty ?? 1}</TableCell>
+                        <TableCell>{tool.available_qty ?? 0}</TableCell>
+                        <TableCell>{tool.on_site_qty ?? 0}</TableCell>
+                        <TableCell>{tool.qty_in_repair ?? 0}</TableCell>
                         <TableCell>{tool.condition ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant="secondary" className={tool.is_issued ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}>
                             {tool.is_issued ? "Issued" : "Available"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {tool.is_issued ? (
+                        <TableCell className="text-right space-x-2">
+                          {canReturn(tool) ? (
                             <Button size="sm" onClick={() => handleReturn(tool)}>Return</Button>
-                          ) : (
+                          ) : null}
+                          {canIssue(tool) ? (
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => {
                                 setIssuingToolId(tool.id);
-                                setIssueForm({ issued_to: "", project_id: "" });
+                                setIssueForm({ issued_to: "", project_id: "", quantity: "1" });
                               }}
                             >
                               Issue
                             </Button>
-                          )}
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -216,7 +267,7 @@ export default function WarehouseToolsPage() {
         onOpenChange={(open) => {
           if (!open) {
             setIssuingToolId(null);
-            setIssueForm({ issued_to: "", project_id: "" });
+            setIssueForm({ issued_to: "", project_id: "", quantity: "1" });
           }
         }}
       >
@@ -251,6 +302,16 @@ export default function WarehouseToolsPage() {
                 </option>
               ))}
             </select>
+            {issuingTool?.tracking_mode === "quantity" ? (
+              <Input
+                type="number"
+                min={1}
+                max={issuingTool.available_qty}
+                placeholder="Quantity"
+                value={issueForm.quantity}
+                onChange={(event) => setIssueForm((current) => ({ ...current, quantity: event.target.value }))}
+              />
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIssuingToolId(null)}>

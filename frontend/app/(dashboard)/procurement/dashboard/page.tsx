@@ -6,16 +6,19 @@ import { AppHeader } from "@/components/app-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  getGlassPriceAnalytics,
   getProcurementDashboard,
   listGlassOrders,
   listGoodsReceipts,
   listTransportOrders,
   type GlassOrder,
+  type GlassPriceAnalyticsSummary,
   type GoodsReceipt,
   type ProcurementDashboard,
   type TransportOrder,
 } from "@/lib/api/procurement";
 import { usePermissions } from "@/hooks/use-permissions";
+import { formatKes, formatPricePerSqm } from "@/lib/procurement/glass-pricing";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -34,6 +37,7 @@ export default function ProcurementDashboardPage() {
   const { canAny } = usePermissions();
   const canViewTransport = canAny("procurement.transport.manage", "procurement.manage");
   const [stats, setStats] = useState<ProcurementDashboard | null>(null);
+  const [glassPricing, setGlassPricing] = useState<GlassPriceAnalyticsSummary | null>(null);
   const [grns, setGrns] = useState<GoodsReceipt[]>([]);
   const [glass, setGlass] = useState<GlassOrder[]>([]);
   const [transport, setTransport] = useState<TransportOrder[]>([]);
@@ -42,27 +46,44 @@ export default function ProcurementDashboardPage() {
   useEffect(() => {
     Promise.allSettled([
       getProcurementDashboard(),
+      getGlassPriceAnalytics(),
       listGoodsReceipts({ per_page: 5 }),
       listGlassOrders({ per_page: 5 }),
       canViewTransport ? listTransportOrders({ per_page: 5 }) : Promise.resolve(null),
     ])
-      .then(([dashboardRes, grnRes, glassRes, transportRes]) => {
+      .then(([dashboardRes, glassPriceRes, grnRes, glassRes, transportRes]) => {
         if (dashboardRes.status === "fulfilled") {
           setStats(dashboardRes.value.data);
         } else {
-          toast.error(dashboardRes.reason instanceof Error ? dashboardRes.reason.message : "Failed to load dashboard stats.");
+          toast.error(
+            dashboardRes.reason instanceof Error
+              ? dashboardRes.reason.message
+              : "Failed to load dashboard stats.",
+          );
+        }
+
+        if (glassPriceRes.status === "fulfilled") {
+          setGlassPricing(glassPriceRes.value.data.summary);
         }
 
         if (grnRes.status === "fulfilled") {
           setGrns(grnRes.value.data);
         } else {
-          toast.error(grnRes.reason instanceof Error ? grnRes.reason.message : "Failed to load goods receipts.");
+          toast.error(
+            grnRes.reason instanceof Error
+              ? grnRes.reason.message
+              : "Failed to load goods receipts.",
+          );
         }
 
         if (glassRes.status === "fulfilled") {
           setGlass(glassRes.value.data);
         } else {
-          toast.error(glassRes.reason instanceof Error ? glassRes.reason.message : "Failed to load glass queue.");
+          toast.error(
+            glassRes.reason instanceof Error
+              ? glassRes.reason.message
+              : "Failed to load glass queue.",
+          );
         }
 
         if (!canViewTransport) {
@@ -92,7 +113,10 @@ export default function ProcurementDashboardPage() {
 
   return (
     <div className="flex min-w-0 w-full flex-col">
-      <AppHeader title="Procurement Dashboard" subtitle="Track approvals, GRNs, glass orders, and transport" />
+      <AppHeader
+        title="Procurement Dashboard"
+        subtitle="Track approvals, GRNs, glass orders, and transport"
+      />
       <div className="space-y-6 p-6">
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading dashboard…</p>
@@ -102,7 +126,9 @@ export default function ProcurementDashboardPage() {
               {cards.map((card) => (
                 <Card key={card.label}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {card.label}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-semibold">{card.value}</p>
@@ -111,6 +137,51 @@ export default function ProcurementDashboardPage() {
               ))}
             </div>
 
+            <Card className="border-teal-200/70 bg-gradient-to-br from-teal-50/80 to-background dark:border-teal-900 dark:from-teal-950/30">
+              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+                <div>
+                  <CardTitle className="text-base">Glass price projection</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Monthly glass spend and average buying price per m² from delivered orders.
+                  </p>
+                </div>
+                <Link
+                  href="/procurement/glass-price-analytics"
+                  className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Open analytics
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Spend this month</p>
+                    <p className="text-2xl font-semibold">
+                      {formatKes(glassPricing?.this_month_spend ?? 0)}
+                    </p>
+                    {glassPricing?.spend_change_pct != null ? (
+                      <p className="text-xs text-muted-foreground">
+                        {glassPricing.spend_change_pct >= 0 ? "+" : ""}
+                        {glassPricing.spend_change_pct}% vs last month
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Avg price / m²</p>
+                    <p className="text-2xl font-semibold">
+                      {formatPricePerSqm(glassPricing?.avg_price_per_sqm)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Area in range</p>
+                    <p className="text-2xl font-semibold">
+                      {(glassPricing?.total_area_m2 ?? 0).toFixed(2)} m²
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid gap-6 xl:grid-cols-3">
               <Card>
                 <CardHeader>
@@ -118,7 +189,10 @@ export default function ProcurementDashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {grns.map((grn) => (
-                    <div key={grn.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div
+                      key={grn.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
                       <div>
                         <p className="font-medium">{grn.grn_number}</p>
                         <p className="text-xs text-muted-foreground">
@@ -129,13 +203,18 @@ export default function ProcurementDashboardPage() {
                         <Badge variant="secondary" className={statusColors[grn.status] ?? ""}>
                           {grn.status.replaceAll("_", " ")}
                         </Badge>
-                        <Link className="text-sm text-primary underline-offset-4 hover:underline" href={`/procurement/goods-receipts/${grn.id}`}>
+                        <Link
+                          className="text-sm text-primary underline-offset-4 hover:underline"
+                          href={`/procurement/goods-receipts/${grn.id}`}
+                        >
                           Open
                         </Link>
                       </div>
                     </div>
                   ))}
-                  {grns.length === 0 ? <p className="text-sm text-muted-foreground">No GRNs found.</p> : null}
+                  {grns.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No GRNs found.</p>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -145,7 +224,10 @@ export default function ProcurementDashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {glass.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
                       <div>
                         <p className="font-medium">{order.order_number}</p>
                         <p className="text-xs text-muted-foreground">
@@ -167,7 +249,9 @@ export default function ProcurementDashboardPage() {
                       </div>
                     </div>
                   ))}
-                  {glass.length === 0 ? <p className="text-sm text-muted-foreground">No glass orders pending.</p> : null}
+                  {glass.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No glass orders pending.</p>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -177,7 +261,10 @@ export default function ProcurementDashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {transport.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
                       <div>
                         <p className="font-medium">{item.transport_number}</p>
                         <p className="text-xs text-muted-foreground">
@@ -189,7 +276,9 @@ export default function ProcurementDashboardPage() {
                       </Badge>
                     </div>
                   ))}
-                  {transport.length === 0 ? <p className="text-sm text-muted-foreground">No transport orders scheduled.</p> : null}
+                  {transport.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No transport orders scheduled.</p>
+                  ) : null}
                 </CardContent>
               </Card>
             </div>

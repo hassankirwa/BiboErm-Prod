@@ -2,11 +2,11 @@
 
 namespace App\Listeners\QualityControl;
 
+use App\Events\FieldInstallation\FieldInstallationCompleted;
 use App\Services\QualityControl\QcInspectionService;
 
 /**
  * Auto-creates a site_installation inspection when field installation completes a job.
- * Register when FieldInstallationCompleted event is published by Field Installation module.
  */
 class CreateSiteInspectionOnFieldJobComplete
 {
@@ -14,8 +14,8 @@ class CreateSiteInspectionOnFieldJobComplete
         protected QcInspectionService $inspections,
     ) {}
 
-    public function handle(int $projectId, int $fieldInstallationJobId): void
+    public function handle(FieldInstallationCompleted $event): void
     {
-        $this->inspections->createSiteInstallation($projectId, $fieldInstallationJobId);
+        $this->inspections->createSiteInstallation($event->projectId, $event->jobId);
     }
 }

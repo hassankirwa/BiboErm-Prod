@@ -48,7 +48,11 @@ class ProductionTeamController extends Controller
             ],
         );
 
-        if (in_array($role, [TeamRole::CuttingLead, TeamRole::FabricationLead], true)) {
+        if (in_array($role, [
+            TeamRole::CuttingLead,
+            TeamRole::FabricationLead,
+            TeamRole::AssemblyLead,
+        ], true)) {
             $order->update(['assigned_team_lead' => $data['user_id']]);
         }
 

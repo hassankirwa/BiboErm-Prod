@@ -3,58 +3,34 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PermissionGate } from "@/components/auth/permission-gate";
+import { FabricationOpeningPreviewDialog } from "@/components/projects/fabrication-opening-preview-dialog";
 import {
   getProject,
   getProjectDocuments,
-  uploadProjectDocument,
   type ProjectDetail,
   type ProjectDocument,
 } from "@/lib/api/projects";
+import { importProjectFabricationList } from "@/lib/api/projects/design";
 import { ApiError } from "@/lib/api/errors";
 import { toast } from "sonner";
 import { MediaImage } from "@/components/media/media-image";
 import {
   AlertCircle,
   CheckCircle2,
-  Download,
+  Eye,
+  FileSpreadsheet,
   ImageIcon,
   Loader2,
-  Upload,
 } from "lucide-react";
-import {
-  acquireAuthenticatedFileObjectUrl,
-  isPrivateFileApiUrl,
-  releaseAuthenticatedFileObjectUrl,
-} from "@/lib/authenticated-file";
 import { cn } from "@/lib/utils";
 
-const DOCUMENT_TYPES = [
-  { value: "design", label: "Design drawing / image" },
-  { value: "works_plan", label: "Works plan" },
-  { value: "client_attachment", label: "Client attachment" },
-];
-
-const ACCEPTED_FILES = "image/*,.pdf,.dwg,.dxf";
+const FABRICATION_ACCEPT =
+  ".xls,.xlsx,.csv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function isImageFilename(filename: string): boolean {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(filename);
-}
-
-function designDocumentCount(documents: ProjectDocument[]): number {
-  return documents.filter((doc) =>
-    ["design", "design_pdf", "design_dwg"].includes(doc.type),
-  ).length;
 }
 
 type ProjectDetailDesignsProps = {
@@ -72,12 +48,12 @@ export function ProjectDetailDesigns({
   onProjectUpdated,
   uploadTrigger = 0,
 }: ProjectDetailDesignsProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fabricationInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [docType, setDocType] = useState("design");
+  const [importingFabrication, setImportingFabrication] = useState(false);
+  const [fabDragOver, setFabDragOver] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<ProjectDocument | null>(null);
 
   async function loadDocuments() {
     setLoading(true);
@@ -98,243 +74,265 @@ export function ProjectDetailDesigns({
 
   useEffect(() => {
     if (uploadTrigger <= 0) return;
-    setDocType("design");
-    fileInputRef.current?.click();
+    fabricationInputRef.current?.click();
   }, [uploadTrigger]);
 
   const isDesignStage = projectStage === "final_design_approval";
-  const designCount = designDocumentCount(documents);
-  const designDocs = documents.filter((doc) =>
-    ["design", "works_plan", "client_attachment"].includes(doc.type),
+  const fabricationDocs = documents.filter((doc) => doc.type === "fabrication");
+  const fabricationDesigns = documents.filter(
+    (doc) => doc.type === "design" && doc.metadata?.source === "fabrication",
   );
+  const openingCount = fabricationDesigns.length;
 
-  async function handleUpload(file: File) {
-    setUploading(true);
+  async function refreshProject() {
+    if (!onProjectUpdated) return;
+    const refreshed = await getProject(projectId);
+    onProjectUpdated(refreshed.data);
+  }
+
+  async function handleFabricationImport(file: File) {
+    setImportingFabrication(true);
     try {
-      const response = await uploadProjectDocument(projectId, file, docType);
-      setDocuments((prev) => [response.data, ...prev]);
-      toast.success("Document uploaded.");
-      if (onProjectUpdated) {
-        const refreshed = await getProject(projectId);
-        onProjectUpdated(refreshed.data);
-      }
+      const result = await importProjectFabricationList(projectId, file);
+      const { created = 0, updated = 0, unchanged = 0, removed = 0, images_saved } =
+        result.summary;
+      const parts = [
+        created > 0 ? `${created} added` : null,
+        updated > 0 ? `${updated} updated` : null,
+        unchanged > 0 ? `${unchanged} unchanged` : null,
+        removed > 0 ? `${removed} removed` : null,
+      ].filter(Boolean);
+      toast.success(
+        parts.length > 0
+          ? `Fabrication sync: ${parts.join(" · ")} (${images_saved} images saved).`
+          : `Synced ${result.summary.designs_saved} openings (${images_saved} images saved).`,
+      );
+      await loadDocuments();
+      await refreshProject();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to upload document.");
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to import fabrication list.",
+      );
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setImportingFabrication(false);
+      if (fabricationInputRef.current) fabricationInputRef.current.value = "";
     }
   }
 
-  function handleFileSelected(file: File | null | undefined) {
-    if (file) void handleUpload(file);
+  function handleDocumentTagged(updated: ProjectDocument) {
+    setDocuments((prev) => prev.map((doc) => (doc.id === updated.id ? updated : doc)));
+    setPreviewDoc(updated);
   }
 
   return (
     <div className="space-y-6">
       {!loading ? (
-        designCount > 0 ? (
+        openingCount > 0 ? (
           <Alert className="border-success/30 bg-success/10 text-success [&>svg]:text-success">
             <CheckCircle2 />
             <AlertTitle>
-              {designCount === 1
-                ? "1 design document on file"
-                : `${designCount} design documents on file`}
+              {openingCount === 1
+                ? "1 fabrication opening on file"
+                : `${openingCount} fabrication openings on file`}
             </AlertTitle>
-            {isDesignStage ? (
-              <AlertDescription className="text-success/80">
-                {designDocs.length > designCount
-                  ? `${designDocs.length} total documents uploaded — ready to advance to BOM once approved.`
-                  : "Upload complete — you can advance to BOM once the design is approved."}
-              </AlertDescription>
-            ) : designDocs.length > designCount ? (
-              <AlertDescription className="text-success/80">
-                {designDocs.length - designCount} additional supporting document
-                {designDocs.length - designCount === 1 ? "" : "s"} also on file.
-              </AlertDescription>
-            ) : null}
+            <AlertDescription className="text-success/80">
+              {isDesignStage
+                ? "Elevations and descriptions extracted — ready for production once approved."
+                : "Extracted for the production team."}
+            </AlertDescription>
           </Alert>
         ) : isDesignStage ? (
           <Alert className="border-warning/30 bg-warning/10 text-warning [&>svg]:text-warning">
             <AlertCircle />
-            <AlertTitle>Final design approval — upload required</AlertTitle>
+            <AlertTitle>Final design approval — fabrication list required</AlertTitle>
             <AlertDescription className="text-warning/90">
-              Upload at least one design PDF or drawing before advancing to BOM.
+              Upload a WinCAD fabrication list to extract openings before advancing to BOM.
             </AlertDescription>
           </Alert>
-        ) : designDocs.length === 0 ? (
+        ) : (
           <Alert>
             <AlertCircle />
-            <AlertTitle>No design documents yet</AlertTitle>
+            <AlertTitle>No fabrication openings yet</AlertTitle>
             <AlertDescription>
-              Upload drawings, works plans, or client attachments below.
+              Upload a WinCAD fabrication list to extract elevations and descriptions for
+              production.
             </AlertDescription>
           </Alert>
-        ) : null
+        )
       ) : null}
 
       {!readOnly ? (
-      <PermissionGate permission="projects.documents.upload">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Upload design / documents</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-2 sm:max-w-xs">
-              <Label htmlFor="design-doc-type">Document type</Label>
-              <Select value={docType} onValueChange={setDocType}>
-                <SelectTrigger id="design-doc-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  if (!uploading) fileInputRef.current?.click();
-                }
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                if (!uploading) setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragOver(false);
-                if (uploading) return;
-                handleFileSelected(event.dataTransfer.files[0]);
-              }}
-              onClick={() => {
-                if (!uploading) fileInputRef.current?.click();
-              }}
-              className={cn(
-                "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors",
-                uploading && "pointer-events-none opacity-60",
-                dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/30",
-              )}
-            >
-              {uploading ? (
-                <Loader2 className="mb-3 h-10 w-10 animate-spin text-primary" />
-              ) : (
-                <Upload className="mb-3 h-10 w-10 text-muted-foreground" />
-              )}
-              <p className="text-sm font-medium">
-                {uploading ? "Uploading…" : "Drop file here or click to upload"}
+        <PermissionGate permission="projects.documents.upload">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Import fabrication list</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Upload a WinCAD fabrication workbook. We extract each opening&apos;s elevation
+                image, code, series, dimensions, and material description for the production team.
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Images, PDF, DWG, or DXF
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={ACCEPTED_FILES}
-                className="hidden"
-                disabled={uploading}
-                onChange={(event) => {
-                  handleFileSelected(event.target.files?.[0]);
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    if (!importingFabrication) fabricationInputRef.current?.click();
+                  }
                 }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </PermissionGate>
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!importingFabrication) setFabDragOver(true);
+                }}
+                onDragLeave={() => setFabDragOver(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setFabDragOver(false);
+                  if (importingFabrication) return;
+                  const file = event.dataTransfer.files[0];
+                  if (file) void handleFabricationImport(file);
+                }}
+                onClick={() => {
+                  if (!importingFabrication) fabricationInputRef.current?.click();
+                }}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors",
+                  importingFabrication && "pointer-events-none opacity-60",
+                  fabDragOver
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/30",
+                )}
+              >
+                {importingFabrication ? (
+                  <Loader2 className="mb-3 h-10 w-10 animate-spin text-primary" />
+                ) : (
+                  <FileSpreadsheet className="mb-3 h-10 w-10 text-muted-foreground" />
+                )}
+                <p className="text-sm font-medium">
+                  {importingFabrication
+                    ? "Extracting openings & images…"
+                    : "Drop fabrication list or click to upload"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  .xls, .xlsx, .csv · syncs by opening code (keeps BOM tags)
+                </p>
+                <input
+                  ref={fabricationInputRef}
+                  type="file"
+                  accept={FABRICATION_ACCEPT}
+                  className="hidden"
+                  disabled={importingFabrication}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleFabricationImport(file);
+                  }}
+                />
+              </div>
+              {fabricationDocs[0] ? (
+                <p className="text-xs text-muted-foreground">
+                  Current workbook:{" "}
+                  <span className="font-medium">{fabricationDocs[0].filename}</span>
+                  {fabricationDocs[0].metadata?.summary?.total_items
+                    ? ` · ${fabricationDocs[0].metadata.summary.total_items} openings`
+                    : null}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </PermissionGate>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Design gallery & files</CardTitle>
+          <CardTitle className="text-base">Fabrication openings for production</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
-          ) : designDocs.length === 0 ? (
+          ) : fabricationDesigns.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No design documents uploaded yet.
+              No openings extracted yet. Upload a fabrication list above.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {designDocs.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="overflow-hidden rounded-lg border border-border"
-                >
-                  {isImageFilename(doc.filename) ? (
-                    <MediaImage
-                      src={doc.url}
-                      alt={doc.filename}
-                      className="h-40 w-full bg-muted object-cover"
-                      fallback={
-                        <div className="flex h-40 items-center justify-center bg-muted">
-                          <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                        </div>
-                      }
-                    />
-                  ) : (
-                    <div className="flex h-40 items-center justify-center bg-muted">
-                      <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="space-y-2 p-3">
-                    <p className="truncate text-sm font-medium">{doc.filename}</p>
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        {doc.type.replace(/_/g, " ")} v{doc.version}
-                      </Badge>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a
-                          href={doc.url && isPrivateFileApiUrl(doc.url) ? "#" : doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={
-                            doc.url && isPrivateFileApiUrl(doc.url)
-                              ? (event) => {
-                                  event.preventDefault();
-                                  void acquireAuthenticatedFileObjectUrl(doc.url).then(
-                                    (objectUrl) => {
-                                      if (!objectUrl) return;
+              {fabricationDesigns.map((doc) => {
+                const meta = doc.metadata;
+                const title =
+                  meta?.code != null
+                    ? `${meta.code}${meta.series ? ` · ${meta.series}` : ""}`
+                    : doc.filename;
+                const description = meta?.description ?? null;
+                const showImage =
+                  isImageFilename(doc.filename) || meta?.has_elevation_image === true;
+                const taggedCount = meta?.bom_tags?.bom_line_ids?.length ?? 0;
 
-                                      window.open(objectUrl, "_blank", "noopener,noreferrer");
-                                      window.setTimeout(
-                                        () => releaseAuthenticatedFileObjectUrl(doc.url),
-                                        30_000,
-                                      );
-                                    },
-                                  );
-                                }
-                              : undefined
-                          }
-                        >
-                          <Download className="mr-1 h-3.5 w-3.5" />
+                return (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => setPreviewDoc(doc)}
+                    className="overflow-hidden rounded-lg border border-border text-left transition-colors hover:border-primary/40 hover:bg-muted/20"
+                  >
+                    {showImage ? (
+                      <MediaImage
+                        src={doc.url}
+                        alt={title}
+                        className="h-40 w-full bg-muted object-contain"
+                        fallback={
+                          <div className="flex h-40 items-center justify-center bg-muted">
+                            <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                          </div>
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-40 flex-col items-center justify-center gap-2 bg-muted px-4 text-center">
+                        <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">
+                          No elevation image in workbook
+                        </p>
+                      </div>
+                    )}
+                    <div className="space-y-2 p-3">
+                      <p className="text-sm font-medium leading-snug">{title}</p>
+                      {description ? (
+                        <p className="line-clamp-3 text-xs text-muted-foreground">
+                          {description}
+                        </p>
+                      ) : (
+                        <p className="truncate text-xs text-muted-foreground">{doc.filename}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="bg-emerald-600 text-[10px]">Fabrication</Badge>
+                        {taggedCount > 0 ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            BOM · {taggedCount}
+                          </Badge>
+                        ) : null}
+                        <span className="ml-auto inline-flex items-center text-xs text-primary">
+                          <Eye className="mr-1 h-3.5 w-3.5" />
                           Open
-                        </a>
-                      </Button>
+                        </span>
+                      </div>
                     </div>
-                    {doc.uploaded_by_user ? (
-                      <p className="text-[10px] text-muted-foreground">
-                        by {doc.uploaded_by_user.name}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <FabricationOpeningPreviewDialog
+        open={previewDoc != null}
+        onOpenChange={(next) => {
+          if (!next) setPreviewDoc(null);
+        }}
+        projectId={projectId}
+        document={previewDoc}
+        readOnly={readOnly}
+        onTagged={handleDocumentTagged}
+      />
     </div>
   );
 }

@@ -11,26 +11,40 @@ import {
   type SetStateAction,
 } from "react";
 import {
+  Camera,
   CheckCircle2,
   ExternalLink,
   FileText,
   ImageIcon,
   Loader2,
+  SwitchCamera,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { GoodsReceipt, GoodsReceiptAttachment } from "@/lib/api/procurement";
+import { MaterialCodeSearch } from "@/components/warehouse/material-code-search";
+import { GrnPutawaySelect } from "@/components/procurement/grn-putaway-select";
 import {
-  flattenBinsForItemCategory,
-  putawayLocationLabels,
+  flattenBinsForWarehouseItem,
+  suggestedPutawayBinId,
   warehouseItemLabel,
+  type PutawayOptionsForItem,
   type WarehouseItem,
   type WarehouseLocationTree,
 } from "@/lib/api/warehouse";
@@ -74,6 +88,235 @@ function isImageUrl(url: string, filename?: string | null) {
   const probe = (filename ?? url).toLowerCase();
   if (/\.(pdf)$/i.test(probe)) return false;
   return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(probe) || probe.includes("image");
+}
+
+function stopMediaStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+function CameraCaptureDialog({
+  open,
+  onOpenChange,
+  title,
+  disabled,
+  onCapture,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  disabled?: boolean;
+  onCapture: (file: File) => Promise<void>;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [starting, setStarting] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const releaseCamera = () => {
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setReady(false);
+  };
+
+  useEffect(() => {
+    if (!open) {
+      releaseCamera();
+      setError(null);
+      setCapturing(false);
+      setStarting(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Camera is not supported in this browser.");
+        return;
+      }
+
+      setStarting(true);
+      setError(null);
+      setReady(false);
+      releaseCamera();
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        });
+
+        if (cancelled) {
+          stopMediaStream(stream);
+          return;
+        }
+
+        streamRef.current = stream;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          await video.play();
+        }
+        setReady(true);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          err instanceof DOMException && err.name === "NotAllowedError"
+            ? "Camera permission was denied. Allow camera access and try again."
+            : err instanceof Error
+              ? err.message
+              : "Could not open the camera.";
+        setError(message);
+      } finally {
+        if (!cancelled) {
+          setStarting(false);
+        }
+      }
+    };
+
+    void startCamera();
+
+    return () => {
+      cancelled = true;
+      releaseCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when dialog opens or facing mode flips
+  }, [open, facingMode]);
+
+  const handleCapture = async () => {
+    const video = videoRef.current;
+    if (!video || !ready || capturing || disabled) {
+      return;
+    }
+
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) {
+      toast.error("Camera is still starting. Try again in a moment.");
+      return;
+    }
+
+    setCapturing(true);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        throw new Error("Could not capture snapshot.");
+      }
+      context.drawImage(video, 0, 0, width, height);
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/jpeg", 0.92);
+      });
+      if (!blob) {
+        throw new Error("Could not create image from camera.");
+      }
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const file = new File([blob], `grn-${stamp}.jpg`, { type: "image/jpeg" });
+
+      try {
+        await onCapture(file);
+        onOpenChange(false);
+      } catch {
+        // Parent upload handler already surfaces the error toast.
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to capture photo.");
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Take photo — {title}</DialogTitle>
+          <DialogDescription>
+            Point the camera at the goods or document, then capture a snapshot. It uploads
+            automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border bg-black">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className={cn(
+              "h-full w-full object-cover",
+              (!ready || error) && "opacity-0",
+            )}
+          />
+          {starting ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="text-sm">Opening camera…</span>
+            </div>
+          ) : null}
+          {error ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted p-4 text-center text-sm text-muted-foreground">
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={starting || capturing || Boolean(error)}
+            onClick={() =>
+              setFacingMode((current) => (current === "environment" ? "user" : "environment"))
+            }
+          >
+            <SwitchCamera className="h-4 w-4" />
+            Flip camera
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={capturing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCapture()}
+              disabled={!ready || capturing || disabled || Boolean(error)}
+            >
+              {capturing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              {capturing ? "Saving…" : "Take snapshot"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function LabeledField({
@@ -183,6 +426,7 @@ function GrnAttachmentCard({
     isImage: boolean;
     name: string;
   } | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -311,21 +555,43 @@ function GrnAttachmentCard({
           </p>
         )}
 
-        <LabeledField
-          label={uploaded.length > 0 ? "Replace" : "Upload"}
-          htmlFor={inputId}
-          hint={compact ? "Auto-saves on select" : "Choose a photo or PDF — it saves automatically."}
-        >
-          <Input
-            ref={inputRef}
-            id={inputId}
-            type="file"
-            accept="image/*,application/pdf"
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
             disabled={uploading}
-            capture={type.includes("photo") ? "environment" : undefined}
-            onChange={(event) => void handleFileChange(event.target.files?.[0])}
-          />
-        </LabeledField>
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera className="h-4 w-4" />
+            Open camera
+          </Button>
+          <LabeledField
+            label={uploaded.length > 0 ? "Or replace from files" : "Or upload from files"}
+            htmlFor={inputId}
+            hint={compact ? "Auto-saves on select" : "Choose a photo or PDF — it saves automatically."}
+          >
+            <Input
+              ref={inputRef}
+              id={inputId}
+              type="file"
+              accept="image/*,application/pdf"
+              disabled={uploading}
+              onChange={(event) => void handleFileChange(event.target.files?.[0])}
+            />
+          </LabeledField>
+        </div>
+
+        <CameraCaptureDialog
+          open={cameraOpen}
+          onOpenChange={setCameraOpen}
+          title={label}
+          disabled={uploading}
+          onCapture={async (file) => {
+            await handleFileChange(file);
+          }}
+        />
       </CardContent>
     </Card>
   );
@@ -339,6 +605,7 @@ function ReceivedLineCard({
   locationsError,
   warehouseItems,
   itemsLoading,
+  putawayOptions,
   onChange,
 }: {
   line: EditableGrnLine;
@@ -348,6 +615,7 @@ function ReceivedLineCard({
   locationsError: string | null;
   warehouseItems: WarehouseItem[];
   itemsLoading: boolean;
+  putawayOptions?: PutawayOptionsForItem | null;
   onChange: (line: EditableGrnLine) => void;
 }) {
   const balanced = line.qty_accepted + line.qty_rejected === line.qty_received;
@@ -357,21 +625,23 @@ function ReceivedLineCard({
     !procurementOnly && line.qty_accepted > 0 && !line.warehouse_item_id;
   const prefix = `grn-line-${line.id}`;
   const linkedItem = warehouseItems.find((item) => item.id === line.warehouse_item_id);
-  const itemCategory = line.warehouse_item_category ?? linkedItem?.category ?? null;
-  const binOptions = useMemo(
-    () => flattenBinsForItemCategory(locationTree, itemCategory),
-    [locationTree, itemCategory],
-  );
-  const putawayLabels = putawayLocationLabels(itemCategory);
+  const itemCategory =
+    line.warehouse_item_category ??
+    putawayOptions?.category ??
+    linkedItem?.category ??
+    null;
 
   const applyWarehouseItem = (warehouseItemId: number | null) => {
     const item = warehouseItems.find((entry) => entry.id === warehouseItemId);
     const category = item?.category ?? null;
-    const nextBins = flattenBinsForItemCategory(locationTree, category);
+    const nextBins = flattenBinsForWarehouseItem(locationTree, item, category);
+    const suggested = suggestedPutawayBinId(item, locationTree);
     const toBinId =
       line.to_bin_id && nextBins.some((bin) => bin.id === line.to_bin_id)
         ? line.to_bin_id
-        : null;
+        : suggested && nextBins.some((bin) => bin.id === suggested)
+          ? suggested
+          : null;
 
     onChange({
       ...line,
@@ -430,24 +700,32 @@ function ReceivedLineCard({
           hint="Required before verify if any quantity is accepted. Saves back to the PO and project BOM."
           className="mb-4"
         >
-          <select
-            id={`${prefix}-item`}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
-            value={line.warehouse_item_id ?? ""}
-            disabled={itemsLoading}
-            onChange={(event) =>
-              applyWarehouseItem(event.target.value ? Number(event.target.value) : null)
-            }
-          >
-            <option value="">
-              {itemsLoading ? "Loading items…" : "Select warehouse item…"}
-            </option>
-            {warehouseItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {warehouseItemLabel(item)}
+          <div className="space-y-2">
+            <MaterialCodeSearch
+              value={line.description}
+              category={itemCategory}
+              onSelect={(item) => applyWarehouseItem(item.id)}
+              placeholder="Find material by code"
+            />
+            <select
+              id={`${prefix}-item`}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
+              value={line.warehouse_item_id ?? ""}
+              disabled={itemsLoading}
+              onChange={(event) =>
+                applyWarehouseItem(event.target.value ? Number(event.target.value) : null)
+              }
+            >
+              <option value="">
+                {itemsLoading ? "Loading items…" : "Select warehouse item…"}
               </option>
-            ))}
-          </select>
+              {warehouseItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {warehouseItemLabel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
         </LabeledField>
       ) : !procurementOnly && line.warehouse_item_id ? (
         <p className="mb-4 text-xs text-muted-foreground">
@@ -510,47 +788,18 @@ function ReceivedLineCard({
           />
         </LabeledField>
         {procurementOnly ? null : (
-          <LabeledField
-            label={putawayLabels.fieldLabel}
-            htmlFor={`${prefix}-bin`}
-            hint={
-              line.warehouse_item_id ? putawayLabels.hint : putawayLabels.selectHint
-            }
-          >
-            <select
-              id={`${prefix}-bin`}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs"
-              value={line.to_bin_id ?? ""}
-              disabled={
-                locationsLoading ||
-                !line.warehouse_item_id ||
-                binOptions.length === 0
-              }
-              onChange={(event) =>
-                onChange({
-                  ...line,
-                  to_bin_id: event.target.value ? Number(event.target.value) : null,
-                })
-              }
-            >
-              <option value="">
-                {locationsLoading
-                  ? "Loading storage locations…"
-                  : !line.warehouse_item_id
-                    ? "Link item first…"
-                    : locationsError
-                      ? "Could not load locations"
-                      : binOptions.length === 0
-                        ? "No locations for this type"
-                        : putawayLabels.placeholder}
-              </option>
-              {binOptions.map((bin) => (
-                <option key={bin.id} value={bin.id}>
-                  {bin.label}
-                </option>
-              ))}
-            </select>
-          </LabeledField>
+          <GrnPutawaySelect
+            id={`${prefix}-bin`}
+            warehouseItemId={line.warehouse_item_id}
+            warehouseItemCategory={itemCategory}
+            toBinId={line.to_bin_id}
+            locationTree={locationTree}
+            warehouseItems={warehouseItems}
+            putawayOptions={putawayOptions}
+            locationsLoading={locationsLoading || itemsLoading}
+            locationsError={locationsError}
+            onChange={(toBinId) => onChange({ ...line, to_bin_id: toBinId })}
+          />
         )}
       </div>
 
@@ -609,6 +858,7 @@ type GoodsReceiptReceivingDetailProps = {
   setQualityNotes: (value: string) => void;
   warehouseItems: WarehouseItem[];
   itemsLoading: boolean;
+  putawayByItemId?: Record<number, PutawayOptionsForItem>;
   uploadingAttachment: GrnAttachmentType | null;
   saving: boolean;
   verifying: boolean;
@@ -631,6 +881,7 @@ export function GoodsReceiptReceivingDetail({
   setQualityNotes,
   warehouseItems,
   itemsLoading,
+  putawayByItemId = {},
   uploadingAttachment,
   saving,
   verifying,
@@ -695,6 +946,11 @@ export function GoodsReceiptReceivingDetail({
                   locationsError={locationsError}
                   warehouseItems={warehouseItems}
                   itemsLoading={itemsLoading}
+                  putawayOptions={
+                    line.warehouse_item_id
+                      ? putawayByItemId[line.warehouse_item_id] ?? null
+                      : null
+                  }
                   onChange={(updated) =>
                     setLines((current) =>
                       current.map((entry) => (entry.id === updated.id ? updated : entry)),
@@ -744,8 +1000,8 @@ export function GoodsReceiptReceivingDetail({
             <CardHeader>
               <CardTitle>Supporting documents</CardTitle>
               <CardDescription>
-                Upload receipt, invoice, and delivery documents. Each file saves automatically
-                when selected.
+                Take a camera snapshot or upload receipt, invoice, and delivery documents.
+                Each file saves automatically.
               </CardDescription>
             </CardHeader>
             <CardContent>

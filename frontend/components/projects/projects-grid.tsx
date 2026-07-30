@@ -104,11 +104,32 @@ export function ProjectsGrid({
         const depositReceived = Number(project.deposit_received ?? 0);
 
         return (
-          <Card key={project.id} className="border-border hover:shadow-md transition-shadow">
-            <CardHeader className="p-4 pb-2">
+          <Card
+            key={project.id}
+            className="relative overflow-hidden border-border hover:shadow-md transition-shadow"
+          >
+            {project.fifo_order != null && (
+              <span
+                aria-hidden
+                title={`FIFO #${project.fifo_order}`}
+                className="pointer-events-none absolute inset-0 z-0 flex select-none items-center justify-center font-mono text-[7.5rem] font-bold leading-none tracking-tighter text-orange-600/20"
+              >
+                {project.fifo_order}
+              </span>
+            )}
+            <CardHeader className="relative z-10 p-4 pb-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
+                    {project.fifo_order != null && (
+                      <Badge
+                        variant="outline"
+                        className="h-5 shrink-0 border-orange-600/30 bg-orange-50 px-1.5 font-mono text-[11px] tabular-nums text-orange-700"
+                        title="FIFO queue position"
+                      >
+                        #{project.fifo_order}
+                      </Badge>
+                    )}
                     <h3 className="text-sm font-semibold text-foreground truncate">
                       {project.name}
                     </h3>
@@ -142,7 +163,7 @@ export function ProjectsGrid({
                 </DropdownMenu>
               </div>
             </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-3">
+            <CardContent className="relative z-10 space-y-3 p-4 pt-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge
                   className={priorityColors[project.priority] ?? priorityColors.normal}

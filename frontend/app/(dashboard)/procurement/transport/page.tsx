@@ -76,7 +76,7 @@ export default function TransportPage() {
   useEffect(() => {
     Promise.all([
       listPurchaseOrders({ per_page: 100 }),
-      listDrivers({ active_only: true, per_page: 100 }),
+      listDrivers({ active_only: true, available_only: true, per_page: 100 }),
     ])
       .then(([ordersRes, driversRes]) => {
         setPurchaseOrders(ordersRes.data);
@@ -193,10 +193,11 @@ export default function TransportPage() {
                 disabled={optionsLoading}
                 onChange={(event) => handleDriverChange(event.target.value)}
               >
-                <option value="">{optionsLoading ? "Loading drivers…" : "Select driver (optional)"}</option>
+                <option value="">{optionsLoading ? "Loading drivers…" : "Select available driver (optional)"}</option>
                 {drivers.map((driver) => (
                   <option key={driver.id} value={driver.id}>
                     {driver.code} · {driver.name}
+                    {driver.status === "occupied" ? " (occupied)" : ""}
                   </option>
                 ))}
               </select>

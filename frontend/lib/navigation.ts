@@ -144,6 +144,24 @@ export const departments: Department[] = [
             { name: "Tasks", path: "/crm/activities/tasks" },
             { name: "Meetings", path: "/crm/activities/meetings" },
             { name: "Calls", path: "/crm/activities/calls" },
+            {
+              name: "My Site Visits",
+              path: "/crm/activities?tab=site-visits",
+              exact: true,
+              anyPermissions: ["site_visits.view", "site_visits.execute"],
+            },
+            {
+              name: "Visit History",
+              path: "/crm/activities?tab=visit-history",
+              exact: true,
+              anyPermissions: ["site_visits.view", "site_visits.execute"],
+            },
+            {
+              name: "Field Day",
+              path: "/crm/activities?tab=field-day",
+              exact: true,
+              permission: "field_day.view",
+            },
           ],
         },
       ],
@@ -304,7 +322,7 @@ export const departments: Department[] = [
       { name: "Fabrication", path: "/projects/fabrication" },
       { name: "Installation", path: "/projects/installation" },
       { name: "Timeline", path: "/projects/timeline" },
-      { name: "Client Portal", path: "/projects/client-portal" },
+      { name: "Client Portal", path: "/client-portal", permission: "projects.client_portal.view" },
     ],
     nav: {
       topItems: [
@@ -323,7 +341,7 @@ export const departments: Department[] = [
             { name: "Fabrication", path: "/projects/fabrication" },
             { name: "Installation", path: "/projects/installation" },
             { name: "Timeline", path: "/projects/timeline" },
-            { name: "Client Portal", path: "/projects/client-portal" },
+            { name: "Client Portal", path: "/client-portal", permission: "projects.client_portal.view" },
           ],
         },
       ],
@@ -340,6 +358,7 @@ export const departments: Department[] = [
       { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
       { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
       { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
+      { name: "Reservations", path: "/warehouse/reservations", permission: "warehouse.reservations.view" },
       { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
       { name: "Project Pipeline", path: "/warehouse/projects", permission: "projects.view" },
       { name: "Master Data", path: "/warehouse/master-data", permission: "warehouse.master_data.view" },
@@ -360,6 +379,7 @@ export const departments: Department[] = [
             { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
             { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
             { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
+            { name: "Reservations", path: "/warehouse/reservations", permission: "warehouse.reservations.view" },
             { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
             { name: "Project Pipeline", path: "/warehouse/projects", permission: "projects.view" },
             { name: "Master Data", path: "/warehouse/master-data", permission: "warehouse.master_data.view" },
@@ -377,6 +397,7 @@ export const departments: Department[] = [
       { name: "Dashboard", path: "/procurement/dashboard", permission: "procurement.view" },
       { name: "Stock Management", path: "/procurement/stock", permission: "procurement.view" },
       { name: "Stock Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
+      { name: "Glass Price Projection", path: "/procurement/glass-price-analytics", permission: "procurement.view" },
       { name: "Purchase Orders", path: "/procurement/orders", permission: "procurement.view" },
       { name: "Receiving Logs", path: "/procurement/goods-receipts", permission: "procurement.view" },
       { name: "Suppliers", path: "/procurement/suppliers", permission: "procurement.view" },
@@ -391,6 +412,7 @@ export const departments: Department[] = [
         { name: "Home", path: "/procurement/dashboard", permission: "procurement.view" },
         { name: "Reports", path: "/analytics" },
         { name: "Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
+        { name: "Glass Prices", path: "/procurement/glass-price-analytics", permission: "procurement.view" },
       ],
       groups: [
         {
@@ -400,6 +422,7 @@ export const departments: Department[] = [
             { name: "Dashboard", path: "/procurement/dashboard", permission: "procurement.view" },
             { name: "Stock Management", path: "/procurement/stock", permission: "procurement.view" },
             { name: "Stock Analytics", path: "/procurement/stock-analytics", permission: "procurement.view" },
+            { name: "Glass Price Projection", path: "/procurement/glass-price-analytics", permission: "procurement.view" },
             { name: "Purchase Orders", path: "/procurement/orders", permission: "procurement.view" },
       { name: "Receiving Logs", path: "/procurement/goods-receipts", permission: "procurement.view" },
             { name: "Suppliers", path: "/procurement/suppliers", permission: "procurement.view" },
@@ -419,13 +442,10 @@ export const departments: Department[] = [
     icon: Factory,
     path: "/production",
     subModules: [
-      { name: "Schedule", path: "/production/schedule" },
-      { name: "Orders", path: "/production/orders" },
-      { name: "Cutting", path: "/production/cutting" },
-      { name: "Assembly", path: "/production/assembly" },
       { name: "Schedule", path: "/production/schedule", permission: "production.view" },
       { name: "Orders", path: "/production/orders", permission: "production.view" },
       { name: "Cutting", path: "/production/cutting", permission: "production.view" },
+      { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
       { name: "Assembly", path: "/production/assembly", permission: "production.view" },
       {
         name: "My Visits",
@@ -449,10 +469,11 @@ export const departments: Department[] = [
           label: "Production",
           icon: Factory,
           items: [
-            { name: "Schedule", path: "/production/schedule" },
-            { name: "Orders", path: "/production/orders" },
-            { name: "Cutting", path: "/production/cutting" },
-            { name: "Assembly", path: "/production/assembly" },
+            { name: "Schedule", path: "/production/schedule", permission: "production.view" },
+            { name: "Orders", path: "/production/orders", permission: "production.view" },
+            { name: "Cutting", path: "/production/cutting", permission: "production.view" },
+            { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
+            { name: "Assembly", path: "/production/assembly", permission: "production.view" },
           ],
         },
         {
@@ -513,6 +534,11 @@ export const departments: Department[] = [
         anyPermissions: ["site_visits.execute", "field_installation.log"],
       },
       {
+        name: "Visit history",
+        path: "/field/site-visits/history",
+        anyPermissions: ["site_visits.view", "site_visits.execute"],
+      },
+      {
         name: "Installation Jobs",
         path: "/field-installation/jobs",
         permission: "field_installation.view",
@@ -521,6 +547,11 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/site-ops/quotation/my-visits" },
+        {
+          name: "Visit history",
+          path: "/field/site-visits/history",
+          anyPermissions: ["site_visits.view", "site_visits.execute"],
+        },
         {
           name: "Field Day",
           path: "/site-ops/field-day",
@@ -619,9 +650,9 @@ export const departments: Department[] = [
     ],
     nav: {
       topItems: [
-        { name: "Home", path: "/qc/dashboard" },
-        { name: "Inspections", path: "/qc/inspections" },
-        { name: "Defects", path: "/qc/defects" },
+        { name: "Home", path: "/qc/dashboard", permission: "qc.view" },
+        { name: "Inspections", path: "/qc/inspections", permission: "qc.view" },
+        { name: "Defects", path: "/qc/defects", permission: "qc.view" },
       ],
       groups: [
         {
@@ -750,11 +781,13 @@ export type WorkspaceApp = {
   href: string;
   icon: LucideIcon;
   iconClassName: string;
-  badge?: { label: string; className: string };
-  /** Spatie permission required to show this app tile */
-  permission?: string;
-  /** Show when the user has any of these permissions (OR). Overrides `permission` when set. */
-  anyPermissions?: string[];
+    badge?: { label: string; className: string };
+    /** Spatie permission required to show this app tile */
+    permission?: string;
+    /** Show when the user has any of these permissions (OR). Overrides `permission` when set. */
+    anyPermissions?: string[];
+    /** Live badge key from GET /workspace/hub-badges */
+    badgeKey?: "warehouse" | "procurement" | "dispatch" | "finance" | "hr";
 };
 
 /** Routes that use the Field department sidebar (measurements, installation). */
@@ -825,7 +858,7 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/warehouse/inventory",
     icon: Warehouse,
     iconClassName: "bg-orange-100 text-orange-600",
-    badge: { label: "3 Low Stock", className: "text-orange-600" },
+    badgeKey: "warehouse",
     permission: "warehouse.stock.view",
   },
   {
@@ -864,7 +897,15 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/procurement/orders",
     icon: Receipt,
     iconClassName: "bg-emerald-100 text-emerald-600",
-    badge: { label: "4 Pending", className: "text-teal-600" },
+    badgeKey: "procurement",
+    permission: "procurement.view",
+  },
+  {
+    id: "glass-analytics",
+    name: "Glass Analytics",
+    href: "/procurement/glass-price-analytics",
+    icon: TrendingUp,
+    iconClassName: "bg-teal-100 text-teal-700",
     permission: "procurement.view",
   },
   {
@@ -889,7 +930,8 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/production/schedule",
     icon: Truck,
     iconClassName: "bg-indigo-100 text-indigo-600",
-    badge: { label: "2 Today", className: "text-indigo-600" },
+    badgeKey: "dispatch",
+    anyPermissions: ["production.view", "production.manage"],
   },
   {
     id: "finance",
@@ -897,8 +939,8 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/finance/invoices",
     icon: CircleDollarSign,
     iconClassName: "bg-green-100 text-green-700",
-    badge: { label: "2 Overdue", className: "text-green-600" },
-    permission: "payroll.view",
+    badgeKey: "finance",
+    anyPermissions: ["finance.view", "payroll.view"],
   },
   {
     id: "hr",
@@ -906,7 +948,7 @@ export const workspaceApps: WorkspaceApp[] = [
     href: "/hr",
     icon: UserCog,
     iconClassName: "bg-rose-100 text-rose-600",
-    badge: { label: "1 On Leave", className: "text-rose-600" },
+    badgeKey: "hr",
     permission: "employees.view",
   },
   {
@@ -919,9 +961,10 @@ export const workspaceApps: WorkspaceApp[] = [
   {
     id: "client-portal",
     name: "Client Portal",
-    href: "/projects/client-portal",
+    href: "/client-portal",
     icon: Globe,
     iconClassName: "bg-teal-100 text-teal-700",
+    permission: "projects.client_portal.view",
   },
   {
     id: "it",
@@ -1232,8 +1275,31 @@ export function isDepartmentNavItemActive(
   pathname: string,
   path: string,
   exact = false,
+  search = "",
 ): boolean {
-  if (pathname === path) {
+  const [basePath, query = ""] = path.split("?");
+  const requiredParams = new URLSearchParams(query);
+  const currentParams = new URLSearchParams(
+    search.startsWith("?") ? search.slice(1) : search,
+  );
+
+  if (requiredParams.toString()) {
+    if (pathname !== basePath) {
+      return false;
+    }
+    for (const [key, value] of requiredParams.entries()) {
+      if (currentParams.get(key) !== value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  if (pathname === basePath) {
+    // Keep query-tab siblings from also marking the plain path as active.
+    if (exact && currentParams.has("tab")) {
+      return false;
+    }
     return true;
   }
 
@@ -1241,10 +1307,10 @@ export function isDepartmentNavItemActive(
     return false;
   }
 
-  if (!pathname.startsWith(`${path}/`)) {
+  if (!pathname.startsWith(`${basePath}/`)) {
     return false;
   }
 
-  const remainder = pathname.slice(path.length + 1);
+  const remainder = pathname.slice(basePath.length + 1);
   return remainder.length > 0 && !remainder.includes("/");
 }

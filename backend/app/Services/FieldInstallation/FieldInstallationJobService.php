@@ -162,6 +162,24 @@ class FieldInstallationJobService
         return $job->fresh();
     }
 
+    public function hold(FieldInstallationJob $job, User $actor): FieldInstallationJob
+    {
+        if ($job->status !== FieldJobStatus::InProgress) {
+            throw ValidationException::withMessages([
+                'status' => ['Only in-progress jobs can be put on hold.'],
+            ]);
+        }
+
+        $job->update(['status' => FieldJobStatus::OnHold]);
+
+        $this->audit->log('field.job_on_hold', $job, newValues: [
+            'status' => FieldJobStatus::OnHold->value,
+            'held_by' => $actor->id,
+        ]);
+
+        return $job->fresh(['project', 'teamLead', 'activeMembers.user']);
+    }
+
     public function assignMember(
         FieldInstallationJob $job,
         int $userId,
@@ -203,9 +221,13 @@ class FieldInstallationJobService
             ]);
         }
 
-        if (! $this->projectStageAtLeast($project, ProjectStage::QcPreInstallation)) {
+        if (! $this->canStartFieldInstallation($project, $installMode)) {
             throw ValidationException::withMessages([
-                'project_id' => ['Project must be at qc_pre_installation stage or later.'],
+                'project_id' => [
+                    $this->isNairobiEarlyEligible($project, $installMode)
+                        ? 'Nairobi early site install requires sash fabrication to be completed first.'
+                        : 'Project must be at qc_pre_installation stage or later.',
+                ],
             ]);
         }
 
@@ -223,6 +245,56 @@ class FieldInstallationJobService
                 'project_id' => ['Project already has an active field installation job.'],
             ]);
         }
+    }
+
+    /**
+     * Outside Nairobi: full QC pre-installation gate.
+     * Nairobi site install: allow early field job once sash fabrication is done
+     * (factory continues into glass assembly / finishing in parallel).
+     */
+    public function canStartFieldInstallation(Project $project, ?InstallMode $installMode = null): bool
+    {
+        $installMode ??= $project->install_mode instanceof InstallMode
+            ? $project->install_mode
+            : InstallMode::tryFrom((string) $project->install_mode);
+
+        if ($this->projectStageAtLeast($project, ProjectStage::QcPreInstallation)) {
+            return true;
+        }
+
+        return $this->isNairobiEarlyEligible($project, $installMode)
+            && $this->hasCompletedSash($project);
+    }
+
+    public function isNairobiEarlyEligible(Project $project, ?InstallMode $installMode = null): bool
+    {
+        $installMode ??= $project->install_mode instanceof InstallMode
+            ? $project->install_mode
+            : InstallMode::tryFrom((string) $project->install_mode);
+
+        if ($installMode === InstallMode::NairobiSiteInstall) {
+            return true;
+        }
+
+        return ($project->location_type ?? null) === 'nairobi'
+            && $installMode !== InstallMode::OutsideFullInstall
+            && $installMode !== InstallMode::NairobiFabricationOnly;
+    }
+
+    protected function hasCompletedSash(Project $project): bool
+    {
+        if ($this->projectStageAtLeast($project, ProjectStage::GlassAssembly)
+            || $this->projectStageAtLeast($project, ProjectStage::QcPreInstallation)) {
+            return true;
+        }
+
+        return ProductionOrder::query()
+            ->where('project_id', $project->id)
+            ->whereHas('stageLogs', function ($query) {
+                $query->where('stage', 'sash')
+                    ->where('status', 'completed');
+            })
+            ->exists();
     }
 
     protected function assertAllUnitsComplete(FieldInstallationJob $job): void
@@ -286,6 +358,7 @@ class FieldInstallationJobService
             ProjectStage::MaterialsReserved,
             ProjectStage::AwaitingProcurement,
             ProjectStage::MaterialsReady,
+            ProjectStage::MaterialsReleased,
             ProjectStage::CuttingStage,
             ProjectStage::FabricationStage,
             ProjectStage::GlassAssembly,

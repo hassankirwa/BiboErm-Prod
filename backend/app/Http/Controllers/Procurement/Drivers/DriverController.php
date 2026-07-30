@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Procurement\Drivers;
 
+use App\Enums\Procurement\DriverStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Procurement\DriverResource;
 use App\Models\Procurement\Driver;
@@ -25,6 +26,15 @@ class DriverController extends Controller
 
         if ($request->boolean('active_only')) {
             $query->where('is_active', true);
+        }
+
+        if ($request->boolean('available_only')) {
+            $query->where('status', DriverStatus::Available->value)
+                ->where('is_active', true);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status')->toString());
         }
 
         if ($request->filled('search')) {
@@ -69,7 +79,11 @@ class DriverController extends Controller
             $validated['code'] = $this->driverCodes->suggest();
         }
 
-        $driver = Driver::query()->create($validated);
+        $driver = Driver::query()->create([
+            ...$validated,
+            'is_active' => true,
+            'status' => DriverStatus::Available->value,
+        ]);
 
         return (new DriverResource($driver))->response()->setStatusCode(201);
     }
@@ -96,6 +110,14 @@ class DriverController extends Controller
             'notes' => ['nullable', 'string'],
             'is_active' => ['boolean'],
         ]);
+
+        if (array_key_exists('is_active', $validated)) {
+            if (! $validated['is_active']) {
+                $validated['status'] = DriverStatus::Inactive->value;
+            } elseif ($driver->status === DriverStatus::Inactive || $driver->status === DriverStatus::Inactive->value) {
+                $validated['status'] = DriverStatus::Available->value;
+            }
+        }
 
         $driver->update($validated);
 

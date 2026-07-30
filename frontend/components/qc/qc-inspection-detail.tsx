@@ -20,6 +20,7 @@ import {
   QC_CONTEXT_LABELS,
   QC_INSPECTION_RESULT_LABELS,
   QC_INSPECTION_SUBMIT_RESULTS,
+  skipQcInspection,
   submitQcInspection,
   updateQcDefect,
   updateQcInspectionDraft,
@@ -29,10 +30,12 @@ import {
   type QcDefectSeverity,
   type QcDefectStatus,
   type QcInspection,
+  type QcInspectionPhoto,
   type QcInspectionSubmitResult,
 } from "@/lib/api/qc";
 import { toast } from "sonner";
 import { QcProjectSummaryCard } from "@/components/qc/qc-project-summary-card";
+import { MediaImage } from "@/components/media/media-image";
 import { Camera, Plus } from "lucide-react";
 
 type ChecklistResponse = string | boolean | number | null;
@@ -43,14 +46,22 @@ function templateItems(inspection: QcInspection): QcChecklistTemplateItem[] {
   return [...templateItemsList, ...custom];
 }
 
-function checklistResponseValue(response: ChecklistResponse): string | boolean | number | null {
+function checklistResponseValue(response: ChecklistResponse | { value?: ChecklistResponse } | null | undefined): string | boolean | number | null {
   if (response === null || response === undefined) {
     return null;
   }
   if (typeof response === "object" && response !== null && "value" in response) {
-    return (response as { value: ChecklistResponse }).value;
+    return (response as { value: ChecklistResponse }).value ?? null;
   }
-  return response;
+  return response as ChecklistResponse;
+}
+
+function passFailSelectValue(response: ChecklistResponse | { value?: ChecklistResponse } | null | undefined): string {
+  const value = checklistResponseValue(response);
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  return String(value);
 }
 
 function deriveResultFromChecklist(
@@ -108,20 +119,29 @@ export function QCInspectionDetail({
   const isDraft = inspection.result === "pending";
 
   const [responses, setResponses] = useState<Record<string, ChecklistResponse>>(() => {
-    const raw = (inspection.checklist_responses ?? {}) as Record<string, ChecklistResponse>;
-    return { ...raw };
+    const raw = (inspection.checklist_responses ?? {}) as Record<
+      string,
+      ChecklistResponse | { value?: ChecklistResponse }
+    >;
+    const normalized: Record<string, ChecklistResponse> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      normalized[key] = checklistResponseValue(value);
+    }
+    return normalized;
   });
   const [notes, setNotes] = useState(inspection.notes ?? "");
   const [internalNotes, setInternalNotes] = useState(inspection.internal_notes ?? "");
-  const [submitResult, setSubmitResult] = useState<QcInspectionSubmitResult>("pass");
-  const [resultTouched, setResultTouched] = useState(false);
+  const [submitResult, setSubmitResult] = useState<QcInspectionSubmitResult | "">("");
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [defectSeverity, setDefectSeverity] = useState<QcDefectSeverity>("minor");
   const [defectDescription, setDefectDescription] = useState("");
   const [photoKey, setPhotoKey] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photos, setPhotos] = useState<QcInspectionPhoto[]>(() => inspection.photos ?? []);
+  const [defects, setDefects] = useState<QcDefect[]>(() => inspection.defects ?? []);
 
   const derivedResult = useMemo(
     () => deriveResultFromChecklist(items, responses),
@@ -129,10 +149,22 @@ export function QCInspectionDetail({
   );
 
   useEffect(() => {
-    if (!resultTouched && derivedResult) {
-      setSubmitResult(derivedResult);
+    setPhotos(inspection.photos ?? []);
+  }, [inspection.photos]);
+
+  useEffect(() => {
+    setDefects(inspection.defects ?? []);
+  }, [inspection.defects]);
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreviewUrl(null);
+      return;
     }
-  }, [derivedResult, resultTouched]);
+    const objectUrl = URL.createObjectURL(photoFile);
+    setPhotoPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [photoFile]);
 
   const setResponse = (key: string, value: ChecklistResponse) => {
     setResponses((prev) => ({ ...prev, [key]: value }));
@@ -182,9 +214,28 @@ export function QCInspectionDetail({
     }
   };
 
+  const handleSkip = async () => {
+    setSubmitting(true);
+    try {
+      await skipQcInspection(
+        inspection.id,
+        notes.trim() || "Skipped — formal QC after assembly",
+      );
+      toast.success("Inspection skipped — complete QC after assembly.");
+      onUpdated();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to skip inspection.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const resolveDefect = async (defect: QcDefect, status: QcDefectStatus) => {
     try {
-      await updateQcDefect(defect.id, { status });
+      const res = await updateQcDefect(defect.id, { status });
+      setDefects((prev) =>
+        prev.map((d) => (d.id === defect.id ? { ...d, ...res.data } : d)),
+      );
       toast.success(`Defect marked ${status.replace("_", " ")}.`);
       onUpdated();
     } catch (error) {
@@ -198,11 +249,12 @@ export function QCInspectionDetail({
       return;
     }
     try {
-      await createQcDefect(inspection.id, {
+      const res = await createQcDefect(inspection.id, {
         severity: defectSeverity,
         description: defectDescription.trim(),
         checklist_key: photoKey || null,
       });
+      setDefects((prev) => [...prev, res.data]);
       toast.success("Defect logged.");
       setDefectDescription("");
       onUpdated();
@@ -221,9 +273,11 @@ export function QCInspectionDetail({
       const formData = new FormData();
       formData.append("file", photoFile);
       if (photoKey) formData.append("checklist_key", photoKey);
-      await uploadQcInspectionPhoto(inspection.id, formData);
+      const res = await uploadQcInspectionPhoto(inspection.id, formData);
+      setPhotos((prev) => [...prev, res.data]);
       toast.success("Photo uploaded.");
       setPhotoFile(null);
+      setPhotoKey("");
       onUpdated();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to upload photo.");
@@ -259,6 +313,11 @@ export function QCInspectionDetail({
               {inspection.result}
             </Badge>
           </div>
+          {inspection.template?.name ? (
+            <p className="text-sm text-muted-foreground">
+              Checklist: <span className="font-medium text-foreground">{inspection.template.name}</span>
+            </p>
+          ) : null}
           {inspection.goods_receipt_id && (
             <p className="text-sm text-muted-foreground">
               GRN:{" "}
@@ -274,16 +333,15 @@ export function QCInspectionDetail({
         {canInspect && isDraft && (
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="qc-submit-result">Inspection result</Label>
+              <Label htmlFor="qc-submit-result">
+                Inspection result <span className="text-destructive">*</span>
+              </Label>
               <Select
-                value={submitResult}
-                onValueChange={(v) => {
-                  setResultTouched(true);
-                  setSubmitResult(v as QcInspectionSubmitResult);
-                }}
+                value={submitResult || undefined}
+                onValueChange={(v) => setSubmitResult(v as QcInspectionSubmitResult)}
               >
                 <SelectTrigger id="qc-submit-result" className="w-[200px]">
-                  <SelectValue placeholder="Select result" />
+                  <SelectValue placeholder="Select result…" />
                 </SelectTrigger>
                 <SelectContent>
                   {QC_INSPECTION_SUBMIT_RESULTS.map((value) => (
@@ -293,22 +351,30 @@ export function QCInspectionDetail({
                   ))}
                 </SelectContent>
               </Select>
-              {derivedResult && !resultTouched && (
+              {derivedResult ? (
                 <p className="text-xs text-muted-foreground">
                   Suggested from checklist: {QC_INSPECTION_RESULT_LABELS[derivedResult]}
                 </p>
-              )}
-              {items.length === 0 && (
+              ) : (
                 <p className="text-xs text-muted-foreground">
-                  No checklist items — choose Pass, Fail, or Conditional pass before submitting.
+                  Required — choose Pass, Fail, or Conditional pass before submitting.
                 </p>
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={saveDraft} disabled={saving}>
+              <Button variant="outline" onClick={saveDraft} disabled={saving || submitting}>
                 {saving ? "Saving..." : "Save draft"}
               </Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
+              {inspection.can_skip && (
+                <Button
+                  variant="secondary"
+                  onClick={handleSkip}
+                  disabled={submitting}
+                >
+                  {submitting ? "Skipping..." : "Skip (QC after assembly)"}
+                </Button>
+              )}
+              <Button onClick={handleSubmit} disabled={submitting || !submitResult}>
                 {submitting ? "Submitting..." : "Submit inspection"}
               </Button>
             </div>
@@ -318,12 +384,20 @@ export function QCInspectionDetail({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Checklist</CardTitle>
+          <CardTitle className="text-base">
+            Checklist
+            {inspection.template?.name ? (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                · {inspection.template.name}
+              </span>
+            ) : null}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No checklist items on this inspection. Assign a template or add custom items via API.
+              No checklist items on this inspection. Open Templates under QC to create one for this
+              inspection type, or refresh after seeding default checklists.
             </p>
           ) : (
             items.map((item) => (
@@ -334,21 +408,30 @@ export function QCInspectionDetail({
                     <p className="text-xs text-muted-foreground">{item.help_text}</p>
                   )}
                 </div>
-                {item.type === "pass_fail" && (
-                  <Select
-                    disabled={readOnly}
-                    value={String(responses[item.key] ?? "")}
-                    onValueChange={(v) => setResponse(item.key, v)}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pass">Pass</SelectItem>
-                      <SelectItem value="fail">Fail</SelectItem>
-                      <SelectItem value="na">N/A</SelectItem>
-                    </SelectContent>
-                  </Select>
+                {(item.type === "pass_fail" || item.type === "photo_required_on_fail") && (
+                  <div className="space-y-1.5">
+                    <Select
+                      disabled={readOnly}
+                      value={passFailSelectValue(responses[item.key])}
+                      onValueChange={(v) => setResponse(item.key, v)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pass">Pass</SelectItem>
+                        <SelectItem value="fail">Fail</SelectItem>
+                        <SelectItem value="na">N/A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {item.type === "photo_required_on_fail" &&
+                      passFailSelectValue(responses[item.key]) === "fail" && (
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                          Photo required for a Fail on this item — upload below with this checklist
+                          key selected.
+                        </p>
+                      )}
+                  </div>
                 )}
                 {item.type === "yes_no" && (
                   <Select
@@ -422,34 +505,66 @@ export function QCInspectionDetail({
             <CardTitle className="text-base">Photos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {(inspection.photos ?? []).length > 0 ? (
-              <ul className="space-y-2 text-sm">
-                {inspection.photos!.map((photo) => (
-                  <li key={photo.id}>
-                    {photo.caption || photo.checklist_key || `Photo #${photo.id}`}
-                    {(photo.url ?? photo.firebase_url) && (
+            {photos.length > 0 ? (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {photos.map((photo) => {
+                  const src = photo.url ?? photo.firebase_url ?? null;
+                  const label = photo.caption || photo.checklist_key || `Photo #${photo.id}`;
+                  return (
+                    <li key={photo.id} className="space-y-1.5">
                       <a
-                        href={photo.url ?? photo.firebase_url!}
+                        href={src ?? undefined}
                         target="_blank"
                         rel="noreferrer"
-                        className="ml-2 text-primary hover:underline"
+                        className="block overflow-hidden rounded-md border bg-muted/30"
                       >
-                        View
+                        {src ? (
+                          <MediaImage
+                            src={src}
+                            alt={label}
+                            className="aspect-square h-auto w-full object-cover"
+                            fallback={
+                              <div className="flex aspect-square items-center justify-center text-xs text-muted-foreground">
+                                Preview unavailable
+                              </div>
+                            }
+                          />
+                        ) : (
+                          <div className="flex aspect-square items-center justify-center text-xs text-muted-foreground">
+                            No preview
+                          </div>
+                        )}
                       </a>
-                    )}
-                  </li>
-                ))}
+                      <p className="truncate text-xs text-muted-foreground" title={label}>
+                        {label}
+                      </p>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">No photos yet.</p>
             )}
             {canInspect && isDraft && (
-              <div className="space-y-2 border-t pt-4">
+              <div className="space-y-3 border-t pt-4">
                 <Input
                   type="file"
                   accept="image/*"
                   onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
                 />
+                {photoPreviewUrl ? (
+                  <div className="overflow-hidden rounded-md border bg-muted/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
+                    <img
+                      src={photoPreviewUrl}
+                      alt={photoFile?.name ?? "Selected photo preview"}
+                      className="max-h-56 w-full object-contain"
+                    />
+                    <p className="truncate border-t px-2 py-1.5 text-xs text-muted-foreground">
+                      Preview · {photoFile?.name}
+                    </p>
+                  </div>
+                ) : null}
                 <Input
                   placeholder="Checklist item key (optional)"
                   value={photoKey}
@@ -460,7 +575,7 @@ export function QCInspectionDetail({
                   size="sm"
                   className="gap-1.5"
                   onClick={uploadPhoto}
-                  disabled={uploadingPhoto}
+                  disabled={uploadingPhoto || !photoFile}
                 >
                   <Camera className="h-4 w-4" />
                   {uploadingPhoto ? "Uploading..." : "Upload photo"}
@@ -476,9 +591,9 @@ export function QCInspectionDetail({
           <CardTitle className="text-base">Defects</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(inspection.defects ?? []).length > 0 ? (
+          {defects.length > 0 ? (
             <ul className="divide-y rounded-md border">
-              {inspection.defects!.map((defect) => (
+              {defects.map((defect) => (
                 <li
                   key={defect.id}
                   className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"

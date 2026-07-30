@@ -47,14 +47,23 @@ class WarehouseStructureSeeder extends Seeder
 
     private function seedDoorTypes(): void
     {
+        // Only GEN is required for catalog accessory linking.
+        // Product door types (SLD, FLD, …) are real master data — create via API when needed.
+        // Keep the expanded set in testing so existing warehouse feature tests stay stable.
         $doorTypes = [
-            ['code' => 'SLD', 'name' => 'Sliding Door', 'section_code' => 'SEC-SLD'],
-            ['code' => 'FLD', 'name' => 'Folding Door', 'section_code' => 'SEC-FLD'],
-            ['code' => 'CSM', 'name' => 'Casement Window', 'section_code' => 'SEC-CSM'],
-            ['code' => 'BTH', 'name' => 'Bathroom', 'section_code' => 'SEC-BTH'],
-            ['code' => 'AWN', 'name' => 'Awning Window', 'section_code' => 'SEC-AWN'],
             ['code' => 'GEN', 'name' => 'General', 'section_code' => 'SEC-GEN'],
         ];
+
+        if (app()->environment('testing')) {
+            $doorTypes = [
+                ['code' => 'SLD', 'name' => 'Sliding Door', 'section_code' => 'SEC-SLD'],
+                ['code' => 'FLD', 'name' => 'Folding Door', 'section_code' => 'SEC-FLD'],
+                ['code' => 'CSM', 'name' => 'Casement Window', 'section_code' => 'SEC-CSM'],
+                ['code' => 'BTH', 'name' => 'Bathroom', 'section_code' => 'SEC-BTH'],
+                ['code' => 'AWN', 'name' => 'Awning Window', 'section_code' => 'SEC-AWN'],
+                ['code' => 'GEN', 'name' => 'General', 'section_code' => 'SEC-GEN'],
+            ];
+        }
 
         foreach ($doorTypes as $doorType) {
             \App\Models\Warehouse\DoorType::query()->updateOrCreate(
@@ -76,6 +85,13 @@ class WarehouseStructureSeeder extends Seeder
             ->first();
 
         if (! $deck) {
+            return;
+        }
+
+        // Production: no dummy door-type Handles/Hinges bins. Catalog accessories
+        // from Premium/Standard/Balustrade/Specialty uploads put away into those
+        // tier cages. Door-type accessory sections exist only for automated tests.
+        if (! app()->environment('testing')) {
             return;
         }
 
@@ -136,10 +152,22 @@ class WarehouseStructureSeeder extends Seeder
             return;
         }
 
+        // Catalog-upload sections only (Premium / Standard / Balustrade / Specialty).
+        // Door-frame profile sections are test fixtures, not upload destinations.
         $sections = [
-            ['code' => 'SEC-ALU-SLD-FRAME', 'name' => 'Sliding Frame Profiles'],
-            ['code' => 'SEC-ALU-CSM-FRAME', 'name' => 'Casement Frame Profiles'],
+            ['code' => 'SEC-ALU-PREMIUM', 'name' => 'Premium Window Profiles'],
+            ['code' => 'SEC-ALU-STANDARD', 'name' => 'Standard Window Profiles'],
+            ['code' => 'SEC-ALU-BALUSTRADE', 'name' => 'Balustrade & Balcony Profiles'],
+            ['code' => 'SEC-ALU-SPECIALTY', 'name' => 'Specialty Aluminium (Tubes/Louvers/Shower/Net)'],
         ];
+
+        if (app()->environment('testing')) {
+            array_unshift(
+                $sections,
+                ['code' => 'SEC-ALU-SLD-FRAME', 'name' => 'Sliding Frame Profiles'],
+                ['code' => 'SEC-ALU-CSM-FRAME', 'name' => 'Casement Frame Profiles'],
+            );
+        }
 
         foreach ($sections as $index => $sectionData) {
             $section = Section::query()->updateOrCreate(
@@ -154,6 +182,8 @@ class WarehouseStructureSeeder extends Seeder
 
             $this->migrateLegacyAluminiumBinCodes($section);
 
+            // Every aluminium section has segmented cages so GRN putaway
+            // can place different profiles in different physical cages.
             $cages = [
                 'CAGE1' => 'Cage 1',
                 'CAGE2' => 'Cage 2',

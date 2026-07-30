@@ -49,7 +49,7 @@ class GlassOrderController extends Controller
     {
         $this->authorize('view', $glassOrder);
 
-        return new GlassOrderResource($glassOrder->load(['project', 'supplier']));
+        return new GlassOrderResource($glassOrder->load(['project', 'supplier', 'creator']));
     }
 
     public function update(Request $request, GlassOrder $glassOrder): GlassOrderResource

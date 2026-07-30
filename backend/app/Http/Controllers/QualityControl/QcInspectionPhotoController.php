@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\QualityControl;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\QualityControl\QcInspectionResource;
 use App\Models\QualityControl\QcInspection;
 use App\Services\QualityControl\QcInspectionService;
+use App\Support\BiboStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -39,9 +39,13 @@ class QcInspectionPhotoController extends Controller
             'data' => [
                 'id' => $photo->id,
                 'inspection_id' => $photo->inspection_id,
+                'defect_id' => $photo->defect_id,
                 'checklist_key' => $photo->checklist_key,
                 'file_path' => $photo->file_path,
+                'url' => BiboStorage::resolvePrivateApiUrl($photo->file_path),
+                'firebase_url' => $photo->firebase_url,
                 'caption' => $photo->caption,
+                'created_at' => $photo->created_at?->toIso8601String(),
             ],
         ], 201);
     }
