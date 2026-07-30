@@ -1,9 +1,0 @@
-# Uploaded files — keep folder structure only
-*
-!.gitignore
-!public/
-!public/profiles/
-!public/profiles/.gitkeep
-!private/
-!private/field-work/
-!private/field-work/.gitkeep
