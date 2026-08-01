@@ -18,7 +18,7 @@ class AcceptQuotationController extends Controller
     {
         $this->authorize('accept', $quotation);
 
-        $updated = $this->quotationService->accept($quotation);
+        $updated = $this->quotationService->accept($quotation, $request->user());
 
         return new QuotationResource($updated->load(['lines', 'deal']));
     }

@@ -41,27 +41,67 @@ type MarkdownLiteBlock =
   | { type: "numbered"; items: string[] }
   | { type: "divider"; text: string };
 
-export function parseInlineBold(
-  text: string,
-): Array<{ bold: boolean; text: string }> {
-  const parts: Array<{ bold: boolean; text: string }> = [];
+export type InlineMark = {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+
+function parseInlineItalic(text: string, bold: boolean): InlineMark[] {
+  const parts: InlineMark[] = [];
+  const regex = /\*([^*]+)\*|_([^_]+)_/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ text: text.slice(lastIndex, match.index), bold });
+    }
+    parts.push({
+      text: match[1] ?? match[2] ?? "",
+      bold,
+      italic: true,
+    });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ text: text.slice(lastIndex), bold });
+  }
+
+  return parts.length > 0 ? parts : [{ text, bold }];
+}
+
+/** Parse **bold**, *italic*, _italic_, and nested combinations. */
+export function parseInlineMarks(text: string): InlineMark[] {
+  const parts: InlineMark[] = [];
   const regex = /\*\*(.+?)\*\*/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ bold: false, text: text.slice(lastIndex, match.index) });
+      parts.push(...parseInlineItalic(text.slice(lastIndex, match.index), false));
     }
-    parts.push({ bold: true, text: match[1] });
+    parts.push(...parseInlineItalic(match[1], true));
     lastIndex = regex.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    parts.push({ bold: false, text: text.slice(lastIndex) });
+    parts.push(...parseInlineItalic(text.slice(lastIndex), false));
   }
 
-  return parts.length > 0 ? parts : [{ bold: false, text }];
+  return parts.length > 0 ? parts : [{ text }];
+}
+
+/** @deprecated Prefer parseInlineMarks. */
+export function parseInlineBold(
+  text: string,
+): Array<{ bold: boolean; text: string }> {
+  return parseInlineMarks(text).map((part) => ({
+    bold: Boolean(part.bold),
+    text: part.text,
+  }));
 }
 
 export function parseMarkdownLite(text: string): MarkdownLiteBlock[] {
@@ -131,12 +171,13 @@ function escapeHtml(text: string): string {
 }
 
 function inlineMarkdownToHtml(text: string): string {
-  return parseInlineBold(text)
-    .map((part) =>
-      part.bold
-        ? `<strong>${escapeHtml(part.text)}</strong>`
-        : escapeHtml(part.text),
-    )
+  return parseInlineMarks(text)
+    .map((part) => {
+      let html = escapeHtml(part.text);
+      if (part.italic) html = `<em>${html}</em>`;
+      if (part.bold) html = `<strong>${html}</strong>`;
+      return html;
+    })
     .join("");
 }
 
@@ -172,10 +213,15 @@ function serializeInlineNode(node: Node): string {
   const el = node as HTMLElement;
   const tag = el.tagName.toLowerCase();
   const inner = serializeInlineContent(el);
-
-  if (tag === "strong" || tag === "b") {
-    return inner ? `**${inner}**` : "";
-  }
+  const style = el.getAttribute("style") ?? "";
+  const isItalic =
+    tag === "em" ||
+    tag === "i" ||
+    /font-style:\s*italic/i.test(style);
+  const isBold =
+    tag === "strong" ||
+    tag === "b" ||
+    /font-weight:\s*(bold|[6-9]00)/i.test(style);
 
   if (tag === "br") {
     return "\n";
@@ -185,7 +231,10 @@ function serializeInlineNode(node: Node): string {
     return serializeBlock(el) ?? "";
   }
 
-  return inner;
+  let result = inner;
+  if (isItalic && result) result = `_${result}_`;
+  if (isBold && result) result = `**${result}**`;
+  return result;
 }
 
 function serializeInlineContent(el: HTMLElement): string {

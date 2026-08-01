@@ -106,4 +106,50 @@ class Quotation extends Model
     {
         return 'v'.$this->revision_number;
     }
+
+    /**
+     * Accounting extracts often store line prices in USD; CRM/UI should show KES.
+     */
+    public function hasUsdPricing(): bool
+    {
+        $this->loadMissing('lines');
+
+        foreach ($this->lines as $line) {
+            $accounting = is_array($line->metadata) ? ($line->metadata['accounting'] ?? null) : null;
+            if (! is_array($accounting)) {
+                continue;
+            }
+            if (($accounting['currency'] ?? null) === 'KES') {
+                continue;
+            }
+            if (($accounting['currency'] ?? null) === 'USD') {
+                return true;
+            }
+            if (($accounting['unit_price_usd'] ?? null) !== null || ($accounting['line_total_usd'] ?? null) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function usdToKesRate(): float
+    {
+        return (float) config('bibo.quotation.usd_to_kes_rate', 129.0);
+    }
+
+    /**
+     * Display total in KES (converts stored USD totals when lines are USD-priced).
+     */
+    public function totalAmountKes(?float $rate = null): float
+    {
+        $total = (float) $this->total_amount;
+        if (! $this->hasUsdPricing()) {
+            return round($total, 2);
+        }
+
+        $rate ??= $this->usdToKesRate();
+
+        return round($total * max($rate, 0), 2);
+    }
 }

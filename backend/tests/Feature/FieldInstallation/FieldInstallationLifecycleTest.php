@@ -57,6 +57,19 @@ class FieldInstallationLifecycleTest extends TestCase
             'type' => 'residential',
             'location_type' => 'nairobi',
             'install_mode' => InstallMode::NairobiSiteInstall,
+            'stage_data' => [
+                'site_measurement' => [
+                    'lines' => [
+                        [
+                            'ref' => 'D01',
+                            'unit_floor' => 'Ground',
+                            'product_type' => 'Door',
+                            'quantity' => 1,
+                            'sort_order' => 0,
+                        ],
+                    ],
+                ],
+            ],
         ]);
 
         $job = FieldInstallationJob::query()->create([
@@ -67,13 +80,16 @@ class FieldInstallationLifecycleTest extends TestCase
             'team_lead_id' => $this->actor->id,
             'created_by' => $this->actor->id,
             'actual_start' => now()->subDay(),
+            'percent_complete' => 100,
         ]);
 
         FieldInstallationUnit::query()->create([
             'job_id' => $job->id,
-            'unit_label' => 'U-1',
+            'unit_label' => 'Ground — D01',
+            'opening_ref' => 'D01',
             'status' => FieldUnitStatus::Installed,
-            'sort_order' => 1,
+            'sort_order' => 0,
+            'measurement_line_key' => 'line-0-D01',
             'installed_at' => now(),
             'installed_by' => $this->actor->id,
         ]);
@@ -139,6 +155,113 @@ class FieldInstallationLifecycleTest extends TestCase
         $this->assertSame(
             ProjectStage::Installation,
             app(\App\Services\Projects\ProjectStageService::class)->currentStage($project->fresh())
+        );
+    }
+
+    public function test_second_delivery_does_not_duplicate_site_receiving_qc(): void
+    {
+        $project = Project::query()->create([
+            'reference' => 'PRJ-FI-RCV2-'.uniqid(),
+            'name' => 'Field Delivery Receiving QC Idempotent',
+            'stage' => ProjectStage::InTransit,
+            'type' => 'residential',
+            'location_type' => 'outside_nairobi',
+            'install_mode' => InstallMode::OutsideFullInstall,
+        ]);
+
+        $job = FieldInstallationJob::query()->create([
+            'reference' => 'FI-RCV2-'.uniqid(),
+            'project_id' => $project->id,
+            'job_type' => FieldJobType::OutsideFullInstall,
+            'status' => FieldJobStatus::Scheduled,
+            'team_lead_id' => $this->actor->id,
+            'created_by' => $this->actor->id,
+        ]);
+
+        $service = app(FieldDeliveryRecordService::class);
+        $payload = [
+            'delivery_condition' => DeliveryCondition::Complete->value,
+            'expected_units' => 1,
+            'received_units' => 1,
+            'lines' => [
+                [
+                    'description' => 'Door leaf',
+                    'qty_expected' => '1',
+                    'qty_received' => '1',
+                    'unit' => 'each',
+                ],
+            ],
+        ];
+
+        $first = $service->record($job, $this->actor, $payload);
+        $second = $service->record($job, $this->actor, $payload);
+
+        $inspections = QcInspection::query()
+            ->where('field_installation_job_id', $job->id)
+            ->where('context', QcInspectionContext::SiteReceiving)
+            ->get();
+
+        $this->assertCount(1, $inspections);
+        $this->assertStringContainsString((string) $first->id, (string) $inspections->first()->notes);
+        $this->assertStringContainsString((string) $second->id, (string) $inspections->first()->notes);
+    }
+
+    public function test_completing_field_job_twice_does_not_duplicate_site_installation_qc(): void
+    {
+        $project = Project::query()->create([
+            'reference' => 'PRJ-FI-QC2-'.uniqid(),
+            'name' => 'Field Complete QC Idempotent',
+            'stage' => ProjectStage::Installation,
+            'type' => 'residential',
+            'location_type' => 'nairobi',
+            'install_mode' => InstallMode::NairobiSiteInstall,
+            'stage_data' => [
+                'site_measurement' => [
+                    'lines' => [
+                        [
+                            'ref' => 'D01',
+                            'unit_floor' => 'Ground',
+                            'product_type' => 'Door',
+                            'quantity' => 1,
+                            'sort_order' => 0,
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $job = FieldInstallationJob::query()->create([
+            'reference' => 'FI2-'.uniqid(),
+            'project_id' => $project->id,
+            'job_type' => FieldJobType::NairobiSiteInstall,
+            'status' => FieldJobStatus::InProgress,
+            'team_lead_id' => $this->actor->id,
+            'created_by' => $this->actor->id,
+            'actual_start' => now()->subDay(),
+            'percent_complete' => 100,
+        ]);
+
+        FieldInstallationUnit::query()->create([
+            'job_id' => $job->id,
+            'unit_label' => 'Ground — D01',
+            'opening_ref' => 'D01',
+            'status' => FieldUnitStatus::Installed,
+            'sort_order' => 0,
+            'measurement_line_key' => 'line-0-D01',
+            'installed_at' => now(),
+            'installed_by' => $this->actor->id,
+        ]);
+
+        $service = app(FieldInstallationJobService::class);
+        $service->complete($job, $this->actor);
+        $service->complete($job->fresh(), $this->actor);
+
+        $this->assertSame(
+            1,
+            QcInspection::query()
+                ->where('field_installation_job_id', $job->id)
+                ->where('context', QcInspectionContext::SiteInstallation)
+                ->count(),
         );
     }
 }

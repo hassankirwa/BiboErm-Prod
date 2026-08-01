@@ -42,6 +42,7 @@ class BomStockCheckService
         $totals = $this->stockLevels->totalsForItemIds($itemIds);
         $aheadProjectIds = $this->fifoSequence->projectIdsAheadOf($projectId);
         $activeReservationProjectIds = $this->activeReservationProjectIds($aheadProjectIds);
+        $held = $this->remainingHeldForProject($projectId);
 
         $aluminiumPlans = $this->aluminiumDemand->plansByItemId($items, $bomLines);
         $aluminiumHandled = [];
@@ -53,8 +54,12 @@ class BomStockCheckService
                 throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(Item::class, [$itemId]);
             }
 
-            // Aluminium: one aggregated check per SKU (bar packing spans all BOM lines).
-            if ($item->category === ItemCategory::AluminiumProfile) {
+            // Bar/roll cut packing: aluminium profiles and metre rubber/seals with cut lengths.
+            $bomLinesForItemPreview = array_values(array_filter(
+                $bomLines,
+                fn (array $line) => (int) $line['item_id'] === $itemId,
+            ));
+            if ($this->aluminiumDemand->shouldCombineCuts($item, $bomLinesForItemPreview)) {
                 if (isset($aluminiumHandled[$itemId])) {
                     continue;
                 }
@@ -68,6 +73,10 @@ class BomStockCheckService
                 ];
 
                 $required = (string) $plan['reserve_qty'];
+                $alreadyHeld = $held['by_item'][$itemId] ?? '0.000';
+                $stillNeeded = bccomp($required, $alreadyHeld, 3) === 1
+                    ? bcsub($required, $alreadyHeld, 3)
+                    : '0.000';
                 $onHand = $itemTotals['on_hand'];
                 $reserved = $itemTotals['reserved'];
                 $available = $itemTotals['available'];
@@ -79,24 +88,21 @@ class BomStockCheckService
                     $item->id
                 );
 
-                // Offcuts cover cuts outside virgin stock; effective virgin need is reserve_qty only.
+                // Offcuts cover cuts outside virgin stock; effective virgin need is remaining gap only.
                 $effectiveAvailable = bcsub($available, $aheadDemand, 3);
                 if (bccomp($effectiveAvailable, '0', 3) < 0) {
                     $effectiveAvailable = '0.000';
                 }
 
-                $shortage = bccomp($required, $effectiveAvailable, 3) === 1
-                    ? bcsub($required, $effectiveAvailable, 3)
+                $shortage = bccomp($stillNeeded, $effectiveAvailable, 3) === 1
+                    ? bcsub($stillNeeded, $effectiveAvailable, 3)
                     : '0.000';
 
                 if (bccomp($shortage, '0', 3) === 1) {
                     $canFullyReserve = false;
                 }
 
-                $bomLinesForItem = array_values(array_filter(
-                    $bomLines,
-                    fn (array $line) => (int) $line['item_id'] === $itemId,
-                ));
+                $bomLinesForItem = $bomLinesForItemPreview;
                 $primaryBomLineId = $bomLinesForItem[0]['project_bom_line_id'] ?? null;
 
                 $results[] = [
@@ -111,6 +117,8 @@ class BomStockCheckService
                         $bomLinesForItem,
                     ))),
                     'required' => $required,
+                    'already_held' => $alreadyHeld,
+                    'still_needed' => $stillNeeded,
                     'required_cuts' => $plan['cuts_total'],
                     'bars_needed' => $plan['bars_needed'],
                     'bar_length_mm' => $plan['bar_length_mm'],
@@ -129,6 +137,13 @@ class BomStockCheckService
             }
 
             $required = (string) $bomLine['quantity'];
+            $bomRef = isset($bomLine['bom_line_ref']) ? (string) $bomLine['bom_line_ref'] : null;
+            $alreadyHeld = $bomRef !== null && $bomRef !== ''
+                ? ($held['by_ref'][$bomRef] ?? '0.000')
+                : ($held['by_item'][$itemId] ?? '0.000');
+            $stillNeeded = bccomp($required, $alreadyHeld, 3) === 1
+                ? bcsub($required, $alreadyHeld, 3)
+                : '0.000';
             $itemTotals = $totals[$itemId] ?? [
                 'on_hand' => '0.000',
                 'reserved' => '0.000',
@@ -151,8 +166,8 @@ class BomStockCheckService
                 $effectiveAvailable = '0.000';
             }
 
-            $shortage = bccomp($required, $effectiveAvailable, 3) === 1
-                ? bcsub($required, $effectiveAvailable, 3)
+            $shortage = bccomp($stillNeeded, $effectiveAvailable, 3) === 1
+                ? bcsub($stillNeeded, $effectiveAvailable, 3)
                 : '0.000';
 
             if (bccomp($shortage, '0', 3) === 1) {
@@ -167,6 +182,8 @@ class BomStockCheckService
                 'category' => $item->category?->value ?? $item->category,
                 'bom_line_ref' => $bomLine['bom_line_ref'] ?? null,
                 'required' => $required,
+                'already_held' => $alreadyHeld,
+                'still_needed' => $stillNeeded,
                 'on_hand' => $onHand,
                 'reserved_by_others' => $reserved,
                 'available' => $available,
@@ -239,5 +256,44 @@ class BomStockCheckService
             ->pluck('project_id')
             ->mapWithKeys(fn ($id) => [(int) $id => true])
             ->all();
+    }
+
+    /**
+     * Remaining hold on active reservations for this project (not yet released to production).
+     *
+     * @return array{by_item: array<int, string>, by_ref: array<string, string>}
+     */
+    public function remainingHeldForProject(int $projectId): array
+    {
+        $byItem = [];
+        $byRef = [];
+
+        $reservations = StockReservation::query()
+            ->where('project_id', $projectId)
+            ->whereIn('status', [
+                ReservationStatus::Pending,
+                ReservationStatus::Partial,
+            ])
+            ->with('lines')
+            ->get();
+
+        foreach ($reservations as $reservation) {
+            foreach ($reservation->lines as $line) {
+                $remaining = $line->remainingQuantity();
+                if (bccomp($remaining, '0', 3) !== 1) {
+                    continue;
+                }
+
+                $itemId = (int) $line->item_id;
+                $byItem[$itemId] = bcadd($byItem[$itemId] ?? '0.000', $remaining, 3);
+
+                if ($line->bom_line_ref !== null && $line->bom_line_ref !== '') {
+                    $ref = (string) $line->bom_line_ref;
+                    $byRef[$ref] = bcadd($byRef[$ref] ?? '0.000', $remaining, 3);
+                }
+            }
+        }
+
+        return ['by_item' => $byItem, 'by_ref' => $byRef];
     }
 }

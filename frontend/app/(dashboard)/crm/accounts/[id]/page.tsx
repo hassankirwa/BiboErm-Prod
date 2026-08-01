@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
@@ -48,9 +48,11 @@ import {
   type ApiAccount,
   type ApiAccountDocument,
 } from "@/lib/api/crm/accounts";
+import { contactDisplayName } from "@/lib/api/crm/contacts";
 import type { ApiDeal } from "@/lib/api/crm/types";
 import { ensureCsrfCookie } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
+import { hasRecordedDeposit } from "@/lib/crm-lead-status";
 import { toast } from "sonner";
 
 function accountToForm(account: ApiAccount) {
@@ -91,6 +93,8 @@ export default function AccountDetailPage({
   const { can } = usePermissions();
   const canEdit = can("accounts.update");
   const canViewDeals = can("deals.view");
+  const canCreateProject = can("projects.create");
+  const shouldLoadDeals = canViewDeals || canCreateProject;
 
   const [account, setAccount] = useState<ApiAccount | null>(null);
   const [deals, setDeals] = useState<ApiDeal[]>([]);
@@ -158,7 +162,7 @@ export default function AccountDetailPage({
   }, [accountId]);
 
   useEffect(() => {
-    if (!canViewDeals || !Number.isFinite(accountId) || accountId <= 0) {
+    if (!shouldLoadDeals || !Number.isFinite(accountId) || accountId <= 0) {
       return;
     }
 
@@ -179,7 +183,7 @@ export default function AccountDetailPage({
     return () => {
       cancelled = true;
     };
-  }, [accountId, canViewDeals]);
+  }, [accountId, shouldLoadDeals]);
 
   useEffect(() => {
     if (!Number.isFinite(accountId) || accountId <= 0) return;
@@ -256,6 +260,30 @@ export default function AccountDetailPage({
     router.replace(`/crm/accounts/${accountId}`);
   }
 
+  const depositReadyDeal = useMemo(() => {
+    const withDeposit = deals.filter((deal) => hasRecordedDeposit(deal));
+    return (
+      withDeposit.find((deal) => !deal.project_id) ?? withDeposit[0] ?? null
+    );
+  }, [deals]);
+
+  const canCreateProjectAfterDeposit =
+    !dealsLoading && depositReadyDeal != null;
+
+  const createProjectHref = useMemo(() => {
+    const params = new URLSearchParams({
+      account_id: String(accountId),
+    });
+    if (account?.name) {
+      params.set("account_name", account.name);
+    }
+    if (depositReadyDeal) {
+      params.set("deal_id", String(depositReadyDeal.id));
+      params.set("deal_label", dealTitle(depositReadyDeal));
+    }
+    return `/crm/projects/new?${params.toString()}`;
+  }, [account?.name, accountId, depositReadyDeal]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -266,7 +294,7 @@ export default function AccountDetailPage({
 
   if (error || !account) {
     return (
-      <div className="flex h-full flex-col">
+      <div className="flex min-h-full flex-col">
         <AppHeader
           title="Account"
           actions={
@@ -286,23 +314,40 @@ export default function AccountDetailPage({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       <AppHeader
         title={account.name}
         subtitle={account.account_number ?? `#${account.id}`}
         actions={
           <div className="flex items-center gap-2">
+            {account.source_lead_id ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/crm/leads/${account.source_lead_id}`}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back to lead
+                </Link>
+              </Button>
+            ) : null}
             {!isEditing && (
               <>
                 <PermissionGate permission="projects.create">
-                  <Button size="sm" asChild>
-                    <Link
-                      href={`/crm/projects/new?account_id=${accountId}`}
+                  {canCreateProjectAfterDeposit ? (
+                    <Button size="sm" asChild>
+                      <Link href={createProjectHref}>
+                        <FolderKanban className="mr-1 h-4 w-4" />
+                        Create Project
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled
+                      title="Record a deposit on a related deal before creating a project"
                     >
                       <FolderKanban className="mr-1 h-4 w-4" />
                       Create Project
-                    </Link>
-                  </Button>
+                    </Button>
+                  )}
                 </PermissionGate>
                 <PermissionGate permission="accounts.update">
                 <Button
@@ -325,7 +370,7 @@ export default function AccountDetailPage({
           </div>
         }
       />
-      <div className="flex-1 space-y-6 overflow-auto p-6">
+      <div className="flex-1 space-y-6 p-6">
         <Card className="max-w-2xl border-border">
           <CardHeader>
             <CardTitle className="text-base">
@@ -512,31 +557,133 @@ export default function AccountDetailPage({
           </CardContent>
         </Card>
 
-        {account.contacts && account.contacts.length > 0 && (
-          <Card className="max-w-2xl border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Contacts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {account.contacts.map((contact) => (
-                  <li key={contact.id}>
-                    <Link
-                      href={`/crm/contacts/${contact.id}`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      {contact.name ??
-                        [contact.first_name, contact.last_name]
-                          .filter(Boolean)
-                          .join(" ") ??
-                        `Contact #${contact.id}`}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
+        {(() => {
+          const contacts =
+            account.contacts && account.contacts.length > 0
+              ? account.contacts
+              : account.primary_contact
+                ? [account.primary_contact]
+                : [];
+
+          return (
+            <Card className="max-w-2xl border-border">
+              <CardHeader>
+                <CardTitle className="text-base">Contacts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {contacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No contacts linked to this account yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-4">
+                    {contacts.map((contact) => {
+                      const name = contactDisplayName(contact);
+                      const isPrimary =
+                        account.primary_contact_id === contact.id;
+
+                      return (
+                        <li
+                          key={contact.id}
+                          className="rounded-lg border border-border/70 p-4"
+                        >
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/crm/contacts/${contact.id}`}
+                              className="text-sm font-medium text-primary hover:underline"
+                            >
+                              {name}
+                            </Link>
+                            {isPrimary ? (
+                              <Badge variant="outline" className="font-normal">
+                                Primary
+                              </Badge>
+                            ) : null}
+                            {contact.status ? (
+                              <Badge
+                                variant="outline"
+                                className="font-normal capitalize"
+                              >
+                                {contact.status.replace(/_/g, " ")}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            {contact.job_title ? (
+                              <p>
+                                <span className="text-muted-foreground">
+                                  Job title:
+                                </span>{" "}
+                                {contact.job_title}
+                              </p>
+                            ) : null}
+                            {contact.email ? (
+                              <p className="flex items-center gap-2">
+                                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <a
+                                  href={`mailto:${contact.email}`}
+                                  className="hover:underline"
+                                >
+                                  {contact.email}
+                                </a>
+                              </p>
+                            ) : null}
+                            {contact.phone ? (
+                              <p className="flex items-center gap-2">
+                                <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                {contact.phone}
+                              </p>
+                            ) : null}
+                            {contact.whatsapp ? (
+                              <p>
+                                <span className="text-muted-foreground">
+                                  WhatsApp:
+                                </span>{" "}
+                                {contact.whatsapp}
+                              </p>
+                            ) : null}
+                            {contact.preferred_contact_method ? (
+                              <p>
+                                <span className="text-muted-foreground">
+                                  Preferred contact:
+                                </span>{" "}
+                                <span className="capitalize">
+                                  {contact.preferred_contact_method.replace(
+                                    /_/g,
+                                    " ",
+                                  )}
+                                </span>
+                              </p>
+                            ) : null}
+                            {contact.contact_number ? (
+                              <p className="text-xs text-muted-foreground">
+                                {contact.contact_number}
+                              </p>
+                            ) : null}
+                            {contact.notes ? (
+                              <p className="whitespace-pre-wrap text-muted-foreground">
+                                {contact.notes}
+                              </p>
+                            ) : null}
+                            {!contact.email &&
+                            !contact.phone &&
+                            !contact.whatsapp &&
+                            !contact.job_title &&
+                            !contact.notes ? (
+                              <p className="text-muted-foreground">
+                                No additional contact details on file.
+                              </p>
+                            ) : null}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Card className="max-w-3xl border-border">
           <CardHeader>

@@ -105,6 +105,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
     });
     const suggested =
       salesDeal?.deposit_required_amount ??
+      lead.latest_quotation?.total_amount_kes ??
       lead.latest_quotation?.total_amount ??
       null;
     if (suggested != null && !depositForm.amount_paid) {
@@ -113,7 +114,12 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
         amount_paid: String(suggested),
       }));
     }
-  }, [lead, salesDeal?.deposit_required_amount, lead?.latest_quotation?.total_amount]);
+  }, [
+    lead,
+    salesDeal?.deposit_required_amount,
+    lead?.latest_quotation?.total_amount_kes,
+    lead?.latest_quotation?.total_amount,
+  ]);
 
   if (loading) {
     return (

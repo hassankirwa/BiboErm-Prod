@@ -19,7 +19,12 @@ class DealController extends Controller
 
         $query = Deal::query()
             ->visibleTo($request->user())
-            ->with(['contact', 'account', 'owner'])
+            ->with([
+                'contact',
+                'account',
+                'owner',
+                'quotations' => fn ($q) => $q->excludingReferenceCopies()->with('lines')->latest('id'),
+            ])
             ->latest();
 
         if ($stage = $request->query('stage')) {

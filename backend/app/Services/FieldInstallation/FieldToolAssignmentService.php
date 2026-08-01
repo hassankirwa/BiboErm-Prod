@@ -41,14 +41,25 @@ class FieldToolAssignmentService
                 ]);
             }
 
-            $assignment = FieldToolAssignment::query()->create([
-                'job_id' => $job->id,
-                'tool_issuance_id' => $issuance->id,
-                'assigned_by' => $issuedBy->id,
-                'expected_return_date' => $data['expected_return_date'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'created_at' => now(),
-            ]);
+            // ToolIssuanceService may already auto-link to the active field job.
+            $assignment = FieldToolAssignment::query()->firstOrCreate(
+                ['tool_issuance_id' => $issuance->id],
+                [
+                    'job_id' => $job->id,
+                    'assigned_by' => $issuedBy->id,
+                    'expected_return_date' => $data['expected_return_date'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                    'created_at' => now(),
+                ],
+            );
+
+            if (! $assignment->wasRecentlyCreated) {
+                $assignment->update(array_filter([
+                    'job_id' => $job->id,
+                    'expected_return_date' => $data['expected_return_date'] ?? $assignment->expected_return_date,
+                    'notes' => $data['notes'] ?? $assignment->notes,
+                ], fn ($value) => $value !== null));
+            }
 
             $this->audit->log('field.tool_linked', $assignment, newValues: [
                 'tool_issuance_id' => $issuance->id,

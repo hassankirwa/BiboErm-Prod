@@ -660,6 +660,57 @@ class QcInspectionFlowTest extends TestCase
         $this->assertSame(QcInspectionResult::Skipped, $inspection->result);
     }
 
+    public function test_post_fab_qc_pass_marks_production_order_completed(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+        Sanctum::actingAs($this->inspector);
+
+        $project = $this->createProject(['stage' => ProjectStage::GlassAssembly]);
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-COMPLETE-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'qc_post_fabrication',
+            'fifo_position' => 1,
+        ]);
+
+        $template = QcChecklistTemplate::query()
+            ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+            ->where('is_system', true)
+            ->firstOrFail();
+
+        $inspection = QcInspection::query()->create([
+            'reference' => 'QC-POST-'.uniqid(),
+            'project_id' => $project->id,
+            'production_order_id' => $order->id,
+            'context' => QcInspectionContext::ProductionQcPostFabrication,
+            'stage' => QcInspectionContext::ProductionQcPostFabrication->value,
+            'template_id' => $template->id,
+            'result' => QcInspectionResult::Pending,
+            'inspector_id' => $this->inspector->id,
+            'checklist_responses' => [],
+            'custom_items' => [],
+        ])->load('template');
+
+        $responses = [];
+        foreach ($inspection->template->items as $item) {
+            $responses[$item['key']] = ['value' => 'pass'];
+        }
+
+        $this->postJson("/api/v1/qc/inspections/{$inspection->id}/submit", [
+            'result' => QcInspectionResult::Pass->value,
+            'notes' => 'Factory QC passed.',
+            'checklist_responses' => $responses,
+        ])->assertOk();
+
+        $this->assertSame(
+            \App\Enums\Production\ProductionOrderStatus::Completed,
+            $order->fresh()->status,
+        );
+        $this->assertNotNull($order->fresh()->actual_end);
+        $this->assertSame(ProjectStage::QcPreInstallation, $project->fresh()->stage);
+    }
+
     public function test_post_fabrication_inspection_cannot_be_skipped(): void
     {
         $this->seed(QcDefaultChecklistsSeeder::class);

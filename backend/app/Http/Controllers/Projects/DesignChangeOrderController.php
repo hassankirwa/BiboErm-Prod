@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Projects;
 
+use App\Enums\Production\ProductionStage;
 use App\Enums\ProjectStage;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Projects\DesignChangeOrderResource;
@@ -81,7 +82,62 @@ class DesignChangeOrderController extends Controller
         $dco->loadMissing('project');
         $this->authorize('advanceStage', $dco->project);
 
-        $updated = $this->designChanges->createRemake($dco, $request->user());
+        $validated = $request->validate([
+            'start_stage' => ['nullable', 'string', Rule::enum(ProductionStage::class)],
+        ]);
+
+        $startStage = isset($validated['start_stage'])
+            ? ProductionStage::from($validated['start_stage'])
+            : null;
+
+        $updated = $this->designChanges->createRemake($dco, $request->user(), $startStage);
+
+        return new DesignChangeOrderResource($updated);
+    }
+
+    public function update(Request $request, DesignChangeOrder $dco): DesignChangeOrderResource
+    {
+        $dco->loadMissing('project');
+        $this->authorize('advanceStage', $dco->project);
+
+        $validated = $request->validate([
+            'reason' => ['sometimes', 'nullable', 'string'],
+            'notes' => ['sometimes', 'nullable', 'string'],
+            'change_path' => ['sometimes', 'nullable', Rule::in(['full_remake', 'minor_material'])],
+            'items' => ['sometimes', 'array'],
+            'items.*.id' => ['nullable', 'string'],
+            'items.*.description' => ['required_with:items', 'string', 'max:500'],
+            'items.*.qty' => ['nullable', 'numeric', 'min:0'],
+            'items.*.unit' => ['nullable', 'string', 'max:30'],
+            'items.*.change_type' => ['nullable', Rule::in(['remake', 'material'])],
+            'items.*.done' => ['nullable', 'boolean'],
+        ]);
+
+        $updated = $this->designChanges->updateDetails($dco, $validated);
+
+        return new DesignChangeOrderResource($updated);
+    }
+
+    public function releaseToProduction(Request $request, DesignChangeOrder $dco): DesignChangeOrderResource
+    {
+        $dco->loadMissing('project');
+        $this->authorize('advanceStage', $dco->project);
+
+        $updated = $this->designChanges->releaseToProduction($dco, $request->user());
+
+        return new DesignChangeOrderResource($updated);
+    }
+
+    public function completeMinor(Request $request, DesignChangeOrder $dco): DesignChangeOrderResource
+    {
+        $dco->loadMissing('project');
+        $this->authorize('advanceStage', $dco->project);
+
+        $validated = $request->validate([
+            'advance_to_stage' => ['nullable', 'string', Rule::enum(ProjectStage::class)],
+        ]);
+
+        $updated = $this->designChanges->completeMinor($dco, $request->user(), $validated);
 
         return new DesignChangeOrderResource($updated);
     }

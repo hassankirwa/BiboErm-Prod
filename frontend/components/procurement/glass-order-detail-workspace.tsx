@@ -204,15 +204,29 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
     [order?.specs?.source, panes, requirements],
   );
 
+  const panesHaveTypeAndTint = useMemo(() => {
+    const dimensioned = panes.filter(paneHasDimensions);
+    if (dimensioned.length === 0) return false;
+    return dimensioned.every(
+      (pane) =>
+        String(pane.glass_type ?? "").trim() !== "" &&
+        String(pane.tint ?? "").trim() !== "",
+    );
+  }, [panes]);
+
   const validationHints = useMemo(() => {
     const hints: string[] = [];
     if (!supplierId) hints.push("Select a glass supplier.");
-    if (!requirements.trim()) hints.push("Enter glass requirements (type, tint, processing).");
+    if (!requirements.trim() && !panesHaveTypeAndTint) {
+      hints.push(
+        "Enter glass requirements, or set type and tint on every pane.",
+      );
+    }
     if (!panes.some(paneHasDimensions)) {
       hints.push("Add at least one pane with width, height, and quantity.");
     }
     return hints;
-  }, [panes, requirements, supplierId]);
+  }, [panes, panesHaveTypeAndTint, requirements, supplierId]);
 
   const deliveryPricingReady = useMemo(() => {
     if (!canReceive || panes.length === 0) return false;
@@ -464,11 +478,14 @@ export function GlassOrderDetailWorkspace({ orderId, returnTo }: Props) {
             <Textarea
               id="requirements"
               rows={3}
-              placeholder="e.g. 6mm clear tempered, low-E coating, polished edges"
+              placeholder="Optional if Type and Tint are set on every pane — e.g. 6mm clear tempered, polished edges"
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
               disabled={!canEdit}
             />
+            <p className="text-xs text-muted-foreground">
+              Free-text summary for the PO, or leave blank when each pane has Type and Tint.
+            </p>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="delivery-location">Delivery location</Label>

@@ -5,6 +5,7 @@ namespace App\Enums\Production;
 enum ProductionStage: string
 {
     case MaterialPrep = 'material_prep';
+    /** @deprecated Removed from active flow; kept for legacy orders. Advances to Cutting. */
     case QcPreCheck = 'qc_pre_check';
     case Cutting = 'cutting';
     case Fabrication = 'fabrication';
@@ -16,7 +17,7 @@ enum ProductionStage: string
     public function label(): string
     {
         return match ($this) {
-            self::MaterialPrep => 'Material Preparation',
+            self::MaterialPrep => 'Materials & tools assembly',
             self::QcPreCheck => 'QC Pre-Check (materials)',
             self::Cutting => 'Cutting',
             self::Fabrication => 'Fabrication',
@@ -43,6 +44,11 @@ enum ProductionStage: string
 
     public function next(): ?self
     {
+        // Legacy orders still sitting on the removed QC pre-check go straight to cutting.
+        if ($this === self::QcPreCheck) {
+            return self::Cutting;
+        }
+
         $stages = self::ordered();
 
         $index = array_search($this, $stages, true);
@@ -55,13 +61,14 @@ enum ProductionStage: string
     }
 
     /**
+     * Active shop-floor sequence (QC pre-check removed — prep goes to cutting).
+     *
      * @return list<self>
      */
     public static function ordered(): array
     {
         return [
             self::MaterialPrep,
-            self::QcPreCheck,
             self::Cutting,
             self::Fabrication,
             self::Sash,

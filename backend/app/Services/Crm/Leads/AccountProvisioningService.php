@@ -42,7 +42,7 @@ class AccountProvisioningService
 
         if (! $this->isEligibleForProvisioning($lead)) {
             throw ValidationException::withMessages([
-                'status' => ['Lead must reach ready for quotation or have a quotation request before provisioning an account.'],
+                'status' => ['Lead must be marked interested before provisioning an account.'],
             ]);
         }
 
@@ -212,7 +212,6 @@ class AccountProvisioningService
 
         if (in_array($status, [
             LeadStatus::Interested->value,
-            LeadStatus::Contacted->value,
         ], true)) {
             return true;
         }
@@ -222,7 +221,6 @@ class AccountProvisioningService
             : (string) ($lead->pipeline_stage ?? '');
 
         if (in_array($pipelineStage, [
-            LeadPipelineStage::ContactConfirmed->value,
             LeadPipelineStage::AccountProvisioned->value,
         ], true)) {
             return true;

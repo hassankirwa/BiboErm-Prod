@@ -137,6 +137,17 @@ export const leadKanbanStages: LeadKanbanStageConfig[] = [
     addBtnClass: "text-emerald-700 hover:bg-emerald-50",
   },
   {
+    id: "won",
+    label: "Won",
+    description: "Deposit recorded / deal won",
+    headerBg: "bg-green-50",
+    headerBorder: "border-green-200",
+    countBadge: "bg-green-700 text-white",
+    tagClass: "bg-green-100 text-green-900",
+    addBtnClass: "text-green-800 hover:bg-green-50",
+    terminal: true,
+  },
+  {
     id: "cold",
     label: "Cold",
     description: "Not progressing — revisit later",

@@ -8,11 +8,13 @@ use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
 use App\Events\FieldInstallation\FieldInstallationCompleted;
 use App\Events\FieldInstallation\FieldInstallationJobStarted;
+use App\Enums\FieldInstallation\FieldUnitStatus;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\FieldInstallation\FieldInstallationJobMember;
 use App\Models\Production\ProductionOrder;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\Warehouse\ToolIssuance;
 use App\Services\Projects\ProjectStageService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -94,13 +96,25 @@ class FieldInstallationJobService
             ]);
         }
 
+        $hasFieldAssignment = $job->toolAssignments()->exists();
+        $hasOpenProjectIssuance = ToolIssuance::query()
+            ->where('project_id', $job->project_id)
+            ->whereNull('return_date')
+            ->exists();
+
+        if (! $hasFieldAssignment && ! $hasOpenProjectIssuance) {
+            throw ValidationException::withMessages([
+                'tools' => ['Warehouse must allocate equipment to this project before starting.'],
+            ]);
+        }
+
         return DB::transaction(function () use ($job, $actor) {
             $job->update([
                 'status' => FieldJobStatus::InProgress,
                 'actual_start' => now(),
             ]);
 
-            $this->unitProgress->generateFromBom($job);
+            $this->unitProgress->generateFromMeasurements($job);
 
             event(new FieldInstallationJobStarted(
                 jobId: $job->id,
@@ -116,6 +130,10 @@ class FieldInstallationJobService
 
     public function complete(FieldInstallationJob $job, User $actor): FieldInstallationJob
     {
+        if ($job->status === FieldJobStatus::Completed) {
+            return $job->fresh(['project', 'units', 'toolAssignments.toolIssuance']) ?? $job;
+        }
+
         if ($job->status !== FieldJobStatus::InProgress && $job->status !== FieldJobStatus::OnHold) {
             throw ValidationException::withMessages([
                 'status' => ['Job must be in progress or on hold to complete.'],
@@ -126,21 +144,36 @@ class FieldInstallationJobService
         $this->assertAllToolsReturned($job);
 
         return DB::transaction(function () use ($job, $actor) {
-            $job->update([
+            $locked = FieldInstallationJob::query()
+                ->whereKey($job->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status === FieldJobStatus::Completed) {
+                return $locked->fresh(['project', 'units', 'toolAssignments.toolIssuance']);
+            }
+
+            if ($locked->status !== FieldJobStatus::InProgress && $locked->status !== FieldJobStatus::OnHold) {
+                throw ValidationException::withMessages([
+                    'status' => ['Job must be in progress or on hold to complete.'],
+                ]);
+            }
+
+            $locked->update([
                 'status' => FieldJobStatus::Completed,
                 'actual_end' => now(),
                 'percent_complete' => 100,
             ]);
 
             event(new FieldInstallationCompleted(
-                jobId: $job->id,
-                projectId: $job->project_id,
+                jobId: $locked->id,
+                projectId: $locked->project_id,
                 completedByUserId: $actor->id,
             ));
 
-            $this->audit->log('field.job_completed', $job, newValues: ['status' => FieldJobStatus::Completed->value]);
+            $this->audit->log('field.job_completed', $locked, newValues: ['status' => FieldJobStatus::Completed->value]);
 
-            return $job->fresh(['project', 'units', 'toolAssignments.toolIssuance']);
+            return $locked->fresh(['project', 'units', 'toolAssignments.toolIssuance']);
         });
     }
 
@@ -299,10 +332,19 @@ class FieldInstallationJobService
 
     protected function assertAllUnitsComplete(FieldInstallationJob $job): void
     {
+        $this->unitProgress->ensureMeasurementUnits($job);
+        $job->refresh();
+
+        if ($job->units()->count() < 1) {
+            throw ValidationException::withMessages([
+                'units' => ['No measured openings to install. Approve site measurements before completing.'],
+            ]);
+        }
+
         $pending = $job->units()
             ->whereNotIn('status', [
-                \App\Enums\FieldInstallation\FieldUnitStatus::Installed->value,
-                \App\Enums\FieldInstallation\FieldUnitStatus::Waived->value,
+                FieldUnitStatus::Installed->value,
+                FieldUnitStatus::Waived->value,
             ])
             ->count();
 
@@ -311,20 +353,38 @@ class FieldInstallationJobService
                 'units' => ['All installation units must be installed or waived before completing the job.'],
             ]);
         }
+
+        $allDone = $job->units()
+            ->whereIn('status', [
+                FieldUnitStatus::Installed->value,
+                FieldUnitStatus::Waived->value,
+            ])
+            ->count() === $job->units()->count();
+
+        if ((float) $job->percent_complete < 100 && ! $allDone) {
+            throw ValidationException::withMessages([
+                'units' => ['All installation units must be installed or waived before completing the job.'],
+            ]);
+        }
     }
 
     protected function assertAllToolsReturned(FieldInstallationJob $job): void
     {
+        // Open = still on site: no returned_at and issuance not closed.
+        // Lost/retired returns close the issuance and set returned_at, so they do not block complete.
         $open = $job->toolAssignments()
+            ->whereNull('returned_at')
             ->where(function ($query): void {
-                $query->whereNull('returned_at')
-                    ->orWhereHas('toolIssuance', fn ($issuance) => $issuance->whereNull('return_date'));
+                $query->whereDoesntHave('toolIssuance')
+                    ->orWhereHas('toolIssuance', function ($issuance): void {
+                        $issuance->whereNull('return_date');
+                    });
             })
             ->count();
 
         if ($open > 0) {
             throw ValidationException::withMessages([
-                'tools' => ['All tools must be returned before completing the job.'],
+                'tools' => ['Return or mark remaining on-site tools as lost before completing the job.'],
             ]);
         }
     }

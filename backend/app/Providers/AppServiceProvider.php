@@ -39,6 +39,7 @@ use App\Listeners\Projects\OnProjectMaterialShortageDetected;
 use App\Listeners\Projects\OnProjectMaterialsReady;
 use App\Listeners\Projects\OnProjectMaterialsReserved;
 use App\Listeners\Projects\OnSiteInstallationQcCompleted;
+use App\Listeners\Projects\CompleteProductionOnPostFabQcPassed;
 use App\Events\QualityControl\QcInspectionCompleted;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\FieldInstallation\FieldInstallationUnit;
@@ -293,5 +294,6 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(FieldInstallationCompleted::class, CreateSiteInspectionOnFieldJobComplete::class);
         Event::listen(FieldDeliveryRecorded::class, CreateSiteReceivingInspectionOnDelivery::class);
         Event::listen(QcInspectionCompleted::class, OnSiteInstallationQcCompleted::class);
+        Event::listen(QcInspectionCompleted::class, CompleteProductionOnPostFabQcPassed::class);
     }
 }

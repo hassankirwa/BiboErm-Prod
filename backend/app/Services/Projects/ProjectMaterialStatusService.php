@@ -110,15 +110,27 @@ class ProjectMaterialStatusService
         $aluminiumPlans = $stockCheckPayload['aluminium_plans'] ?? [];
         $aluminiumShortageAttributed = [];
 
-        // Aluminium is reserved once per SKU (nested metres). Pre-compute coverage so every
-        // BOM cut for that SKU counts as reserved when the combined qty is met.
+        // Combined SKUs (aluminium bars / rubber metres): pre-compute coverage per item.
+        // Aluminium bar packs: a partial hold is OK for unit/completion when warehouse
+        // can still cover the remaining gap (no procurement shortage) — e.g. 18/24 m.
+        // Rubber exact metres still require the full cut total.
         $aluminiumSkuCovered = [];
         foreach ($aluminiumPlans as $itemId => $plan) {
             $itemId = (int) $itemId;
             $target = (string) ($plan['reserve_qty'] ?? '0.000');
             $reservedForSku = $reservedByItem[$itemId] ?? '0.000';
-            $aluminiumSkuCovered[$itemId] = bccomp($target, '0.000', 3) !== 1
+            $fullyHeld = bccomp($target, '0.000', 3) !== 1
                 || bccomp($reservedForSku, $target, 3) >= 0;
+
+            if (($plan['packing_mode'] ?? null) === 'exact_metres') {
+                $aluminiumSkuCovered[$itemId] = $fullyHeld;
+                continue;
+            }
+
+            $checkShortage = (string) ($checkByItem[$itemId]['shortage'] ?? '0.000');
+            $hasHold = bccomp($reservedForSku, '0.000', 3) === 1;
+            $aluminiumSkuCovered[$itemId] = $fullyHeld
+                || ($hasHold && bccomp($checkShortage, '0.000', 3) !== 1);
         }
 
         $lines = [];
@@ -165,7 +177,14 @@ class ProjectMaterialStatusService
 
             $warehouseAvailable = $check['effective_available'] ?? $check['available'] ?? '0.000';
             $offcutUsable = $check['offcut_usable'] ?? '0.000';
-            $barsNeeded = $isCombinedAluminium ? (int) ($check['bars_needed'] ?? $plan['bars_needed'] ?? 0) : null;
+            $barsNeeded = null;
+            if ($isCombinedAluminium) {
+                $rawBars = $check['bars_needed'] ?? $plan['bars_needed'] ?? null;
+                $barsNeeded = $rawBars === null ? null : (int) $rawBars;
+                if (($plan['packing_mode'] ?? null) === 'exact_metres') {
+                    $barsNeeded = null;
+                }
+            }
             $stockCheckShortage = (string) ($check['shortage'] ?? '0.000');
 
             // Procurement shortage: still needed after reserve, or (if unreserved) after live WH+offcut.

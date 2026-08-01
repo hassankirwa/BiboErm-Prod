@@ -46,7 +46,7 @@ class HandleProjectBomFinalized
             return;
         }
 
-        $this->audit->log('warehouse.material_check_passed', 'project', $event->projectId, [
+        $this->audit->materialCheckPassed($event->projectId, [
             'bom_id' => $event->bomId,
             'line_count' => count($check['lines'] ?? []),
         ]);

@@ -38,6 +38,21 @@ export type FieldInstallationJob = {
   members?: FieldJobMember[];
   units?: FieldInstallationUnit[];
   tool_assignments?: FieldToolAssignment[];
+  assigned_dispatch?: {
+    id: number;
+    status: string;
+    vehicle_reg: string | null;
+    vehicle_details: string | null;
+    dispatched_at: string | null;
+    delivered_at: string | null;
+    driver: {
+      id: number;
+      code: string;
+      name: string;
+      phone: string | null;
+      vehicle_registration: string | null;
+    } | null;
+  } | null;
 };
 
 export type FieldJobMember = {
@@ -53,7 +68,25 @@ export type FieldInstallationUnit = {
   status: string;
   installed_at: string | null;
   snag_notes: string | null;
+  misfit_notes?: string | null;
   sort_order: number;
+  measurement_line_key?: string | null;
+  opening_ref?: string | null;
+  product_type?: string | null;
+  unit_floor?: string | null;
+  room_location?: string | null;
+  quantity?: number;
+  measurement_snapshot?: {
+    ref?: string | null;
+    product_type?: string | null;
+    unit_floor?: string | null;
+    room_location?: string | null;
+    width_centre_mm?: number | string | null;
+    height_centre_mm?: number | string | null;
+    quantity?: number;
+    remarks?: string | null;
+  } | null;
+  photos?: FieldPhoto[];
 };
 
 export type FieldToolAssignment = {
@@ -116,6 +149,7 @@ export type FieldDeliveryRecord = {
   expected_units?: number | null;
   received_units?: number | null;
   notes: string | null;
+  receiver?: { id: number; name: string } | null;
   lines?: Array<{
     id: number;
     description: string;
@@ -298,6 +332,13 @@ export async function updateDelivery(
     expected_units: number;
     received_units: number;
     notes: string;
+    lines: Array<{
+      description: string;
+      qty_expected: number;
+      qty_received: number;
+      unit?: string;
+      condition_notes?: string;
+    }>;
   }>,
 ) {
   return apiRequest<{ data: FieldDeliveryRecord }>(
@@ -415,11 +456,17 @@ export async function uploadFieldPhoto(payload: {
 
 export async function updateUnit(
   unitId: number,
-  payload: { status: string; snag_notes?: string },
+  payload: { status: string; snag_notes?: string; misfit_notes?: string },
 ) {
   return apiRequest<{ data: FieldInstallationUnit }>(
     `/field-installation/units/${unitId}`,
     { method: "PATCH", body: payload },
+  );
+}
+
+export async function listFieldUnits(jobId: number) {
+  return apiRequest<{ data: FieldInstallationUnit[] }>(
+    `/field-installation/jobs/${jobId}/units`,
   );
 }
 

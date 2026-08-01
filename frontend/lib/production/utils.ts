@@ -11,7 +11,6 @@ import {
 /** Production flow order — use this instead of Object.entries so dropdown order stays stable. */
 export const PRODUCTION_STAGE_ORDER: ProductionStageValue[] = [
   "material_prep",
-  "qc_pre_check",
   "cutting",
   "fabrication",
   "sash",
@@ -104,6 +103,8 @@ export function materialReadinessLabel(
   label?: ScheduleOrder["material_readiness"] extends { label: infer L } ? L : string,
 ): string {
   switch (label) {
+    case "released":
+      return "Released";
     case "ready":
       return "Materials ready";
     case "shortage":

@@ -13,7 +13,7 @@ export default async function FieldInstallationJobDetailPage({ params }: Props) 
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
         title={`Job #${id}`}
-        subtitle="Units, daily logs, delivery, and non-conformities"
+        subtitle="Overview → arrival → install → daily log → issues → complete"
       />
       <FieldJobDetail jobId={jobId} />
     </div>

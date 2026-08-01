@@ -21,7 +21,7 @@ export function MeasurementSection({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-md border border-border p-3">
+    <section className="min-w-0 space-y-3 overflow-hidden rounded-md border border-border p-2 sm:p-3">
       <h4 className="text-sm font-semibold">{title}</h4>
       {children}
     </section>
@@ -29,7 +29,11 @@ export function MeasurementSection({
 }
 
 export function FieldGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
+  return (
+    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
+      {children}
+    </div>
+  );
 }
 
 export function NumberField({
@@ -46,7 +50,7 @@ export function NumberField({
   unit?: string;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 min-w-0">
       <Label className="text-xs text-muted-foreground">
         {label}
         {unit ? ` (${unit})` : ""}
@@ -58,7 +62,7 @@ export function NumberField({
           type="number"
           min={0}
           inputMode="decimal"
-          className="h-10 sm:h-8"
+          className="h-10 w-full min-w-0 sm:h-8"
           value={value ?? ""}
           onChange={(event) =>
             onChange(event.target.value ? Number(event.target.value) : null)
@@ -83,19 +87,20 @@ export function TextField({
   multiline?: boolean;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 min-w-0">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {readOnly ? (
         <p className="text-sm whitespace-pre-wrap">{value?.trim() || "—"}</p>
       ) : multiline ? (
         <Textarea
           rows={2}
+          className="w-full min-w-0"
           value={value ?? ""}
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (
         <Input
-          className="h-10 sm:h-8"
+          className="h-10 w-full min-w-0 sm:h-8"
           value={value ?? ""}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -123,7 +128,7 @@ export function SelectField<T extends string>({
     options.find((option) => option.value === value)?.label ?? (value || "—");
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 min-w-0">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {readOnly ? (
         <p className="text-sm">{display}</p>
@@ -132,7 +137,7 @@ export function SelectField<T extends string>({
           value={value ?? undefined}
           onValueChange={(next) => onChange(next as T)}
         >
-          <SelectTrigger className="h-10 sm:h-8">
+          <SelectTrigger className="h-10 w-full min-w-0 sm:h-8">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>

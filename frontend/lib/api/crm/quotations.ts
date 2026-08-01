@@ -2,7 +2,7 @@ import { API_URL } from "../config";
 import { getDeviceUuid } from "../device";
 import { apiFetch } from "../client";
 import { ApiError } from "../errors";
-import type { ApiQuotation } from "./types";
+import type { ApiQuotation, ApiQuotationSummary } from "./types";
 import { unwrapResource } from "./types";
 
 export type { ApiQuotation, ApiQuotationLine } from "./types";
@@ -166,7 +166,8 @@ export async function downloadQuotationPdf(
   URL.revokeObjectURL(url);
 }
 
-export function quotationAmount(quotation: ApiQuotation): number {
-  const raw = quotation.total_amount ?? 0;
+export function quotationAmount(quotation: ApiQuotation | ApiQuotationSummary): number {
+  const preferred = "total_amount_kes" in quotation ? quotation.total_amount_kes : null;
+  const raw = preferred ?? quotation.total_amount ?? 0;
   return typeof raw === "string" ? parseFloat(raw) || 0 : raw ?? 0;
 }

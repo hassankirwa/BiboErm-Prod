@@ -11,6 +11,7 @@ import { ProductionOrderActions } from "@/components/production/production-order
 import { ProductionQcLinks } from "@/components/production/production-qc-links";
 import { ProductionStageBadge } from "@/components/production/production-stage-badge";
 import { ProductionTeamPanel } from "@/components/production/production-team-panel";
+import { ProjectDetailDesigns } from "@/components/projects/project-detail-designs";
 import { MediaImage } from "@/components/media/media-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -239,6 +240,7 @@ export default function ProductionOrderDetailPage({
         <Tabs defaultValue="active" className="space-y-4">
           <TabsList className="flex h-auto flex-wrap gap-1">
             <TabsTrigger value="active">{activeStageLabel}</TabsTrigger>
+            <TabsTrigger value="designs">Designs</TabsTrigger>
             <TabsTrigger value="project">Project</TabsTrigger>
             <TabsTrigger value="team">Team &amp; QC</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
@@ -377,6 +379,14 @@ export default function ProductionOrderDetailPage({
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="designs" className="space-y-4">
+            <ProjectDetailDesigns
+              projectId={order.project_id}
+              projectStage={order.project?.stage}
+              readOnly
+            />
           </TabsContent>
 
           <TabsContent value="project" className="space-y-4">

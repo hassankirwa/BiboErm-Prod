@@ -84,6 +84,7 @@ export function dealDisplayName(deal: ApiDeal): string {
 
 export function dealValue(deal: ApiDeal): number {
   const raw =
+    deal.display_value ??
     deal.final_agreed_amount ??
     deal.quotation_amount ??
     deal.estimated_value ??

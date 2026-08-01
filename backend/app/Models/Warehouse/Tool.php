@@ -74,6 +74,14 @@ class Tool extends Model
     public function availableQty(): int
     {
         if ($this->isSerialized()) {
+            if (in_array($this->condition, [
+                ToolCondition::Lost,
+                ToolCondition::Retired,
+                ToolCondition::Damaged,
+            ], true)) {
+                return 0;
+            }
+
             return $this->activeIssuance() ? 0 : 1;
         }
 

@@ -300,6 +300,21 @@ class QcInspectionService
     public function createSiteInstallation(int $projectId, int $fieldJobId): QcInspection
     {
         $context = QcInspectionContext::SiteInstallation;
+
+        $existing = QcInspection::query()
+            ->where('field_installation_job_id', $fieldJobId)
+            ->where('context', $context)
+            ->orderByRaw(
+                'CASE WHEN result = ? THEN 0 ELSE 1 END',
+                [QcInspectionResult::Pending->value],
+            )
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existing) {
+            return $this->ensureDefaultTemplate($existing);
+        }
+
         $template = $this->templates->resolve($context, $projectId);
 
         return QcInspection::query()->create([
@@ -318,6 +333,32 @@ class QcInspectionService
     public function createSiteReceiving(int $projectId, int $fieldJobId, ?int $deliveryRecordId = null): QcInspection
     {
         $context = QcInspectionContext::SiteReceiving;
+
+        // One receiving inspection per field job — extra deliveries must not spawn duplicates.
+        $existing = QcInspection::query()
+            ->where('field_installation_job_id', $fieldJobId)
+            ->where('context', $context)
+            ->orderByRaw(
+                'CASE WHEN result = ? THEN 0 ELSE 1 END',
+                [QcInspectionResult::Pending->value],
+            )
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existing) {
+            if ($deliveryRecordId !== null) {
+                $tag = "field_delivery_record_id:{$deliveryRecordId}";
+                $notes = (string) ($existing->notes ?? '');
+                if (! str_contains($notes, $tag)) {
+                    $existing->update([
+                        'notes' => trim($notes === '' ? $tag : "{$notes}; {$tag}"),
+                    ]);
+                }
+            }
+
+            return $this->ensureDefaultTemplate($existing->fresh());
+        }
+
         $template = $this->templates->resolve($context, $projectId);
 
         return QcInspection::query()->create([

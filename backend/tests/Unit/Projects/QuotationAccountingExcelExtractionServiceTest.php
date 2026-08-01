@@ -172,7 +172,13 @@ class QuotationAccountingExcelExtractionServiceTest extends TestCase
                 (string) $first['metadata']['accounting']['drawing']['embedded_media']['data_url'],
             );
             $this->assertStringStartsWith('data:image/', (string) ($first['picture_data_url'] ?? ''));
+            $this->assertArrayNotHasKey('binary', $first['metadata']['accounting']['drawing']['embedded_media']);
         }
+
+        $this->assertNotFalse(
+            json_encode($payload, JSON_THROW_ON_ERROR),
+            'Extracted payload must be JSON-encodable (valid UTF-8, no raw binaries).',
+        );
     }
 
     public function test_build_payload_requires_at_least_one_line(): void

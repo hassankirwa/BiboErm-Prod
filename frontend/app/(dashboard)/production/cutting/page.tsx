@@ -37,7 +37,7 @@ export default function ProductionCuttingPage() {
         title="Cutting Queue"
         subtitle={
           manager
-            ? "Material prep, QC pre-check, and cutting (server-filtered by stage)"
+            ? "Materials & tools assembly and cutting (server-filtered by stage)"
             : "Orders assigned to you in cutting stages"
         }
       />

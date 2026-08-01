@@ -92,6 +92,9 @@ class QuotationLineEnrichmentService
         if (! $this->hasExtractedMedia($embeddedMedia)) {
             $embeddedMedia = $fabDrawing['embedded_media'] ?? $embeddedMedia;
         }
+        if (is_array($embeddedMedia)) {
+            $embeddedMedia = app(WorkbookDrawingExtractor::class)->prepareMediaForJson($embeddedMedia);
+        }
 
         $elevationSource = $accountingDrawing['elevation']['source']
             ?? ($width > 0 && ($line['width_mm'] ?? null) > 0 ? 'accounting' : null)

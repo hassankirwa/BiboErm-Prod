@@ -35,6 +35,11 @@ class WarehouseAuditLogger
         $this->log('reservation.created', 'stock_reservation', $reservationId, $context);
     }
 
+    public function reservationAdjusted(int $reservationId, array $context = []): void
+    {
+        $this->log('reservation.adjusted', 'stock_reservation', $reservationId, $context);
+    }
+
     public function reservationReleased(int $reservationId, array $context = []): void
     {
         $this->log('reservation.released', 'stock_reservation', $reservationId, $context);
@@ -78,6 +83,11 @@ class WarehouseAuditLogger
     public function shortageDetected(int $projectId, array $context = []): void
     {
         $this->log('warehouse.shortage_detected', 'project', $projectId, $context);
+    }
+
+    public function materialCheckPassed(int $projectId, array $context = []): void
+    {
+        $this->log('warehouse.material_check_passed', 'project', $projectId, $context);
     }
 
     public function materialsReady(int $projectId, array $context = []): void

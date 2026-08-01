@@ -163,7 +163,13 @@ export function FabricationOpeningPreviewDialog({
   }, [bomLines, meta?.code]);
 
   useEffect(() => {
-    if (!open || !document) return;
+    if (!open || !document || readOnly) {
+      if (readOnly) {
+        setBomLines([]);
+        setLoadingBom(false);
+      }
+      return;
+    }
 
     const existing = meta?.bom_tags?.bom_line_ids ?? [];
     setSelectedIds(existing.map(Number).filter((id) => Number.isFinite(id)));
@@ -198,7 +204,7 @@ export function FabricationOpeningPreviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, document?.id, projectId]);
+  }, [open, document?.id, projectId, readOnly]);
 
   async function handleSaveTags() {
     if (!document) return;
@@ -258,7 +264,14 @@ export function FabricationOpeningPreviewDialog({
           </div>
         </DialogHeader>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1",
+            readOnly
+              ? "md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.4fr)]"
+              : "md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(280px,0.9fr)]",
+          )}
+        >
           {/* Left — elevation */}
           <div className="flex min-h-[220px] items-center justify-center border-b border-border bg-muted/30 p-4 md:border-b-0 md:border-r">
             {document && showImage ? (
@@ -382,103 +395,103 @@ export function FabricationOpeningPreviewDialog({
             </div>
           </ScrollArea>
 
-          {/* Right — BOM tags */}
-          <div className="flex min-h-0 flex-col">
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Tag BOM
-              </h3>
-              {suggestedIds.length > 0 && !readOnly ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setSelectedIds(suggestedIds)}
-                >
-                  Suggest from notes
-                </Button>
+          {/* Right — BOM tags (PM only) */}
+          {!readOnly && (
+            <div className="flex min-h-0 flex-col">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tag BOM
+                </h3>
+                {suggestedIds.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setSelectedIds(suggestedIds)}
+                  >
+                    Suggest from notes
+                  </Button>
+                ) : null}
+              </div>
+
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="p-3">
+                  {loadingBom ? (
+                    <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading BOM…
+                    </div>
+                  ) : bomLines.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-border px-3 py-6 text-sm text-muted-foreground">
+                      No BOM on this project yet. Import a BOM first, then tag lines to this
+                      opening.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {bomLines.map((line) => {
+                        const checked = selectedIds.includes(line.id);
+                        const label = [
+                          line.material_code,
+                          line.material_name,
+                          line.measurement_mm != null ? `${line.measurement_mm} mm` : null,
+                          `Qty ${line.quantity}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+
+                        return (
+                          <label
+                            key={line.id}
+                            className={cn(
+                              "flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-xs hover:bg-muted/50",
+                              checked && "bg-primary/5",
+                            )}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(value) =>
+                                toggleLine(line.id, value === true)
+                              }
+                              className="mt-0.5"
+                            />
+                            <span className="min-w-0 leading-snug">
+                              <span className="font-medium">{label}</span>
+                              {line.notes ? (
+                                <span className="mt-0.5 block text-muted-foreground line-clamp-2">
+                                  {line.notes}
+                                </span>
+                              ) : null}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              {bomLines.length > 0 ? (
+                <div className="shrink-0 border-t border-border p-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={saving}
+                    onClick={() => void handleSaveTags()}
+                    className="w-full"
+                  >
+                    {saving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Tag className="mr-2 h-4 w-4" />
+                    )}
+                    Save BOM tags
+                    {selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}
+                  </Button>
+                </div>
               ) : null}
             </div>
-
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="p-3">
-                {loadingBom ? (
-                  <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading BOM…
-                  </div>
-                ) : bomLines.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-border px-3 py-6 text-sm text-muted-foreground">
-                    No BOM on this project yet. Import a BOM first, then tag lines to this
-                    opening.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {bomLines.map((line) => {
-                      const checked = selectedIds.includes(line.id);
-                      const label = [
-                        line.material_code,
-                        line.material_name,
-                        line.measurement_mm != null ? `${line.measurement_mm} mm` : null,
-                        `Qty ${line.quantity}`,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ");
-
-                      return (
-                        <label
-                          key={line.id}
-                          className={cn(
-                            "flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-xs hover:bg-muted/50",
-                            checked && "bg-primary/5",
-                            readOnly && "cursor-default",
-                          )}
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={readOnly}
-                            onCheckedChange={(value) =>
-                              toggleLine(line.id, value === true)
-                            }
-                            className="mt-0.5"
-                          />
-                          <span className="min-w-0 leading-snug">
-                            <span className="font-medium">{label}</span>
-                            {line.notes ? (
-                              <span className="mt-0.5 block text-muted-foreground line-clamp-2">
-                                {line.notes}
-                              </span>
-                            ) : null}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-
-            {!readOnly && bomLines.length > 0 ? (
-              <div className="shrink-0 border-t border-border p-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={saving}
-                  onClick={() => void handleSaveTags()}
-                  className="w-full"
-                >
-                  {saving ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Tag className="mr-2 h-4 w-4" />
-                  )}
-                  Save BOM tags
-                  {selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

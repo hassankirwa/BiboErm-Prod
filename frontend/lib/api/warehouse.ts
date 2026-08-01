@@ -174,7 +174,41 @@ export type Tool = {
     issued_to: number;
     quantity?: number;
     issue_date: string | null;
+    project?: { id: number; reference: string; name: string; stage?: string } | null;
+    issued_to_user?: { id: number; name: string } | null;
   } | null;
+};
+
+export type ToolIssuance = {
+  id: number;
+  tool_id: number;
+  project_id: number | null;
+  issued_to: number;
+  issued_by: number | null;
+  quantity: number;
+  issue_date: string | null;
+  return_date: string | null;
+  condition_out: string | null;
+  condition_in: string | null;
+  damage_notes: string | null;
+  is_open: boolean;
+  tool?: {
+    id: number;
+    tool_code: string;
+    name: string;
+    tool_type: string | null;
+    tracking_mode?: string;
+  } | null;
+  project?: {
+    id: number;
+    reference: string;
+    name: string;
+    stage: string;
+    install_mode?: string | null;
+  } | null;
+  issued_to_user?: { id: number; name: string; email?: string } | null;
+  issued_by_user?: { id: number; name: string } | null;
+  field_job?: { id: number; reference: string; status: string } | null;
 };
 
 export type DoorType = {
@@ -475,6 +509,16 @@ export async function listTools(params?: { active_only?: boolean }) {
   return apiRequest<{ data: Tool[] }>(`/warehouse/tools${buildQuery(params)}`);
 }
 
+export async function listToolIssuances(params?: {
+  open_only?: boolean;
+  project_id?: number;
+  installation_only?: boolean;
+}) {
+  return apiRequest<{ data: ToolIssuance[] }>(
+    `/warehouse/tools/issuances${buildQuery(params)}`,
+  );
+}
+
 export async function createTool(payload: {
   tool_code: string;
   name: string;
@@ -507,7 +551,17 @@ export async function issueTool(
 
 export async function returnTool(
   issuanceId: number,
-  payload: { condition_in?: string; damage_notes?: string },
+  payload: {
+    disposition?: "returned" | "damaged" | "lost" | "replaced";
+    condition_in?: string;
+    damage_notes?: string;
+    create_replacement?: boolean;
+    replacement?: {
+      tool_code?: string;
+      name?: string;
+      tool_type?: string;
+    };
+  },
 ) {
   return apiRequest<{
     id: number;
@@ -515,8 +569,71 @@ export async function returnTool(
     return_date: string | null;
     condition_in: string | null;
     damage_notes: string | null;
+    disposition?: string | null;
+    incident?: ToolIncident | null;
   }>(`/warehouse/tools/issuances/${issuanceId}/return`, {
     method: "POST",
+    body: payload,
+  });
+}
+
+export type ToolIncident = {
+  id: number;
+  tool_id: number;
+  issuance_id: number | null;
+  field_job_id: number | null;
+  responsible_user_id: number;
+  reported_by: number | null;
+  type: "damage" | "loss" | "malfunction" | string;
+  status: "open" | "in_repair" | "repaired" | "replaced" | "written_off" | string;
+  notes: string | null;
+  resolution_notes: string | null;
+  quantity: number;
+  replacement_tool_id: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  tool?: { id: number; tool_code: string; name: string; tool_type?: string | null } | null;
+  responsible_user?: { id: number; name: string } | null;
+  reported_by_user?: { id: number; name: string } | null;
+  replacement_tool?: { id: number; tool_code: string; name: string } | null;
+};
+
+export async function listToolIncidents(params?: {
+  status?: string;
+  tool_id?: number;
+}) {
+  return apiRequest<{ data: ToolIncident[] }>(
+    `/warehouse/tools/incidents${buildQuery(params)}`,
+  );
+}
+
+export async function createToolIncident(payload: {
+  tool_id: number;
+  responsible_user_id: number;
+  type: "damage" | "loss" | "malfunction";
+  issuance_id?: number;
+  field_job_id?: number;
+  notes?: string;
+  quantity?: number;
+}) {
+  return apiRequest<{ data: ToolIncident }>("/warehouse/tools/incidents", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function updateToolIncident(
+  id: number,
+  payload: {
+    status: "in_repair" | "repaired" | "replaced" | "written_off";
+    resolution_notes?: string;
+    replacement_tool_id?: number;
+    create_replacement?: boolean;
+    replacement?: { tool_code?: string; name?: string; tool_type?: string };
+  },
+) {
+  return apiRequest<{ data: ToolIncident }>(`/warehouse/tools/incidents/${id}`, {
+    method: "PATCH",
     body: payload,
   });
 }

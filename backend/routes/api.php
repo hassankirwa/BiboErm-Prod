@@ -194,6 +194,7 @@ Route::prefix('v1')->group(function () {
             require __DIR__.'/api/production/orders.php';
             require __DIR__.'/api/production/schedule.php';
             require __DIR__.'/api/production/cutting.php';
+            require __DIR__.'/api/production/misfits.php';
         });
 
     Route::middleware(['auth:sanctum', 'active'])

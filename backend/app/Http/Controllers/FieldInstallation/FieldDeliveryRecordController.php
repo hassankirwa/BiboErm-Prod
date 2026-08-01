@@ -23,7 +23,7 @@ class FieldDeliveryRecordController extends Controller
         $this->authorize('view', $fieldJob);
 
         $records = $fieldJob->deliveryRecords()
-            ->with('lines')
+            ->with(['lines', 'receiver'])
             ->latest()
             ->get();
 
@@ -46,8 +46,8 @@ class FieldDeliveryRecordController extends Controller
         $deliveryRecord->loadMissing('job', 'lines');
         $this->authorize('deliver', $deliveryRecord->job);
 
-        $deliveryRecord->update($request->validated());
+        $record = $this->service->update($deliveryRecord, $request->validated());
 
-        return new FieldDeliveryRecordResource($deliveryRecord->fresh('lines'));
+        return new FieldDeliveryRecordResource($record);
     }
 }

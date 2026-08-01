@@ -4,8 +4,10 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getKanbanStageLabel,
+  getPipelineStageLabel,
   PIPELINE_TRACKER_STAGES,
-  resolveLeadKanbanStage,
+  pipelineTrackerProgressIndex,
+  resolveLeadPipelineStage,
   type LeadKanbanStageId,
 } from "@/lib/crm-lead-pipeline";
 import { getSlaBadge } from "@/lib/crm/sla-badges";
@@ -18,22 +20,22 @@ type LeadPipelineTrackerProps = {
   className?: string;
 };
 
-function stageIndex(stageId: LeadKanbanStageId): number {
-  return PIPELINE_TRACKER_STAGES.indexOf(stageId);
-}
-
 export function LeadPipelineTracker({
   pipelineStage,
   status,
   updatedAt,
   className,
 }: LeadPipelineTrackerProps) {
-  const currentStage = resolveLeadKanbanStage({
+  const pipeline = resolveLeadPipelineStage({
     pipeline_stage: pipelineStage,
     status,
   });
-  const currentIndex = stageIndex(currentStage);
-  const sla = getSlaBadge(pipelineStage ?? currentStage, updatedAt);
+  const currentIndex = pipelineTrackerProgressIndex({
+    pipeline_stage: pipelineStage,
+    status,
+  });
+  const allComplete = currentIndex >= PIPELINE_TRACKER_STAGES.length;
+  const sla = getSlaBadge(pipelineStage ?? pipeline, updatedAt);
 
   return (
     <div
@@ -46,17 +48,22 @@ export function LeadPipelineTracker({
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Pipeline stage
         </p>
-        {sla ? (
-          <Badge variant="outline" className={cn("text-[10px]", sla.className)}>
-            {sla.label}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="text-[10px]">
+            {getPipelineStageLabel(pipeline)}
           </Badge>
-        ) : null}
+          {sla ? (
+            <Badge variant="outline" className={cn("text-[10px]", sla.className)}>
+              {sla.label}
+            </Badge>
+          ) : null}
+        </div>
       </div>
 
       <ol className="flex flex-wrap gap-2">
-        {PIPELINE_TRACKER_STAGES.map((stageId, index) => {
-          const done = currentIndex > index;
-          const active = currentIndex === index;
+        {PIPELINE_TRACKER_STAGES.map((stageId: LeadKanbanStageId, index) => {
+          const done = allComplete || currentIndex > index;
+          const active = !allComplete && currentIndex === index;
 
           return (
             <li

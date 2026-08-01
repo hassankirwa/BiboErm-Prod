@@ -53,6 +53,15 @@ class GlassOrderService
         $this->assertReadyForOrder($order);
 
         return DB::transaction(function () use ($order, $user) {
+            $specs = is_array($order->specs) ? $order->specs : [];
+            if (trim((string) ($specs['requirements'] ?? '')) === '') {
+                $composed = $this->composeRequirementsFromPanes($specs['panes'] ?? []);
+                if ($composed !== '') {
+                    $specs['requirements'] = $composed;
+                    $order->update(['specs' => $specs]);
+                }
+            }
+
             $order->update([
                 'status' => GlassOrderStatus::Ordered,
                 'ordered_at' => now(),
@@ -218,8 +227,8 @@ class GlassOrderService
             ->get()
             ->map(fn (ProjectBomLine $line) => [
                 'name' => $line->material_name,
-                'width_mm' => $line->measurement_mm,
-                'height_mm' => null,
+                'width_mm' => $line->width_mm !== null ? (float) $line->width_mm : null,
+                'height_mm' => $line->height_mm !== null ? (float) $line->height_mm : null,
                 'quantity' => (float) $line->quantity,
                 'glass_type' => $line->material_code,
                 'notes' => $line->notes,
@@ -244,13 +253,16 @@ class GlassOrderService
         }
 
         $specs = is_array($order->specs) ? $order->specs : [];
+        $panes = $specs['panes'] ?? [];
         $requirements = trim((string) ($specs['requirements'] ?? ''));
 
-        if ($requirements === '') {
-            $errors['specs.requirements'] = ['Enter glass requirements (type, tint, processing) before ordering.'];
+        if ($requirements === '' && ! $this->panesHaveTypeAndTint($panes)) {
+            $errors['specs.requirements'] = [
+                'Enter glass requirements, or set type and tint on every pane before ordering.',
+            ];
         }
 
-        if (! $this->hasValidPaneDimensions($specs['panes'] ?? [])) {
+        if (! $this->hasValidPaneDimensions($panes)) {
             $errors['specs.panes'] = ['Add at least one pane with width, height, and quantity.'];
         }
 
@@ -269,17 +281,79 @@ class GlassOrderService
         }
 
         return collect($panes)->contains(function ($pane) {
+            return $this->paneHasDimensions($pane);
+        });
+    }
+
+    /**
+     * Dimensioned panes must each carry type + tint when free-text requirements are blank.
+     *
+     * @param  array<int, mixed>|mixed  $panes
+     */
+    protected function panesHaveTypeAndTint(mixed $panes): bool
+    {
+        if (! is_array($panes)) {
+            return false;
+        }
+
+        $dimensioned = collect($panes)->filter(fn ($pane) => $this->paneHasDimensions($pane));
+
+        if ($dimensioned->isEmpty()) {
+            return false;
+        }
+
+        return $dimensioned->every(function ($pane) {
             if (! is_array($pane)) {
                 return false;
             }
 
-            $width = $pane['width_mm'] ?? null;
-            $height = $pane['height_mm'] ?? null;
-            $quantity = $pane['quantity'] ?? null;
-
-            return is_numeric($width) && (float) $width > 0
-                && is_numeric($height) && (float) $height > 0
-                && is_numeric($quantity) && (float) $quantity > 0;
+            return trim((string) ($pane['glass_type'] ?? '')) !== ''
+                && trim((string) ($pane['tint'] ?? '')) !== '';
         });
+    }
+
+    /**
+     * @param  array<int, mixed>|mixed  $panes
+     */
+    protected function composeRequirementsFromPanes(mixed $panes): string
+    {
+        if (! is_array($panes)) {
+            return '';
+        }
+
+        $parts = [];
+
+        foreach ($panes as $pane) {
+            if (! is_array($pane) || ! $this->paneHasDimensions($pane)) {
+                continue;
+            }
+
+            $type = trim((string) ($pane['glass_type'] ?? ''));
+            $tint = trim((string) ($pane['tint'] ?? ''));
+            if ($type === '' && $tint === '') {
+                continue;
+            }
+
+            $name = trim((string) ($pane['name'] ?? 'Glass'));
+            $label = trim($type.($type !== '' && $tint !== '' ? ' / ' : '').$tint);
+            $parts[] = $name !== '' ? "{$name}: {$label}" : $label;
+        }
+
+        return implode('; ', array_unique($parts));
+    }
+
+    protected function paneHasDimensions(mixed $pane): bool
+    {
+        if (! is_array($pane)) {
+            return false;
+        }
+
+        $width = $pane['width_mm'] ?? null;
+        $height = $pane['height_mm'] ?? null;
+        $quantity = $pane['quantity'] ?? null;
+
+        return is_numeric($width) && (float) $width > 0
+            && is_numeric($height) && (float) $height > 0
+            && is_numeric($quantity) && (float) $quantity > 0;
     }
 }

@@ -35,6 +35,7 @@ export type LeadKanbanStageId =
   | "measurements_submitted"
   | "design_required"
   | "ready_for_quotation"
+  | "won"
   | "cold"
   | "lost";
 
@@ -47,11 +48,12 @@ export const KANBAN_PIPELINE_STAGE_IDS: LeadKanbanStageId[] = [
   "measurements_submitted",
   "design_required",
   "ready_for_quotation",
+  "won",
   "cold",
   "lost",
 ];
 
-export const TERMINAL_KANBAN_STAGE_IDS: LeadKanbanStageId[] = ["cold", "lost"];
+export const TERMINAL_KANBAN_STAGE_IDS: LeadKanbanStageId[] = ["won", "cold", "lost"];
 
 export const PIPELINE_STAGE_LABELS: Record<LeadPipelineStage, string> = {
   new_lead: "New Lead",
@@ -86,6 +88,7 @@ export const KANBAN_STAGE_LABELS: Record<LeadKanbanStageId, string> = {
   measurements_submitted: "Measurements Submitted",
   design_required: "Design Required",
   ready_for_quotation: "Ready for Quotation",
+  won: "Won",
   cold: "Cold",
   lost: "Lost",
 };
@@ -108,9 +111,9 @@ export const PIPELINE_STAGE_TO_KANBAN: Record<LeadPipelineStage, LeadKanbanStage
   proforma_sent: "ready_for_quotation",
   client_accepted: "ready_for_quotation",
   awaiting_deposit: "ready_for_quotation",
-  deposit_paid: "ready_for_quotation",
-  deal_won: "ready_for_quotation",
-  project_created: "ready_for_quotation",
+  deposit_paid: "won",
+  deal_won: "won",
+  project_created: "won",
   cold: "cold",
   lost: "lost",
 };
@@ -140,6 +143,7 @@ export const KANBAN_STAGE_TO_LEGACY_STATUS: Record<LeadKanbanStageId, string> = 
   measurements_submitted: "measurements_captured",
   design_required: "measurements_captured",
   ready_for_quotation: "converted",
+  won: "converted",
   cold: "not_reachable",
   lost: "unqualified",
 };
@@ -168,8 +172,8 @@ const NEXT_ACTIONS: Partial<Record<LeadPipelineStage, PipelineNextAction>> = {
     description: "Confirm contact details and initial interest.",
   },
   contact_confirmed: {
-    label: "Create account",
-    description: "Provision a CRM account before scheduling measurements.",
+    label: "Mark interested",
+    description: "Confirm interest before provisioning a CRM account.",
   },
   account_provisioned: {
     label: "Schedule site visit",
@@ -214,14 +218,12 @@ const NEXT_ACTIONS: Partial<Record<LeadPipelineStage, PipelineNextAction>> = {
     href: "/design/review",
   },
   ready_for_quotation: {
-    label: "Create proforma quotation",
-    description: "Prepare and send the proforma to the client.",
-    href: "/quotation/proforma",
+    label: "Await pending quotation",
+    description: "Quotation team prepares the proforma. Send it to the client when approved.",
   },
   proforma_created: {
     label: "Send proforma quotation",
-    description: "Share the proforma with the client.",
-    href: "/quotation/proforma",
+    description: "Share the approved proforma with the client.",
   },
   proforma_sent: {
     label: "Follow up with client",
@@ -236,6 +238,10 @@ const NEXT_ACTIONS: Partial<Record<LeadPipelineStage, PipelineNextAction>> = {
     description: "Verify deposit before project creation.",
   },
   deposit_paid: {
+    label: "Mark deal won",
+    description: "Confirm the win after deposit is recorded.",
+  },
+  deal_won: {
     label: "Create project",
     description: "Convert won deal into a production project.",
   },
@@ -243,7 +249,37 @@ const NEXT_ACTIONS: Partial<Record<LeadPipelineStage, PipelineNextAction>> = {
 
 export function isTerminalPipelineStage(stage: string | null | undefined): boolean {
   const key = (stage ?? "").toLowerCase();
-  return key === "cold" || key === "lost" || key === "project_created";
+  return key === "cold" || key === "lost" || key === "project_created" || key === "deal_won" || key === "deposit_paid";
+}
+
+/** Stages at/after deposit where Ready for Quotation is complete. */
+export function isPastReadyForQuotation(
+  stage: LeadPipelineStage | string | null | undefined,
+): boolean {
+  const key = (stage ?? "").toLowerCase() as LeadPipelineStage;
+  return (
+    key === "deposit_paid" ||
+    key === "deal_won" ||
+    key === "project_created"
+  );
+}
+
+/**
+ * Progress index for the lead detail tracker.
+ * Returns PIPELINE_TRACKER_STAGES.length when Ready for Quotation and earlier steps are all done.
+ */
+export function pipelineTrackerProgressIndex(input: {
+  pipeline_stage?: string | null;
+  status?: string | null;
+}): number {
+  const pipeline = resolveLeadPipelineStage(input);
+  if (isPastReadyForQuotation(pipeline)) {
+    return PIPELINE_TRACKER_STAGES.length;
+  }
+
+  const kanban = pipelineStageToKanban(pipeline);
+  const idx = PIPELINE_TRACKER_STAGES.indexOf(kanban);
+  return idx >= 0 ? idx : 0;
 }
 
 export function isTerminalKanbanStage(stageId: LeadKanbanStageId): boolean {
@@ -288,9 +324,25 @@ export function getKanbanStageLabel(stageId: LeadKanbanStageId): string {
 
 export function getNextPipelineAction(
   stage: LeadPipelineStage | string | null | undefined,
+  status?: string | null,
 ): PipelineNextAction | null {
   const key = (stage ?? "new_lead").toLowerCase() as LeadPipelineStage;
   if (isTerminalPipelineStage(key)) return null;
+
+  if (key === "contact_confirmed") {
+    const normalized = (status ?? "").toLowerCase();
+    if (normalized === "interested") {
+      return {
+        label: "Create account",
+        description: "Provision a CRM account for this interested client.",
+      };
+    }
+    return {
+      label: "Mark interested",
+      description: "Confirm interest before provisioning a CRM account.",
+    };
+  }
+
   return NEXT_ACTIONS[key] ?? null;
 }
 

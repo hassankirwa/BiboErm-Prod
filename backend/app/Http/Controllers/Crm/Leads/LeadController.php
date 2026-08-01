@@ -215,7 +215,15 @@ class LeadController extends Controller
         $lead->refresh();
 
         $salesContext = $this->leadSalesContext->resolve($lead);
-        $lead->sales_context = $salesContext;
+
+        $this->leadPipelineService->syncFromSalesContext(
+            $lead,
+            $salesContext['sales_deal'] ?? null,
+            $salesContext['latest_quotation'] ?? null,
+            $request->user(),
+        );
+        $lead->refresh();
+        $lead->sales_context = $this->leadSalesContext->resolve($lead);
 
         return new LeadDetailResource(
             $lead->load([

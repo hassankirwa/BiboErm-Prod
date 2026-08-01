@@ -29,6 +29,8 @@ class DealFromQuotationService
 
         $title = $account->name.' — '.($quotation->quotation_number ?? 'Quotation');
 
+        $kesTotal = $quotation->totalAmountKes();
+
         $deal = Deal::query()->create([
             'reference' => 'DL-'.strtoupper(Str::random(8)),
             'deal_number' => 'DL-'.strtoupper(Str::random(8)),
@@ -40,9 +42,9 @@ class DealFromQuotationService
             'source_lead_id' => $account->source_lead_id,
             'stage' => DealStage::QuotationSent->value,
             'status' => 'open',
-            'amount' => $quotation->total_amount,
-            'estimated_value' => $quotation->total_amount,
-            'quotation_amount' => $quotation->total_amount,
+            'amount' => $kesTotal,
+            'estimated_value' => $kesTotal,
+            'quotation_amount' => $kesTotal,
             'owner_id' => $account->account_owner_id ?? $user->id,
             'deal_owner_id' => $account->account_owner_id ?? $user->id,
             'created_by' => $user->id,

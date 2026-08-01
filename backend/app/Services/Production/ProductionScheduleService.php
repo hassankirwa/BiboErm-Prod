@@ -3,6 +3,7 @@
 namespace App\Services\Production;
 
 use App\Enums\Production\ProductionOrderStatus;
+use App\Enums\ProjectStage;
 use App\Models\Production\ProductionOrder;
 use App\Services\Projects\ProjectMaterialStatusService;
 use Illuminate\Database\Eloquent\Collection;
@@ -39,13 +40,16 @@ class ProductionScheduleService
 
             $status = $this->materialStatus->build($order->project);
             $summary = $status['summary'];
+            $projectStage = $order->project->stage?->value ?? $order->project->stage;
 
             $order->setAttribute('material_readiness', [
-                'label' => $this->readinessLabel($summary),
+                'label' => $this->readinessLabel($summary, is_string($projectStage) ? $projectStage : null),
                 'shortage_lines' => $summary['shortage_lines'],
                 'fully_reserved' => $summary['fully_reserved'],
                 'total_lines' => $summary['total_lines'],
                 'open_requisitions' => $summary['open_requisitions'],
+                'reservation_complete' => (bool) ($summary['reservation_complete'] ?? false),
+                'materials_released_lines' => (int) ($summary['materials_released_lines'] ?? 0),
             ]);
 
             $glassOrders = collect($status['glass_orders'] ?? []);
@@ -62,10 +66,14 @@ class ProductionScheduleService
     }
 
     /**
-     * @param  array{shortage_lines: int, fully_reserved: int, total_lines: int, open_requisitions: int}  $summary
+     * @param  array<string, mixed>  $summary
      */
-    private function readinessLabel(array $summary): string
+    private function readinessLabel(array $summary, ?string $projectStage = null): string
     {
+        if ($this->materialsHaveBeenReleased($summary, $projectStage)) {
+            return 'released';
+        }
+
         if (($summary['shortage_lines'] ?? 0) > 0) {
             return 'shortage';
         }
@@ -74,11 +82,50 @@ class ProductionScheduleService
             return 'procurement_pending';
         }
 
+        if (! empty($summary['reservation_complete'])) {
+            return 'ready';
+        }
+
+        $unitsTotal = (int) ($summary['reservation_units_total'] ?? 0);
+        $unitsReserved = (int) ($summary['reservation_units_reserved'] ?? 0);
+        if ($unitsTotal > 0 && $unitsReserved >= $unitsTotal) {
+            return 'ready';
+        }
+
         if (($summary['total_lines'] ?? 0) > 0
             && ($summary['fully_reserved'] ?? 0) >= ($summary['total_lines'] ?? 0)) {
             return 'ready';
         }
 
         return 'partial';
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     */
+    private function materialsHaveBeenReleased(array $summary, ?string $projectStage): bool
+    {
+        if (($summary['materials_released_lines'] ?? 0) > 0) {
+            return true;
+        }
+
+        if ($projectStage === null || $projectStage === '') {
+            return false;
+        }
+
+        $releasedOrLater = [
+            ProjectStage::MaterialsReleased->value,
+            ProjectStage::CuttingStage->value,
+            ProjectStage::FabricationStage->value,
+            ProjectStage::GlassAssembly->value,
+            ProjectStage::QcPreInstallation->value,
+            ProjectStage::InTransit->value,
+            ProjectStage::Installation->value,
+            ProjectStage::SiteQc->value,
+            ProjectStage::Snagging->value,
+            ProjectStage::ProjectComplete->value,
+        ];
+
+        return in_array($projectStage, $releasedOrLater, true);
     }
 }

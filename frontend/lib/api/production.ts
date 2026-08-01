@@ -130,11 +130,13 @@ export type ScheduleOrder = {
   actual_start: string | null;
   teams?: ProductionOrderTeam[];
   material_readiness?: {
-    label: "ready" | "partial" | "shortage" | "procurement_pending";
+    label: "ready" | "partial" | "shortage" | "procurement_pending" | "released";
     shortage_lines: number;
     fully_reserved: number;
     total_lines: number;
     open_requisitions: number;
+    reservation_complete?: boolean;
+    materials_released_lines?: number;
   };
   glass_status?: {
     status: string | null;
@@ -164,7 +166,7 @@ function buildQuery(params?: Record<string, string | number | boolean | null | u
 }
 
 export const PRODUCTION_STAGE_LABELS: Record<ProductionStageValue, string> = {
-  material_prep: "Material Preparation",
+  material_prep: "Materials & tools assembly",
   qc_pre_check: "QC Pre-Check",
   cutting: "Cutting",
   fabrication: "Fabrication",
@@ -176,7 +178,6 @@ export const PRODUCTION_STAGE_LABELS: Record<ProductionStageValue, string> = {
 
 export const CUTTING_STAGES: ProductionStageValue[] = [
   "material_prep",
-  "qc_pre_check",
   "cutting",
 ];
 
@@ -369,5 +370,44 @@ export async function assignProductionTeam(
       method: "POST",
       body: payload,
     },
+  );
+}
+
+export type ProductionMisfit = {
+  unit_id: number;
+  unit_label: string;
+  opening_ref: string | null;
+  product_type: string | null;
+  unit_floor: string | null;
+  misfit_notes: string | null;
+  status: string;
+  updated_at: string | null;
+  job: { id: number; reference: string; status: string } | null;
+  project: { id: number; reference: string; name: string; stage: string } | null;
+  non_conformity: {
+    id: number;
+    nc_type: string;
+    severity: string;
+    status: string;
+    title: string;
+    description: string;
+    reported_at: string | null;
+  } | null;
+  design_change_order: {
+    id: number;
+    status: string;
+    reason: string | null;
+    remake_production_order_id: number | null;
+    remake_production_order: {
+      id: number;
+      reference: string;
+      status: string;
+    } | null;
+  } | null;
+};
+
+export async function listProductionMisfits() {
+  return apiRequest<{ data: ProductionMisfit[]; meta?: { total?: number } }>(
+    "/production/misfits",
   );
 }

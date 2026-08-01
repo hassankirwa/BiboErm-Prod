@@ -42,7 +42,15 @@ class QuotationController extends Controller
     {
         $this->authorize('view', $quotation);
 
-        $quotation->load(['lines', 'deal', 'account', 'contact', 'preparedBy', 'deal.project']);
+        $quotation->load([
+            'lines',
+            'deal',
+            'deal.project',
+            'deal.quotations' => fn ($q) => $q->excludingReferenceCopies()->with('lines')->latest('id'),
+            'account',
+            'contact',
+            'preparedBy',
+        ]);
 
         if ($request->query('include') === 'history') {
             $quotation->setRelation(

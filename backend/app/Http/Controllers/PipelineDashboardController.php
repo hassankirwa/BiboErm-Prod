@@ -67,7 +67,9 @@ class PipelineDashboardController extends Controller
         $pipelineValue = (float) Quotation::query()
             ->excludingReferenceCopies()
             ->where('status', QuotationStatus::Sent->value)
-            ->sum('total_amount');
+            ->with('lines')
+            ->get()
+            ->sum(fn (Quotation $quotation): float => $quotation->totalAmountKes());
 
         $openDeals = Deal::query()
             ->visibleTo($user)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ClientPortal;
 
 use App\Enums\FieldInstallation\FieldPhotoAttachableType;
+use App\Enums\Production\ProductionOrderStatus;
 use App\Enums\ProjectStage;
 use App\Enums\QualityControl\QcInspectionContext;
 use App\Enums\QualityControl\QcInspectionResult;
@@ -402,12 +403,18 @@ class ClientPortalController extends Controller
             }
         }
 
-        return collect(self::CLIENT_JOURNEY)->map(function (array $step, int $index) use ($currentStepIndex) {
+        $productionComplete = $this->isProductionComplete($project);
+
+        return collect(self::CLIENT_JOURNEY)->map(function (array $step, int $index) use ($currentStepIndex, $productionComplete) {
             $state = 'upcoming';
             if ($index < $currentStepIndex) {
                 $state = 'complete';
             } elseif ($index === $currentStepIndex) {
                 $state = 'current';
+            }
+
+            if ($step['key'] === 'production' && $productionComplete) {
+                $state = 'complete';
             }
 
             return [
@@ -418,6 +425,27 @@ class ClientPortalController extends Controller
                 'state' => $state,
             ];
         })->all();
+    }
+
+    private function isProductionComplete(Project $project): bool
+    {
+        $hasCompletedOrder = ProductionOrder::query()
+            ->where('project_id', $project->id)
+            ->where('status', ProductionOrderStatus::Completed)
+            ->exists();
+
+        if ($hasCompletedOrder) {
+            return true;
+        }
+
+        return QcInspection::query()
+            ->where('project_id', $project->id)
+            ->where('context', QcInspectionContext::ProductionQcPostFabrication)
+            ->whereIn('result', [
+                QcInspectionResult::Pass->value,
+                QcInspectionResult::ConditionalPass->value,
+            ])
+            ->exists();
     }
 
     /**

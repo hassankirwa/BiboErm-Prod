@@ -28,7 +28,7 @@ class ProjectDealSyncService
         }
 
         $paid = $this->dealDepositPaid($deal);
-        $quoted = $deal->final_agreed_amount ?? $deal->quotation_amount ?? $deal->estimated_value ?? $deal->amount;
+        $quoted = $deal->displayValueKes();
         $depositToRecord = $this->resolveDepositReceivedAmount($deal, $paid);
 
         $updates = [];

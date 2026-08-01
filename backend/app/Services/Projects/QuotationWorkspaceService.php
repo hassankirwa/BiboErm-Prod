@@ -52,8 +52,9 @@ class QuotationWorkspaceService
     }
 
     /**
-     * Broader account list for the new-quotation form: includes design-ready accounts
-     * even when a draft quotation already exists, so users can switch accounts.
+     * Account list for the new-quotation form: eligible (measurements / design-ready)
+     * active accounts that do not already have a quotation.
+     * Deep-links can still force-include a specific account via includeAccountId.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -113,23 +114,12 @@ class QuotationWorkspaceService
 
     public function quotationFormAccountsQuery(?User $user = null): Builder
     {
-        $eligibleAccountIds = $this->accountIdsEligibleForQuotation();
-
-        $query = Account::query()->whereIn('id', $eligibleAccountIds);
-
-        if ($user && ! $user->can('accounts.view_all')) {
-            $visibleThroughVisits = $this->accountIdsVisibleThroughApprovedVisits($user);
-
-            $query->where(function (Builder $inner) use ($user, $visibleThroughVisits): void {
-                $inner->visibleTo($user);
-
-                if ($visibleThroughVisits->isNotEmpty()) {
-                    $inner->orWhereIn('id', $visibleThroughVisits);
-                }
+        // Same eligibility + no-quotation filter as the pending queue.
+        return $this->pendingAccountsQuery($user)
+            ->where(function (Builder $query): void {
+                $query->whereNull('status')
+                    ->orWhere('status', '!=', 'dormant');
             });
-        }
-
-        return $query;
     }
 
     protected function userCanSelectAccount(?User $user, Account $account): bool
@@ -172,13 +162,17 @@ class QuotationWorkspaceService
         $eligibleAccountIds = $this->accountIdsEligibleForQuotation();
 
         $quotedAccountIds = Quotation::query()
+            ->excludingReferenceCopies()
+            ->whereNotNull('account_id')
             ->whereIn('status', [
                 QuotationStatus::Draft->value,
-                QuotationStatus::Sent->value,
-                QuotationStatus::Accepted->value,
                 QuotationStatus::InternalReview->value,
+                QuotationStatus::Approved->value,
+                QuotationStatus::Sent->value,
+                QuotationStatus::RevisionRequested->value,
+                QuotationStatus::Revised->value,
+                QuotationStatus::Accepted->value,
             ])
-            ->whereNotNull('account_id')
             ->pluck('account_id')
             ->unique();
 

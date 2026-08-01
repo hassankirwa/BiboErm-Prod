@@ -19,7 +19,12 @@ class ProjectDocumentController extends Controller
     public function index(Project $project): JsonResponse
     {
         $this->authorize('view', $project);
-        abort_unless(request()->user()->can('projects.documents.view') || request()->user()->can('projects.manage'), 403);
+        abort_unless(
+            request()->user()->can('projects.documents.view')
+                || request()->user()->can('projects.manage')
+                || request()->user()->can('production.view'),
+            403
+        );
 
         $documents = $project->documents()->with('uploader')->get();
 
@@ -66,7 +71,12 @@ class ProjectDocumentController extends Controller
     public function download(Project $project, ProjectDocument $document): JsonResponse
     {
         $this->authorize('view', $project);
-        abort_unless(request()->user()->can('projects.documents.view') || request()->user()->can('projects.manage'), 403);
+        abort_unless(
+            request()->user()->can('projects.documents.view')
+                || request()->user()->can('projects.manage')
+                || request()->user()->can('production.view'),
+            403
+        );
 
         if ((int) $document->project_id !== $project->id) {
             abort(404);

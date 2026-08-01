@@ -110,10 +110,10 @@ export function LeadRelatedRecords({
           count={proforma ? 1 : 0}
           href={
             proforma
-              ? quotationDetailPath(proforma.id)
-              : "/quotation/proforma"
+              ? quotationDetailPath(proforma.id, "crm")
+              : "/crm/deals"
           }
-          meta={proformaMeta ?? "No proforma created yet"}
+          meta={proformaMeta ?? "Pending — quotation team prepares the proforma"}
         />
         {lead.need_site_visit ? (
           <div className="flex items-center gap-2 rounded-[10px] bg-amber-50 px-3 py-2 text-xs text-amber-900">

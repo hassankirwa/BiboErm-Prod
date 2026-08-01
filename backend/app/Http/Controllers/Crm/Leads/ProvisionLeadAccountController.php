@@ -38,7 +38,7 @@ class ProvisionLeadAccountController extends Controller
 
         if (! $this->accountProvisioning->isEligibleForProvisioning($lead)) {
             throw ValidationException::withMessages([
-                'lead' => ['Lead is not ready for account creation. Confirm contact details first.'],
+                'lead' => ['Lead must be marked interested before creating an account.'],
             ]);
         }
 

@@ -155,7 +155,11 @@ export default function NewProjectQuotationPage() {
           !preferredMatch && preferredDesignJobId != null && Number.isFinite(preferredDesignJobId)
             ? accounts.find((account) => account.latest_design_job_id === preferredDesignJobId)
             : null;
-        const initialAccount = preferredMatch ?? designJobMatch ?? accounts[0] ?? null;
+        const unquotedAccounts = accounts.filter(
+          (account) => !account.latest_quotation && !account.has_quotation,
+        );
+        const initialAccount =
+          preferredMatch ?? designJobMatch ?? unquotedAccounts[0] ?? null;
 
         if (initialAccount) {
           setForm((f) => ({
@@ -166,6 +170,13 @@ export default function NewProjectQuotationPage() {
           if (initialAccount.has_design_document) {
             await loadFabricationForAccount(initialAccount.id);
           }
+        } else {
+          setForm((f) => ({
+            ...f,
+            account_id: "",
+            project_name: "",
+            project_number: "",
+          }));
         }
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Failed to load accounts.");
@@ -453,7 +464,8 @@ export default function NewProjectQuotationPage() {
                   <Spinner className="h-5 w-5" />
                 ) : pendingAccounts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No accounts ready for quotation. Approve a site visit or design job first.
+                    No accounts ready for quotation. Approve measurements for an
+                    active account that does not already have a quotation.
                   </p>
                 ) : (
                   <select
@@ -462,10 +474,15 @@ export default function NewProjectQuotationPage() {
                     value={form.account_id}
                     onChange={(e) => handleAccountChange(e.target.value)}
                   >
+                    <option value="">Select account</option>
                     {pendingAccounts.map((account) => (
                       <option key={account.id} value={account.id}>
                         {account.name}
-                        {account.draft_quotations_count > 0 ? " (draft exists)" : ""}
+                        {account.latest_quotation
+                          ? " (quotation exists)"
+                          : account.draft_quotations_count > 0
+                            ? " (draft exists)"
+                            : ""}
                       </option>
                     ))}
                   </select>

@@ -136,12 +136,14 @@ export function ProjectDetailDesigns({
                 : `${openingCount} fabrication openings on file`}
             </AlertTitle>
             <AlertDescription className="text-success/80">
-              {isDesignStage
-                ? "Elevations and descriptions extracted — ready for production once approved."
-                : "Extracted for the production team."}
+              {readOnly
+                ? "Open an elevation to view drawings and material details while producing."
+                : isDesignStage
+                  ? "Elevations and descriptions extracted — ready for production once approved."
+                  : "Extracted for the production team."}
             </AlertDescription>
           </Alert>
-        ) : isDesignStage ? (
+        ) : isDesignStage && !readOnly ? (
           <Alert className="border-warning/30 bg-warning/10 text-warning [&>svg]:text-warning">
             <AlertCircle />
             <AlertTitle>Final design approval — fabrication list required</AlertTitle>
@@ -154,8 +156,9 @@ export function ProjectDetailDesigns({
             <AlertCircle />
             <AlertTitle>No fabrication openings yet</AlertTitle>
             <AlertDescription>
-              Upload a WinCAD fabrication list to extract elevations and descriptions for
-              production.
+              {readOnly
+                ? "Design drawings have not been uploaded on this project yet. Ask the project manager to import the fabrication list."
+                : "Upload a WinCAD fabrication list to extract elevations and descriptions for production."}
             </AlertDescription>
           </Alert>
         )
@@ -252,7 +255,9 @@ export function ProjectDetailDesigns({
             <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
           ) : fabricationDesigns.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No openings extracted yet. Upload a fabrication list above.
+              {readOnly
+                ? "No openings available for this project."
+                : "No openings extracted yet. Upload a fabrication list above."}
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

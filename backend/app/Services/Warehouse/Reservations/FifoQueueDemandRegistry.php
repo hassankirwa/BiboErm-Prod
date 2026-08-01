@@ -39,7 +39,9 @@ class FifoQueueDemandRegistry
             $itemId = (int) $line['item_id'];
             $item = $items->get($itemId);
 
-            if ($item?->category === ItemCategory::AluminiumProfile) {
+            if ($item?->category === ItemCategory::AluminiumProfile
+                || ($item && isset($aluminiumPlans[$itemId]))
+            ) {
                 if (isset($aluminiumHandled[$itemId])) {
                     continue;
                 }

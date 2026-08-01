@@ -125,6 +125,9 @@ export type ApiDeal = {
   estimated_value: string | number | null;
   quotation_amount: string | number | null;
   final_agreed_amount: string | number | null;
+  display_value?: string | number | null;
+  pricing_currency?: "USD" | "KES" | string | null;
+  exchange_rate?: number | string | null;
   deposit_required_amount: string | number | null;
   deposit_required_percent: string | number | null;
   deposit_paid_amount: string | number | null;
@@ -384,7 +387,10 @@ export type ApiQuotationSummary = {
   status: string | null;
   revision_number?: number | null;
   revision_label?: string | null;
+  pricing_currency?: "USD" | "KES" | string | null;
   total_amount: number | string | null;
+  total_amount_kes?: number | string | null;
+  exchange_rate?: number | string | null;
   sent_at: string | null;
   accepted_at: string | null;
   deal_id: number | null;
@@ -405,7 +411,10 @@ export type ApiQuotation = {
   discount_amount: number | string | null;
   tax_amount: number | string | null;
   tax_rate?: number | string | null;
+  pricing_currency?: "USD" | "KES" | string | null;
   total_amount: number | string | null;
+  total_amount_kes?: number | string | null;
+  exchange_rate?: number | string | null;
   valid_until: string | null;
   terms_conditions: string | null;
   sent_at: string | null;

@@ -26,8 +26,11 @@ class FifoReservationService
     ) {}
 
     /**
+     * Reserve BOM demand for a project. Tops up an existing pending/partial reservation
+     * when stock is already partially held — only the remaining gap is allocated.
+     *
      * @param  array<int, array{item_id: int, quantity: string|float, bom_line_ref?: string|null, required_length_mm?: int|null, project_bom_line_id?: int|null}>  $bomLines
-     * @return array{success: bool, reservation?: StockReservation, check: array<string, mixed>}
+     * @return array{success: bool, reservation?: StockReservation, check: array<string, mixed>, topped_up?: bool}
      */
     public function reserveForProject(User $user, int $projectId, array $bomLines, ?string $notes = null): array
     {
@@ -38,10 +41,11 @@ class FifoReservationService
         }
 
         try {
-            $reservation = DB::transaction(function () use ($user, $projectId, $bomLines, $notes, $check) {
+            $result = DB::transaction(function () use ($user, $projectId, $bomLines, $notes, $check) {
                 $allocations = [];
                 $aluminiumPlans = $check['aluminium_plans'] ?? [];
                 $aluminiumReserved = [];
+                $held = $this->bomStockCheck->remainingHeldForProject($projectId);
 
                 $items = Item::query()
                     ->whereIn('id', array_unique(array_map(fn ($l) => (int) $l['item_id'], $bomLines)))
@@ -55,25 +59,43 @@ class FifoReservationService
                         throw new InvalidArgumentException('Unknown warehouse item on BOM line.');
                     }
 
-                    if ($item->category === ItemCategory::AluminiumProfile) {
+                    if ($this->aluminiumDemand->shouldCombineCuts($item, array_values(array_filter(
+                        $bomLines,
+                        fn ($l) => (int) $l['item_id'] === $item->id
+                    )))) {
                         if (isset($aluminiumReserved[$item->id])) {
                             continue;
                         }
                         $aluminiumReserved[$item->id] = true;
 
                         $plan = $aluminiumPlans[$item->id]
-                            ?? $this->aluminiumDemand->planForItem($item, array_values(array_filter(
-                                $bomLines,
-                                fn ($l) => (int) $l['item_id'] === $item->id
-                            )));
+                            ?? ($this->aluminiumDemand->shouldPackOntoBars($item)
+                                ? $this->aluminiumDemand->planForItem($item, array_values(array_filter(
+                                    $bomLines,
+                                    fn ($l) => (int) $l['item_id'] === $item->id
+                                )))
+                                : $this->aluminiumDemand->exactMetrePlanForItem($item, array_values(array_filter(
+                                    $bomLines,
+                                    fn ($l) => (int) $l['item_id'] === $item->id
+                                ))));
 
-                        if (($plan['offcut_piece_ids'] ?? []) !== []) {
-                            $this->offcutAllocation->allocatePieceIds($projectId, $plan['offcut_piece_ids']);
-                        }
+                        $target = (string) ($plan['reserve_qty'] ?? '0');
+                        $alreadyHeld = $held['by_item'][$item->id] ?? '0.000';
+                        $remaining = bccomp($target, $alreadyHeld, 3) === 1
+                            ? bcsub($target, $alreadyHeld, 3)
+                            : '0.000';
 
-                        $remaining = (string) ($plan['reserve_qty'] ?? '0');
                         if (bccomp($remaining, '0', 3) !== 1) {
                             continue;
+                        }
+
+                        // Offcuts only for aluminium bar packing on first full reserve.
+                        if (
+                            $this->aluminiumDemand->shouldPackOntoBars($item)
+                            && bccomp($alreadyHeld, '0', 3) !== 1
+                            && ($plan['offcut_piece_ids'] ?? []) !== []
+                        ) {
+                            $this->offcutAllocation->allocatePieceIds($projectId, $plan['offcut_piece_ids']);
                         }
 
                         $this->allocateFromBins(
@@ -86,7 +108,15 @@ class FifoReservationService
                         continue;
                     }
 
-                    $remaining = (string) $bomLine['quantity'];
+                    $bomRef = isset($bomLine['bom_line_ref']) ? (string) $bomLine['bom_line_ref'] : null;
+                    $target = (string) $bomLine['quantity'];
+                    $alreadyHeld = $bomRef !== null && $bomRef !== ''
+                        ? ($held['by_ref'][$bomRef] ?? '0.000')
+                        : ($held['by_item'][$item->id] ?? '0.000');
+                    $remaining = bccomp($target, $alreadyHeld, 3) === 1
+                        ? bcsub($target, $alreadyHeld, 3)
+                        : '0.000';
+
                     if (bccomp($remaining, '0', 3) !== 1) {
                         continue;
                     }
@@ -99,15 +129,41 @@ class FifoReservationService
                     );
                 }
 
-                $reservation = StockReservation::query()->create([
-                    'reservation_number' => $this->numbers->next('RSV', 'stock_reservations', 'reservation_number'),
-                    'project_id' => $projectId,
-                    'status' => ReservationStatus::Pending,
-                    'reserved_at' => now(),
-                    'reserved_by' => $user->id,
-                    'fifo_sequence' => $this->fifoSequence->sequenceForProject($projectId),
-                    'notes' => $notes,
-                ]);
+                $existing = $this->activeReservationForProject($projectId);
+                $toppedUp = $existing !== null;
+
+                if ($allocations === []) {
+                    if ($existing === null) {
+                        throw new InvalidArgumentException('Nothing to reserve.');
+                    }
+
+                    return [
+                        'reservation' => $existing->load('lines.item', 'lines.bin', 'project', 'reservedByUser'),
+                        'topped_up' => true,
+                    ];
+                }
+
+                if ($existing !== null) {
+                    $reservation = $existing;
+                    if ($notes) {
+                        $reservation->notes = trim(($reservation->notes ? $reservation->notes."\n" : '').$notes);
+                        $reservation->save();
+                    }
+                    if ($reservation->status === ReservationStatus::Partial) {
+                        $reservation->status = ReservationStatus::Pending;
+                        $reservation->save();
+                    }
+                } else {
+                    $reservation = StockReservation::query()->create([
+                        'reservation_number' => $this->numbers->next('RSV', 'stock_reservations', 'reservation_number'),
+                        'project_id' => $projectId,
+                        'status' => ReservationStatus::Pending,
+                        'reserved_at' => now(),
+                        'reserved_by' => $user->id,
+                        'fifo_sequence' => $this->fifoSequence->sequenceForProject($projectId),
+                        'notes' => $notes,
+                    ]);
+                }
 
                 foreach ($allocations as $allocation) {
                     StockReservationLine::query()->create([
@@ -120,7 +176,10 @@ class FifoReservationService
                     ]);
                 }
 
-                return $reservation->load('lines.item', 'lines.bin', 'project', 'reservedByUser');
+                return [
+                    'reservation' => $reservation->load('lines.item', 'lines.bin', 'project', 'reservedByUser'),
+                    'topped_up' => $toppedUp,
+                ];
             });
         } catch (InvalidArgumentException) {
             return [
@@ -131,9 +190,176 @@ class FifoReservationService
 
         return [
             'success' => true,
-            'reservation' => $reservation,
+            'reservation' => $result['reservation'],
             'check' => $check,
+            'topped_up' => (bool) ($result['topped_up'] ?? false),
         ];
+    }
+
+    /**
+     * Manually set how much of an item remains held for a project (absolute quantity).
+     * Increases allocate from bins; decreases free the hold without consuming on-hand.
+     *
+     * @return array{success: bool, reservation: StockReservation, previous_qty: string, quantity_reserved: string}
+     */
+    public function adjustHeldQuantity(
+        User $user,
+        int $projectId,
+        int $itemId,
+        string $targetQuantity,
+        ?string $notes = null,
+        ?string $bomLineRef = null,
+    ): array {
+        $targetQuantity = number_format((float) $targetQuantity, 3, '.', '');
+
+        if (bccomp($targetQuantity, '0', 3) < 0) {
+            throw new InvalidArgumentException('Reserved quantity cannot be negative.');
+        }
+
+        $item = Item::query()->with('aluminiumProfile')->find($itemId);
+        if (! $item) {
+            throw new InvalidArgumentException('Unknown warehouse item.');
+        }
+
+        return DB::transaction(function () use ($user, $projectId, $item, $targetQuantity, $notes, $bomLineRef) {
+            $held = $this->bomStockCheck->remainingHeldForProject($projectId);
+            $current = $bomLineRef !== null && $bomLineRef !== ''
+                ? ($held['by_ref'][$bomLineRef] ?? '0.000')
+                : ($held['by_item'][$item->id] ?? '0.000');
+
+            // Item-level held qty when adjusting a bar-packed SKU row (no BOM ref) or aluminium/rubber rolls.
+            if (
+                $bomLineRef === null
+                || $bomLineRef === ''
+                || $item->category === ItemCategory::AluminiumProfile
+                || ($item->category === ItemCategory::Rubber && $this->aluminiumDemand->isMetreUom($item))
+            ) {
+                $current = $held['by_item'][$item->id] ?? '0.000';
+            }
+
+            $delta = bcsub($targetQuantity, $current, 3);
+            $reservation = $this->activeReservationForProject($projectId);
+
+            if (bccomp($delta, '0', 3) === 0) {
+                if ($reservation === null) {
+                    throw new InvalidArgumentException('No active reservation to adjust.');
+                }
+
+                return [
+                    'success' => true,
+                    'reservation' => $reservation->load('lines.item', 'lines.bin', 'project', 'reservedByUser'),
+                    'previous_qty' => $current,
+                    'quantity_reserved' => $current,
+                ];
+            }
+
+            if ($reservation === null) {
+                if (bccomp($delta, '0', 3) < 0) {
+                    throw new InvalidArgumentException('No active reservation to reduce.');
+                }
+
+                $reservation = StockReservation::query()->create([
+                    'reservation_number' => $this->numbers->next('RSV', 'stock_reservations', 'reservation_number'),
+                    'project_id' => $projectId,
+                    'status' => ReservationStatus::Pending,
+                    'reserved_at' => now(),
+                    'reserved_by' => $user->id,
+                    'fifo_sequence' => $this->fifoSequence->sequenceForProject($projectId),
+                    'notes' => $notes,
+                ]);
+            } elseif ($notes) {
+                $reservation->notes = trim(($reservation->notes ? $reservation->notes."\n" : '').$notes);
+                $reservation->save();
+            }
+
+            if (bccomp($delta, '0', 3) === 1) {
+                $allocations = [];
+                $this->allocateFromBins($item, $delta, $bomLineRef, $allocations);
+
+                foreach ($allocations as $allocation) {
+                    StockReservationLine::query()->create([
+                        'reservation_id' => $reservation->id,
+                        'item_id' => $allocation['item_id'],
+                        'bin_id' => $allocation['bin_id'],
+                        'quantity_reserved' => $allocation['quantity'],
+                        'quantity_released' => 0,
+                        'bom_line_ref' => $allocation['bom_line_ref'],
+                    ]);
+                }
+
+                if ($reservation->status === ReservationStatus::Partial) {
+                    $reservation->status = ReservationStatus::Pending;
+                    $reservation->save();
+                }
+            } else {
+                $this->reduceHold($reservation, $item->id, bcmul($delta, '-1', 3), $bomLineRef);
+            }
+
+            return [
+                'success' => true,
+                'reservation' => $reservation->fresh(['lines.item', 'lines.bin', 'project', 'reservedByUser']),
+                'previous_qty' => $current,
+                'quantity_reserved' => $targetQuantity,
+            ];
+        });
+    }
+
+    /**
+     * Free held stock without consuming on-hand (manual un-reserve / down-adjust).
+     */
+    protected function reduceHold(
+        StockReservation $reservation,
+        int $itemId,
+        string $quantity,
+        ?string $bomLineRef = null,
+    ): void {
+        $remaining = $quantity;
+        $reservation->load('lines');
+
+        $lines = $reservation->lines
+            ->filter(function (StockReservationLine $line) use ($itemId, $bomLineRef) {
+                if ((int) $line->item_id !== $itemId) {
+                    return false;
+                }
+                if ($bomLineRef !== null && $bomLineRef !== '' && (string) $line->bom_line_ref !== $bomLineRef) {
+                    return false;
+                }
+
+                return bccomp($line->remainingQuantity(), '0', 3) === 1;
+            })
+            ->sortByDesc(fn (StockReservationLine $line) => $line->id)
+            ->values();
+
+        foreach ($lines as $line) {
+            if (bccomp($remaining, '0', 3) !== 1) {
+                break;
+            }
+
+            $lineRemaining = $line->remainingQuantity();
+            $take = bccomp($lineRemaining, $remaining, 3) >= 0 ? $remaining : $lineRemaining;
+
+            $this->stockLevels->decrementReserved($line->item_id, $line->bin_id, $take);
+            $line->quantity_reserved = bcsub((string) $line->quantity_reserved, $take, 3);
+            $line->save();
+
+            $remaining = bcsub($remaining, $take, 3);
+        }
+
+        if (bccomp($remaining, '0', 3) === 1) {
+            throw new InvalidArgumentException('Cannot reduce reserved quantity below zero.');
+        }
+    }
+
+    protected function activeReservationForProject(int $projectId): ?StockReservation
+    {
+        return StockReservation::query()
+            ->where('project_id', $projectId)
+            ->whereIn('status', [
+                ReservationStatus::Pending,
+                ReservationStatus::Partial,
+            ])
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**

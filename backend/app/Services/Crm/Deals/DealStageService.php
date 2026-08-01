@@ -8,12 +8,14 @@ use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Deal;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Crm\Leads\LeadPipelineService;
 use Illuminate\Validation\ValidationException;
 
 class DealStageService
 {
     public function __construct(
         protected CrmAuditLogger $crmAudit,
+        protected LeadPipelineService $leadPipeline,
     ) {}
 
     public function updateStage(Deal $deal, string $stage, User $user): Deal
@@ -73,6 +75,8 @@ class DealStageService
             ['stage' => DealStage::Won->value, 'status' => 'won'],
             $user,
         );
+
+        $this->leadPipeline->syncFromDeal($deal->fresh(), $user);
 
         return $deal->fresh()->load(['contact', 'account', 'owner']);
     }

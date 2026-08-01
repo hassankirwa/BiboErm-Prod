@@ -10,6 +10,9 @@ class DealResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $hasUsd = $this->hasUsdQuotationPricing();
+        $rate = $hasUsd ? $this->latestQuotation()?->usdToKesRate() : null;
+
         return [
             'id' => $this->id,
             'deal_number' => $this->deal_number ?? $this->reference,
@@ -23,10 +26,14 @@ class DealResource extends JsonResource
             'source_lead_id' => $this->source_lead_id,
             'stage' => $this->stage,
             'status' => $this->status,
-            'amount' => $this->amount,
-            'estimated_value' => $this->estimated_value,
-            'quotation_amount' => $this->quotation_amount,
-            'final_agreed_amount' => $this->final_agreed_amount,
+            'pricing_currency' => $hasUsd ? 'USD' : 'KES',
+            'exchange_rate' => $rate,
+            // API money fields are KES for CRM display / editing.
+            'amount' => $this->amountToKes($this->amount),
+            'estimated_value' => $this->amountToKes($this->estimated_value),
+            'quotation_amount' => $this->amountToKes($this->quotation_amount),
+            'final_agreed_amount' => $this->amountToKes($this->final_agreed_amount),
+            'display_value' => $this->displayValueKes(),
             'deposit_required_amount' => $this->deposit_required_amount,
             'deposit_required_percent' => $this->deposit_required_percent,
             'deposit_paid_amount' => $this->deposit_paid_amount,

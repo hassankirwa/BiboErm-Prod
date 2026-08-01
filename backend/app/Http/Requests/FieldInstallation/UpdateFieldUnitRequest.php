@@ -19,6 +19,7 @@ class UpdateFieldUnitRequest extends FormRequest
         return [
             'status' => ['required', Rule::enum(FieldUnitStatus::class)],
             'snag_notes' => ['nullable', 'string'],
+            'misfit_notes' => ['nullable', 'string'],
         ];
     }
 }

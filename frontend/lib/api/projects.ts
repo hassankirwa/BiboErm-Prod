@@ -549,6 +549,7 @@ export type ProjectMaterialLine = {
   bars_needed?: number | null;
   stock_check_shortage?: string | null;
   is_fully_reserved?: boolean;
+  is_combined_aluminium?: boolean;
   measurement_mm: number | null;
   is_procurement_only: boolean;
   is_glass: boolean;
@@ -693,6 +694,15 @@ export type DesignChangeOrderStatus =
   | "closed"
   | "cancelled";
 
+export type DesignChangeItem = {
+  id: string;
+  description: string;
+  qty: number;
+  unit: string;
+  change_type: "remake" | "material" | string;
+  done: boolean;
+};
+
 export type DesignChangeOrder = {
   id: number;
   project_id: number;
@@ -700,6 +710,8 @@ export type DesignChangeOrder = {
   status: DesignChangeOrderStatus | string;
   reason: string | null;
   measurement_notes: Record<string, unknown> | string[] | null;
+  change_path?: "full_remake" | "minor_material" | string | null;
+  change_items?: DesignChangeItem[];
   scope_bom_line_ids: number[] | null;
   remeasure_site_visit_id: number | null;
   revised_bom_version: number | null;
@@ -774,10 +786,52 @@ export async function approveDesignChangeOrder(
   );
 }
 
-export async function createDesignChangeRemake(id: number) {
+export async function createDesignChangeRemake(
+  id: number,
+  payload?: { start_stage?: string },
+) {
   return apiRequest<{ data: DesignChangeOrder }>(
     `/projects/design-change-orders/${id}/create-remake`,
+    { method: "POST", body: payload ?? {} },
+  );
+}
+
+export async function updateDesignChangeOrder(
+  id: number,
+  payload: {
+    reason?: string;
+    notes?: string;
+    change_path?: "full_remake" | "minor_material";
+    items?: Array<{
+      id?: string;
+      description: string;
+      qty?: number;
+      unit?: string;
+      change_type?: "remake" | "material";
+      done?: boolean;
+    }>;
+  },
+) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}`,
+    { method: "PATCH", body: payload },
+  );
+}
+
+export async function releaseDesignChangeToProduction(id: number) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}/release-to-production`,
     { method: "POST" },
+  );
+}
+
+export async function completeMinorDesignChange(
+  id: number,
+  payload?: { advance_to_stage?: string },
+) {
+  return apiRequest<{ data: DesignChangeOrder }>(
+    `/projects/design-change-orders/${id}/complete-minor`,
+    { method: "POST", body: payload ?? {} },
   );
 }
 
@@ -786,6 +840,31 @@ export async function closeDesignChangeOrder(id: number) {
     `/projects/design-change-orders/${id}/close`,
     { method: "POST" },
   );
+}
+
+export type ProjectDelay = {
+  id: number;
+  project_id: number;
+  stage: string;
+  reason: string;
+  days_lost: number;
+  notes: string | null;
+  logged_at: string | null;
+};
+
+export async function logProjectDelay(
+  projectId: number,
+  payload: {
+    stage: string;
+    reason: string;
+    days_lost: number;
+    notes?: string;
+  },
+) {
+  return apiRequest<{ data: ProjectDelay }>(`/projects/${projectId}/delays`, {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function updateProjectSiteAssessmentNotes(
@@ -1031,12 +1110,34 @@ export async function reserveProjectMaterials(
   return apiRequest<{
     success: boolean;
     message?: string;
+    topped_up?: boolean;
     project?: { id: number; stage: string };
     reservation?: { id: number; fifo_sequence: number; status: string };
     check?: unknown;
   }>(`/projects/${projectId}/reserve-materials`, {
     method: "POST",
     body: payload ?? {},
+  });
+}
+
+export async function adjustProjectReservation(
+  projectId: number,
+  payload: {
+    item_id: number;
+    quantity_reserved: number | string;
+    bom_line_ref?: string;
+    notes?: string;
+  },
+) {
+  return apiRequest<{
+    success: boolean;
+    previous_qty: string;
+    quantity_reserved: string;
+    reservation?: { id: number; status: string };
+    message?: string;
+  }>(`/projects/${projectId}/adjust-reservation`, {
+    method: "POST",
+    body: payload,
   });
 }
 
@@ -1238,7 +1339,7 @@ export const PM_MANUAL_NEXT_STAGES: Record<string, string[]> = {
   final_design_approval: ["bom_finalized"],
   qc_pre_installation: ["in_transit", "snagging"],
   in_transit: ["installation"],
-  installation: ["site_qc", "snagging"],
+  installation: [],
   site_qc: ["snagging", "project_complete"],
   snagging: ["project_complete"],
 };

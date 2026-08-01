@@ -146,6 +146,77 @@ class Deal extends Model
         return $this->hasMany(Quotation::class);
     }
 
+    public function latestQuotation(): ?Quotation
+    {
+        if ($this->relationLoaded('quotations')) {
+            return $this->quotations
+                ->filter(fn (Quotation $quotation): bool => ! ($quotation->is_reference_copy ?? false))
+                ->sortByDesc('id')
+                ->first();
+        }
+
+        return $this->quotations()
+            ->excludingReferenceCopies()
+            ->with('lines')
+            ->latest('id')
+            ->first();
+    }
+
+    public function hasUsdQuotationPricing(): bool
+    {
+        return (bool) $this->latestQuotation()?->hasUsdPricing();
+    }
+
+    /**
+     * Convert a deal money field to KES when it was synced from a USD quotation total.
+     */
+    public function amountToKes(float|string|null $amount): ?float
+    {
+        if ($amount === null || $amount === '') {
+            return null;
+        }
+
+        $value = round((float) $amount, 2);
+        $quotation = $this->latestQuotation();
+
+        if (! $quotation || ! $quotation->hasUsdPricing()) {
+            return $value;
+        }
+
+        $usdTotal = round((float) $quotation->total_amount, 2);
+        $kesTotal = $quotation->totalAmountKes();
+        $rate = $quotation->usdToKesRate();
+
+        // Already stored/displayed as the KES quotation total.
+        if (abs($value - $kesTotal) < 1.0) {
+            return $value;
+        }
+
+        // Copied directly from quotation.total_amount (USD).
+        if (abs($value - $usdTotal) < 0.05) {
+            return $kesTotal;
+        }
+
+        // Deal quotation_amount still holds the USD total → treat sibling synced fields as USD.
+        $storedQuoteAmount = $this->quotation_amount !== null ? round((float) $this->quotation_amount, 2) : null;
+        if ($storedQuoteAmount !== null && abs($storedQuoteAmount - $usdTotal) < 0.05) {
+            return round($value * $rate, 2);
+        }
+
+        return $value;
+    }
+
+    public function displayValueKes(): float
+    {
+        $raw = $this->final_agreed_amount
+            ?? $this->quotation_amount
+            ?? $this->estimated_value
+            ?? $this->amount
+            ?? 0;
+
+        return $this->amountToKes($raw) ?? 0.0;
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(DealPayment::class);

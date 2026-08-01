@@ -553,6 +553,83 @@ class WorkbookDrawingExtractor
         return null;
     }
 
+    /**
+     * Convert internal binary media into a JSON-safe shape (data URL, no raw bytes).
+     *
+     * @param  array<string, mixed>|null  $media
+     * @return array<string, mixed>|null
+     */
+    public function prepareMediaForJson(?array $media): ?array
+    {
+        if ($media === null) {
+            return null;
+        }
+
+        $binary = $media['binary'] ?? null;
+        $mime = $media['mime_type'] ?? null;
+        if (
+            ($media['data_url'] ?? null) === null
+            && is_string($binary)
+            && $binary !== ''
+            && is_string($mime)
+            && $mime !== ''
+        ) {
+            $media['data_url'] = 'data:'.$mime.';base64,'.base64_encode($binary);
+        }
+
+        unset($media['binary']);
+
+        return $media;
+    }
+
+    /**
+     * Recursively strip raw binary blobs and force UTF-8-safe strings for JSON encoding.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function sanitizePayloadForJson(array $payload): array
+    {
+        return $this->sanitizeValueForJson($payload);
+    }
+
+    protected function sanitizeValueForJson(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return $this->sanitizeUtf8String($value);
+        }
+
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $out = [];
+        foreach ($value as $key => $child) {
+            if ($key === 'binary') {
+                continue;
+            }
+            $out[$key] = $this->sanitizeValueForJson($child);
+        }
+
+        return $out;
+    }
+
+    protected function sanitizeUtf8String(string $value): string
+    {
+        if ($value === '' || mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        $converted = @mb_convert_encoding($value, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252, GBK, GB2312');
+        if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
+            return $converted;
+        }
+
+        $ignored = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+        return is_string($ignored) ? $ignored : '';
+    }
+
     /** @deprecated Prefer drawingToMedia — kept for callers that still need data URLs. */
     protected function drawingToDataUrl(BaseDrawing $drawing): ?string
     {

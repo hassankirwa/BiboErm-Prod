@@ -12,6 +12,7 @@ use App\Services\Projects\FabricationExcelExtractionService;
 use App\Services\Projects\QuotationAccountingExcelExtractionService;
 use App\Services\Projects\QuotationLineEnrichmentService;
 use App\Services\Projects\QuotationWorkspaceService;
+use App\Services\Projects\WorkbookDrawingExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,6 +25,7 @@ class ProjectQuotationWorkspaceController extends Controller
         protected QuotationLineEnrichmentService $lineEnrichment,
         protected QuotationCalculatorService $calculator,
         protected DesignDocumentBridgeService $designBridge,
+        protected WorkbookDrawingExtractor $drawingExtractor,
     ) {}
 
     public function pending(Request $request): JsonResponse
@@ -80,6 +82,9 @@ class ProjectQuotationWorkspaceController extends Controller
             $payload = $this->lineEnrichment->enrich($payload, $fabricationPayload);
         }
 
+        // Ensure embedded drawing binaries never reach JsonResponse (invalid UTF-8).
+        $payload = $this->drawingExtractor->sanitizePayloadForJson($payload);
+
         return response()->json(['data' => $payload]);
     }
 
@@ -132,6 +137,8 @@ class ProjectQuotationWorkspaceController extends Controller
                 $payload = $this->lineEnrichment->enrich($payload, $fabricationPayload);
             }
         }
+
+        $payload = $this->drawingExtractor->sanitizePayloadForJson($payload);
 
         return response()->json(['data' => $payload]);
     }

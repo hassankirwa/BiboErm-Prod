@@ -34,6 +34,7 @@ import {
   type BalconyObstruction,
   type BalconySideCondition,
   type BalconySideMeasurements,
+  type BalconyType,
 } from "@/lib/measurements/balcony-types";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -142,7 +143,7 @@ function SideFields({
   const condition = side.condition ?? null;
 
   return (
-    <div className="space-y-2 rounded border border-dashed border-border p-3">
+    <div className="min-w-0 space-y-2 rounded border border-dashed border-border p-2 sm:p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </p>
@@ -229,14 +230,14 @@ function SideFields({
         />
       </FieldGrid>
       {condition === "open" && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] leading-snug text-muted-foreground">
           Barricade is the low wall (e.g. 1/3, 1/2, or ~1400 mm). Open height is
           from the top of that barricade to the top of the balcony opening —
           that is the glass / railing area.
         </p>
       )}
       {condition === "full_wall" && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] leading-snug text-muted-foreground">
           Full-height wall covers the entire balcony height on this side — not
           an open glass edge.
         </p>
@@ -257,7 +258,7 @@ export function BalconyMeasurementPanel({
   }
 
   return (
-    <div className="space-y-4 bg-muted/20 p-2 sm:p-3">
+    <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden bg-muted/20 p-2 sm:p-3">
       <BalconyTypePicker
         value={details.balcony_type}
         readOnly={readOnly}
@@ -315,7 +316,7 @@ export function BalconyMeasurementPanel({
       </MeasurementSection>
 
       <MeasurementSection title="Side measurements">
-        <div className="space-y-3">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <SideFields
             title="Left side"
             side={details.left_side ?? emptyBalconySide()}
@@ -328,11 +329,11 @@ export function BalconyMeasurementPanel({
             readOnly={readOnly}
             onChange={(right_side) => patch({ right_side })}
           />
-          <div className="space-y-2 rounded border border-dashed border-border p-3">
+          <div className="min-w-0 space-y-2 rounded border border-dashed border-border p-2 sm:p-3 md:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Front edge (open end, opposite the door)
             </p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] leading-snug text-muted-foreground">
               {details.balcony_type === "irregular"
                 ? "Three equal front-facing edges. Record each edge length plus barricade and open height above."
                 : details.balcony_type === "curved"

@@ -318,7 +318,7 @@ class ProductionStageService
         if (! $assigned) {
             throw ValidationException::withMessages([
                 'assignee' => [
-                    'Assign a team member to material preparation before completing this stage.',
+                    'Assign a team member to materials & tools assembly before completing this stage.',
                 ],
             ]);
         }

@@ -38,6 +38,7 @@ export const KANBAN_STAGE_TO_STATUS: Record<LeadKanbanStageId, LeadStatus> = {
   measurements_submitted: "measurements_captured",
   design_required: "measurements_captured",
   ready_for_quotation: "converted",
+  won: "converted",
   cold: "not_reachable",
   lost: "unqualified",
 };
@@ -58,7 +59,7 @@ export const STATUS_TO_KANBAN_STAGE: Record<string, LeadKanbanStageId> = {
 
 /** Mirrors backend LeadStageService transitions (v2). */
 export const LEAD_STATUS_TRANSITIONS: Record<string, string[]> = {
-  new: ["contacted", "not_reachable", "unqualified"],
+  new: ["contacted", "interested", "not_reachable", "unqualified"],
   contacted: ["interested", "not_reachable", "unqualified"],
   interested: ["unqualified"],
   account_created: [],
@@ -206,16 +207,12 @@ export function hasProvisionedAccount(status: string | null | undefined): boolea
 export function canProvisionAccountFromLead(
   status: string | null | undefined,
   hasLinkedAccount: boolean,
-  pipelineStage?: string | null,
+  _pipelineStage?: string | null,
 ): boolean {
   if (hasLinkedAccount) return false;
   const normalized = (status ?? "new").toLowerCase();
-  const stage = (pipelineStage ?? "").toLowerCase();
-  if (
-    stage === "contact_confirmed" ||
-    normalized === "interested" ||
-    normalized === "contacted"
-  ) {
+  // Accounts are for interested clients only — not at first contact.
+  if (normalized === "interested") {
     return true;
   }
   return isLeadQualifiedForAccount(normalized);

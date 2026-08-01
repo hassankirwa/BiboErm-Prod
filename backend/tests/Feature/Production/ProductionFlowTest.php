@@ -292,7 +292,7 @@ class ProductionFlowTest extends TestCase
             ->assertOk();
 
         $order->refresh();
-        $this->assertSame(ProductionStage::QcPreCheck, $order->current_stage);
+        $this->assertSame(ProductionStage::Cutting, $order->current_stage);
 
         $log = $order->stageLogs()->where('stage', 'material_prep')->where('status', 'completed')->first();
         $this->assertNotNull($log);

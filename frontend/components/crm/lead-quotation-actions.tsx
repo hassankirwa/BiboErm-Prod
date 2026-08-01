@@ -223,7 +223,7 @@ export function LeadQuotationActions({
             </Badge>
           ) : null}
           <span className="text-xs text-muted-foreground">
-            {formatCurrency(quotationAmount(latestQuotation as Parameters<typeof quotationAmount>[0]))}
+            {formatCurrency(quotationAmount(latestQuotation))}
           </span>
           <Button size="sm" variant="outline" className="ml-auto h-7 px-2 text-xs" asChild>
             <Link href={quotationViewHref(latestQuotation, quotationSent)}>
@@ -237,7 +237,7 @@ export function LeadQuotationActions({
       {showCreateQuotation && !latestQuotation ? (
         <Badge variant="secondary" className="h-9 gap-1.5 px-3 font-normal">
           <Clock className="h-3.5 w-3.5" />
-          Quotation in progress
+          Pending quotation
         </Badge>
       ) : null}
 

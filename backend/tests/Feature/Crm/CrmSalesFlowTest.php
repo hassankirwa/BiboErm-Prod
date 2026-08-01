@@ -687,7 +687,7 @@ class CrmSalesFlowTest extends TestCase
         $this->patchJson("/api/v1/crm/leads/{$lead->id}/status", [
             'status' => LeadStatus::Interested->value,
         ])->assertOk()
-            ->assertJsonPath('data.pipeline_stage', LeadPipelineStage::SiteVisitRequired->value);
+            ->assertJsonPath('data.pipeline_stage', LeadPipelineStage::ContactConfirmed->value);
     }
 
     public function test_account_creation_rejected_for_unqualified_lead(): void

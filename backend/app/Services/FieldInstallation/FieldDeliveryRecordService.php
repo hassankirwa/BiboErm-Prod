@@ -90,6 +90,40 @@ class FieldDeliveryRecordService
         });
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function update(FieldDeliveryRecord $record, array $data): FieldDeliveryRecord
+    {
+        return DB::transaction(function () use ($record, $data) {
+            $header = collect($data)->except('lines')->all();
+            if ($header !== []) {
+                $record->update($header);
+            }
+
+            if (array_key_exists('lines', $data)) {
+                $record->lines()->delete();
+                foreach ($data['lines'] ?? [] as $line) {
+                    FieldDeliveryLine::query()->create([
+                        'delivery_record_id' => $record->id,
+                        'project_bom_line_id' => $line['project_bom_line_id'] ?? null,
+                        'warehouse_item_id' => $line['warehouse_item_id'] ?? null,
+                        'description' => $line['description'],
+                        'qty_expected' => $line['qty_expected'],
+                        'qty_received' => $line['qty_received'],
+                        'unit' => $line['unit'] ?? 'each',
+                        'condition_notes' => $line['condition_notes'] ?? null,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            $this->audit->log('field.delivery_updated', $record, newValues: $data);
+
+            return $record->fresh(['lines', 'receiver']);
+        });
+    }
+
     protected function assertQtyMismatchDocumented(FieldDeliveryRecord $record, array $data): void
     {
         $hasShortage = false;

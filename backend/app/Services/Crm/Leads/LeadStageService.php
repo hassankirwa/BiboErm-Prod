@@ -18,7 +18,7 @@ class LeadStageService
 
     /** @var array<string, list<string>> */
     protected array $transitions = [
-        'new' => ['contacted', 'not_reachable', 'unqualified'],
+        'new' => ['contacted', 'interested', 'not_reachable', 'unqualified'],
         'contacted' => ['interested', 'not_reachable', 'unqualified'],
         'interested' => ['unqualified'],
         'account_created' => [],
@@ -101,8 +101,8 @@ class LeadStageService
         return match ($status) {
             LeadStatus::New->value => LeadPipelineStage::NewLead,
             LeadStatus::Contacted->value => LeadPipelineStage::ContactConfirmed,
-            LeadStatus::Interested->value => LeadPipelineStage::SiteVisitRequired,
-            LeadStatus::AccountCreated->value => LeadPipelineStage::SiteVisitRequired,
+            LeadStatus::Interested->value => LeadPipelineStage::ContactConfirmed,
+            LeadStatus::AccountCreated->value => LeadPipelineStage::AccountProvisioned,
             LeadStatus::NotReachable->value => LeadPipelineStage::Cold,
             LeadStatus::Unqualified->value => LeadPipelineStage::Lost,
             LeadStatus::Qualified->value => LeadPipelineStage::SiteVisitRequired,

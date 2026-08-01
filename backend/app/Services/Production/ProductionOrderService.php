@@ -168,7 +168,11 @@ class ProductionOrderService
         return $order->fresh();
     }
 
-    public function createRemakeFromDesignChange(DesignChangeOrder $dco, User $actor): ProductionOrder
+    public function createRemakeFromDesignChange(
+        DesignChangeOrder $dco,
+        User $actor,
+        ?ProductionStage $startStage = null,
+    ): ProductionOrder
     {
         $projectId = (int) $dco->project_id;
 
@@ -199,7 +203,9 @@ class ProductionOrderService
             ]);
         }
 
-        return DB::transaction(function () use ($dco, $projectId, $parent, $actor) {
+        $stage = $startStage ?? ProductionStage::MaterialPrep;
+
+        return DB::transaction(function () use ($dco, $projectId, $parent, $actor, $stage) {
             $fifo = $this->fifoSequenceForProject($projectId);
 
             $order = ProductionOrder::query()->create([
@@ -207,7 +213,7 @@ class ProductionOrderService
                 'project_id' => $projectId,
                 'parent_production_order_id' => $parent?->id,
                 'status' => ProductionOrderStatus::Scheduled,
-                'current_stage' => ProductionStage::MaterialPrep,
+                'current_stage' => $stage,
                 'fifo_position' => max(1, $fifo),
             ]);
 
@@ -218,6 +224,7 @@ class ProductionOrderService
                 'parent_production_order_id' => $parent?->id,
                 'created_by' => $actor->id,
                 'remake' => true,
+                'start_stage' => $stage->value,
             ]);
 
             return $order->load('project');

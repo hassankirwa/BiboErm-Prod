@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bold,
   BookOpen,
+  Italic,
   List,
   ListOrdered,
   NotebookPen,
@@ -25,10 +26,20 @@ import {
   hasLeadNotes,
   htmlToMarkdownLite,
   markdownLiteToHtml,
-  parseInlineBold,
+  parseInlineMarks,
   parseMarkdownLite,
+  type InlineMark,
   type LeadNotesSource,
 } from "@/lib/lead-notes-utils";
+
+function renderInlineMarks(parts: InlineMark[]) {
+  return parts.map((part, partIndex) => {
+    let node: React.ReactNode = part.text;
+    if (part.italic) node = <em>{node}</em>;
+    if (part.bold) node = <strong>{node}</strong>;
+    return <span key={partIndex}>{node}</span>;
+  });
+}
 
 function LeadNotesRendered({ text }: { text: string }) {
   const blocks = parseMarkdownLite(text);
@@ -59,15 +70,7 @@ function LeadNotesRendered({ text }: { text: string }) {
           return (
             <ul key={`bullet-${index}`} className="list-disc space-y-1 pl-5">
               {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>
-                  {parseInlineBold(item).map((part, partIndex) =>
-                    part.bold ? (
-                      <strong key={partIndex}>{part.text}</strong>
-                    ) : (
-                      <span key={partIndex}>{part.text}</span>
-                    ),
-                  )}
-                </li>
+                <li key={itemIndex}>{renderInlineMarks(parseInlineMarks(item))}</li>
               ))}
             </ul>
           );
@@ -77,15 +80,7 @@ function LeadNotesRendered({ text }: { text: string }) {
           return (
             <ol key={`numbered-${index}`} className="list-decimal space-y-1 pl-5">
               {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>
-                  {parseInlineBold(item).map((part, partIndex) =>
-                    part.bold ? (
-                      <strong key={partIndex}>{part.text}</strong>
-                    ) : (
-                      <span key={partIndex}>{part.text}</span>
-                    ),
-                  )}
-                </li>
+                <li key={itemIndex}>{renderInlineMarks(parseInlineMarks(item))}</li>
               ))}
             </ol>
           );
@@ -93,13 +88,7 @@ function LeadNotesRendered({ text }: { text: string }) {
 
         return (
           <p key={`paragraph-${index}`}>
-            {parseInlineBold(block.text).map((part, partIndex) =>
-              part.bold ? (
-                <strong key={partIndex}>{part.text}</strong>
-              ) : (
-                <span key={partIndex}>{part.text}</span>
-              ),
-            )}
+            {renderInlineMarks(parseInlineMarks(block.text))}
           </p>
         );
       })}
@@ -123,11 +112,45 @@ function LeadNotesEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const skipExternalSyncRef = useRef(false);
   const minHeight = Math.max(120, minRows * 24);
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    unorderedList: false,
+    orderedList: false,
+  });
 
   const syncEditorFromValue = useCallback((markdown: string) => {
     const el = editorRef.current;
     if (!el) return;
     el.innerHTML = markdown.trim() ? markdownLiteToHtml(markdown) : "";
+  }, []);
+
+  const refreshActiveFormats = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+
+    const selection = document.getSelection();
+    if (
+      !selection ||
+      selection.rangeCount === 0 ||
+      !selection.anchorNode ||
+      !el.contains(selection.anchorNode)
+    ) {
+      setActiveFormats({
+        bold: false,
+        italic: false,
+        unorderedList: false,
+        orderedList: false,
+      });
+      return;
+    }
+
+    setActiveFormats({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      unorderedList: document.queryCommandState("insertUnorderedList"),
+      orderedList: document.queryCommandState("insertOrderedList"),
+    });
   }, []);
 
   useEffect(() => {
@@ -144,16 +167,29 @@ function LeadNotesEditor({
     }
   }, [autoFocus]);
 
+  useEffect(() => {
+    const onSelectionChange = () => refreshActiveFormats();
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => document.removeEventListener("selectionchange", onSelectionChange);
+  }, [refreshActiveFormats]);
+
   const emitChange = useCallback(() => {
     const el = editorRef.current;
     if (!el) return;
     const markdown = htmlToMarkdownLite(el.innerHTML);
     skipExternalSyncRef.current = true;
     onChange(markdown);
-  }, [onChange]);
+    refreshActiveFormats();
+  }, [onChange, refreshActiveFormats]);
 
   const applyFormat = useCallback(
-    (command: "bold" | "insertUnorderedList" | "insertOrderedList") => {
+    (
+      command:
+        | "bold"
+        | "italic"
+        | "insertUnorderedList"
+        | "insertOrderedList",
+    ) => {
       editorRef.current?.focus();
       document.execCommand(command, false);
       emitChange();
@@ -171,6 +207,14 @@ function LeadNotesEditor({
     [emitChange],
   );
 
+  const formatButtonClass = (active: boolean) =>
+    cn(
+      "h-8 w-8 border p-0",
+      active
+        ? "border-[#1e3a5f] bg-[#1e3a5f] text-white hover:bg-[#1e3a5f] hover:text-white"
+        : "border-[#e8dcc8] bg-white text-[#1e3a5f]",
+    );
+
   return (
     <div className="overflow-hidden rounded-lg border border-[#e8dcc8] bg-[#fffdf8] shadow-sm">
       <div className="flex items-center gap-0.5 border-b border-[#efe6d6] bg-[#faf6ee] px-2 py-1.5">
@@ -179,7 +223,8 @@ function LeadNotesEditor({
           size="sm"
           variant="outline"
           aria-label="Bold"
-          className="h-8 w-8 border-[#e8dcc8] bg-white p-0"
+          aria-pressed={activeFormats.bold}
+          className={formatButtonClass(activeFormats.bold)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => applyFormat("bold")}
         >
@@ -189,8 +234,21 @@ function LeadNotesEditor({
           type="button"
           size="sm"
           variant="outline"
+          aria-label="Italic"
+          aria-pressed={activeFormats.italic}
+          className={formatButtonClass(activeFormats.italic)}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => applyFormat("italic")}
+        >
+          <Italic className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
           aria-label="Bullet list"
-          className="h-8 w-8 border-[#e8dcc8] bg-white p-0"
+          aria-pressed={activeFormats.unorderedList}
+          className={formatButtonClass(activeFormats.unorderedList)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => applyFormat("insertUnorderedList")}
         >
@@ -201,7 +259,8 @@ function LeadNotesEditor({
           size="sm"
           variant="outline"
           aria-label="Numbered list"
-          className="h-8 w-8 border-[#e8dcc8] bg-white p-0"
+          aria-pressed={activeFormats.orderedList}
+          className={formatButtonClass(activeFormats.orderedList)}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => applyFormat("insertOrderedList")}
         >
@@ -226,12 +285,14 @@ function LeadNotesEditor({
           aria-label={placeholder ?? "Lead note"}
           onInput={emitChange}
           onPaste={handlePaste}
+          onKeyUp={refreshActiveFormats}
+          onMouseUp={refreshActiveFormats}
           style={{ minHeight }}
           className={cn(
             "resize-y overflow-auto px-4 py-3 text-[15px] leading-relaxed text-[#2c2416] outline-none",
             "[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5",
             "[&_ul]:my-1 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
-            "[&_strong]:font-semibold",
+            "[&_strong]:font-semibold [&_em]:italic",
           )}
         />
       </div>
@@ -274,6 +335,74 @@ export function LeadNotesViewModal({
             <LeadNotesRendered text={notesText} />
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function LeadAddNoteDialog({
+  open,
+  onOpenChange,
+  leadTitle,
+  saving,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  leadTitle?: string;
+  saving?: boolean;
+  onConfirm: (noteText: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState("");
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setDraft("");
+    onOpenChange(next);
+  };
+
+  async function handleSave() {
+    if (!draft.trim()) return;
+    await onConfirm(draft);
+    setDraft("");
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg border-[#e8dcc8] bg-[#fffdf8]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-[#1e3a5f]">
+            <NotebookPen className="h-4 w-4" />
+            Add note
+          </DialogTitle>
+          <DialogDescription>
+            {leadTitle
+              ? `Record a note for ${leadTitle}.`
+              : "Record a note for this lead."}
+          </DialogDescription>
+        </DialogHeader>
+        <LeadNotesEditor
+          value={draft}
+          onChange={setDraft}
+          placeholder="Add a note — select text and use the toolbar to format."
+          minRows={5}
+          autoFocus
+        />
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleSave()}
+            disabled={saving || !draft.trim()}
+          >
+            {saving ? "Saving..." : "Add note"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

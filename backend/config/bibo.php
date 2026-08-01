@@ -81,6 +81,7 @@ return [
                 'permissions' => [
                     'projects.documents.view', 'projects.documents.upload',
                     'projects.bom.view', 'projects.bom.upload', 'projects.manage',
+                    'production.view',
                 ],
             ],
             'field-installation-photos' => [
@@ -187,7 +188,7 @@ return [
                     ['from' => 'final_design_approval', 'to' => ['bom_finalized']],
                     ['from' => 'qc_pre_installation', 'to' => ['in_transit', 'snagging']],
                     ['from' => 'in_transit', 'to' => ['installation']],
-                    ['from' => 'installation', 'to' => ['site_qc', 'snagging']],
+                    ['from' => 'installation', 'to' => []],
                     ['from' => 'site_qc', 'to' => ['snagging', 'project_complete']],
                     ['from' => 'snagging', 'to' => ['project_complete']],
                 ],

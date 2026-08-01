@@ -10,6 +10,9 @@ class ToolResource extends JsonResource
     public function toArray(Request $request): array
     {
         $activeIssuance = $this->activeIssuance();
+        if ($activeIssuance) {
+            $activeIssuance->loadMissing(['project', 'issuedToUser']);
+        }
         $issuedQty = $this->issuedQty();
 
         return [
@@ -33,6 +36,16 @@ class ToolResource extends JsonResource
                 'issued_to' => $activeIssuance->issued_to,
                 'quantity' => (int) $activeIssuance->quantity,
                 'issue_date' => $activeIssuance->issue_date?->toDateString(),
+                'project' => $activeIssuance->project ? [
+                    'id' => $activeIssuance->project->id,
+                    'reference' => $activeIssuance->project->reference,
+                    'name' => $activeIssuance->project->name,
+                    'stage' => $activeIssuance->project->stage?->value ?? $activeIssuance->project->stage,
+                ] : null,
+                'issued_to_user' => $activeIssuance->issuedToUser ? [
+                    'id' => $activeIssuance->issuedToUser->id,
+                    'name' => $activeIssuance->issuedToUser->name,
+                ] : null,
             ] : null,
         ];
     }

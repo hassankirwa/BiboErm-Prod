@@ -19,6 +19,7 @@ export const QC_INSPECTION_CONTEXTS = [
   "production_qc_pre_check",
   "production_qc_post_fabrication",
   "production_in_process",
+  "site_receiving",
   "site_installation",
   "snagging_signoff",
 ] as const;
@@ -207,6 +208,7 @@ export const QC_CONTEXT_LABELS: Record<QcInspectionContext, string> = {
   production_qc_pre_check: "Pre-cutting QC",
   production_qc_post_fabrication: "Post-fabrication QC",
   production_in_process: "In-process QC",
+  site_receiving: "Site receiving",
   site_installation: "Site installation",
   snagging_signoff: "Snagging sign-off",
 };

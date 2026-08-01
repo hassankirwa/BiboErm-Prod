@@ -108,16 +108,24 @@ class ProjectDispatchDriverOccupancyTest extends TestCase
 
         $this->assertSame(DriverStatus::Occupied, $driverB->fresh()->status);
 
+        $dispatchB = ProjectDispatch::query()->where('project_id', $projectB->id)->firstOrFail();
+
+        $this->postJson("/api/v1/projects/project-dispatches/{$dispatchB->id}/delivered")
+            ->assertOk()
+            ->assertJsonPath('data.status', ProjectDispatchStatus::Delivered->value);
+
+        $this->assertSame(DriverStatus::Available, $driverB->fresh()->status);
+
         $this->postJson("/api/v1/projects/{$projectB->id}/advance-stage", [
             'stage' => ProjectStage::Installation->value,
         ])->assertOk();
 
-        $this->assertSame(DriverStatus::Available, $driverB->fresh()->status);
         $this->assertDatabaseHas('project_dispatches', [
             'project_id' => $projectB->id,
             'driver_id' => $driverB->id,
             'status' => ProjectDispatchStatus::Delivered->value,
         ]);
+        $this->assertSame(ProjectStage::Installation, $projectB->fresh()->stage);
     }
 
     public function test_cannot_dispatch_occupied_driver(): void

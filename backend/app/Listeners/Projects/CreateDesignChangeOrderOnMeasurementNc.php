@@ -45,6 +45,14 @@ class CreateDesignChangeOrderOnMeasurementNc
             return;
         }
 
-        $this->designChanges->createFromNonConformity($nc, $actor);
+        try {
+            $this->designChanges->createFromNonConformity($nc, $actor);
+        } catch (\Throwable $e) {
+            Log::error('Auto design-change order failed after measurement NC', [
+                'non_conformity_id' => $nc->id,
+                'project_id' => $nc->project_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

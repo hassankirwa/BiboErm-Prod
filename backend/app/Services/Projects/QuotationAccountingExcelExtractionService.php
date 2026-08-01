@@ -55,7 +55,7 @@ class QuotationAccountingExcelExtractionService
             $payload = $this->attachWorkbookDrawings($payload, $path, $extension);
         }
 
-        return $payload;
+        return $this->drawingExtractor->sanitizePayloadForJson($payload);
     }
 
     /**
@@ -1508,6 +1508,7 @@ class QuotationAccountingExcelExtractionService
             if ($embeddedMedia === null) {
                 $embeddedMedia = $this->drawingExtractor->emptyEmbeddedMedia('none_found');
             }
+            $embeddedMedia = $this->drawingExtractor->prepareMediaForJson($embeddedMedia);
 
             $accounting = $line['metadata']['accounting'] ?? [];
             $accounting['drawing'] = [

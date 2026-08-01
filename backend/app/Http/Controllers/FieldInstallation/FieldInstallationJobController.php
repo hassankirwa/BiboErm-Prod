@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\FieldInstallation;
 
+use App\Enums\Projects\ProjectDispatchStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FieldInstallation\AssignFieldJobMemberRequest;
 use App\Http\Requests\FieldInstallation\StoreFieldJobRequest;
 use App\Http\Requests\FieldInstallation\UpdateFieldJobRequest;
 use App\Http\Resources\FieldInstallation\FieldInstallationJobResource;
 use App\Models\FieldInstallation\FieldInstallationJob;
+use App\Models\Projects\ProjectDispatch;
 use App\Services\FieldInstallation\FieldInstallationJobService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,17 +56,33 @@ class FieldInstallationJobController extends Controller
     {
         $this->authorize('view', $fieldJob);
 
-        return new FieldInstallationJobResource(
-            $fieldJob->load([
-                'project',
-                'teamLead',
-                'activeMembers.user',
-                'units',
-                'toolAssignments.toolIssuance.tool',
-                'toolAssignments.toolIssuance.issuedToUser',
-                'toolAssignments.assignedByUser',
-            ])
-        );
+        $job = $fieldJob->load([
+            'project',
+            'teamLead',
+            'activeMembers.user',
+            'units',
+            'toolAssignments.toolIssuance.tool',
+            'toolAssignments.toolIssuance.issuedToUser',
+            'toolAssignments.assignedByUser',
+        ]);
+
+        $assignedDispatch = ProjectDispatch::query()
+            ->where('project_id', $job->project_id)
+            ->with('driver')
+            ->orderByRaw(
+                'CASE WHEN status IN (?, ?) THEN 0 ELSE 1 END',
+                [
+                    ProjectDispatchStatus::Scheduled->value,
+                    ProjectDispatchStatus::InTransit->value,
+                ],
+            )
+            ->latest('dispatched_at')
+            ->latest('id')
+            ->first();
+
+        $job->setRelation('assignedDispatch', $assignedDispatch);
+
+        return new FieldInstallationJobResource($job);
     }
 
     public function update(UpdateFieldJobRequest $request, FieldInstallationJob $fieldJob): FieldInstallationJobResource

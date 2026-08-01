@@ -17,6 +17,12 @@ class DesignChangeOrderResource extends JsonResource
             'status' => $this->status instanceof \BackedEnum ? $this->status->value : $this->status,
             'reason' => $this->reason,
             'measurement_notes' => $this->measurement_notes,
+            'change_path' => is_array($this->measurement_notes)
+                ? ($this->measurement_notes['change_path'] ?? null)
+                : null,
+            'change_items' => is_array($this->measurement_notes)
+                ? ($this->measurement_notes['items'] ?? [])
+                : [],
             'scope_bom_line_ids' => $this->scope_bom_line_ids,
             'remeasure_site_visit_id' => $this->remeasure_site_visit_id,
             'revised_bom_version' => $this->revised_bom_version,

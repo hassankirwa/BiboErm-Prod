@@ -73,6 +73,7 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
     {
         $manager = $this->warehouseAluminiumManager();
         $employee = $this->warehouseAccessoriesManager();
+        $project = $this->createTestProject();
 
         $create = $this->actingAsSanctum($manager)
             ->postJson('/api/v1/warehouse/tools', [
@@ -90,6 +91,7 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
         $this->actingAsSanctum($manager)
             ->postJson("/api/v1/warehouse/tools/{$toolId}/issue", [
                 'issued_to' => $employee->id,
+                'project_id' => $project->id,
                 'quantity' => 5,
             ])
             ->assertOk()

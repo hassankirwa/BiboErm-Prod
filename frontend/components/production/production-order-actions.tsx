@@ -244,7 +244,7 @@ export function ProductionOrderActions({
   async function handleComplete() {
     if (isMaterialPrep) {
       if (!hasStageAssignee) {
-        toast.error("Assign a team member to material preparation before completing");
+        toast.error("Assign a team member to materials & tools assembly before completing");
         return;
       }
     }
@@ -364,7 +364,7 @@ export function ProductionOrderActions({
           )}
           {isMaterialPrep && hasStarted && !hasStageAssignee && (
             <p className="w-full text-xs text-muted-foreground">
-              Assign a team member to material preparation before completing this stage.
+              Assign a team member to materials & tools assembly before completing this stage.
             </p>
           )}
           {isCutting && hasStarted && cuttingBlockReason && (

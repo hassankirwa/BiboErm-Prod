@@ -9,6 +9,7 @@ use App\Models\Deal;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Projects\ProjectActivationService;
 use App\Services\Projects\ProjectDealSyncService;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class DealToProjectService
         protected CrmAuditLogger $crmAudit,
         protected ProjectActivationService $projectActivation,
         protected ProjectDealSyncService $projectDealSync,
+        protected LeadPipelineService $leadPipeline,
     ) {}
 
     public function createFromDeal(Deal $deal, User $user): array
@@ -69,7 +71,7 @@ class DealToProjectService
                 'contact_id' => $deal->primary_contact_id ?? $deal->contact_id,
                 'account_id' => $deal->account_id,
                 'site_address' => $deal->site_address,
-                'quoted_amount' => $deal->final_agreed_amount ?? $deal->estimated_value ?? $deal->amount,
+                'quoted_amount' => $deal->displayValueKes(),
                 'deposit_received' => $this->projectDealSync->dealDepositPaid($deal),
                 'sales_rep_id' => $deal->deal_owner_id ?? $deal->owner_id ?? $user->id,
                 'stage' => $projectStage,
@@ -98,6 +100,8 @@ class DealToProjectService
             ], $user);
 
             DealProjectCreated::dispatch($deal, $project);
+
+            $this->leadPipeline->syncFromDeal($deal->fresh(), $user);
 
             return [
                 'deal' => $deal->fresh()->load(['contact', 'account', 'owner', 'project']),

@@ -4,10 +4,12 @@ use App\Http\Controllers\Warehouse\Tools\IssueToolController;
 use App\Http\Controllers\Warehouse\Tools\ReturnToolController;
 use App\Http\Controllers\Warehouse\Tools\ToolController;
 use App\Http\Controllers\Warehouse\Tools\ToolIncidentController;
+use App\Http\Controllers\Warehouse\Tools\ToolIssuanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('permission:warehouse.tools.view|warehouse.tools.manage')->group(function () {
     Route::get('tools', [ToolController::class, 'index']);
+    Route::get('tools/issuances', [ToolIssuanceController::class, 'index']);
     Route::get('tools/incidents', [ToolIncidentController::class, 'index']);
 });
 

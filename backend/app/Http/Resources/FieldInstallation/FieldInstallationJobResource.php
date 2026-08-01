@@ -44,6 +44,32 @@ class FieldInstallationJobResource extends JsonResource
             'members' => FieldInstallationJobMemberResource::collection($this->whenLoaded('activeMembers')),
             'units' => FieldUnitProgressResource::collection($this->whenLoaded('units')),
             'tool_assignments' => FieldToolAssignmentResource::collection($this->whenLoaded('toolAssignments')),
+            'assigned_dispatch' => $this->when(
+                $this->relationLoaded('assignedDispatch'),
+                function () {
+                    $dispatch = $this->assignedDispatch;
+                    if (! $dispatch) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $dispatch->id,
+                        'status' => $dispatch->status?->value ?? $dispatch->status,
+                        'vehicle_reg' => $dispatch->vehicle_reg
+                            ?? $dispatch->driver?->vehicle_registration,
+                        'vehicle_details' => $dispatch->vehicle_details,
+                        'dispatched_at' => $dispatch->dispatched_at?->toIso8601String(),
+                        'delivered_at' => $dispatch->delivered_at?->toIso8601String(),
+                        'driver' => $dispatch->driver ? [
+                            'id' => $dispatch->driver->id,
+                            'code' => $dispatch->driver->code,
+                            'name' => $dispatch->driver->name,
+                            'phone' => $dispatch->driver->phone,
+                            'vehicle_registration' => $dispatch->driver->vehicle_registration,
+                        ] : null,
+                    ];
+                },
+            ),
         ];
     }
 }

@@ -6,6 +6,7 @@ import { Package, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  adjustProjectReservation,
   getProject,
   getProjectMaterialStatus,
   projectLabel,
@@ -51,6 +53,8 @@ type ReservationsWorkbenchProps = {
   projectId: number;
 };
 
+type AdjustDrafts = Record<string, string>;
+
 export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps) {
   const { hasPermission } = useAuth();
   const canReserve = hasPermission("warehouse.reservations.create");
@@ -63,11 +67,15 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [adjustingKey, setAdjustingKey] = useState<string | null>(null);
+  const [adjustDrafts, setAdjustDrafts] = useState<AdjustDrafts>({});
   const [receivedBy, setReceivedBy] = useState("");
   const [releaseNotes, setReleaseNotes] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true);
+    }
     try {
       const [projectRes, statusRes, reservationsRes] = await Promise.all([
         getProject(projectId),
@@ -78,9 +86,13 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
       setMaterialStatus(statusRes.data);
       setReservations(reservationsRes.data);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load workbench.");
+      if (!opts?.silent) {
+        toast.error(error instanceof Error ? error.message : "Failed to load workbench.");
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) {
+        setLoading(false);
+      }
     }
   }, [projectId]);
 
@@ -117,6 +129,7 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
       number,
       {
         key: string;
+        warehouse_item_id: number;
         material_name: string;
         material_code: string | null;
         cutParts: string[];
@@ -128,13 +141,16 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
         offcut_usable: string | null;
         bars_needed: number | null;
         shortage_qty: string;
+        is_fully_reserved: boolean;
       }
     >();
     const other: typeof warehouseLines = [];
 
     for (const line of warehouseLines) {
       const isAluminium =
-        line.line_type === "aluminium_profile" || line.bars_needed != null;
+        Boolean(line.is_combined_aluminium) ||
+        line.line_type === "aluminium_profile" ||
+        line.bars_needed != null;
       if (!isAluminium || !line.warehouse_item_id) {
         other.push(line);
         continue;
@@ -145,6 +161,7 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
       if (!existing) {
         aluminiumByItem.set(line.warehouse_item_id, {
           key: `alu-${line.warehouse_item_id}`,
+          warehouse_item_id: line.warehouse_item_id,
           material_name: line.material_name,
           material_code: line.material_code,
           cutParts: [cutLabel],
@@ -156,12 +173,15 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
           offcut_usable: line.offcut_usable ?? null,
           bars_needed: line.bars_needed ?? null,
           shortage_qty: line.shortage_qty,
+          is_fully_reserved: Boolean(line.is_fully_reserved),
         });
       } else {
         existing.cutParts.push(cutLabel);
-        // SKU-level fields are identical on every line; keep first non-zero shortage.
         if (Number(existing.shortage_qty) <= 0 && Number(line.shortage_qty) > 0) {
           existing.shortage_qty = line.shortage_qty;
+        }
+        if (line.is_fully_reserved) {
+          existing.is_fully_reserved = true;
         }
       }
     }
@@ -172,6 +192,100 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
     };
   }, [warehouseLines]);
 
+  useEffect(() => {
+    const next: AdjustDrafts = {};
+    for (const row of availabilityRows.aluminium) {
+      next[row.key] = Number(row.reserved_qty).toFixed(3);
+    }
+    for (const line of availabilityRows.other) {
+      next[`other-${line.bom_line_id}`] = Number(line.reserved_qty).toFixed(3);
+    }
+    setAdjustDrafts(next);
+  }, [availabilityRows]);
+
+  function applyOptimisticHeldQty(opts: {
+    itemId: number;
+    bomLineRef?: string;
+    quantity: string;
+  }): ProjectMaterialStatus | null {
+    if (!materialStatus) {
+      return null;
+    }
+
+    const previous = materialStatus;
+    const qty = Number(opts.quantity).toFixed(3);
+    const isAluminiumAdjust = !opts.bomLineRef;
+
+    let unitDelta = 0;
+    let lineFullyDelta = 0;
+    const seenAluminium = new Set<number>();
+
+    const nextLines = previous.lines.map((line) => {
+      const matches = opts.bomLineRef
+        ? String(line.bom_line_id) === opts.bomLineRef
+        : line.warehouse_item_id === opts.itemId;
+
+      if (!matches || line.is_procurement_only) {
+        return line;
+      }
+
+      const target = Number(line.reservation_target_qty ?? line.required_qty);
+      const wasFull = Number(line.reserved_qty) >= target && target > 0;
+      const nowFull = Number(qty) >= target && target > 0;
+
+      if (isAluminiumAdjust && line.warehouse_item_id != null) {
+        if (!seenAluminium.has(line.warehouse_item_id)) {
+          seenAluminium.add(line.warehouse_item_id);
+          if (!wasFull && nowFull) unitDelta += 1;
+          if (wasFull && !nowFull) unitDelta -= 1;
+        }
+      } else {
+        if (!wasFull && nowFull) unitDelta += 1;
+        if (wasFull && !nowFull) unitDelta -= 1;
+      }
+
+      if (!wasFull && nowFull) lineFullyDelta += 1;
+      if (wasFull && !nowFull) lineFullyDelta -= 1;
+
+      return {
+        ...line,
+        reserved_qty: qty,
+        is_fully_reserved: nowFull,
+        shortage_qty: nowFull ? "0.000" : line.shortage_qty,
+      };
+    });
+
+    const unitsTotal =
+      previous.summary.reservation_units_total ?? previous.summary.warehouse_lines;
+    const prevUnitsReserved =
+      previous.summary.reservation_units_reserved ?? previous.summary.fully_reserved;
+    const nextUnitsReserved = Math.max(0, prevUnitsReserved + unitDelta);
+    const reservationComplete = unitsTotal > 0 && nextUnitsReserved >= unitsTotal;
+
+    setMaterialStatus({
+      ...previous,
+      lines: nextLines,
+      summary: {
+        ...previous.summary,
+        fully_reserved: Math.max(0, previous.summary.fully_reserved + lineFullyDelta),
+        reservation_units_reserved: nextUnitsReserved,
+        reservation_complete: reservationComplete,
+        can_reserve_now: previous.summary.can_fully_reserve && !reservationComplete,
+      },
+    });
+    setAdjustDrafts((drafts) => {
+      const next = { ...drafts };
+      if (opts.bomLineRef) {
+        next[`other-${opts.bomLineRef}`] = qty;
+      } else {
+        next[`alu-${opts.itemId}`] = qty;
+      }
+      return next;
+    });
+
+    return previous;
+  }
+
   async function handleReserve() {
     setReserving(true);
     try {
@@ -180,12 +294,62 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
         toast.error(response.message ?? "Could not reserve materials.");
         return;
       }
-      toast.success("Materials reserved for this project (stock held, not deducted yet).");
-      await load();
+      toast.success(
+        response.topped_up
+          ? "Reservation topped up — only missing quantities were held."
+          : "Materials reserved for this project (stock held, not deducted yet).",
+      );
+      await load({ silent: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to reserve materials.");
     } finally {
       setReserving(false);
+    }
+  }
+
+  async function handleAdjust(opts: {
+    key: string;
+    itemId: number;
+    bomLineRef?: string;
+    uomLabel: string;
+    quantity?: number | string;
+  }) {
+    const raw = opts.quantity ?? adjustDrafts[opts.key];
+    const qty = Number(raw);
+    if (!Number.isFinite(qty) || qty < 0) {
+      toast.error("Enter a valid reserved quantity (0 or more).");
+      return;
+    }
+
+    const quantity = qty.toFixed(3);
+    const snapshot = applyOptimisticHeldQty({
+      itemId: opts.itemId,
+      bomLineRef: opts.bomLineRef,
+      quantity,
+    });
+
+    setAdjustingKey(opts.key);
+    try {
+      const response = await adjustProjectReservation(projectId, {
+        item_id: opts.itemId,
+        quantity_reserved: quantity,
+        bom_line_ref: opts.bomLineRef,
+        notes: "Manual reservation adjustment",
+      });
+      if (!response.success) {
+        if (snapshot) setMaterialStatus(snapshot);
+        toast.error(response.message ?? "Could not adjust reservation.");
+        return;
+      }
+      toast.success(
+        `Held set to ${response.quantity_reserved} ${opts.uomLabel} (was ${response.previous_qty}).`,
+      );
+      void load({ silent: true });
+    } catch (error) {
+      if (snapshot) setMaterialStatus(snapshot);
+      toast.error(error instanceof Error ? error.message : "Failed to adjust reservation.");
+    } finally {
+      setAdjustingKey(null);
     }
   }
 
@@ -239,8 +403,11 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
     typeof summary.reservation_complete === "boolean"
       ? summary.reservation_complete
       : unitsTotal > 0 && unitsReserved >= unitsTotal;
+  const hasPartialHold = activeReservation !== null && !fullyReserved;
   const showReserve =
     canReserve && RESERVE_STAGES.has(stage) && Boolean(summary.can_reserve_now);
+  const showAdjust =
+    canReserve && RESERVE_STAGES.has(stage) && (activeReservation !== null || showReserve);
   const showRelease =
     canRelease &&
     RELEASE_STAGES.has(stage) &&
@@ -284,6 +451,9 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
           <CardContent className="space-y-3 text-sm">
             <p className="text-muted-foreground">
               Holds stock for this project (FIFO). Does not deduct on-hand until release handover.
+              {hasPartialHold
+                ? " Top-up only books the missing gap — already held lines are left alone."
+                : ""}
             </p>
             {showReserve ? (
               <Button size="sm" onClick={() => void handleReserve()} disabled={reserving}>
@@ -292,7 +462,7 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                 ) : (
                   <Package className="mr-2 h-4 w-4" />
                 )}
-                Reserve materials
+                {hasPartialHold ? "Top up missing" : "Reserve materials"}
               </Button>
             ) : (
               <p className="text-muted-foreground">
@@ -365,7 +535,7 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                     : activeReservation === null
                       ? "Reserve materials first, then release to production."
                       : !fullyReserved
-                        ? `Reservation incomplete (${unitsReserved}/${unitsTotal} units). Aluminium profiles count once per SKU — finish remaining accessories/hardware before release.`
+                        ? `Reservation incomplete (${unitsReserved}/${unitsTotal} units). Top up missing or adjust held qty below, then release.`
                         : "Release is available once materials are fully reserved to this project."}
               </p>
             )}
@@ -377,8 +547,10 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
         <CardHeader className="pb-3">
           <CardTitle className="text-base">BOM availability</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Aluminium is grouped by SKU: all fabrication cuts for that profile are packed onto
-            6m bars. Accessories stay as piece quantities.
+            Aluminium profiles nest onto 6m bars. Rubber/seals reserve exact cut metres.
+            {showAdjust
+              ? " Use Adjust to manually set held quantity for a line (increase or decrease)."
+              : ""}
           </p>
         </CardHeader>
         <CardContent className="overflow-x-auto space-y-6">
@@ -395,6 +567,7 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                     <TableHead className="text-right">WH avail.</TableHead>
                     <TableHead className="text-right">Offcut</TableHead>
                     <TableHead className="text-right">Shortage</TableHead>
+                    {showAdjust ? <TableHead className="text-right">Adjust held</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -403,8 +576,12 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                       row.reservation_uom === "metre" || row.reservation_uom === "m"
                         ? "m"
                         : row.reservation_uom;
+                    const underReserved = !row.is_fully_reserved;
                     return (
-                      <TableRow key={row.key}>
+                      <TableRow
+                        key={row.key}
+                        className={underReserved ? "bg-amber-500/5" : undefined}
+                      >
                         <TableCell>
                           <div className="font-medium">{row.material_name}</div>
                           <div className="text-xs text-muted-foreground">
@@ -421,7 +598,9 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                           {row.bars_needed ?? "—"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {row.reserved_qty} / {row.reservation_target_qty} {uom}
+                          <span className={underReserved ? "text-amber-700 dark:text-amber-400" : undefined}>
+                            {row.reserved_qty} / {row.reservation_target_qty} {uom}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {row.warehouse_available ?? "—"}
@@ -440,6 +619,64 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                             `${row.shortage_qty} ${uom}`
                           )}
                         </TableCell>
+                        {showAdjust ? (
+                          <TableCell className="text-right">
+                            <div className="inline-flex items-center gap-1.5 justify-end">
+                              <Input
+                                className="h-8 w-24 text-right tabular-nums"
+                                type="number"
+                                min={0}
+                                step="0.001"
+                                value={adjustDrafts[row.key] ?? ""}
+                                onChange={(event) =>
+                                  setAdjustDrafts((prev) => ({
+                                    ...prev,
+                                    [row.key]: event.target.value,
+                                  }))
+                                }
+                                aria-label={`Adjust held ${row.material_code ?? row.material_name}`}
+                              />
+                              <span className="text-xs text-muted-foreground w-4">{uom}</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8"
+                                disabled={adjustingKey === row.key}
+                                onClick={() =>
+                                  void handleAdjust({
+                                    key: row.key,
+                                    itemId: row.warehouse_item_id,
+                                    uomLabel: uom,
+                                  })
+                                }
+                              >
+                                {adjustingKey === row.key ? (
+                                  <Spinner className="h-3.5 w-3.5" />
+                                ) : (
+                                  "Set"
+                                )}
+                              </Button>
+                              {underReserved ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-8"
+                                  disabled={adjustingKey === row.key}
+                                  onClick={() =>
+                                    void handleAdjust({
+                                      key: row.key,
+                                      itemId: row.warehouse_item_id,
+                                      uomLabel: uom,
+                                      quantity: row.reservation_target_qty,
+                                    })
+                                  }
+                                >
+                                  Fill need
+                                </Button>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     );
                   })}
@@ -461,36 +698,89 @@ export function ReservationsWorkbench({ projectId }: ReservationsWorkbenchProps)
                     <TableHead className="text-right">Held / need</TableHead>
                     <TableHead className="text-right">WH avail.</TableHead>
                     <TableHead className="text-right">Shortage</TableHead>
+                    {showAdjust ? <TableHead className="text-right">Adjust held</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {availabilityRows.other.map((line) => (
-                    <TableRow key={line.bom_line_id}>
-                      <TableCell>
-                        <div className="font-medium">{line.material_name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {line.material_code ?? "—"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {line.required_qty}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {line.reserved_qty} / {line.reservation_target_qty ?? line.required_qty}{" "}
-                        pcs
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {line.warehouse_available ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {Number(line.shortage_qty) > 0 ? (
-                          <span className="text-destructive">{line.shortage_qty}</span>
-                        ) : (
-                          line.shortage_qty
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {availabilityRows.other.map((line) => {
+                    const key = `other-${line.bom_line_id}`;
+                    const underReserved = !line.is_fully_reserved;
+                    return (
+                      <TableRow
+                        key={line.bom_line_id}
+                        className={underReserved ? "bg-amber-500/5" : undefined}
+                      >
+                        <TableCell>
+                          <div className="font-medium">{line.material_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {line.material_code ?? "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {line.required_qty}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          <span className={underReserved ? "text-amber-700 dark:text-amber-400" : undefined}>
+                            {line.reserved_qty} / {line.reservation_target_qty ?? line.required_qty}{" "}
+                            pcs
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {line.warehouse_available ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {Number(line.shortage_qty) > 0 ? (
+                            <span className="text-destructive">{line.shortage_qty}</span>
+                          ) : (
+                            line.shortage_qty
+                          )}
+                        </TableCell>
+                        {showAdjust && line.warehouse_item_id ? (
+                          <TableCell className="text-right">
+                            <div className="inline-flex items-center gap-1.5 justify-end">
+                              <Input
+                                className="h-8 w-24 text-right tabular-nums"
+                                type="number"
+                                min={0}
+                                step="0.001"
+                                value={adjustDrafts[key] ?? ""}
+                                onChange={(event) =>
+                                  setAdjustDrafts((prev) => ({
+                                    ...prev,
+                                    [key]: event.target.value,
+                                  }))
+                                }
+                                aria-label={`Adjust held ${line.material_code ?? line.material_name}`}
+                              />
+                              <span className="text-xs text-muted-foreground w-6">pcs</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8"
+                                disabled={adjustingKey === key}
+                                onClick={() =>
+                                  void handleAdjust({
+                                    key,
+                                    itemId: line.warehouse_item_id!,
+                                    bomLineRef: String(line.bom_line_id),
+                                    uomLabel: "pcs",
+                                  })
+                                }
+                              >
+                                {adjustingKey === key ? (
+                                  <Spinner className="h-3.5 w-3.5" />
+                                ) : (
+                                  "Set"
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        ) : showAdjust ? (
+                          <TableCell />
+                        ) : null}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

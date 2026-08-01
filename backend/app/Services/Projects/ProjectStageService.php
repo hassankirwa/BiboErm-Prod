@@ -2,10 +2,13 @@
 
 namespace App\Services\Projects;
 
+use App\Enums\FieldInstallation\FieldJobStatus;
+use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
 use App\Enums\QualityControl\QcInspectionContext;
 use App\Enums\QualityControl\QcInspectionResult;
 use App\Events\Projects\ProjectStageAdvanced;
+use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\Project;
 use App\Models\ProjectStageLog;
 use App\Models\QualityControl\QcInspection;
@@ -93,6 +96,17 @@ class ProjectStageService
         if (! $force && ! $this->canTransition($project, $toStage)) {
             throw ValidationException::withMessages([
                 'stage' => ["Cannot transition project from {$fromStage->value} to {$toStage->value}."],
+            ]);
+        }
+
+        if (
+            ! $force
+            && $fromStage === ProjectStage::Installation
+            && in_array($toStage, [ProjectStage::SiteQc, ProjectStage::Snagging], true)
+            && ! $this->hasCompletedFieldInstallation($project)
+        ) {
+            throw ValidationException::withMessages([
+                'stage' => ['Field installation must be completed before leaving the installation stage.'],
             ]);
         }
 
@@ -211,6 +225,22 @@ class ProjectStageService
     public function current(Project $project): ProjectStage
     {
         return $this->currentStage($project);
+    }
+
+    public function hasCompletedFieldInstallation(Project $project): bool
+    {
+        $installMode = $project->install_mode instanceof InstallMode
+            ? $project->install_mode
+            : InstallMode::tryFrom((string) $project->install_mode);
+
+        if ($installMode === InstallMode::NairobiFabricationOnly) {
+            return true;
+        }
+
+        return FieldInstallationJob::query()
+            ->where('project_id', $project->id)
+            ->where('status', FieldJobStatus::Completed->value)
+            ->exists();
     }
 
     /**

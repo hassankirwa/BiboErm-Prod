@@ -47,7 +47,8 @@ export function qcDefaultsForProductionStage(currentStage?: string | null): {
     };
   }
   if (currentStage === "qc_pre_check") {
-    return { context: "production_qc_pre_check", lockContext: false };
+    // Legacy stage — prefer in-process QC rather than a dedicated pre-check.
+    return { context: "production_in_process", lockContext: false };
   }
   if (currentStage && IN_PROCESS_STAGE_VALUES.has(currentStage)) {
     return {
@@ -56,7 +57,7 @@ export function qcDefaultsForProductionStage(currentStage?: string | null): {
       lockContext: false,
     };
   }
-  return { context: "production_qc_pre_check", lockContext: false };
+  return { context: "production_in_process", lockContext: false };
 }
 
 type Props = {

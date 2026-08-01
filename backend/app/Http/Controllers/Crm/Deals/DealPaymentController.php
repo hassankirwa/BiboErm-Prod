@@ -63,7 +63,9 @@ class DealPaymentController extends Controller
         return response()->json([
             'data' => [
                 'payment' => new DealPaymentResource($payment),
-                'deal' => new DealResource($deal->fresh()->load(['contact', 'account', 'owner'])),
+                'deal' => new DealResource(
+                    $deal->fresh()->load(['contact', 'account', 'owner', 'quotations.lines']),
+                ),
             ],
         ], 201);
     }

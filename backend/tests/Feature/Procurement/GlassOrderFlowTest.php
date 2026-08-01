@@ -122,6 +122,47 @@ class GlassOrderFlowTest extends TestCase
         $this->assertSame('2.000', $requisition->lines->first()->quantity);
     }
 
+    public function test_mark_ordered_accepts_pane_type_and_tint_without_requirements_text(): void
+    {
+        $project = $this->createProject();
+        $supplier = \App\Models\Procurement\Supplier::query()->create([
+            'code' => 'GLASS-03',
+            'name' => 'Pane Spec Glass Co',
+            'category' => 'glass',
+            'is_active' => true,
+        ]);
+
+        $order = GlassOrder::query()->create([
+            'order_number' => 'GLS-TEST-005',
+            'project_id' => $project->id,
+            'supplier_id' => $supplier->id,
+            'specs' => [
+                'requirements' => '',
+                'panes' => [
+                    [
+                        'name' => 'Reflective glass',
+                        'width_mm' => 633,
+                        'height_mm' => 1961,
+                        'quantity' => 2,
+                        'glass_type' => 'Tempered Glass',
+                        'tint' => 'Grey',
+                    ],
+                ],
+            ],
+            'status' => GlassOrderStatus::Draft,
+            'created_by' => $this->manager->id,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/procurement/glass-orders/{$order->id}/mark-ordered")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'ordered')
+            ->assertJsonPath(
+                'data.specs.requirements',
+                'Reflective glass: Tempered Glass / Grey'
+            );
+    }
+
     public function test_mark_delivered_requires_buying_prices_and_records_price_per_sqm(): void
     {
         $project = $this->createProject();
@@ -208,5 +249,39 @@ class GlassOrderFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.project_id', $project->id)
             ->assertJsonPath('data.0.project.reference', 'PRJ-GLASS-001');
+    }
+
+    public function test_create_autofills_pane_width_and_height_from_bom(): void
+    {
+        $project = $this->createProject();
+
+        $bom = \App\Models\ProjectBom::query()->create([
+            'project_id' => $project->id,
+            'version' => 1,
+            'status' => 'draft',
+            'uploaded_by' => $this->manager->id,
+        ]);
+
+        \App\Models\ProjectBomLine::query()->create([
+            'bom_id' => $bom->id,
+            'line_type' => 'glass',
+            'material_name' => 'Reflective glass',
+            'quantity' => 2,
+            'measurement_mm' => 1961,
+            'width_mm' => 633,
+            'height_mm' => 1961,
+            'is_glass' => true,
+            'unit_of_measure' => 'pcs',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson('/api/v1/procurement/glass-orders', [
+                'project_id' => $project->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.specs.panes.0.width_mm', 633)
+            ->assertJsonPath('data.specs.panes.0.height_mm', 1961)
+            ->assertJsonPath('data.specs.panes.0.quantity', 2);
     }
 }

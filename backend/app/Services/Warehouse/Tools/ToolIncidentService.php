@@ -176,7 +176,7 @@ class ToolIncidentService
     ): ToolIncident {
         $issuance->loadMissing('tool', 'issuedToUser', 'issuedByUser');
 
-        $type = $conditionIn === ToolCondition::Retired->value
+        $type = in_array($conditionIn, [ToolCondition::Retired->value, ToolCondition::Lost->value], true)
             ? ToolIncidentType::Loss
             : ToolIncidentType::Damage;
 
@@ -210,7 +210,7 @@ class ToolIncidentService
         }
 
         if ($type === ToolIncidentType::Loss) {
-            $tool->condition = ToolCondition::Retired;
+            $tool->condition = ToolCondition::Lost;
         } else {
             $tool->condition = ToolCondition::Damaged;
         }

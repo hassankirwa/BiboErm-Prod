@@ -106,9 +106,76 @@ class ProjectOperationsController extends Controller
                 'stage' => $this->stages->currentStage($project->fresh())->value,
             ],
             'check' => $result['check'],
+            'topped_up' => (bool) ($result['topped_up'] ?? false),
             'reservation' => [
                 'id' => $result['reservation']->id,
                 'fifo_sequence' => $result['reservation']->fifo_sequence,
+                'status' => $result['reservation']->status,
+            ],
+        ]);
+    }
+
+    public function adjustReservation(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('viewMaterialStatus', $project);
+        abort_unless(
+            $request->user()->can('warehouse.reservations.create') || $request->user()->can('projects.manage'),
+            403
+        );
+
+        $current = $this->stages->currentStage($project);
+
+        if (! in_array($current, [
+            ProjectStage::MaterialCheck,
+            ProjectStage::MaterialsReserved,
+            ProjectStage::AwaitingProcurement,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'stage' => ['Reservations can only be adjusted while the project is awaiting warehouse reservation.'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'item_id' => ['required', 'integer', 'exists:warehouse_items,id'],
+            'quantity_reserved' => ['required', 'numeric', 'min:0'],
+            'bom_line_ref' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $result = app(\App\Services\Warehouse\Reservations\FifoReservationService::class)
+                ->adjustHeldQuantity(
+                    user: $request->user(),
+                    projectId: $project->id,
+                    itemId: (int) $validated['item_id'],
+                    targetQuantity: (string) $validated['quantity_reserved'],
+                    notes: $validated['notes'] ?? null,
+                    bomLineRef: $validated['bom_line_ref'] ?? null,
+                );
+        } catch (\InvalidArgumentException $e) {
+            throw ValidationException::withMessages([
+                'quantity_reserved' => [$e->getMessage()],
+            ]);
+        }
+
+        app(\App\Services\Warehouse\WarehouseAuditLogger::class)->reservationAdjusted(
+            $result['reservation']->id,
+            [
+                'project_id' => $project->id,
+                'item_id' => (int) $validated['item_id'],
+                'previous_qty' => $result['previous_qty'],
+                'quantity_reserved' => $result['quantity_reserved'],
+                'bom_line_ref' => $validated['bom_line_ref'] ?? null,
+                'performed_by' => $request->user()->id,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'previous_qty' => $result['previous_qty'],
+            'quantity_reserved' => $result['quantity_reserved'],
+            'reservation' => [
+                'id' => $result['reservation']->id,
                 'status' => $result['reservation']->status,
             ],
         ]);

@@ -287,10 +287,19 @@ class ProjectBomController extends Controller
             ]);
         }
 
-        if (
-            $this->stages->currentStage($project) === ProjectStage::FinalDesignApproval
-            && ! ProjectStageGate::hasDesignDocument($project)
-        ) {
+        $currentStage = $this->stages->currentStage($project);
+
+        if ($currentStage !== ProjectStage::FinalDesignApproval) {
+            throw ValidationException::withMessages([
+                'stage' => [
+                    $currentStage === ProjectStage::SiteAssessment
+                        ? 'Advance the project to Final design approval before finalizing the BOM.'
+                        : 'BOM can only be finalized when the project is at Final design approval.',
+                ],
+            ]);
+        }
+
+        if (! ProjectStageGate::hasDesignDocument($project)) {
             throw ValidationException::withMessages([
                 'documents' => [
                     'Upload at least one design document on the Designs tab before finalizing the BOM.',

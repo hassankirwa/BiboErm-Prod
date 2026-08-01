@@ -26,8 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { recordPayment } from "@/lib/api/crm/deals";
-import { approveQuotation, sendQuotation, submitQuotationForReview } from "@/lib/api/crm/quotations";
+import { createProjectFromDeal, markDealWon, recordPayment } from "@/lib/api/crm/deals";
+import { approveQuotation, fetchQuotation, sendQuotation, submitQuotationForReview } from "@/lib/api/crm/quotations";
 import type { ApiQuotation, ApiQuotationLine } from "@/lib/api/crm/types";
 import { ApiError } from "@/lib/api/errors";
 import {
@@ -62,7 +62,7 @@ import {
   SENDABLE_QUOTATION_STATUSES,
   SUBMITTABLE_QUOTATION_STATUSES,
 } from "@/lib/quotations/status";
-import { hasRecordedDeposit } from "@/lib/crm-lead-status";
+import { dealIsWon, hasRecordedDeposit } from "@/lib/crm-lead-status";
 import { cn } from "@/lib/utils";
 import {
   Banknote,
@@ -70,11 +70,13 @@ import {
   ChevronLeft,
   Eye,
   ExternalLink,
+  FolderKanban,
   GitBranch,
   History,
   Loader2,
   RefreshCw,
   Send,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -260,6 +262,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   const [addingNote, setAddingNote] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [recordingDeposit, setRecordingDeposit] = useState(false);
+  const [dealActionLoading, setDealActionLoading] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const [paymentForm, setPaymentForm] = useState({
     payment_reference: "",
@@ -282,9 +285,11 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setQuotation(
-        await fetchWorkspaceQuotation(quotationId, { includeHistory: !isCrmMode }),
-      );
+      // CRM detail needs the same deal + deposit fields as lead/deal pages.
+      const data = isCrmMode
+        ? await fetchQuotation(quotationId)
+        : await fetchWorkspaceQuotation(quotationId, { includeHistory: true });
+      setQuotation(data);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to load quotation.");
     } finally {
@@ -355,14 +360,65 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   async function handleSend() {
     setSending(true);
     try {
-      await sendQuotation(quotationId);
-      toast.success("Proforma quotation sent to client.");
+      const updated = await sendQuotation(quotationId);
+      setQuotation(updated);
+      toast.success("Quotation sent to client.");
       setSendConfirmOpen(false);
       await load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to send quotation.");
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleMarkWon() {
+    const dealId = quotation?.deal_id ?? quotation?.deal?.id;
+    if (!dealId) {
+      toast.error("No deal linked to this quotation.");
+      return;
+    }
+    setDealActionLoading("won");
+    try {
+      const deal = await markDealWon(dealId);
+      setQuotation((prev) =>
+        prev ? { ...prev, deal, deal_id: deal.id, project_id: deal.project_id ?? prev.project_id } : prev,
+      );
+      toast.success("Deal marked as won.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to mark deal won.");
+    } finally {
+      setDealActionLoading(null);
+    }
+  }
+
+  async function handleCreateProject() {
+    const dealId = quotation?.deal_id ?? quotation?.deal?.id;
+    if (!dealId) {
+      toast.error("No deal linked to this quotation.");
+      return;
+    }
+    setDealActionLoading("project");
+    try {
+      const result = await createProjectFromDeal(dealId);
+      const project = result.data.project;
+      setQuotation((prev) =>
+        prev
+          ? {
+              ...prev,
+              deal: result.data.deal,
+              deal_id: result.data.deal.id,
+              project_id: project.id,
+            }
+          : prev,
+      );
+      toast.success(`Project ${project.name ?? `#${project.id}`} created.`);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to create project.");
+    } finally {
+      setDealActionLoading(null);
     }
   }
 
@@ -395,9 +451,9 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
   }
 
   async function handleRecordDeposit() {
-    const dealId = quotation?.deal_id;
+    const dealId = quotation?.deal_id ?? quotation?.deal?.id;
     if (!dealId) {
-      toast.error("No deal linked to this quotation.");
+      toast.error("No deal linked to this quotation yet. Send it to the client first.");
       return;
     }
 
@@ -409,7 +465,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
 
     setRecordingDeposit(true);
     try {
-      await recordPayment(dealId, {
+      const result = await recordPayment(dealId, {
         payment_reference: paymentForm.payment_reference.trim(),
         payment_date: paymentForm.payment_date,
         amount_paid: amount,
@@ -418,6 +474,15 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
         quotation_id: quotationId,
         notes: paymentForm.notes.trim() || undefined,
       });
+      setQuotation((prev) =>
+        prev
+          ? {
+              ...prev,
+              deal: result.data.deal,
+              deal_id: result.data.deal.id,
+            }
+          : prev,
+      );
       setPaymentDialogOpen(false);
       setPaymentForm((f) => ({ ...f, payment_reference: "", amount_paid: "", notes: "" }));
       toast.success("Deposit recorded.");
@@ -443,11 +508,18 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
     );
   }
 
-  const canNegotiate = quotation.sent_at && SENT_STATUSES.has(quotation.status ?? "");
+  const canNegotiate = SENT_STATUSES.has(quotation.status ?? "");
   const canRevise = !isCrmMode && canNegotiate && !quotation.is_reference_copy && quotation.status !== "draft";
   const showComparison = !isCrmMode && referenceQuotation != null;
+  const dealId = quotation.deal_id ?? quotation.deal?.id ?? null;
+  const projectId = quotation.project_id ?? quotation.deal?.project_id ?? null;
+  const quotationSent = SENT_STATUSES.has(quotation.status ?? "");
+  const won = dealIsWon(quotation.deal);
+  const hasDeposit = hasRecordedDeposit(quotation.deal);
+  // Same gate as lead stage actions: after send-to-client, CRM can record deposit.
   const showDepositAction =
-    isCrmMode && canNegotiate && quotation.deal_id && !hasRecordedDeposit(quotation.deal);
+    isCrmMode && quotationSent && dealId != null && !hasDeposit;
+  const showCrmDealActions = isCrmMode && quotationSent && dealId != null;
   const canSubmitForReview =
     quotation.status != null && SUBMITTABLE_QUOTATION_STATUSES.has(quotation.status);
   const canApprove =
@@ -515,7 +587,7 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Send Proforma Quotation
+                  {isCrmMode ? "Send to client" : "Send Proforma Quotation"}
                 </Button>
               </PermissionGate>
             ) : null}
@@ -526,6 +598,50 @@ export function QuotationDetailView({ quotationId, mode }: QuotationDetailViewPr
                   Record Deposit
                 </Button>
               </PermissionGate>
+            ) : null}
+            {showCrmDealActions && !won ? (
+              <PermissionGate permission="deals.mark_won">
+                <Button
+                  variant="outline"
+                  onClick={() => void handleMarkWon()}
+                  disabled={dealActionLoading != null}
+                >
+                  {dealActionLoading === "won" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trophy className="mr-2 h-4 w-4" />
+                  )}
+                  Mark Won
+                </Button>
+              </PermissionGate>
+            ) : null}
+            {showCrmDealActions && won && !projectId ? (
+              <PermissionGate permission="deals.create_project">
+                <Button
+                  onClick={() => void handleCreateProject()}
+                  disabled={dealActionLoading != null}
+                >
+                  {dealActionLoading === "project" ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FolderKanban className="mr-2 h-4 w-4" />
+                  )}
+                  Create Project
+                </Button>
+              </PermissionGate>
+            ) : null}
+            {showCrmDealActions && projectId ? (
+              <Button variant="outline" asChild>
+                <Link href={projectDetailPath(projectId, "crm")}>
+                  <FolderKanban className="mr-2 h-4 w-4" />
+                  View Project
+                </Link>
+              </Button>
+            ) : null}
+            {showCrmDealActions ? (
+              <Button variant="outline" asChild>
+                <Link href={`/crm/deals/${dealId}`}>View Deal</Link>
+              </Button>
             ) : null}
             {canRevise ? (
               <Button variant="secondary" onClick={() => void handleRevise()} disabled={revising}>

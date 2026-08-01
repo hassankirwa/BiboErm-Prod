@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Crm\Deals\DealToProjectService;
+use App\Services\Crm\Leads\LeadPipelineService;
 use App\Services\Projects\ProjectActivationService;
 use App\Services\Projects\ProjectDealSyncService;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class DealPaymentService
         protected ProjectDealSyncService $projectDealSync,
         protected ProjectActivationService $projectActivation,
         protected DealToProjectService $dealToProject,
+        protected LeadPipelineService $leadPipeline,
     ) {}
 
     public function record(Deal $deal, User $user, array $data): DealPayment
@@ -73,6 +75,8 @@ class DealPaymentService
             }
 
             $this->crmAudit->dealPaymentRecorded($payment, $user);
+
+            $this->leadPipeline->syncFromDeal($deal->fresh(), $user);
 
             return $payment->load(['deal', 'receivedBy']);
         });

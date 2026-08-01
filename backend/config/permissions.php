@@ -114,6 +114,7 @@ return [
         'production_manager' => [
             'analytics.view',
             'projects.view', 'projects.material_status.view', 'projects.site_assessment_notes',
+            'projects.documents.view',
             'projects.advance_stage_production',
             'warehouse.stock.view',
             'warehouse.reservations.view',
@@ -169,7 +170,7 @@ return [
         'qc_inspector' => [
             'qc.view', 'qc.manage',
             'production.view',
-            'projects.view', 'projects.material_status.view',
+            'projects.view', 'projects.material_status.view', 'projects.documents.view',
             'payroll.view',
         ],
 

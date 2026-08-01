@@ -22,7 +22,7 @@ class LeadSalesContextService
         $latestQuotation = Quotation::query()
             ->where('account_id', $accountId)
             ->excludingReferenceCopies()
-            ->with(['deal.project'])
+            ->with(['deal.project', 'lines'])
             ->latest('id')
             ->first();
 

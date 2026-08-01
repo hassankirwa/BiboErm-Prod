@@ -444,6 +444,7 @@ export const departments: Department[] = [
     subModules: [
       { name: "Schedule", path: "/production/schedule", permission: "production.view" },
       { name: "Orders", path: "/production/orders", permission: "production.view" },
+      { name: "Misfits", path: "/production/misfits", permission: "production.view" },
       { name: "Cutting", path: "/production/cutting", permission: "production.view" },
       { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
       { name: "Assembly", path: "/production/assembly", permission: "production.view" },
@@ -471,6 +472,7 @@ export const departments: Department[] = [
           items: [
             { name: "Schedule", path: "/production/schedule", permission: "production.view" },
             { name: "Orders", path: "/production/orders", permission: "production.view" },
+            { name: "Misfits", path: "/production/misfits", permission: "production.view" },
             { name: "Cutting", path: "/production/cutting", permission: "production.view" },
             { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
             { name: "Assembly", path: "/production/assembly", permission: "production.view" },

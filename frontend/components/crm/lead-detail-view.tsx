@@ -20,6 +20,8 @@ import {
 
   Mail,
 
+  NotebookPen,
+
   Pencil,
 
   Phone,
@@ -151,6 +153,7 @@ import { LeadComposeEmailDialog } from "@/components/crm/lead-compose-email-dial
 import { LeadsActivityModal } from "@/components/crm/leads-activity-modal";
 
 import {
+  LeadAddNoteDialog,
   LeadNotesCanvas,
   LeadStageNotesDialog,
   appendLeadNote,
@@ -248,6 +251,8 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
   const [panel, setPanel] = useState<LeadDetailPanel>("details");
 
   const [emailOpen, setEmailOpen] = useState(false);
+
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
 
   const [activities, setActivities] = useState<ApiActivity[]>([]);
 
@@ -353,7 +358,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     status,
   });
 
-  const nextPipelineAction = getNextPipelineAction(pipelineStage);
+  const nextPipelineAction = getNextPipelineAction(pipelineStage, status);
 
   useEffect(() => {
     const id = Number(leadId);
@@ -855,38 +860,6 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             </Button>
 
-            </div>
-
-          </PermissionGate>
-
-        );
-
-      case "contact_confirmed":
-
-        return (
-
-          <PermissionGate permission="leads.update">
-
-            <div className="flex flex-wrap gap-2">
-
-              {activityButtons}
-
-              {!linkedAccountId ? (
-                <Button
-                  size="sm"
-                  className="h-9"
-                  disabled={disabled || actionLoading}
-                  onClick={() => void handleProvisionAccount()}
-                >
-                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-                  Create Account
-                </Button>
-              ) : accountHref ? (
-                <Button size="sm" variant="outline" className="h-9" asChild>
-                  <Link href={accountHref}>Open Account</Link>
-                </Button>
-              ) : null}
-
               <Button
 
                 size="sm"
@@ -928,6 +901,96 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
                 Mark Interested
 
               </Button>
+
+            </div>
+
+          </PermissionGate>
+
+        );
+
+      case "contact_confirmed":
+
+        return (
+
+          <PermissionGate permission="leads.update">
+
+            <div className="flex flex-wrap gap-2">
+
+              {activityButtons}
+
+              {status !== "interested" ? (
+
+                <Button
+
+                  size="sm"
+
+                  className="h-9"
+
+                  disabled={disabled}
+
+                  onClick={() =>
+
+                    requestStageAction({
+
+                      kind: "status",
+
+                      label: "Mark Interested",
+
+                      status: "interested",
+
+                      message: "Marked as interested.",
+
+                    })
+
+                  }
+
+                  title={
+
+                    lead && !hasLeadNotes(lead)
+
+                      ? "Add a note before changing stage"
+
+                      : undefined
+
+                  }
+
+                >
+
+                  <ThumbsUp className="mr-1.5 h-3.5 w-3.5" />
+
+                  Mark Interested
+
+                </Button>
+
+              ) : !linkedAccountId ? (
+
+                <Button
+
+                  size="sm"
+
+                  className="h-9"
+
+                  disabled={disabled || actionLoading}
+
+                  onClick={() => void handleProvisionAccount()}
+
+                >
+
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+
+                  Create Account
+
+                </Button>
+
+              ) : accountHref ? (
+
+                <Button size="sm" variant="outline" className="h-9" asChild>
+
+                  <Link href={accountHref}>Open Account</Link>
+
+                </Button>
+
+              ) : null}
 
               <Button
 
@@ -1213,6 +1276,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         );
 
       case "ready_for_quotation":
+      case "won":
 
         return (
 
@@ -1220,31 +1284,13 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             {activityButtons}
 
-            <Button size="sm" className="h-9" asChild>
-
-              <Link href="/quotation/proforma">Create Proforma Quotation</Link>
-
-            </Button>
-
-            {lead?.latest_quotation ? (
-
-              <LeadQuotationActions
-
-                latestQuotation={lead.latest_quotation}
-
-                salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
-
-                linkedAccountId={linkedAccountId}
-
-                showCreateQuotation={false}
-
-                disabled={disabled}
-
-                onRefresh={reloadLead}
-
-              />
-
-            ) : null}
+            <LeadQuotationActions
+              latestQuotation={lead?.latest_quotation}
+              salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
+              showCreateQuotation={!lead?.latest_quotation && statusToKanbanStage(status, lead?.pipeline_stage) !== "won"}
+              disabled={disabled}
+              onRefresh={reloadLead}
+            />
 
           </div>
 
@@ -1457,6 +1503,28 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
               Send Email
 
             </Button>
+
+            <PermissionGate permission="leads.update">
+
+              <Button
+
+                variant="outline"
+
+                size="sm"
+
+                className="h-9 border-border text-[#1e3a5f] hover:bg-[#ebf2ff]/50"
+
+                onClick={() => setAddNoteOpen(true)}
+
+              >
+
+                <NotebookPen className="mr-1.5 h-3.5 w-3.5" />
+
+                Add notes
+
+              </Button>
+
+            </PermissionGate>
 
             <PermissionGate permission="leads.convert">
 
@@ -2028,6 +2096,20 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
         saving={notesSaving || actionLoading}
 
         onConfirm={handleStageNotesConfirm}
+
+      />
+
+      <LeadAddNoteDialog
+
+        open={addNoteOpen}
+
+        onOpenChange={setAddNoteOpen}
+
+        leadTitle={card?.title}
+
+        saving={notesSaving}
+
+        onConfirm={handleAddNote}
 
       />
 

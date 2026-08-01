@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers\Projects;
 
+use App\Enums\FieldInstallation\DeliveryCondition;
+use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
+use App\Enums\Projects\ProjectDispatchStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProjectResource;
+use App\Models\FieldInstallation\FieldDeliveryRecord;
 use App\Models\Project;
 use App\Models\ProjectDelay;
+use App\Models\Projects\ProjectDispatch;
 use App\Models\User;
 use App\Services\Projects\ProjectDashboardService;
 use App\Services\Projects\ProjectDealSyncService;
@@ -559,10 +564,6 @@ class ProjectController extends Controller
                 'force' => $force,
                 'stage_data' => $stageData,
             ]);
-
-            if ($fromStage === ProjectStage::InTransit && $target === ProjectStage::Installation) {
-                $this->dispatches->completeOpenDispatchesForProject($project);
-            }
         }
 
         return new ProjectResource(
@@ -670,6 +671,37 @@ class ProjectController extends Controller
                 'driver_id' => ['A driver is required to advance to in transit.'],
             ]);
         }
+
+        if ($target === ProjectStage::Installation) {
+            $installMode = $project->install_mode instanceof InstallMode
+                ? $project->install_mode
+                : InstallMode::tryFrom((string) $project->install_mode);
+
+            if ($installMode === InstallMode::OutsideFullInstall && ! $this->hasSiteDeliveryEvidence($project)) {
+                throw ValidationException::withMessages([
+                    'stage' => [
+                        'Mark the project dispatch as delivered or record a complete field delivery before advancing to installation.',
+                    ],
+                ]);
+            }
+        }
+    }
+
+    protected function hasSiteDeliveryEvidence(Project $project): bool
+    {
+        $hasDeliveredDispatch = ProjectDispatch::query()
+            ->where('project_id', $project->id)
+            ->where('status', ProjectDispatchStatus::Delivered->value)
+            ->exists();
+
+        if ($hasDeliveredDispatch) {
+            return true;
+        }
+
+        return FieldDeliveryRecord::query()
+            ->where('project_id', $project->id)
+            ->where('delivery_condition', DeliveryCondition::Complete->value)
+            ->exists();
     }
 
     protected function assertUserCanAdvanceToStage(

@@ -24,6 +24,10 @@ class FieldDeliveryRecordResource extends JsonResource
             'expected_units' => $this->expected_units,
             'received_units' => $this->received_units,
             'notes' => $this->notes,
+            'receiver' => $this->whenLoaded('receiver', fn () => $this->receiver ? [
+                'id' => $this->receiver->id,
+                'name' => $this->receiver->name,
+            ] : null),
             'lines' => FieldDeliveryLineResource::collection($this->whenLoaded('lines')),
         ];
     }

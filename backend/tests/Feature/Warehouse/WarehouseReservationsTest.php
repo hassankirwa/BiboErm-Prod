@@ -300,4 +300,186 @@ class WarehouseReservationsTest extends WarehouseFeatureTestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['received_by']);
     }
+
+    public function test_reserve_tops_up_existing_reservation_without_double_holding(): void
+    {
+        $user = $this->operationsManager();
+        $project = $this->createTestProject();
+        $item = $this->itemBySku('ACC-HNG-001');
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN2');
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 4,
+                    'bom_line_ref' => 'BOM-HNG-1',
+                ]],
+            ])
+            ->assertOk();
+
+        $afterFirst = (string) StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        $reservationId = StockReservation::query()->where('project_id', $project->id)->value('id');
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 10,
+                    'bom_line_ref' => 'BOM-HNG-1',
+                ]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('reservation.id', $reservationId)
+            ->assertJsonPath('topped_up', true);
+
+        $afterTopUp = (string) StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        $this->assertSame(bcadd($afterFirst, '6', 3), $afterTopUp);
+
+        $held = StockReservation::query()
+            ->with('lines')
+            ->findOrFail($reservationId)
+            ->lines
+            ->sum(fn ($line) => (float) $line->remainingQuantity());
+
+        $this->assertEqualsWithDelta(10.0, $held, 0.001);
+    }
+
+    public function test_manual_adjust_increases_and_decreases_held_quantity(): void
+    {
+        $user = $this->operationsManager();
+        $project = $this->createTestProject();
+        $item = $this->itemBySku('ACC-HNG-001');
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN2');
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 5,
+                    'bom_line_ref' => 'BOM-HNG-1',
+                ]],
+            ])
+            ->assertOk();
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reservations/adjust", [
+                'item_id' => $item->id,
+                'quantity_reserved' => 8,
+                'bom_line_ref' => 'BOM-HNG-1',
+                'notes' => 'Manual bump',
+            ])
+            ->assertOk()
+            ->assertJsonPath('previous_qty', '5.000')
+            ->assertJsonPath('quantity_reserved', '8.000');
+
+        $afterIncrease = (string) StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reservations/adjust", [
+                'item_id' => $item->id,
+                'quantity_reserved' => 3,
+                'bom_line_ref' => 'BOM-HNG-1',
+            ])
+            ->assertOk()
+            ->assertJsonPath('previous_qty', '8.000')
+            ->assertJsonPath('quantity_reserved', '3.000');
+
+        $afterDecrease = (string) StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        $this->assertSame(bcsub($afterIncrease, '5', 3), $afterDecrease);
+
+        $onHandUnchanged = StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_on_hand');
+
+        $this->assertGreaterThan(0, (float) $onHandUnchanged);
+    }
+
+    public function test_reserve_packs_metre_rubber_seal_cuts_to_exact_metres(): void
+    {
+        $user = $this->operationsManager();
+        $project = $this->createTestProject();
+
+        $item = \App\Models\Warehouse\Item::query()->create([
+            'sku' => 'PY35-TEST-'.uniqid(),
+            'name' => 'Inter seal',
+            'category' => \App\Enums\Warehouse\ItemCategory::Rubber->value,
+            'unit_of_measure' => 'metre',
+        ]);
+
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN2');
+        StockLevel::query()->create([
+            'item_id' => $item->id,
+            'bin_id' => $bin->id,
+            'quantity_on_hand' => 24,
+            'quantity_reserved' => 0,
+        ]);
+
+        $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [
+                    ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 1767, 'bom_line_ref' => '64'],
+                    ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 2041, 'bom_line_ref' => '79'],
+                    ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 1791, 'bom_line_ref' => '91'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $held = (string) StockLevel::query()
+            ->where('item_id', $item->id)
+            ->where('bin_id', $bin->id)
+            ->value('quantity_reserved');
+
+        // Exact sum of cuts: 5.599m (not a full 6m bar).
+        $this->assertSame('5.599', $held);
+    }
+
+    public function test_stock_check_shortage_uses_remaining_gap_after_partial_hold(): void
+    {
+        $user = $this->warehouseAluminiumManager();
+        $project = $this->createTestProject();
+        $item = $this->itemBySku('ACC-HNG-001');
+
+        $this->actingAsSanctum($this->operationsManager())
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/reserve", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 4,
+                    'bom_line_ref' => 'BOM-HNG-1',
+                ]],
+            ])
+            ->assertOk();
+
+        $response = $this->actingAsSanctum($user)
+            ->postJson("/api/v1/warehouse/projects/{$project->id}/stock-check", [
+                'lines' => [[
+                    'item_id' => $item->id,
+                    'quantity' => 10,
+                    'bom_line_ref' => 'BOM-HNG-1',
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertTrue($response->json('can_fully_reserve'));
+        $this->assertSame('4.000', $response->json('lines.0.already_held'));
+        $this->assertSame('6.000', $response->json('lines.0.still_needed'));
+        $this->assertSame('0.000', $response->json('lines.0.shortage'));
+    }
 }

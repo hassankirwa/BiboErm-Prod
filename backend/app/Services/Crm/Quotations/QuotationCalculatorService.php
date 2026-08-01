@@ -10,6 +10,7 @@ use App\Models\QuotationLine;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Crm\Deals\DealFromQuotationService;
+use App\Services\Crm\Leads\LeadPipelineService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,7 @@ class QuotationCalculatorService
     public function __construct(
         protected CrmAuditLogger $crmAudit,
         protected DealFromQuotationService $dealFromQuotation,
+        protected LeadPipelineService $leadPipeline,
     ) {}
 
     public function createForDeal(Deal $deal, User $user, array $data): Quotation
@@ -68,7 +70,7 @@ class QuotationCalculatorService
 
             $deal->update([
                 'stage' => DealStage::QuotationPreparation->value,
-                'quotation_amount' => $total,
+                'quotation_amount' => $quotation->fresh(['lines'])->totalAmountKes(),
             ]);
 
             return $quotation->load(['lines', 'deal', 'account', 'contact']);
@@ -271,19 +273,31 @@ class QuotationCalculatorService
 
         $quotation = $quotation->fresh()->load(['lines', 'deal', 'account']);
 
-        if (! $quotation->deal_id && $user) {
-            $this->dealFromQuotation->createFromQuotation($quotation, $user);
-            $quotation = $quotation->fresh()->load(['lines', 'deal', 'account']);
+        if (! $quotation->deal_id) {
+            $actor = $user ?? $quotation->preparedBy;
+            if ($actor) {
+                $this->dealFromQuotation->createFromQuotation($quotation, $actor);
+                $quotation = $quotation->fresh()->load(['lines', 'deal', 'account']);
+            }
         } else {
             $quotation->deal?->update([
                 'stage' => DealStage::QuotationSent->value,
-                'quotation_amount' => $quotation->total_amount,
+                'quotation_amount' => $quotation->totalAmountKes(),
             ]);
         }
 
         $this->crmAudit->quotationSent($quotation, $user);
 
-        return $quotation;
+        $actor = $user ?? $quotation->preparedBy;
+        if ($actor) {
+            $lead = $this->leadPipeline->resolveLeadForQuotation($quotation);
+            if ($lead) {
+                $this->leadPipeline->onProformaSent($lead, $actor);
+                $this->leadPipeline->onAwaitingDeposit($lead->fresh(), $actor);
+            }
+        }
+
+        return $quotation->fresh()->load(['lines', 'deal', 'account']);
     }
 
     public function appendNegotiationNote(Quotation $quotation, User $user, string $body): Quotation
@@ -424,7 +438,7 @@ class QuotationCalculatorService
 
             $quotation->deal?->update([
                 'stage' => DealStage::NegotiationRevision->value,
-                'quotation_amount' => $newQuotation->fresh()->total_amount,
+                'quotation_amount' => $newQuotation->fresh(['lines'])->totalAmountKes(),
             ]);
 
             return $newQuotation->fresh()->load(['lines', 'deal', 'account', 'contact']);
@@ -460,7 +474,7 @@ class QuotationCalculatorService
         ]);
     }
 
-    public function accept(Quotation $quotation): Quotation
+    public function accept(Quotation $quotation, ?User $user = null): Quotation
     {
         $quotation->update([
             'status' => QuotationStatus::Accepted->value,
@@ -468,10 +482,20 @@ class QuotationCalculatorService
         ]);
 
         if ($quotation->deal) {
+            $kesTotal = $quotation->fresh(['lines'])->totalAmountKes();
             $quotation->deal->update([
-                'final_agreed_amount' => $quotation->total_amount,
-                'quotation_amount' => $quotation->total_amount,
+                'final_agreed_amount' => $kesTotal,
+                'quotation_amount' => $kesTotal,
             ]);
+        }
+
+        $actor = $user ?? $quotation->preparedBy;
+        if ($actor) {
+            $lead = $this->leadPipeline->resolveLeadForQuotation($quotation->fresh(['deal', 'account']));
+            if ($lead) {
+                $this->leadPipeline->onClientAccepted($lead, $actor);
+                $this->leadPipeline->onAwaitingDeposit($lead->fresh(), $actor);
+            }
         }
 
         return $quotation->fresh()->load(['lines', 'deal']);
@@ -534,7 +558,9 @@ class QuotationCalculatorService
                     'total_amount' => $total,
                 ]);
 
-                $quotation->deal?->update(['quotation_amount' => $total]);
+                $quotation->deal?->update([
+                    'quotation_amount' => $quotation->fresh(['lines'])->totalAmountKes(),
+                ]);
             }
 
             $headerUpdates = [];
@@ -617,7 +643,9 @@ class QuotationCalculatorService
                     'total_amount' => $total,
                 ]);
 
-                $quotation->deal?->update(['quotation_amount' => $total]);
+                $quotation->deal?->update([
+                    'quotation_amount' => $quotation->fresh(['lines'])->totalAmountKes(),
+                ]);
             }
 
             $headerUpdates = [];

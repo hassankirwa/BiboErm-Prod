@@ -20,8 +20,11 @@ use Illuminate\Support\Facades\Route;
 Route::post('project-dispatches/{projectDispatch}/delivered', [ProjectDispatchController::class, 'markDelivered']);
 
 Route::get('design-change-orders/{dco}', [DesignChangeOrderController::class, 'show']);
+Route::patch('design-change-orders/{dco}', [DesignChangeOrderController::class, 'update']);
 Route::post('design-change-orders/{dco}/approve', [DesignChangeOrderController::class, 'approve']);
+Route::post('design-change-orders/{dco}/release-to-production', [DesignChangeOrderController::class, 'releaseToProduction']);
 Route::post('design-change-orders/{dco}/create-remake', [DesignChangeOrderController::class, 'createRemake']);
+Route::post('design-change-orders/{dco}/complete-minor', [DesignChangeOrderController::class, 'completeMinor']);
 Route::post('design-change-orders/{dco}/close', [DesignChangeOrderController::class, 'close']);
 
 Route::get('dashboard', [ProjectController::class, 'dashboard']);
@@ -87,6 +90,7 @@ Route::prefix('{project}')->group(function () {
 
     Route::get('material-status', [ProjectOperationsController::class, 'materialStatus']);
     Route::post('reserve-materials', [ProjectOperationsController::class, 'reserveMaterials']);
+    Route::post('adjust-reservation', [ProjectOperationsController::class, 'adjustReservation']);
     Route::post('delays', [ProjectOperationsController::class, 'storeDelay']);
     Route::get('floors', [ProjectOperationsController::class, 'floors']);
     Route::post('floors', [ProjectOperationsController::class, 'storeFloor']);

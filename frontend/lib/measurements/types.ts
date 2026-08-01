@@ -154,9 +154,32 @@ export function resolveGlassTypeSelectValue(value?: string | null): string {
   if (isKnownGlassType(value)) return value;
   return GLASS_TYPE_CUSTOM_VALUE;
 }
-export function emptyMeasurementLine(sortOrder = 0): SiteMeasurementLine {
+export function nextMeasurementLineRef(lines: SiteMeasurementLine[]): string {
+  let maxNumeric = 0;
+  let foundNumeric = false;
+
+  for (const line of lines) {
+    const raw = (line.ref ?? "").trim();
+    if (!raw) continue;
+    const match = raw.match(/^(\d+)$/);
+    if (!match) continue;
+    foundNumeric = true;
+    maxNumeric = Math.max(maxNumeric, Number(match[1]));
+  }
+
+  if (foundNumeric) {
+    return String(maxNumeric + 1);
+  }
+
+  return String(lines.length + 1);
+}
+
+export function emptyMeasurementLine(
+  sortOrder = 0,
+  ref?: string | null,
+): SiteMeasurementLine {
   return {
-    ref: "",
+    ref: ref ?? "",
     unit_floor: "",
     room_location: "",
     product_type: null,
@@ -175,6 +198,12 @@ export function emptyMeasurementLine(sortOrder = 0): SiteMeasurementLine {
     balcony_details: null,
     shower_details: null,
   };
+}
+
+export function createNextMeasurementLine(
+  lines: SiteMeasurementLine[],
+): SiteMeasurementLine {
+  return emptyMeasurementLine(lines.length, nextMeasurementLineRef(lines));
 }
 
 export function isSpecializedMeasurementProduct(
@@ -204,7 +233,7 @@ export function emptySiteMeasurementForm(): SiteMeasurementFormData {
     floor_finish_other: "",
     floor_finish_thickness_mm: null,
     site_status: [],
-    lines: [emptyMeasurementLine(0)],
+    lines: [emptyMeasurementLine(0, "1")],
     operational_notes: "",
   };
 }

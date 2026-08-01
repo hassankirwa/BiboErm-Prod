@@ -124,6 +124,35 @@ class AluminiumBarDemandServiceTest extends TestCase
         $this->assertSame('2.000', $plan['reserve_qty']);
     }
 
+    public function test_metre_rubber_seal_cuts_use_exact_metres_not_six_metre_bars(): void
+    {
+        $item = Item::query()->create([
+            'sku' => 'RUB-SEAL-'.uniqid(),
+            'name' => 'Inter seal',
+            'category' => ItemCategory::Rubber->value,
+            'unit_of_measure' => 'metre',
+        ]);
+
+        $service = app(AluminiumBarDemandService::class);
+        $lines = [
+            ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 1767],
+            ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 2041],
+            ['item_id' => $item->id, 'quantity' => 1, 'required_length_mm' => 1791],
+        ];
+
+        $this->assertTrue($service->shouldCombineCuts($item, $lines));
+        $this->assertFalse($service->shouldPackOntoBars($item));
+
+        $plans = $service->plansByItemId(collect([$item->id => $item]), $lines);
+        $plan = $plans[$item->id];
+
+        // 1767 + 2041 + 1791 = 5599mm => 5.599m exact (not rounded up to 6m).
+        $this->assertNull($plan['bars_needed']);
+        $this->assertSame('5.599', $plan['reserve_qty']);
+        $this->assertSame('metre', $plan['reserve_uom']);
+        $this->assertSame('exact_metres', $plan['packing_mode']);
+    }
+
     protected function makeAluminiumItem(): Item
     {
         return Item::query()->create([

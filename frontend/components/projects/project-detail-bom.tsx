@@ -256,6 +256,16 @@ export function ProjectDetailBom({
         )
       ) : null}
 
+      {!loading && project.stage === "site_assessment" && hasImportedLines && isDraft ? (
+        <Alert className="border-info/30 bg-info/10 text-info [&>svg]:text-info">
+          <AlertCircle />
+          <AlertTitle>BOM ready to advance</AlertTitle>
+          <AlertDescription className="text-info/90">
+            Finalize is available after you advance this project to Final design approval.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
@@ -405,9 +415,9 @@ export function ProjectDetailBom({
           </PermissionGate>
 
           <PermissionGate permission="projects.bom.finalize">
-            {isDraft && hasImportedLines && !showPreview ? (
+            {isBomPrepStage && isDraft && hasImportedLines && !showPreview ? (
               <Button
-                disabled={finalizing || (isBomPrepStage && !hasDesign)}
+                disabled={finalizing || !hasDesign}
                 onClick={handleFinalize}
               >
                 {finalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

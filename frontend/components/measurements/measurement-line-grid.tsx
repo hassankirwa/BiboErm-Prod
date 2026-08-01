@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,7 +24,7 @@ import {
   showerTypeLabel,
 } from "@/lib/measurements/shower-types";
 import {
-  emptyMeasurementLine,
+  createNextMeasurementLine,
   isSpecializedMeasurementProduct,
   MEASUREMENT_PRODUCT_TYPE_OPTIONS,
   type MeasurementProductType,
@@ -105,7 +105,7 @@ export function MeasurementLineGrid({
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   function addLine() {
-    onChange([...lines, emptyMeasurementLine(lines.length)]);
+    onChange([...lines, createNextMeasurementLine(lines)]);
   }
 
   function removeLine(index: number) {
@@ -143,13 +143,10 @@ export function MeasurementLineGrid({
     }
   }
 
-  const colSpan =
-    5 + DIMENSION_FIELDS.length + 2 + (readOnly ? 0 : 1);
-
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="min-w-[1200px] w-full text-xs">
+        <table className="w-full min-w-[960px] text-xs">
           <thead className="bg-muted/50">
             <tr>
               <th className="px-2 py-2 text-left font-medium">Ref</th>
@@ -172,11 +169,14 @@ export function MeasurementLineGrid({
               const specialized = isSpecializedMeasurementProduct(
                 line.product_type,
               );
-              const isOpen = Boolean(expanded[index]) || (readOnly && specialized);
+              const isOpen =
+                Boolean(expanded[index]) || (readOnly && specialized);
 
               return (
-                <Fragment key={index}>
-                  <tr className="border-t border-border align-top">
+                <tr
+                  key={index}
+                  className="border-t border-border align-top"
+                >
                     <td className="px-2 py-2">
                       {readOnly ? (
                         line.ref || "—"
@@ -285,7 +285,7 @@ export function MeasurementLineGrid({
                         className="px-2 py-2"
                         colSpan={DIMENSION_FIELDS.length}
                       >
-                        <div className="flex min-w-[220px] items-start gap-2">
+                        <div className="flex min-w-[200px] max-w-md items-start gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -300,7 +300,7 @@ export function MeasurementLineGrid({
                             )}
                             {isOpen ? "Hide details" : "Edit details"}
                           </Button>
-                          <p className="pt-1.5 text-muted-foreground">
+                          <p className="min-w-0 break-words pt-1.5 text-muted-foreground">
                             {specializedSummary(line)}
                           </p>
                         </div>
@@ -382,39 +382,71 @@ export function MeasurementLineGrid({
                       </td>
                     )}
                   </tr>
-                  {specialized && isOpen && (
-                    <tr className="border-t border-border">
-                      <td colSpan={colSpan} className="p-0">
-                        {line.product_type === "Balcony" ? (
-                          <BalconyMeasurementPanel
-                            value={line.balcony_details}
-                            readOnly={readOnly}
-                            onChange={(balcony_details) =>
-                              onChange(
-                                updateLine(lines, index, { balcony_details }),
-                              )
-                            }
-                          />
-                        ) : (
-                          <ShowerMeasurementPanel
-                            value={line.shower_details}
-                            readOnly={readOnly}
-                            onChange={(shower_details) =>
-                              onChange(
-                                updateLine(lines, index, { shower_details }),
-                              )
-                            }
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {lines.map((line, index) => {
+        const specialized = isSpecializedMeasurementProduct(line.product_type);
+        const isOpen =
+          Boolean(expanded[index]) || (readOnly && specialized);
+        if (!specialized || !isOpen) return null;
+
+        const productLabel =
+          MEASUREMENT_PRODUCT_TYPE_OPTIONS.find(
+            (option) => option.value === line.product_type,
+          )?.label ?? line.product_type;
+
+        return (
+          <div
+            key={`detail-${index}`}
+            className="min-w-0 max-w-full overflow-hidden rounded-md border border-border"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
+              <p className="min-w-0 text-xs font-medium">
+                {line.ref ? `Ref ${line.ref}` : `Line ${index + 1}`}
+                {productLabel ? ` · ${productLabel}` : ""} details
+              </p>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0"
+                  onClick={() => toggleExpanded(index)}
+                >
+                  Hide details
+                </Button>
+              )}
+            </div>
+            <div className="min-w-0 max-w-full overflow-x-hidden">
+              {line.product_type === "Balcony" ? (
+                <BalconyMeasurementPanel
+                  value={line.balcony_details}
+                  readOnly={readOnly}
+                  onChange={(balcony_details) =>
+                    onChange(
+                      updateLine(lines, index, { balcony_details }),
+                    )
+                  }
+                />
+              ) : (
+                <ShowerMeasurementPanel
+                  value={line.shower_details}
+                  readOnly={readOnly}
+                  onChange={(shower_details) =>
+                    onChange(
+                      updateLine(lines, index, { shower_details }),
+                    )
+                  }
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
 
       <p className="text-xs text-muted-foreground">
         Door/Window: WT = Width top · WC = Width centre · WB = Width bottom · HL

@@ -128,7 +128,8 @@ class AluminiumBarDemandService
     }
 
     /**
-     * Group BOM lines by aluminium item and build a demand plan per SKU.
+     * Group BOM lines into combined SKU demand plans.
+     * Aluminium: nest cuts onto 6m bars. Rubber (metre): exact cut metres (no bar rounding).
      *
      * @param  list<array{item_id: int, quantity: string|float, required_length_mm?: int|null, bom_line_ref?: string|null, project_bom_line_id?: int|null}>  $bomLines
      * @param  \Illuminate\Support\Collection<int, Item>  $items
@@ -140,7 +141,7 @@ class AluminiumBarDemandService
         foreach ($bomLines as $line) {
             $itemId = (int) $line['item_id'];
             $item = $items->get($itemId);
-            if (! $item || $item->category !== ItemCategory::AluminiumProfile) {
+            if (! $item) {
                 continue;
             }
             $grouped[$itemId][] = $line;
@@ -148,10 +149,84 @@ class AluminiumBarDemandService
 
         $plans = [];
         foreach ($grouped as $itemId => $lines) {
-            $plans[$itemId] = $this->planForItem($items->get($itemId), $lines);
+            $item = $items->get($itemId);
+            if (! $item || ! $this->shouldCombineCuts($item, $lines)) {
+                continue;
+            }
+            $plans[$itemId] = $this->shouldPackOntoBars($item)
+                ? $this->planForItem($item, $lines)
+                : $this->exactMetrePlanForItem($item, $lines);
         }
 
         return $plans;
+    }
+
+    /**
+     * Rubber/seal metre demand: sum fabrication cut lengths exactly (no 6m bar rounding).
+     *
+     * @param  list<array{item_id: int, quantity: string|float, required_length_mm?: int|null}>  $bomLinesForItem
+     * @return array<string, mixed>
+     */
+    public function exactMetrePlanForItem(Item $item, array $bomLinesForItem): array
+    {
+        $cuts = $this->expandCuts($bomLinesForItem);
+        $totalMm = array_sum($cuts);
+
+        return [
+            'item_id' => $item->id,
+            'sku' => $item->sku,
+            'bar_length_mm' => null,
+            'cuts' => $cuts,
+            'cuts_total' => count($cuts),
+            'offcut_assignments' => [],
+            'offcut_piece_ids' => [],
+            'bars_needed' => null,
+            'bar_pack' => [],
+            'reserve_qty' => $totalMm > 0 ? bcdiv((string) $totalMm, '1000', 3) : '0.000',
+            'reserve_uom' => 'metre',
+            'offcut_usable_metres' => '0.000',
+            'packing_mode' => 'exact_metres',
+        ];
+    }
+
+    /**
+     * Combined SKU reservation: aluminium bars, or metre rubber with cut lengths.
+     *
+     * @param  list<array{item_id?: int, quantity?: string|float, required_length_mm?: int|null}>  $bomLinesForItem
+     */
+    public function shouldCombineCuts(Item $item, array $bomLinesForItem = []): bool
+    {
+        if ($this->shouldPackOntoBars($item)) {
+            return true;
+        }
+
+        if ($item->category !== ItemCategory::Rubber || ! $this->isMetreUom($item)) {
+            return false;
+        }
+
+        foreach ($bomLinesForItem as $line) {
+            if ((int) ($line['required_length_mm'] ?? 0) > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Only aluminium profiles nest onto standard 6m bars. */
+    public function shouldPackOntoBars(Item $item): bool
+    {
+        return $item->category === ItemCategory::AluminiumProfile;
+    }
+
+    /**
+     * @deprecated Use shouldCombineCuts / shouldPackOntoBars
+     *
+     * @param  list<array{item_id?: int, quantity?: string|float, required_length_mm?: int|null}>  $bomLinesForItem
+     */
+    public function shouldPackCuts(Item $item, array $bomLinesForItem = []): bool
+    {
+        return $this->shouldCombineCuts($item, $bomLinesForItem);
     }
 
     public function barLengthMm(Item $item): int
@@ -209,7 +284,7 @@ class AluminiumBarDemandService
         return number_format($barsNeeded, 3, '.', '');
     }
 
-    protected function isMetreUom(Item $item): bool
+    public function isMetreUom(Item $item): bool
     {
         $uom = strtolower(trim((string) ($item->unit_of_measure ?? '')));
 

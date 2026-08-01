@@ -25,6 +25,12 @@ class UpdateDeliveryRecordRequest extends FormRequest
             'expected_units' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'received_units' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'lines' => ['sometimes', 'array'],
+            'lines.*.description' => ['required_with:lines', 'string', 'max:255'],
+            'lines.*.qty_expected' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.qty_received' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.unit' => ['nullable', 'string', 'max:30'],
+            'lines.*.condition_notes' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

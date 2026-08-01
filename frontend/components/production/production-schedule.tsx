@@ -33,6 +33,7 @@ type Props = {
 };
 
 const READINESS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  released: "default",
   ready: "default",
   partial: "secondary",
   procurement_pending: "outline",

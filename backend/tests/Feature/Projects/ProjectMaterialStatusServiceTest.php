@@ -380,6 +380,97 @@ class ProjectMaterialStatusServiceTest extends TestCase
         $this->assertSame(3, $status['summary']['fully_reserved']);
     }
 
+    public function test_partial_aluminium_hold_counts_as_reserved_unit_when_warehouse_can_cover_gap(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->makeProject([
+            'stage' => ProjectStage::MaterialsReserved->value,
+        ]);
+
+        $warehouse = Warehouse::query()->create([
+            'code' => 'MAIN-PARTIAL',
+            'name' => 'Partial Warehouse',
+        ]);
+        $deck = Deck::query()->create([
+            'warehouse_id' => $warehouse->id,
+            'slug' => 'accessories',
+            'name' => 'Profiles',
+        ]);
+        $section = Section::query()->create([
+            'deck_id' => $deck->id,
+            'code' => 'P2',
+            'name' => 'Profiles',
+            'section_type' => 'general_accessories',
+        ]);
+        $bin = Bin::query()->create([
+            'section_id' => $section->id,
+            'code' => 'BIN-PARTIAL-01',
+        ]);
+
+        $profileItem = Item::query()->create([
+            'sku' => 'PY08-PARTIAL',
+            'name' => 'OUTER FRAME',
+            'category' => ItemCategory::AluminiumProfile->value,
+            'unit_of_measure' => 'metre',
+        ]);
+
+        \App\Models\Warehouse\StockLevel::query()->create([
+            'item_id' => $profileItem->id,
+            'bin_id' => $bin->id,
+            'quantity_on_hand' => 100,
+            'quantity_reserved' => 18,
+        ]);
+
+        $bom = ProjectBom::query()->create([
+            'project_id' => $project->id,
+            'version' => 1,
+            'status' => 'finalized',
+            'uploaded_by' => $user->id,
+        ]);
+
+        // Four bars needed (24m); only 18m held — OK because WH can cover the gap.
+        foreach ([[2090, 2], [1816, 2], [2090, 2], [1825, 2]] as $index => [$mm, $qty]) {
+            ProjectBomLine::query()->create([
+                'bom_id' => $bom->id,
+                'line_type' => 'aluminium_profile',
+                'warehouse_item_id' => $profileItem->id,
+                'material_code' => $profileItem->sku,
+                'material_name' => $profileItem->name,
+                'quantity' => $qty,
+                'measurement_mm' => $mm,
+                'sort_order' => $index + 1,
+            ]);
+        }
+
+        $reservation = StockReservation::query()->create([
+            'reservation_number' => 'RSV-PARTIAL-ALU',
+            'project_id' => $project->id,
+            'status' => ReservationStatus::Pending->value,
+            'reserved_at' => now(),
+            'reserved_by' => $user->id,
+            'fifo_sequence' => 1,
+        ]);
+
+        StockReservationLine::query()->create([
+            'reservation_id' => $reservation->id,
+            'item_id' => $profileItem->id,
+            'bin_id' => $bin->id,
+            'quantity_reserved' => 18,
+            'quantity_released' => 0,
+            'bom_line_ref' => (string) $bom->lines()->orderBy('id')->value('id'),
+        ]);
+
+        $status = app(ProjectMaterialStatusService::class)->build($project->fresh(['latestBom.lines.warehouseItem']));
+        $aluLine = collect($status['lines'])->firstWhere('warehouse_item_id', $profileItem->id);
+
+        $this->assertSame('18.000', $aluLine['reserved_qty']);
+        $this->assertSame('24.000', $aluLine['reservation_target_qty']);
+        $this->assertTrue($aluLine['is_fully_reserved']);
+        $this->assertSame(1, $status['summary']['reservation_units_total']);
+        $this->assertSame(1, $status['summary']['reservation_units_reserved']);
+        $this->assertTrue($status['summary']['reservation_complete']);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */

@@ -78,7 +78,7 @@ export function BalconyTypePicker({
           above it.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 sm:gap-3">
         {BALCONY_TYPE_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -86,7 +86,7 @@ export function BalconyTypePicker({
             disabled={readOnly}
             onClick={() => onChange(option.value)}
             className={cn(
-              "flex flex-col overflow-hidden rounded-md border border-border bg-background text-left transition active:scale-[0.98]",
+              "flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-background text-left transition active:scale-[0.98]",
               "hover:border-primary/50",
               readOnly && "cursor-default opacity-90",
             )}

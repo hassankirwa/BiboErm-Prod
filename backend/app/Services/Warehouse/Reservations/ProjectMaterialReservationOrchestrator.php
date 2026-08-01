@@ -60,6 +60,7 @@ class ProjectMaterialReservationOrchestrator
         $this->audit->reservationCreated($reservation->id, [
             'project_id' => $projectId,
             'fifo_sequence' => $reservation->fifo_sequence,
+            'topped_up' => (bool) ($result['topped_up'] ?? false),
         ]);
 
         if ($emitEvents) {

@@ -63,7 +63,7 @@ export function buildFormFromVisit(
                     : (line.shower_details ?? null),
               };
             })
-          : [emptyMeasurementLine(0)],
+          : [emptyMeasurementLine(0, "1")],
     };
   }
 

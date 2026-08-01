@@ -85,6 +85,7 @@ class ProjectReservationController extends Controller
 
         return response()->json([
             'success' => true,
+            'topped_up' => (bool) ($result['topped_up'] ?? false),
             'reservation' => new StockReservationResource($result['reservation']),
             'check' => $result['check'],
         ]);

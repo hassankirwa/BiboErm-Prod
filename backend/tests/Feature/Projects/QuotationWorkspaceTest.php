@@ -137,7 +137,7 @@ class QuotationWorkspaceTest extends TestCase
         $response->assertJsonPath('data.0.name', $account->name);
     }
 
-    public function test_form_accounts_includes_account_with_existing_draft_quotation(): void
+    public function test_form_accounts_excludes_account_with_existing_draft_quotation(): void
     {
         Sanctum::actingAs($this->user);
         $account = $this->createAccountWithApprovedVisit();
@@ -159,6 +159,30 @@ class QuotationWorkspaceTest extends TestCase
         $this->assertEmpty(collect($pending->json('data'))->where('id', $account->id));
 
         $formAccounts = $this->getJson('/api/v1/projects/quotations/form-accounts');
+        $formAccounts->assertOk();
+        $this->assertEmpty(collect($formAccounts->json('data'))->where('id', $account->id));
+    }
+
+    public function test_form_accounts_can_include_quoted_account_via_include_id(): void
+    {
+        Sanctum::actingAs($this->user);
+        $account = $this->createAccountWithApprovedVisit();
+
+        $this->postJson('/api/v1/projects/quotations', [
+            'account_id' => $account->id,
+            'project_name' => 'Existing draft',
+            'lines' => [
+                [
+                    'description' => 'Line',
+                    'quantity' => 1,
+                    'unit_price' => 100,
+                ],
+            ],
+        ])->assertCreated();
+
+        $formAccounts = $this->getJson(
+            "/api/v1/projects/quotations/form-accounts?include_account_id={$account->id}",
+        );
         $formAccounts->assertOk();
         $this->assertNotEmpty(collect($formAccounts->json('data'))->where('id', $account->id));
         $this->assertNotNull(collect($formAccounts->json('data'))->firstWhere('id', $account->id)['latest_quotation']);

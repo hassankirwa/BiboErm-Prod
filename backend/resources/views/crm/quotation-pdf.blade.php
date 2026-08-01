@@ -32,22 +32,26 @@
             </tr>
         </thead>
         <tbody>
+            @php
+                $usdPriced = $quotation->hasUsdPricing();
+                $kesRate = $usdPriced ? $quotation->usdToKesRate() : 1.0;
+            @endphp
             @foreach ($quotation->lines as $index => $line)
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $line->description }}</td>
                     <td>{{ $line->quantity }}</td>
-                    <td>{{ number_format((float) $line->unit_price, 2) }}</td>
-                    <td>{{ number_format((float) $line->line_total, 2) }}</td>
+                    <td>{{ number_format((float) $line->unit_price * $kesRate, 2) }}</td>
+                    <td>{{ number_format((float) $line->line_total * $kesRate, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
     <div class="totals">
-        <p>Subtotal: KES {{ number_format((float) $quotation->subtotal, 2) }}</p>
-        <p>Discount: KES {{ number_format((float) $quotation->discount_amount, 2) }}</p>
-        <p>Tax: KES {{ number_format((float) $quotation->tax_amount, 2) }}</p>
-        <p><strong>Total: KES {{ number_format((float) $quotation->total_amount, 2) }}</strong></p>
+        <p>Subtotal: KES {{ number_format((float) $quotation->subtotal * $kesRate, 2) }}</p>
+        <p>Discount: KES {{ number_format((float) $quotation->discount_amount * $kesRate, 2) }}</p>
+        <p>Tax: KES {{ number_format((float) $quotation->tax_amount * $kesRate, 2) }}</p>
+        <p><strong>Total: KES {{ number_format($quotation->totalAmountKes(), 2) }}</strong></p>
     </div>
     @if ($quotation->terms_conditions)
         <p><strong>Terms &amp; conditions</strong></p>

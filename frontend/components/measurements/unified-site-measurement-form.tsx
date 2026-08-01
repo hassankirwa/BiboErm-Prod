@@ -37,7 +37,7 @@ import {
   resolveMeasurementContext,
 } from "@/lib/measurements/adapters";
 import {
-  emptyMeasurementLine,
+  createNextMeasurementLine,
   hasSiteMeasurementFormData,
   isMeasurementFormLocked,
   type SiteMeasurementFormData,
@@ -236,7 +236,7 @@ export function UnifiedSiteMeasurementForm({
 
   function addLine() {
     updateForm({
-      lines: [...form.lines, emptyMeasurementLine(form.lines.length)],
+      lines: [...form.lines, createNextMeasurementLine(form.lines)],
     });
   }
 
