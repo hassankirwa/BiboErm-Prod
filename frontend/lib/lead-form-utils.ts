@@ -18,6 +18,7 @@ export function apiLeadToFormValues(lead: ApiLeadDetail): LeadFormValues {
     title: lead.name ?? lead.site_name ?? "",
     leadTypeId: lead.lead_type_id ?? null,
     leadSourceId: lead.lead_source_id ?? null,
+    leadSourceSlug: lead.lead_source?.slug ?? "",
     stageId: statusToKanbanStage(lead.status),
     ownerId:
       lead.lead_owner_id ?? lead.assigned_sales_user_id ?? lead.assigned_to ?? null,
@@ -51,6 +52,8 @@ export function apiLeadToFormValues(lead: ApiLeadDetail): LeadFormValues {
     productInterests: lead.product_interests ?? [],
     requirementDescription: lead.requirement_description ?? "",
     propertySiteType: lead.property_site_type ?? "",
+    buildingConstructionStageId: lead.building_construction_stage_id ?? null,
+    sitePhotoFiles: [],
     urgency: lead.urgency ?? "",
     expectedTimeline: lead.expected_timeline ?? "",
     nextActionDate:
@@ -66,6 +69,7 @@ export function cardToFormValues(card: LeadKanbanCard): LeadFormValues {
     title: card.title,
     leadTypeId: null,
     leadSourceId: card.leadSourceId ?? null,
+    leadSourceSlug: "",
     stageId: card.stageId,
     ownerId: card.ownerId ?? null,
     priority: "medium",

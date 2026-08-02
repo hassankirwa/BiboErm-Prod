@@ -625,6 +625,18 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
           visitForm.site_address || lead?.site_address || undefined,
 
+        latitude: (() => {
+          const value =
+            lead?.latitude != null ? Number(lead.latitude) : Number.NaN;
+          return Number.isFinite(value) ? value : undefined;
+        })(),
+
+        longitude: (() => {
+          const value =
+            lead?.longitude != null ? Number(lead.longitude) : Number.NaN;
+          return Number.isFinite(value) ? value : undefined;
+        })(),
+
         assigned_field_officer_id: Number(visitForm.assigned_field_officer_id),
 
         visit_date: visitForm.visit_date,

@@ -6,12 +6,12 @@ import {
   Calendar,
   ClipboardList,
   Loader2,
-  MapPin,
   Play,
   Ruler,
   User,
 } from "lucide-react";
 import { SiteVisitStatusBadge } from "@/components/crm/site-visit-status-badge";
+import { SiteVisitLocationPanel } from "@/components/crm/site-visit-location-panel";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,12 +110,11 @@ export function FieldOpenVisitCard({
           </p>
         )}
 
-        {visit.site_address && (
-          <p className="flex items-start gap-2 text-sm text-muted-foreground">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-            {visit.site_address}
-          </p>
-        )}
+        <SiteVisitLocationPanel
+          siteAddress={visit.site_address}
+          latitude={visit.latitude}
+          longitude={visit.longitude}
+        />
 
         {visit.deal?.requirement_summary && (
           <p className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">

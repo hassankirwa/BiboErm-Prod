@@ -405,4 +405,44 @@ class SiteVisitWorkflowTest extends TestCase
         $this->assertContains($this->fieldOfficer->id, $ids);
         $this->assertContains($productionManager->id, $ids);
     }
+
+    public function test_schedule_copies_latitude_longitude_from_lead_when_omitted(): void
+    {
+        Sanctum::actingAs($this->salesRep);
+
+        $lead = Lead::query()->create([
+            'reference' => 'LD-PIN-001',
+            'lead_number' => 'LD-PIN-001',
+            'name' => 'Pinned site lead',
+            'first_name' => 'Pinned',
+            'status' => LeadStatus::Qualified,
+            'site_address' => 'Kasasani Sunton, Nairobi',
+            'latitude' => -1.21945,
+            'longitude' => 36.89123,
+            'lead_owner_id' => $this->salesRep->id,
+            'created_by' => $this->salesRep->id,
+        ]);
+
+        $this->provisionAccountForLead($lead);
+
+        $response = $this->postJson('/api/v1/crm/site-visits', [
+            'title' => 'Measurement with lead pin',
+            'lead_id' => $lead->id,
+            'assigned_field_officer_id' => $this->fieldOfficer->id,
+            'visit_date' => now()->toDateString(),
+            'measurement_context' => 'quotation',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.site_address', 'Kasasani Sunton, Nairobi')
+            ->assertJsonPath('data.latitude', -1.21945)
+            ->assertJsonPath('data.longitude', 36.89123);
+
+        $this->assertDatabaseHas('site_visits', [
+            'id' => $response->json('data.id'),
+            'site_address' => 'Kasasani Sunton, Nairobi',
+            'latitude' => -1.21945,
+            'longitude' => 36.89123,
+        ]);
+    }
 }

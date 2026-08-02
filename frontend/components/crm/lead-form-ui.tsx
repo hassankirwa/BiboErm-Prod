@@ -34,6 +34,10 @@ import {
 } from "@/lib/lead-form-config";
 import { KENYA_COUNTIES, getSubCountiesForCounty } from "@/lib/kenya-locations";
 import { useCrmFormLookups } from "@/hooks/use-crm-form-lookups";
+import type {
+  CrmAssignableUser,
+  CrmLookups,
+} from "@/lib/api/crm/lookups";
 import { useAuth } from "@/contexts/auth-context";
 import { CrmSitePhotoPicker } from "@/components/crm/crm-site-photo-picker";
 import { SiteVisitAssigneeSelect } from "@/components/crm/site-visit-assignee-select";
@@ -158,6 +162,8 @@ export function LeadFormFields({
   update,
   variant = "page",
   showSiteVisitFields = true,
+  lookups: lookupsProp,
+  assignableUsers: assignableUsersProp,
 }: {
   form: LeadFormValues;
   update: <K extends keyof LeadFormValues>(
@@ -167,11 +173,21 @@ export function LeadFormFields({
   variant?: "page" | "modal";
   /** Hidden on create — site visits are scheduled from lead detail after contact/interested stages. */
   showSiteVisitFields?: boolean;
+  /** Optional shared lookups from the parent form (avoids a second fetch). */
+  lookups?: CrmLookups | null;
+  assignableUsers?: CrmAssignableUser[];
 }) {
   const { user } = useAuth();
-  const { lookups, assignableUsers, loading, error } = useCrmFormLookups({
+  const hooked = useCrmFormLookups({
     assignableRole: "sales_representative",
   });
+  const lookups = lookupsProp !== undefined ? lookupsProp : hooked.lookups;
+  const assignableUsers =
+    assignableUsersProp !== undefined
+      ? assignableUsersProp
+      : hooked.assignableUsers;
+  const loading = lookupsProp !== undefined ? !lookupsProp : hooked.loading;
+  const error = lookupsProp !== undefined ? null : hooked.error;
 
   const leadSources = lookups?.lead_sources ?? [];
   const leadTypes = lookups?.lead_types ?? [];
@@ -199,12 +215,13 @@ export function LeadFormFields({
       </Field>
       <Field label="Lead type">
         <Select
-          value={form.leadTypeId ? String(form.leadTypeId) : undefined}
+          key={`lead-type-${form.leadTypeId ?? "none"}`}
+          value={form.leadTypeId != null ? String(form.leadTypeId) : undefined}
           onValueChange={(v) =>
             update("leadTypeId", v ? Number(v) : null)
           }
         >
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-9 w-full">
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
           <SelectContent>
@@ -218,13 +235,18 @@ export function LeadFormFields({
       </Field>
       <Field label="Lead source">
         <Select
-          value={form.leadSourceId ? String(form.leadSourceId) : undefined}
-          onValueChange={(v) =>
-            update("leadSourceId", v ? Number(v) : null)
-          }
+          value={form.leadSourceSlug || undefined}
+          onValueChange={(v) => {
+            const match = leadSources.find((source) => source.slug === v);
+            update("leadSourceSlug", v);
+            update(
+              "leadSourceId",
+              match?.id != null ? Number(match.id) : null,
+            );
+          }}
           disabled={leadSources.length === 0}
         >
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-9 w-full">
             <SelectValue
               placeholder={
                 error
@@ -237,7 +259,7 @@ export function LeadFormFields({
           </SelectTrigger>
           <SelectContent>
             {leadSources.map((s) => (
-              <SelectItem key={s.id} value={String(s.id)}>
+              <SelectItem key={s.id} value={s.slug}>
                 {s.label}
               </SelectItem>
             ))}
@@ -246,11 +268,12 @@ export function LeadFormFields({
       </Field>
       <Field label="Stage">
         <Select
+          key={`lead-stage-${form.stageId}`}
           value={form.stageId}
           onValueChange={(v) => update("stageId", v as LeadKanbanStageId)}
         >
-          <SelectTrigger className="h-9">
-            <SelectValue />
+          <SelectTrigger className="h-9 w-full">
+            <SelectValue placeholder="Select stage" />
           </SelectTrigger>
           <SelectContent>
             {leadKanbanStages.map((s) => (
@@ -263,10 +286,11 @@ export function LeadFormFields({
       </Field>
       <Field label="Owner">
         <Select
-          value={form.ownerId ? String(form.ownerId) : undefined}
+          key={`lead-owner-${form.ownerId ?? "none"}`}
+          value={form.ownerId != null ? String(form.ownerId) : undefined}
           onValueChange={(v) => update("ownerId", v ? Number(v) : null)}
         >
-          <SelectTrigger className="h-9">
+          <SelectTrigger className="h-9 w-full">
             <SelectValue placeholder="Select owner" />
           </SelectTrigger>
           <SelectContent>

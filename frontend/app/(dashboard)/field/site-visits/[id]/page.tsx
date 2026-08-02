@@ -7,6 +7,8 @@ import { AppHeader } from "@/components/app-header";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { UnifiedSiteMeasurementForm } from "@/components/measurements/unified-site-measurement-form";
 import { SiteVisitStatusBadge } from "@/components/crm/site-visit-status-badge";
+import { SiteVisitLocationPanel } from "@/components/crm/site-visit-location-panel";
+import { resolveSiteVisitLocation } from "@/lib/crm/site-visit-location";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -146,6 +148,7 @@ export default function FieldSiteVisitDetailPage() {
   const showStart = canStartFieldVisit(status);
   const context = visit ? resolveMeasurementContext(visit) : "quotation";
   const canApprove = canApproveSiteVisit(visit, user?.id, roles);
+  const visitLocation = visit ? resolveSiteVisitLocation(visit) : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -214,13 +217,6 @@ export default function FieldSiteVisitDetailPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {visit.site_address && (
-                  <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                    {visit.site_address}
-                  </p>
-                )}
-
                 {visit.project_id && (
                   <p className="text-sm">Project: #{visit.project_id}</p>
                 )}
@@ -303,6 +299,12 @@ export default function FieldSiteVisitDetailPage() {
                       </Button>
                   )}
                 </div>
+
+                <SiteVisitLocationPanel
+                  siteAddress={visitLocation?.siteAddress}
+                  latitude={visitLocation?.latitude}
+                  longitude={visitLocation?.longitude}
+                />
               </CardContent>
             </Card>
 

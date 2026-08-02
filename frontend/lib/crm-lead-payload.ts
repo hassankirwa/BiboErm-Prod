@@ -12,10 +12,25 @@ import {
   type LeadFormValues,
 } from "@/lib/lead-form-config";
 
+/** Resolve lead source id from slug — same idea as resolveCountyId. */
+export function resolveLeadSourceId(
+  sources: CrmLookupItem[] | undefined,
+  leadSourceSlug: string,
+): number | null {
+  if (!leadSourceSlug || !sources?.length) return null;
+  const match = sources.find(
+    (item) =>
+      item.slug === leadSourceSlug ||
+      item.label.toLowerCase() === leadSourceSlug.toLowerCase(),
+  );
+  return match?.id != null ? Number(match.id) : null;
+}
+
 export function leadFormToCreatePayload(
   values: LeadFormValues,
   lookups?: {
     counties?: CrmLookupItem[];
+    lead_sources?: CrmLookupItem[];
     product_interests?: CrmLookupItem[];
     fieldDayPinId?: number | null;
     existingAccountId?: number | null;
@@ -43,7 +58,9 @@ export function leadFormToCreatePayload(
   const payload: CreateLeadPayload = {
     name: values.title.trim(),
     lead_type_id: values.leadTypeId,
-    lead_source_id: values.leadSourceId,
+    lead_source_id:
+      resolveLeadSourceId(lookups?.lead_sources, values.leadSourceSlug) ??
+      values.leadSourceId,
     status: kanbanStageToStatus(values.stageId),
     priority: values.priority || tagToPriority(values.tag),
     lead_owner_id: values.ownerId,

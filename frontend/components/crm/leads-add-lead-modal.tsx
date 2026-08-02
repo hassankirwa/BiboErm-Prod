@@ -51,6 +51,7 @@ export function LeadsAddLeadModal({
         emptyLeadForm(defaultStageId, {
           ownerId: user?.id ?? null,
           leadSourceId: lookups?.lead_sources[0]?.id ?? null,
+          leadSourceSlug: lookups?.lead_sources[0]?.slug ?? "",
           leadTypeId: lookups?.lead_types[0]?.id ?? null,
         }),
       );

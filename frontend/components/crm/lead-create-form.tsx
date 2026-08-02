@@ -41,7 +41,7 @@ export function LeadCreateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { lookups } = useCrmFormLookups({
+  const { lookups, assignableUsers } = useCrmFormLookups({
     assignableRole: "sales_representative",
   });
   const returnView = searchParams.get("return");
@@ -56,6 +56,7 @@ export function LeadCreateForm() {
     emptyLeadForm("new_lead", {
       ownerId: user?.id ?? null,
       leadSourceId: lookups?.lead_sources[0]?.id ?? null,
+      leadSourceSlug: lookups?.lead_sources[0]?.slug ?? "",
     }),
   );
   const [submitting, setSubmitting] = useState(false);
@@ -68,12 +69,24 @@ export function LeadCreateForm() {
     string | null
   >(null);
 
+  const resolveExistingClientSource = (sources = lookups?.lead_sources) =>
+    sources?.find((source) => source.slug === "existing_client") ?? null;
+
+  const resolveDefaultNewClientSource = (sources = lookups?.lead_sources) =>
+    sources?.find((source) => source.slug === "field_visit") ??
+    sources?.[0] ??
+    null;
+
   const applyExistingAccountPrefill = (account: ApiAccount) => {
     const contact = account.primary_contact;
+    // Same pattern as county: map lookup id → slug for the select value.
     const countySlug =
       lookups?.counties.find((county) => county.id === account.county_id)
         ?.slug ?? "";
+    const existingSource = resolveExistingClientSource();
 
+    // Prefill account + contact identity only. Site, measurements, and quote
+    // belong to the new opportunity and must stay blank for returning clients.
     setForm((current) => ({
       ...current,
       company: account.name,
@@ -84,16 +97,17 @@ export function LeadCreateForm() {
       whatsapp: contact?.whatsapp ?? current.whatsapp,
       jobTitle: contact?.job_title ?? current.jobTitle,
       ownerId:
-        account.account_owner_id ?? account.owner_id ?? current.ownerId ?? user?.id ?? null,
+        account.account_owner_id ??
+        account.owner_id ??
+        current.ownerId ??
+        user?.id ??
+        null,
       countySlug: countySlug || current.countySlug,
-      location:
-        account.physical_address ??
-        account.billing_address ??
-        current.location,
-      siteAddress:
-        account.physical_address ??
-        account.billing_address ??
-        current.siteAddress,
+      leadSourceSlug: existingSource?.slug ?? "existing_client",
+      leadSourceId: existingSource?.id ?? current.leadSourceId,
+      stageId: "account_provisioned",
+      leadTypeId:
+        current.leadTypeId ?? lookups?.lead_types[0]?.id ?? null,
     }));
     setSelectedAccountId(account.id);
     setSelectedAccountLabel(account.name);
@@ -104,21 +118,45 @@ export function LeadCreateForm() {
     setSelectedAccountLabel(null);
   };
 
+  // Keep source/stage in sync once lookups are ready (avoids race when
+  // Existing client is chosen before options have loaded).
   useEffect(() => {
     if (!lookups) return;
-    setForm((current) => ({
-      ...current,
-      ownerId: current.ownerId ?? user?.id ?? null,
-      leadSourceId:
+
+    const existingSource = resolveExistingClientSource(lookups.lead_sources);
+    const defaultSource = resolveDefaultNewClientSource(lookups.lead_sources);
+
+    setForm((current) => {
+      if (intakeMode === "existing") {
+        return {
+          ...current,
+          ownerId: current.ownerId ?? user?.id ?? null,
+          leadTypeId: current.leadTypeId ?? lookups.lead_types[0]?.id ?? null,
+          leadSourceSlug: existingSource?.slug ?? "existing_client",
+          leadSourceId: existingSource?.id ?? current.leadSourceId,
+          stageId: "account_provisioned",
+        };
+      }
+
+      const nextSlug =
+        current.leadSourceSlug || defaultSource?.slug || "";
+      const nextId =
         current.leadSourceId ??
-        lookups.lead_sources.find((source) => source.slug === "field_visit")
-          ?.id ??
-        lookups.lead_sources[0]?.id ??
-        null,
-      leadTypeId:
-        current.leadTypeId ?? lookups.lead_types[0]?.id ?? null,
-    }));
-  }, [lookups, user?.id]);
+        (nextSlug
+          ? lookups.lead_sources.find((source) => source.slug === nextSlug)?.id
+          : null) ??
+        defaultSource?.id ??
+        null;
+
+      return {
+        ...current,
+        ownerId: current.ownerId ?? user?.id ?? null,
+        leadTypeId: current.leadTypeId ?? lookups.lead_types[0]?.id ?? null,
+        leadSourceSlug: nextSlug || defaultSource?.slug || "",
+        leadSourceId: nextId,
+      };
+    });
+  }, [lookups, user?.id, intakeMode]);
 
   useEffect(() => {
     if (!fieldDayPinId || Number.isNaN(fieldDayPinId) || !lookups) return;
@@ -195,6 +233,11 @@ export function LeadCreateForm() {
           countySlug: countySlug || current.countySlug,
           subcounty: subcounty || current.subcounty,
           ward: ward || current.ward,
+          leadSourceSlug:
+            lookups.lead_sources.find((source) => source.slug === "field_visit")
+              ?.slug ??
+            current.leadSourceSlug ||
+            "field_visit",
           leadSourceId:
             lookups.lead_sources.find((source) => source.slug === "field_visit")
               ?.id ??
@@ -232,6 +275,7 @@ export function LeadCreateForm() {
       const lead = await createLead(
         leadFormToCreatePayload(form, {
           counties: lookups?.counties,
+          lead_sources: lookups?.lead_sources,
           product_interests: lookups?.product_interests,
           fieldDayPinId,
           existingAccountId:
@@ -328,7 +372,7 @@ export function LeadCreateForm() {
               {fieldDayPinId
                 ? "Review the prefilled site details from your field visit, then create the lead."
                 : intakeMode === "existing"
-                  ? "Link a new project opportunity to an existing client account. Contact details are prefilled from the account."
+                  ? "Link a new opportunity to an existing client. Account and contact are prefilled; site, measurements, and quote start fresh."
                   : "Capture the site or opportunity first. Contact details are optional until someone is identified."}
             </p>
           </div>
@@ -382,6 +426,17 @@ export function LeadCreateForm() {
                     setIntakeMode(value);
                     if (value === "new") {
                       clearExistingAccount();
+                      const defaultSource = resolveDefaultNewClientSource();
+                      setForm((current) => ({
+                        ...current,
+                        leadSourceSlug:
+                          defaultSource?.slug ??
+                          current.leadSourceSlug ||
+                          "field_visit",
+                        leadSourceId:
+                          defaultSource?.id ?? current.leadSourceId,
+                        stageId: "new_lead",
+                      }));
                     }
                   }}
                   options={[
@@ -411,6 +466,8 @@ export function LeadCreateForm() {
             form={form}
             update={update}
             showSiteVisitFields={false}
+            lookups={lookups}
+            assignableUsers={assignableUsers}
           />
 
           <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 px-5 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80">

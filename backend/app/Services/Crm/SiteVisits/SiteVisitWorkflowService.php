@@ -44,11 +44,27 @@ class SiteVisitWorkflowService
 
             $this->assertValidScheduleContext($data, $context);
 
-            if ($context === MeasurementContext::Quotation && ! empty($data['lead_id']) && empty($data['account_id'])) {
+            if ($context === MeasurementContext::Quotation && ! empty($data['lead_id'])) {
                 $lead = Lead::query()->find($data['lead_id']);
-                if ($lead?->converted_account_id) {
-                    $data['account_id'] = $lead->converted_account_id;
-                    $data['contact_id'] = $data['contact_id'] ?? $lead->converted_contact_id;
+
+                if ($lead) {
+                    if (empty($data['account_id']) && $lead->converted_account_id) {
+                        $data['account_id'] = $lead->converted_account_id;
+                        $data['contact_id'] = $data['contact_id'] ?? $lead->converted_contact_id;
+                    }
+
+                    // Carry site pin/address from the lead when the schedule payload omits them.
+                    if (trim((string) ($data['site_address'] ?? '')) === '') {
+                        $data['site_address'] = $lead->site_address;
+                    }
+
+                    if (! array_key_exists('latitude', $data) || $data['latitude'] === null || $data['latitude'] === '') {
+                        $data['latitude'] = $lead->latitude;
+                    }
+
+                    if (! array_key_exists('longitude', $data) || $data['longitude'] === null || $data['longitude'] === '') {
+                        $data['longitude'] = $lead->longitude;
+                    }
                 }
             }
 

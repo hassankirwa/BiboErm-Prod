@@ -42,6 +42,8 @@ export type LeadFormValues = {
   title: string;
   leadTypeId: number | null;
   leadSourceId: number | null;
+  /** Lookup slug bound to the Lead source select (same pattern as countySlug). */
+  leadSourceSlug: string;
   stageId: LeadKanbanStageId;
   ownerId: number | null;
   priority: string;
@@ -87,6 +89,7 @@ export function emptyLeadForm(
   defaults?: {
     ownerId?: number | null;
     leadSourceId?: number | null;
+    leadSourceSlug?: string;
     leadTypeId?: number | null;
   },
 ): LeadFormValues {
@@ -94,6 +97,7 @@ export function emptyLeadForm(
     title: "",
     leadTypeId: defaults?.leadTypeId ?? null,
     leadSourceId: defaults?.leadSourceId ?? null,
+    leadSourceSlug: defaults?.leadSourceSlug ?? "",
     stageId,
     ownerId: defaults?.ownerId ?? null,
     priority: "medium",
