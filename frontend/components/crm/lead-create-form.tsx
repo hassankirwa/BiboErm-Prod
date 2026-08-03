@@ -236,8 +236,7 @@ export function LeadCreateForm() {
           leadSourceSlug:
             lookups.lead_sources.find((source) => source.slug === "field_visit")
               ?.slug ??
-            current.leadSourceSlug ||
-            "field_visit",
+            (current.leadSourceSlug || "field_visit"),
           leadSourceId:
             lookups.lead_sources.find((source) => source.slug === "field_visit")
               ?.id ??
@@ -431,8 +430,7 @@ export function LeadCreateForm() {
                         ...current,
                         leadSourceSlug:
                           defaultSource?.slug ??
-                          current.leadSourceSlug ||
-                          "field_visit",
+                          (current.leadSourceSlug || "field_visit"),
                         leadSourceId:
                           defaultSource?.id ?? current.leadSourceId,
                         stageId: "new_lead",
