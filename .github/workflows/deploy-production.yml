@@ -1,0 +1,108 @@
+name: Deploy production
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy merged development branch
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'development')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: /var/www/bibo-erm
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Validate deployment settings
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_HOST:?DEPLOY_HOST is not configured}"
+          : "${DEPLOY_USER:?DEPLOY_USER is not configured}"
+          DEPLOY_PORT="${DEPLOY_PORT:-22}"
+          echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
+
+      - name: Synchronize application files
+        run: |
+          set -euo pipefail
+          rsync --archive --compress --delete --itemize-changes \
+            --exclude='/.git/' \
+            --exclude='/.github/' \
+            --exclude='/ecosystem.config.cjs' \
+            --exclude='/backend/.env' \
+            --exclude='/backend/storage/' \
+            --exclude='/backend/vendor/' \
+            --exclude='/frontend/.env' \
+            --exclude='/frontend/.next/' \
+            --exclude='/frontend/node_modules/' \
+            --exclude='/storage/' \
+            -e "ssh -p $DEPLOY_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Install, migrate, cache, and restart
+        run: |
+          set -euo pipefail
+          ssh -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          cd "$DEPLOY_PATH/frontend"
+          npm install --no-audit --no-fund
+          npm run build
+
+          cd "$DEPLOY_PATH/backend"
+          composer install \
+            --no-dev \
+            --no-interaction \
+            --prefer-dist \
+            --optimize-autoloader
+          php artisan migrate --force
+          php artisan db:seed --force
+          php artisan optimize:clear
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+          pm2 reload "$DEPLOY_PATH/ecosystem.config.cjs" \
+            --only bibo-erm \
+            --update-env
+          REMOTE

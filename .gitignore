@@ -1,3 +1,22 @@
 # Local working docs and uploaded files — not tracked in git
 /docs/
 /storage/
+
+# Environment and secret files (keep distributable examples)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Operating-system and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*~
