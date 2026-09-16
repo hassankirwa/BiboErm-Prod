@@ -18,6 +18,7 @@ import {
   type CatalogInventoryItem,
   type CatalogTier,
 } from "@/lib/api/warehouse";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ export function CatalogItemBrowser({
 }: CatalogItemBrowserProps) {
   const [items, setItems] = useState<CatalogInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<CatalogTier | "all">("all");
@@ -54,7 +56,9 @@ export function CatalogItemBrowser({
   }, [searchInput]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     listCatalogItems({
       category,
       catalog_tier: tier,
@@ -63,11 +67,23 @@ export function CatalogItemBrowser({
       per_page: 50,
     })
       .then((response) => {
+        if (cancelled) return;
         setItems(response.data);
         setIndex(0);
       })
-      .catch((error: Error) => toast.error(error.message || "Failed to load catalog items."))
-      .finally(() => setLoading(false));
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = getApiErrorMessage(error, "Failed to load catalog items.");
+        setItems([]);
+        setLoadError(message);
+        toast.error(message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [category, refreshKey, search, tier]);
 
   const current = items[index] ?? null;
@@ -122,6 +138,8 @@ export function CatalogItemBrowser({
             <Loader2 className="size-4 animate-spin" />
             Loading catalog…
           </div>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">{loadError}</p>
         ) : !current ? (
           <p className="text-sm text-muted-foreground">
             Import a material catalog to browse items.

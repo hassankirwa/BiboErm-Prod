@@ -62,5 +62,9 @@ export type AuthState = {
 
 export type ApiErrorBody = {
   message?: string;
+  error?: string;
+  detail?: string;
+  exception?: string;
   errors?: Record<string, string[]>;
+  limits?: Record<string, string | number>;
 };

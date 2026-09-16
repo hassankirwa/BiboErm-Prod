@@ -16,7 +16,9 @@ return [
     ],
 
     'warehouse' => [
-        // Image-heavy material catalog workbooks (PREMIUM, BALUSTRADE, ALUMINIUM…).
+        // Image-heavy material catalog workbooks (PREMIUM ~5MB, BALUSTRADE ~25MB, ALUMINIUM ~124MB).
+        // PHP post_max_size / upload_max_filesize (public/.user.ini) and nginx
+        // client_max_body_size must be at least this large or extract returns 413/422.
         'material_catalog_workbook_max_kb' => (int) env('BIBO_WAREHOUSE_CATALOG_WORKBOOK_MAX_KB', 153600),
     ],
 

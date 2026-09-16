@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\ClarifyFailedUploads;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\EnsureTrustedDevice;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Support\ApiExceptionPresenter;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -10,6 +12,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Spatie\Permission\Middleware\PermissionMiddleware;
@@ -32,7 +35,9 @@ return Application::configure(basePath: dirname(__DIR__))
          * Relying only on EnsureFrontendRequestsAreStateful breaks HTTP clients that omit Referer,
          * which makes fromFrontend() false and leaves $request->session() unavailable.
          */
-        $middleware->api(append: [
+        $middleware->api(prepend: [
+            ClarifyFailedUploads::class,
+        ], append: [
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
@@ -50,5 +55,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, Throwable $e): bool => ApiExceptionPresenter::wantsApiJson($request)
+        );
+
+        $exceptions->render(function (Throwable $e, Request $request) {
+            return ApiExceptionPresenter::toResponse($e, $request);
+        });
     })->create();

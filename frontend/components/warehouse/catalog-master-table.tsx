@@ -26,6 +26,7 @@ import {
   type CatalogInventoryItem,
   type CatalogTier,
 } from "@/lib/api/warehouse";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +51,7 @@ type CatalogMasterTableProps = {
 export function CatalogMasterTable({ onDeactivate, refreshKey = 0 }: CatalogMasterTableProps) {
   const [items, setItems] = useState<CatalogInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [tier, setTier] = useState<CatalogTier | "all">("all");
@@ -71,7 +73,9 @@ export function CatalogMasterTable({ onDeactivate, refreshKey = 0 }: CatalogMast
   }, [searchInput]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     listCatalogItems({
       category,
       catalog_tier: tier,
@@ -80,11 +84,23 @@ export function CatalogMasterTable({ onDeactivate, refreshKey = 0 }: CatalogMast
       per_page: 20,
     })
       .then((response) => {
+        if (cancelled) return;
         setItems(response.data);
         setMeta(response.meta);
       })
-      .catch((error: Error) => toast.error(error.message || "Failed to load catalog items."))
-      .finally(() => setLoading(false));
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = getApiErrorMessage(error, "Failed to load catalog items.");
+        setItems([]);
+        setLoadError(message);
+        toast.error(message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [category, page, refreshKey, search, tier]);
 
   const from = meta.total === 0 ? 0 : (meta.current_page - 1) * meta.per_page + 1;
@@ -169,6 +185,12 @@ export function CatalogMasterTable({ onDeactivate, refreshKey = 0 }: CatalogMast
                       <Loader2 className="size-4 animate-spin" />
                       Loading catalog…
                     </span>
+                  </TableCell>
+                </TableRow>
+              ) : loadError ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-10 text-center text-sm text-destructive">
+                    {loadError}
                   </TableCell>
                 </TableRow>
               ) : items.length === 0 ? (

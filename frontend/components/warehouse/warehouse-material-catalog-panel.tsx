@@ -26,6 +26,7 @@ import {
   type MaterialMasterMappingItem,
   type StoredCatalogItem,
 } from "@/lib/api/warehouse";
+import { getApiErrorMessage } from "@/lib/api/errors";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -128,7 +129,7 @@ export function WarehouseMaterialCatalogPanel({ onImported }: { onImported?: () 
       const response = await listMaterialCatalog();
       setStoredCodes(response.data);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load imported bin mappings.");
+      toast.error(getApiErrorMessage(error, "Could not load imported bin mappings."));
     }
   };
 
@@ -155,7 +156,7 @@ export function WarehouseMaterialCatalogPanel({ onImported }: { onImported?: () 
         `Found ${response.data.summary.total_codes} entries: ${response.data.summary.new ?? 0} new, ${response.data.summary.changed ?? 0} changed, ${response.data.summary.unchanged ?? 0} unchanged.`,
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read the bin workbook.");
+      toast.error(getApiErrorMessage(error, "Could not read the bin workbook."));
     } finally {
       setBusy(null);
     }
@@ -186,7 +187,7 @@ export function WarehouseMaterialCatalogPanel({ onImported }: { onImported?: () 
       await loadStored();
       onImported?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not import the bin workbook.");
+      toast.error(getApiErrorMessage(error, "Could not import the bin workbook."));
     } finally {
       setBusy(null);
     }
@@ -202,7 +203,7 @@ export function WarehouseMaterialCatalogPanel({ onImported }: { onImported?: () 
         `Mapped ${response.data.summary.mapped_items} of ${response.data.summary.total_items} materials. Review ${response.data.summary.unmapped_items} unmapped rows.`,
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read the material master.");
+      toast.error(getApiErrorMessage(error, "Could not read the material master."));
     } finally {
       setBusy(null);
     }
@@ -274,7 +275,7 @@ export function WarehouseMaterialCatalogPanel({ onImported }: { onImported?: () 
       if (materialInputRef.current) materialInputRef.current.value = "";
       onImported?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not import the material master.");
+      toast.error(getApiErrorMessage(error, "Could not import the material master."));
     } finally {
       setBusy(null);
     }

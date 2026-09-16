@@ -3,7 +3,7 @@ import { getDeviceId } from "@/lib/device-id";
 import { API_URL, getApiBaseUrl } from "./config";
 import { ensureCsrfCookie, getCsrfTokenFromCookie, getXsrfToken } from "./csrf";
 import { getDeviceUuid } from "./device";
-import { ApiError } from "./errors";
+import { ApiError, messageFromApiErrorBody } from "./errors";
 import { buildCacheKey, cachedRequest, invalidateApiCache } from "./request-cache";
 
 export { ApiError, ensureCsrfCookie, invalidateApiCache };
@@ -129,14 +129,26 @@ export async function apiRequest<T>(
 
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
-  const data = isJson ? await response.json() : null;
+  let data: unknown = null;
+  let rawText: string | null = null;
+
+  if (isJson) {
+    data = await response.json().catch(() => null);
+  } else if (!response.ok) {
+    rawText = await response.text().catch(() => null);
+  }
 
   if (!response.ok) {
-    const errorBody = (data as ApiErrorBody) ?? {};
+    const errorBody =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as Record<string, unknown>)
+        : rawText
+          ? ({ message: rawText } as Record<string, unknown>)
+          : {};
     throw new ApiError(
       response.status,
-      errorBody.message ?? `Request failed with status ${response.status}`,
-      errorBody as Record<string, unknown>,
+      messageFromApiErrorBody(errorBody, response.status, (errorBody as ApiErrorBody).message),
+      errorBody,
     );
   }
 
@@ -200,14 +212,21 @@ export async function apiBlobRequest(
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
-    const errorBody = contentType.includes("application/json")
-      ? ((await response.json().catch(() => ({}))) as ApiErrorBody)
-      : {};
+    let body: Record<string, unknown> = {};
+
+    if (contentType.includes("application/json")) {
+      body = ((await response.json().catch(() => ({}))) as Record<string, unknown>) ?? {};
+    } else {
+      const text = await response.text().catch(() => "");
+      if (text) {
+        body = { message: text };
+      }
+    }
 
     throw new ApiError(
       response.status,
-      errorBody.message ?? `Request failed with status ${response.status}`,
-      errorBody as Record<string, unknown>,
+      messageFromApiErrorBody(body, response.status),
+      body,
     );
   }
 
@@ -268,10 +287,11 @@ export async function apiFetch<T>(
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (!res.ok) {
-      const message =
-        (typeof body.message === "string" && body.message) ||
-        "Request failed. Please try again.";
-      throw new ApiError(res.status, message, body);
+      throw new ApiError(
+        res.status,
+        messageFromApiErrorBody(body, res.status),
+        body,
+      );
     }
 
     return body as T;
