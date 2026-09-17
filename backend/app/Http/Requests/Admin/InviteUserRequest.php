@@ -21,6 +21,7 @@ class InviteUserRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:255'],
             'department_id' => ['required', 'integer', 'exists:departments,id'],
             'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'department_email' => ['nullable', 'email', 'max:255'],
             'additional_assignments' => ['nullable', 'array'],
             'additional_assignments.*.department_id' => ['required', 'integer', 'exists:departments,id'],
             'additional_assignments.*.role_id' => ['required', 'integer', 'exists:roles,id'],

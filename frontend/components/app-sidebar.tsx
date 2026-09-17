@@ -47,8 +47,9 @@ import {
   workspaceNavItems,
   filterWorkspaceFooterNavItems,
   filterWorkspaceInsightsNavItems,
-  leaveHrefForDepartment,
+  footerHrefForDepartment,
   isWorkspaceShellPath,
+  workspaceFooterNavGroup,
 } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
@@ -82,23 +83,85 @@ function NavItem({
             if (isMobile) setOpenMobile(false);
           }}
         >
-          <Icon
-            className={cn(
-              "h-[18px] w-[18px] shrink-0",
-              isActive ? "text-primary" : "text-neutral-500"
-            )}
-          />
-          <span
-            className={cn(
-              "text-sm",
-              isActive ? "font-semibold text-primary" : "font-medium text-neutral-700"
-            )}
-          >
-            {name}
-          </span>
+          <Icon className="h-[18px] w-[18px] shrink-0" />
+          <span>{name}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  );
+}
+
+function SelfServiceHrNav({
+  pathname,
+  department = null,
+}: {
+  pathname: string;
+  department?: NonNullable<ReturnType<typeof getActiveDepartment>> | null;
+}) {
+  const footerItems = filterWorkspaceFooterNavItems();
+  const GroupIcon = workspaceFooterNavGroup.icon;
+  const resolvedItems = footerItems.map((item) => ({
+    ...item,
+    href: department
+      ? footerHrefForDepartment(department, item.kind)
+      : item.href,
+  }));
+  const isGroupActive = resolvedItems.some((item) =>
+    isWorkspaceNavActive(pathname, item.href),
+  );
+
+  return (
+    <Collapsible
+      defaultOpen={isGroupActive}
+      className="group/hr-self-collapsible"
+    >
+      <SidebarGroup className="shrink-0 p-0">
+        <SidebarGroupContent>
+          <SidebarMenu className="gap-0 px-3">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton
+                  className="h-10 rounded-md px-3 hover:bg-neutral-100"
+                  tooltip={workspaceFooterNavGroup.name}
+                >
+                  <GroupIcon className="h-[18px] w-[18px] shrink-0 text-neutral-500" />
+                  <span className="text-sm font-medium text-neutral-700">
+                    {workspaceFooterNavGroup.name}
+                  </span>
+                  <ChevronDown className="ml-auto h-4 w-4 text-neutral-400 transition-transform group-data-[state=open]/hr-self-collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+            </SidebarMenuItem>
+
+            <CollapsibleContent>
+              <SidebarMenuSub className="ml-4 border-l-0 px-0 pl-5">
+                {resolvedItems.map((item) => {
+                  const isActive = isWorkspaceNavActive(pathname, item.href);
+                  const ItemIcon = item.icon;
+                  return (
+                    <SidebarMenuSubItem key={item.href}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          "text-neutral-600 hover:text-neutral-900",
+                          isActive && "sidebar-sub-active",
+                        )}
+                      >
+                        <Link href={item.href}>
+                          <ItemIcon className="h-4 w-4 shrink-0" />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  );
+                })}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </Collapsible>
   );
 }
 
@@ -137,7 +200,6 @@ function WorkspaceContent({
   permissions: string[];
   roles: string[];
 }) {
-  const footerItems = filterWorkspaceFooterNavItems();
   const insightsItems = filterWorkspaceInsightsNavItems(permissions, roles);
   const showFullWorkspaceNav = canAccessWorkspaceHub(roles);
 
@@ -189,21 +251,7 @@ function WorkspaceContent({
 
         <SidebarSeparator className="mx-3 my-3 bg-neutral-200" />
 
-        <SidebarGroup className="shrink-0 p-0">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1 px-3">
-              {footerItems.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  name={item.name}
-                  icon={item.icon}
-                  isActive={isWorkspaceNavActive(pathname, item.href)}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <SelfServiceHrNav pathname={pathname} />
 
         <div className="flex-1" />
       </SidebarContent>
@@ -230,7 +278,6 @@ function DepartmentContent({
   permissions: string[];
   roles: string[];
 }) {
-  const footerItems = filterWorkspaceFooterNavItems();
   const insightsItems =
     department.id === "workspace"
       ? filterWorkspaceInsightsNavItems(permissions, roles)
@@ -402,24 +449,7 @@ function DepartmentContent({
           <SidebarSeparator className="mx-3 my-3 shrink-0 bg-neutral-200" />
         ) : null}
 
-        <SidebarGroup className="shrink-0 p-0">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1 px-3">
-              {footerItems.map((item) => {
-                const href = leaveHrefForDepartment(department);
-                return (
-                  <NavItem
-                    key={href}
-                    href={href}
-                    name={item.name}
-                    icon={item.icon}
-                    isActive={isWorkspaceNavActive(pathname, href)}
-                  />
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <SelfServiceHrNav pathname={pathname} department={department} />
       </SidebarContent>
 
       <SidebarFooter className="mt-auto shrink-0 border-t border-neutral-200 p-3">

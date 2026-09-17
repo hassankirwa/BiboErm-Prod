@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
+import { PayrollEntryDetailSheet } from "@/components/hr/payroll-entry-detail-sheet";
 import { PayrollStatusBadge } from "@/components/hr/payroll-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   generatePayrollRun,
   rejectPayrollRun,
   submitPayrollRun,
+  type PayrollEntry,
   type PayrollRun,
 } from "@/lib/api/payroll";
 
@@ -33,6 +35,18 @@ function formatMoney(value: number): string {
     currency: "KES",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function deductionSummary(entry: PayrollEntry): string {
+  const parts = [
+    entry.shif ? `SHIF ${formatMoney(entry.shif)}` : null,
+    entry.nssf ? `NSSF ${formatMoney(entry.nssf)}` : null,
+    entry.paye ? `PAYE ${formatMoney(entry.paye)}` : null,
+    entry.other_deductions
+      ? `Other ${formatMoney(entry.other_deductions)}`
+      : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "—";
 }
 
 function PayrollRunDetailContent() {
@@ -46,6 +60,7 @@ function PayrollRunDetailContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<PayrollEntry | null>(null);
 
   const load = useCallback(async () => {
     if (!runId) return;
@@ -54,6 +69,10 @@ function PayrollRunDetailContent() {
     try {
       const result = await fetchPayrollRun(runId);
       setRun(result.data);
+      setSelectedEntry((current) => {
+        if (!current) return null;
+        return result.data.entries?.find((entry) => entry.id === current.id) ?? null;
+      });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -119,6 +138,10 @@ function PayrollRunDetailContent() {
             </h1>
             <PayrollStatusBadge status={run.status} />
           </div>
+          <p className="text-sm text-muted-foreground">
+            Open an employee to review deductions and configure overtime, bonuses, or extra
+            deductions for this period.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage && run.status === "draft" && (
@@ -198,15 +221,19 @@ function PayrollRunDetailContent() {
                 <TableRow>
                   <TableHead>Employee</TableHead>
                   <TableHead>Gross</TableHead>
-                  <TableHead>NHIF</TableHead>
-                  <TableHead>NSSF</TableHead>
-                  <TableHead>PAYE</TableHead>
+                  <TableHead>Additions</TableHead>
+                  <TableHead>Deductions</TableHead>
                   <TableHead>Net</TableHead>
+                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {run.entries.map((entry) => (
-                  <TableRow key={entry.id}>
+                  <TableRow
+                    key={entry.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedEntry(entry)}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-medium">{entry.user_name}</p>
@@ -216,10 +243,28 @@ function PayrollRunDetailContent() {
                       </div>
                     </TableCell>
                     <TableCell>{formatMoney(entry.gross_salary)}</TableCell>
-                    <TableCell>{formatMoney(entry.nhif)}</TableCell>
-                    <TableCell>{formatMoney(entry.nssf)}</TableCell>
-                    <TableCell>{formatMoney(entry.paye)}</TableCell>
+                    <TableCell>
+                      {(entry.additions_total ?? 0) > 0
+                        ? formatMoney(entry.additions_total ?? 0)
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[280px] text-xs text-muted-foreground">
+                      {deductionSummary(entry)}
+                    </TableCell>
                     <TableCell>{formatMoney(entry.net_pay)}</TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedEntry(entry);
+                        }}
+                      >
+                        Open
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -227,6 +272,19 @@ function PayrollRunDetailContent() {
           )}
         </CardContent>
       </Card>
+
+      <PayrollEntryDetailSheet
+        open={selectedEntry != null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEntry(null);
+        }}
+        runId={run.id}
+        periodYear={run.period_year}
+        periodMonth={run.period_month}
+        entry={selectedEntry}
+        canEdit={canManage && run.status === "draft"}
+        onUpdated={() => void load()}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ use App\Http\Requests\Leave\SubmitLeaveRequestRequest;
 use App\Http\Resources\Hr\LeaveRequestResource;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Hr\LeaveBalanceService;
 use App\Services\Hr\LeaveRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,10 @@ class LeaveRequestController extends Controller
             ->latest('id')
             ->get();
 
-        return LeaveRequestResource::collection($requests)->response();
+        return response()->json([
+            'data' => LeaveRequestResource::collection($requests)->resolve(),
+            'balance' => app(LeaveBalanceService::class)->balanceFor($user),
+        ]);
     }
 
     public function store(SubmitLeaveRequestRequest $request): JsonResponse

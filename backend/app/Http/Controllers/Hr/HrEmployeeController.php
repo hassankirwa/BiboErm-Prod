@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Models\EmployeeProfile;
 use App\Models\ProfileChangeRequest;
 use App\Models\User;
+use App\Services\Hr\EmployeeDirectCreateService;
 use App\Services\Profile\ProfileChangeRequestService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class HrEmployeeController extends Controller
 {
@@ -49,6 +52,53 @@ class HrEmployeeController extends Controller
         }
 
         return response()->json($query->paginate($perPage));
+    }
+
+    public function store(Request $request, EmployeeDirectCreateService $creator): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
+            'activate_now' => ['sometimes', 'boolean'],
+            'department_id' => ['required', 'integer', 'exists:departments,id'],
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'additional_assignments' => ['nullable', 'array'],
+            'additional_assignments.*.department_id' => ['required_with:additional_assignments', 'integer', 'exists:departments,id'],
+            'additional_assignments.*.role_id' => ['required_with:additional_assignments', 'integer', 'exists:roles,id'],
+            'employee_number' => ['nullable', 'string', 'max:50', 'unique:employee_profiles,employee_number'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'unit' => ['nullable', 'string', 'max:150'],
+            'employment_type' => ['nullable', 'string', Rule::in(EmployeeProfile::EMPLOYMENT_TYPES)],
+            'start_date' => ['nullable', 'date'],
+            'work_location' => ['nullable', 'string', 'max:255'],
+            'department_email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'phone_alt' => ['nullable', 'string', 'max:50'],
+            'address' => ['nullable', 'string'],
+            'home_county' => ['nullable', 'string', 'max:100'],
+            'home_area' => ['nullable', 'string', 'max:150'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
+            'national_id' => ['nullable', 'string', 'max:50'],
+            'kra_pin' => ['nullable', 'string', 'max:50'],
+            'nssf_number' => ['nullable', 'string', 'max:50'],
+            'shif_number' => ['nullable', 'string', 'max:50'],
+            'bank_or_mpesa' => ['nullable', 'string', 'max:255'],
+            'monthly_gross_salary' => ['nullable', 'numeric', 'min:0'],
+            'reporting_manager_id' => ['nullable', 'integer', 'exists:users,id'],
+            'hr_notes' => ['nullable', 'string'],
+        ]);
+
+        $result = $creator->create($validated, $request->user());
+
+        return response()->json([
+            'message' => __('Employee created.'),
+            'data' => [
+                'user' => $result['user'],
+                'temporary_password' => $result['temporary_password'],
+            ],
+        ], 201);
     }
 
     public function show(User $user): JsonResponse

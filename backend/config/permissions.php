@@ -176,10 +176,10 @@ return [
 
         'hr_manager' => [
             'hr.view', 'hr.manage',
-            'employees.view', 'employees.update_hr_details', 'employees.approve',
+            'employees.view', 'employees.create', 'employees.import', 'employees.update_hr_details', 'employees.approve',
             'users.invite', 'users.view', 'users.update_identity',
             'profile_changes.review',
-            'leave.review', 'hr_documents.manage',
+            'leave.review', 'hr_requests.review', 'suggestions.review', 'hr_documents.manage',
             'payroll.view', 'payroll.manage',
         ],
 

@@ -21,7 +21,13 @@ class HrEmployeeIdentityController extends Controller
 
     public function update(User $user, UpdateEmployeeIdentityRequest $request): JsonResponse
     {
-        if (! in_array($user->status, [User::STATUS_ACTIVE, User::STATUS_PENDING_HR_REVIEW, User::STATUS_SUSPENDED], true)) {
+        if (! in_array($user->status, [
+            User::STATUS_ACTIVE,
+            User::STATUS_PENDING_HR_REVIEW,
+            User::STATUS_PENDING_PROFILE_COMPLETION,
+            User::STATUS_INVITED,
+            User::STATUS_SUSPENDED,
+        ], true)) {
             throw ValidationException::withMessages([
                 'user' => [__('Identity cannot be updated for this account status.')],
             ]);
@@ -68,7 +74,13 @@ class HrEmployeeIdentityController extends Controller
 
     public function resetPassword(User $user): JsonResponse
     {
-        if (! in_array($user->status, [User::STATUS_ACTIVE, User::STATUS_PENDING_HR_REVIEW, User::STATUS_SUSPENDED], true)) {
+        if (! in_array($user->status, [
+            User::STATUS_ACTIVE,
+            User::STATUS_PENDING_HR_REVIEW,
+            User::STATUS_PENDING_PROFILE_COMPLETION,
+            User::STATUS_INVITED,
+            User::STATUS_SUSPENDED,
+        ], true)) {
             throw ValidationException::withMessages([
                 'user' => [__('Password cannot be reset for this account status.')],
             ]);

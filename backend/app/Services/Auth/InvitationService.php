@@ -2,6 +2,8 @@
 
 namespace App\Services\Auth;
 
+use App\Models\Department;
+use App\Models\EmployeeProfile;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use App\Models\UserInvitation;
@@ -33,6 +35,7 @@ class InvitationService
         int $roleId,
         array $additionalAssignments,
         User $invitedBy,
+        ?string $departmentEmail = null,
     ): InvitationResult {
         $email = mb_strtolower(trim($email));
 
@@ -42,7 +45,7 @@ class InvitationService
 
         DepartmentRoleAssignmentRules::validate($departmentId, $roleId, $additionalAssignments);
 
-        $user = DB::transaction(function () use ($email, $name, $departmentId, $roleId, $additionalAssignments, $invitedBy) {
+        $user = DB::transaction(function () use ($email, $name, $departmentId, $roleId, $additionalAssignments, $invitedBy, $departmentEmail) {
             $tempPasswordPlain = Str::password(18);
 
             $user = User::query()->create([
@@ -57,6 +60,21 @@ class InvitationService
             ]);
 
             UserProfile::query()->firstOrCreate(['user_id' => $user->id]);
+
+            if ($departmentEmail) {
+                EmployeeProfile::query()->updateOrCreate(
+                    ['user_id' => $user->id],
+                    ['department_email' => mb_strtolower(trim($departmentEmail))],
+                );
+            } else {
+                $shared = Department::query()->whereKey($departmentId)->value('shared_email');
+                if ($shared) {
+                    EmployeeProfile::query()->updateOrCreate(
+                        ['user_id' => $user->id],
+                        ['department_email' => mb_strtolower(trim((string) $shared))],
+                    );
+                }
+            }
 
             $assignmentRows = [];
             $seen = [];
@@ -212,28 +230,70 @@ class InvitationService
 
     public function resendForUser(User $user, User $invitedBy): InvitationResult
     {
-        if ($user->status !== User::STATUS_INVITED) {
-            throw ValidationException::withMessages(['user' => ['User is not awaiting invitation acceptance.']]);
+        return $this->inviteExistingUser($user, $invitedBy);
+    }
+
+    /**
+     * Send or resend an invitation for an existing employee (including imports).
+     * On accept they enter pending profile completion → pending HR review.
+     */
+    public function inviteExistingUser(User $user, User $invitedBy, ?string $emailOverride = null): InvitationResult
+    {
+        if (in_array($user->status, [User::STATUS_SUSPENDED, User::STATUS_INACTIVE], true)) {
+            throw ValidationException::withMessages([
+                'user' => ['Cannot invite a suspended or inactive user.'],
+            ]);
         }
 
-        [$plainToken, $tempPasswordPlain, $invitation] = DB::transaction(function () use ($user, $invitedBy) {
+        $email = mb_strtolower(trim($emailOverride ?? $user->email));
+        if ($email === '' || $this->isPlaceholderEmail($email)) {
+            throw ValidationException::withMessages([
+                'email' => ['Set a real login email before sending an invitation.'],
+            ]);
+        }
+
+        if (
+            User::query()
+                ->where('email', $email)
+                ->where('id', '!=', $user->id)
+                ->exists()
+        ) {
+            throw ValidationException::withMessages([
+                'email' => ['Another user already uses this email.'],
+            ]);
+        }
+
+        [$plainToken, $tempPasswordPlain, $invitation] = DB::transaction(function () use ($user, $invitedBy, $email) {
+            $wasInvited = $user->status === User::STATUS_INVITED;
+
             UserInvitation::query()
                 ->where('user_id', $user->id)
                 ->whereNull('accepted_at')
                 ->update(['revoked_at' => now()]);
 
             $tempPasswordPlain = Str::password(18);
+            $user->email = $email;
             $user->password = Hash::make($tempPasswordPlain);
+            $user->status = User::STATUS_INVITED;
             $user->must_change_password = true;
+            $user->email_verified_at = null;
+            $user->onboarding_completed_at = null;
+            $user->invited_by = $invitedBy->id;
             $user->save();
 
             $primary = UserDepartmentRole::query()
                 ->where('user_id', $user->id)
                 ->where('is_primary', true)
+                ->with('department')
                 ->first();
 
             if (! $primary) {
                 throw ValidationException::withMessages(['user' => ['User has no primary department assignment.']]);
+            }
+
+            $profile = EmployeeProfile::query()->firstOrCreate(['user_id' => $user->id]);
+            if (! $profile->department_email && $primary->department?->shared_email) {
+                $profile->update(['department_email' => $primary->department->shared_email]);
             }
 
             $plainToken = Str::random(64);
@@ -242,7 +302,7 @@ class InvitationService
 
             $invitation = UserInvitation::query()->create([
                 'user_id' => $user->id,
-                'email' => $user->email,
+                'email' => $email,
                 'name' => $user->name,
                 'department_id' => $primary->department_id,
                 'role_id' => $primary->role_id,
@@ -253,20 +313,30 @@ class InvitationService
 
             $this->audit->log(
                 module: 'users',
-                action: 'resend_invite',
+                action: $wasInvited ? 'resend_invite' : 'invite_existing',
                 entityType: 'user',
                 entityId: $user->id,
-                newValues: ['invitation_id' => $invitation->id],
+                newValues: [
+                    'email' => $email,
+                    'status' => User::STATUS_INVITED,
+                    'invitation_id' => $invitation->id,
+                ],
             );
 
             return [$plainToken, $tempPasswordPlain, $invitation];
         });
 
         $mailResult = $this->mail->send(
-            new UserInvitedMail($user, $plainToken, $tempPasswordPlain, $invitation),
-            $user->email,
+            new UserInvitedMail($user->fresh(), $plainToken, $tempPasswordPlain, $invitation),
+            $email,
         );
 
-        return InvitationResult::fromMail($user, $mailResult);
+        return InvitationResult::fromMail($user->fresh(), $mailResult);
+    }
+
+    private function isPlaceholderEmail(string $email): bool
+    {
+        return str_ends_with($email, '@pending.bibo.internal')
+            || str_ends_with($email, '@bibo.internal');
     }
 }

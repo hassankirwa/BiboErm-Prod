@@ -5,6 +5,7 @@ export type Department = {
   id: number;
   name: string;
   slug: string;
+  shared_email?: string | null;
 };
 
 export type Role = {
@@ -64,6 +65,7 @@ export async function inviteUser(payload: {
   name?: string;
   department_id: number;
   role_id: number;
+  department_email?: string;
   additional_assignments?: Array<{ department_id: number; role_id: number }>;
 }): Promise<InviteUserResponse> {
   await ensureCsrfCookie();

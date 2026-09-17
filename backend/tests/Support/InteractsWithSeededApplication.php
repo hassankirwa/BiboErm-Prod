@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\User;
 use App\Models\UserDepartmentRole;
 use Database\Seeders\DepartmentSeeder;
+use Database\Seeders\PayrollSettingsSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -62,6 +63,7 @@ trait InteractsWithSeededApplication
             RoleSeeder::class,
             DepartmentSeeder::class,
             RolePermissionSeeder::class,
+            PayrollSettingsSeeder::class,
         ]);
     }
 

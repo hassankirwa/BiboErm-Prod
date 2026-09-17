@@ -50,6 +50,8 @@ import {
   Shield,
   HardDrive,
   ScrollText,
+  MessageSquarePlus,
+  HandCoins,
 } from "lucide-react";
 
 export type SubModule = {
@@ -678,8 +680,12 @@ export const departments: Department[] = [
     path: "/hr",
     subModules: [
       { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+      { name: "Staff import", path: "/hr/import", permission: "employees.import" },
       { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+      { name: "Settings", path: "/hr/settings", permission: "payroll.manage" },
       { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+      { name: "Requests", path: "/hr/requests", permission: "hr_requests.review" },
+      { name: "Suggestions", path: "/hr/suggestions", permission: "suggestions.review" },
       { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
     ],
     nav: {
@@ -694,8 +700,12 @@ export const departments: Department[] = [
           icon: UserCog,
           items: [
             { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+            { name: "Staff import", path: "/hr/import", permission: "employees.import" },
             { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+            { name: "Settings", path: "/hr/settings", permission: "payroll.manage" },
             { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+            { name: "Requests", path: "/hr/requests", permission: "hr_requests.review" },
+            { name: "Suggestions", path: "/hr/suggestions", permission: "suggestions.review" },
             { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
           ],
         },
@@ -1094,9 +1104,31 @@ export function filterWorkspaceInsightsNavItems(
   );
 }
 
-/** Self-service leave link shown in every department sidebar footer. */
+/** Self-service HR hub links shown in every department sidebar footer. */
+export const workspaceFooterNavGroup = {
+  name: "HR",
+  icon: UserCog,
+} as const;
+
 export const workspaceFooterNavItems = [
-  { name: "Leave", href: "/workspace/leave", icon: CalendarDays },
+  {
+    name: "Leave Requests",
+    href: "/workspace/leave",
+    icon: CalendarDays,
+    kind: "leave" as const,
+  },
+  {
+    name: "Advanced Requests",
+    href: "/workspace/advanced-requests",
+    icon: HandCoins,
+    kind: "advanced" as const,
+  },
+  {
+    name: "Suggestion Box",
+    href: "/workspace/suggestions",
+    icon: MessageSquarePlus,
+    kind: "suggestions" as const,
+  },
 ] as const;
 
 export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems {
@@ -1106,14 +1138,34 @@ export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems 
 /**
  * Self-service leave URL scoped to the active department so the sidebar stays
  * on the user's dashboard instead of switching to the workspace shell.
- * HR reuses its existing `/hr/leave` management page; the workspace hub and
- * analytics fall back to the shared `/workspace/leave` route.
+ * HR staff use `/workspace/leave` for self-service; `/hr/leave` stays the
+ * management inbox.
  */
 export function leaveHrefForDepartment(department: Department | null): string {
   if (!department) return "/workspace/leave";
-  if (department.id === "hr") return "/hr/leave";
-  if (department.id === "analytics") return "/workspace/leave";
+  if (department.id === "hr" || department.id === "analytics") {
+    return "/workspace/leave";
+  }
   return `${department.path}/leave`;
+}
+
+export function footerHrefForDepartment(
+  department: Department | null,
+  kind: (typeof workspaceFooterNavItems)[number]["kind"],
+): string {
+  if (kind === "leave") {
+    return leaveHrefForDepartment(department);
+  }
+  if (kind === "advanced") {
+    if (!department || department.id === "hr" || department.id === "analytics") {
+      return "/workspace/advanced-requests";
+    }
+    return `${department.path}/advanced-requests`;
+  }
+  if (!department || department.id === "hr" || department.id === "analytics") {
+    return "/workspace/suggestions";
+  }
+  return `${department.path}/suggestions`;
 }
 
 export function isWorkspaceNavActive(pathname: string, href: string): boolean {

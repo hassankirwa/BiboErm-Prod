@@ -9,6 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class LeaveRequestService
 {
+    public function __construct(
+        private readonly LeaveBalanceService $balances,
+    ) {}
+
     /**
      * @param  array{leave_type: string, start_date: string, end_date: string, reason?: string|null}  $data
      */
@@ -29,10 +33,28 @@ class LeaveRequestService
             ]);
         }
 
+        $days = $this->balances->daysBetween($start, $end);
+
         if ($this->hasOverlappingRequest($user->id, $start, $end)) {
             throw ValidationException::withMessages([
                 'start_date' => [__('You already have a pending or approved leave request that overlaps these dates.')],
             ]);
+        }
+
+        if ($data['leave_type'] === LeaveRequest::TYPE_ANNUAL) {
+            $balance = $this->balances->balanceFor($user, (int) $start->year);
+            if ($days > $balance['available']) {
+                throw ValidationException::withMessages([
+                    'end_date' => [__(
+                        'This request needs :days day(s) but you only have :available annual leave day(s) available (:remaining remaining after approved leave).',
+                        [
+                            'days' => $days,
+                            'available' => $balance['available'],
+                            'remaining' => $balance['remaining'],
+                        ]
+                    )],
+                ]);
+            }
         }
 
         return LeaveRequest::query()->create([
@@ -40,6 +62,7 @@ class LeaveRequestService
             'leave_type' => $data['leave_type'],
             'start_date' => $start->toDateString(),
             'end_date' => $end->toDateString(),
+            'days' => $days,
             'reason' => $data['reason'] ?? null,
             'status' => LeaveRequest::STATUS_PENDING,
         ]);
@@ -72,11 +95,30 @@ class LeaveRequestService
             ]);
         }
 
+        if ($request->leave_type === LeaveRequest::TYPE_ANNUAL) {
+            $employee = $request->user;
+            if ($employee) {
+                $days = (int) ($request->days ?? $this->balances->daysBetween($request->start_date, $request->end_date));
+                $balance = $this->balances->balanceFor($employee, (int) $request->start_date->year);
+                // Pending includes this request; available already excludes it from remaining after approve path.
+                // remaining = entitlement - used (approved only). Ensure used + this days <= entitlement.
+                if ($days > $balance['remaining']) {
+                    throw ValidationException::withMessages([
+                        'leave' => [__(
+                            'Cannot approve: employee only has :remaining annual leave day(s) remaining this year.',
+                            ['remaining' => $balance['remaining']]
+                        )],
+                    ]);
+                }
+            }
+        }
+
         $request->update([
             'status' => LeaveRequest::STATUS_APPROVED,
             'reviewed_by' => $reviewer->id,
             'reviewed_at' => now(),
             'rejection_reason' => null,
+            'days' => $request->days ?? $this->balances->daysBetween($request->start_date, $request->end_date),
         ]);
 
         return $request->fresh(['user', 'reviewer']);

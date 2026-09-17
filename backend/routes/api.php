@@ -74,6 +74,12 @@ Route::prefix('v1')->group(function () {
         Route::post('leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])
             ->middleware('device.trusted');
 
+        Route::get('my/hr-requests', [\App\Http\Controllers\Hr\HrRequestController::class, 'myIndex']);
+        Route::post('my/hr-requests', [\App\Http\Controllers\Hr\HrRequestController::class, 'myStore'])
+            ->middleware('device.trusted');
+        Route::post('my/hr-suggestions', [\App\Http\Controllers\Hr\HrSuggestionController::class, 'myStore'])
+            ->middleware('device.trusted');
+
         Route::get('my/hr-documents', [MyHrDocumentController::class, 'index']);
         Route::get('my/hr-documents/{hrDocument}/download', [MyHrDocumentController::class, 'download']);
 

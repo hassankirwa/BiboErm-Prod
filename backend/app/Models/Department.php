@@ -11,6 +11,7 @@ class Department extends Model
         'name',
         'slug',
         'default_module',
+        'shared_email',
         'is_active',
     ];
 

@@ -26,10 +26,17 @@ import { ApiError } from "@/lib/api/client";
 export type HrFormState = {
   employee_number: string;
   job_title: string;
+  unit: string;
   employment_type: EmploymentType;
   start_date: string;
   reporting_manager_id: string;
   work_location: string;
+  department_email: string;
+  national_id: string;
+  kra_pin: string;
+  nssf_number: string;
+  shif_number: string;
+  bank_or_mpesa: string;
   salary_grade: string;
   monthly_gross_salary: string;
   contract_type: ContractType | "";
@@ -40,10 +47,17 @@ export type HrFormState = {
 export const emptyHrForm = (): HrFormState => ({
   employee_number: "",
   job_title: "",
+  unit: "",
   employment_type: "full_time",
   start_date: new Date().toISOString().slice(0, 10),
   reporting_manager_id: "",
   work_location: "",
+  department_email: "",
+  national_id: "",
+  kra_pin: "",
+  nssf_number: "",
+  shif_number: "",
+  bank_or_mpesa: "",
   salary_grade: "",
   monthly_gross_salary: "",
   contract_type: "",
@@ -57,12 +71,19 @@ export function hrFormFromEmployee(
   return {
     employee_number: employee?.employee_number ?? "",
     job_title: employee?.job_title ?? "",
+    unit: employee?.unit ?? "",
     employment_type: employee?.employment_type ?? "full_time",
     start_date: employee?.start_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
     reporting_manager_id: employee?.reporting_manager_id
       ? String(employee.reporting_manager_id)
       : "",
     work_location: employee?.work_location ?? "",
+    department_email: employee?.department_email ?? "",
+    national_id: employee?.national_id ?? "",
+    kra_pin: employee?.kra_pin ?? "",
+    nssf_number: employee?.nssf_number ?? "",
+    shif_number: employee?.shif_number ?? "",
+    bank_or_mpesa: employee?.bank_or_mpesa ?? "",
     salary_grade: employee?.salary_grade ?? "",
     monthly_gross_salary:
       employee?.monthly_gross_salary != null
@@ -143,6 +164,29 @@ export function EmployeeHrForm({
             value={form.job_title}
             onChange={(e) => set({ job_title: e.target.value })}
             disabled={disabled}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="unit">Unit</Label>
+          <Input
+            id="unit"
+            value={form.unit}
+            onChange={(e) => set({ unit: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="department-email">Department email (shared mailbox)</Label>
+          <Input
+            id="department-email"
+            type="email"
+            value={form.department_email}
+            onChange={(e) => set({ department_email: e.target.value })}
+            disabled={disabled}
+            placeholder="e.g. warehouse@bibo.com"
           />
         </div>
       </div>
@@ -267,6 +311,54 @@ export function EmployeeHrForm({
           onChange={(e) => set({ contract_end_date: e.target.value })}
           disabled={disabled}
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="national-id">National ID</Label>
+          <Input
+            id="national-id"
+            value={form.national_id}
+            onChange={(e) => set({ national_id: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="kra-pin">KRA PIN</Label>
+          <Input
+            id="kra-pin"
+            value={form.kra_pin}
+            onChange={(e) => set({ kra_pin: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="nssf-number">NSSF No.</Label>
+          <Input
+            id="nssf-number"
+            value={form.nssf_number}
+            onChange={(e) => set({ nssf_number: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="shif-number">SHIF (SHA) No.</Label>
+          <Input
+            id="shif-number"
+            value={form.shif_number}
+            onChange={(e) => set({ shif_number: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="bank-or-mpesa">Bank / M-Pesa</Label>
+          <Input
+            id="bank-or-mpesa"
+            value={form.bank_or_mpesa}
+            onChange={(e) => set({ bank_or_mpesa: e.target.value })}
+            disabled={disabled}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

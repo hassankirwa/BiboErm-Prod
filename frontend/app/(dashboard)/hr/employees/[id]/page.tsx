@@ -10,6 +10,7 @@ import { EmployeeHrForm,
   hrFormFromEmployee,
   type HrFormState,
 } from "@/components/hr/employee-hr-form";
+import { EmployeePayComponentsPanel } from "@/components/hr/employee-pay-components-panel";
 import { EmployeeIdentityPanel } from "@/components/hr/employee-identity-panel";
 import { EmployeePersonalPanel } from "@/components/hr/employee-personal-panel";
 import { ProfileChangeRequestReview } from "@/components/hr/profile-change-request-review";
@@ -32,6 +33,7 @@ function EmployeeDetailContent() {
   const canUpdate = hasPermission("employees.update_hr_details");
   const canApprove = hasPermission("employees.approve");
   const canUpdateIdentity = hasPermission("users.update_identity");
+  const canInvite = hasPermission("users.invite");
   const canReviewProfileChanges = hasPermission("profile_changes.review");
 
   const [detail, setDetail] = useState<HrEmployeeDetail | null>(null);
@@ -73,12 +75,19 @@ function EmployeeDetailContent() {
   const buildPayload = () => ({
     employee_number: form.employee_number,
     job_title: form.job_title,
+    unit: form.unit || undefined,
     employment_type: form.employment_type,
     start_date: form.start_date,
     reporting_manager_id: form.reporting_manager_id
       ? Number(form.reporting_manager_id)
       : undefined,
     work_location: form.work_location || undefined,
+    department_email: form.department_email || undefined,
+    national_id: form.national_id || undefined,
+    kra_pin: form.kra_pin || undefined,
+    nssf_number: form.nssf_number || undefined,
+    shif_number: form.shif_number || undefined,
+    bank_or_mpesa: form.bank_or_mpesa || undefined,
     salary_grade: form.salary_grade || undefined,
     monthly_gross_salary: form.monthly_gross_salary
       ? Number(form.monthly_gross_salary)
@@ -233,10 +242,12 @@ function EmployeeDetailContent() {
         <div className="space-y-6">
           {canUpdateIdentity && (
             <EmployeeIdentityPanel
-              key={`${detail.user.id}-${detail.user.email}`}
+              key={`${detail.user.id}-${detail.user.email}-${detail.user.status}`}
               userId={userId}
               name={detail.user.name}
               email={detail.user.email}
+              status={detail.user.status}
+              canInvite={canInvite}
               onUpdated={loadDetail}
               onError={setError}
               onSuccess={setSuccess}
@@ -277,6 +288,13 @@ function EmployeeDetailContent() {
           </div>
         </div>
       </div>
+
+      {canUpdate && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Payroll earnings &amp; deductions</h2>
+          <EmployeePayComponentsPanel userId={userId} disabled={!canEditHr} />
+        </div>
+      )}
 
       {detail.user.status === "active" && (
         <div className="flex justify-end">

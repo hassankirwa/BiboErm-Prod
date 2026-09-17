@@ -75,6 +75,7 @@ export function LeaveRequestTable({
             {mode === "hr" && <TableHead>Employee</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Dates</TableHead>
+            <TableHead>Days</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Reason</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -97,6 +98,7 @@ export function LeaveRequestTable({
               <TableCell>
                 {formatDate(request.start_date)} – {formatDate(request.end_date)}
               </TableCell>
+              <TableCell>{request.days ?? "—"}</TableCell>
               <TableCell>
                 <LeaveStatusBadge status={request.status} />
               </TableCell>

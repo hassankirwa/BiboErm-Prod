@@ -57,11 +57,13 @@ export function InviteEmployeeDialog({
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [departmentEmail, setDepartmentEmail] = useState("");
   const [assignments, setAssignments] = useState<DepartmentRoleAssignment[]>([]);
 
   const resetForm = () => {
     setEmail("");
     setName("");
+    setDepartmentEmail("");
     setAssignments([]);
     setError(null);
   };
@@ -83,6 +85,7 @@ export function InviteEmployeeDialog({
       const result = await adminApi.inviteUser({
         email,
         name: name || undefined,
+        department_email: departmentEmail || undefined,
         ...assignmentPayload,
       });
 
@@ -151,6 +154,16 @@ export function InviteEmployeeDialog({
               id="hr-invite-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hr-invite-dept-email">Department email (shared mailbox)</Label>
+            <Input
+              id="hr-invite-dept-email"
+              type="email"
+              value={departmentEmail}
+              onChange={(e) => setDepartmentEmail(e.target.value)}
+              placeholder="e.g. warehouse@bibo.com"
             />
           </div>
 

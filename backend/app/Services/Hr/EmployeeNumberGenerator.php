@@ -8,8 +8,9 @@ final class EmployeeNumberGenerator
 {
     public function suggest(?int $excludeUserId = null): string
     {
-        $defaultPrefix = strtoupper((string) config('bibo.hr.employee_number_prefix', 'EMP'));
+        $defaultPrefix = strtoupper((string) config('bibo.hr.employee_number_prefix', 'BWD'));
         $defaultPad = max(1, (int) config('bibo.hr.employee_number_pad', 4));
+        $useHyphen = (bool) config('bibo.hr.employee_number_hyphen', false);
 
         $query = EmployeeProfile::query()->whereNotNull('employee_number');
 
@@ -20,22 +21,23 @@ final class EmployeeNumberGenerator
         /** @var list<string> $numbers */
         $numbers = $query->pluck('employee_number')->all();
 
-        $last = $this->resolveLatestNumber($numbers);
+        $last = $this->resolveLatestNumber($numbers, $defaultPrefix);
 
         if ($last !== null) {
-            return $this->incrementNumber($last['prefix'], $last['sequence'], $last['pad']);
+            return $this->formatNumber($last['prefix'], $last['sequence'] + 1, $last['pad'], $last['hyphen']);
         }
 
-        return sprintf('%s-%0'.$defaultPad.'d', $defaultPrefix, 1);
+        return $this->formatNumber($defaultPrefix, 1, $defaultPad, $useHyphen);
     }
 
     /**
      * @param  list<string>  $numbers
-     * @return array{prefix: string, sequence: int, pad: int}|null
+     * @return array{prefix: string, sequence: int, pad: int, hyphen: bool}|null
      */
-    private function resolveLatestNumber(array $numbers): ?array
+    private function resolveLatestNumber(array $numbers, string $preferredPrefix): ?array
     {
-        $latest = null;
+        $latestPreferred = null;
+        $latestAny = null;
 
         foreach ($numbers as $number) {
             $parsed = $this->parseNumber($number);
@@ -44,34 +46,52 @@ final class EmployeeNumberGenerator
                 continue;
             }
 
-            if ($latest === null || $parsed['sequence'] > $latest['sequence']) {
-                $latest = $parsed;
+            if ($latestAny === null || $parsed['sequence'] > $latestAny['sequence']) {
+                $latestAny = $parsed;
+            }
+
+            if ($parsed['prefix'] === $preferredPrefix) {
+                if ($latestPreferred === null || $parsed['sequence'] > $latestPreferred['sequence']) {
+                    $latestPreferred = $parsed;
+                }
             }
         }
 
-        return $latest;
+        return $latestPreferred ?? $latestAny;
     }
 
     /**
-     * @return array{prefix: string, sequence: int, pad: int}|null
+     * @return array{prefix: string, sequence: int, pad: int, hyphen: bool}|null
      */
     private function parseNumber(string $number): ?array
     {
         $number = strtoupper(trim($number));
 
-        if (! preg_match('/^([A-Z]+)-(\d+)$/', $number, $matches)) {
-            return null;
+        if (preg_match('/^([A-Z]+)-(\d+)$/', $number, $matches)) {
+            return [
+                'prefix' => $matches[1],
+                'sequence' => (int) $matches[2],
+                'pad' => strlen($matches[2]),
+                'hyphen' => true,
+            ];
         }
 
-        return [
-            'prefix' => $matches[1],
-            'sequence' => (int) $matches[2],
-            'pad' => strlen($matches[2]),
-        ];
+        if (preg_match('/^([A-Z]+)(\d+)$/', $number, $matches)) {
+            return [
+                'prefix' => $matches[1],
+                'sequence' => (int) $matches[2],
+                'pad' => strlen($matches[2]),
+                'hyphen' => false,
+            ];
+        }
+
+        return null;
     }
 
-    private function incrementNumber(string $prefix, int $sequence, int $pad): string
+    private function formatNumber(string $prefix, int $sequence, int $pad, bool $hyphen): string
     {
-        return sprintf('%s-%0'.$pad.'d', $prefix, $sequence + 1);
+        $digits = sprintf('%0'.$pad.'d', $sequence);
+
+        return $hyphen ? $prefix.'-'.$digits : $prefix.$digits;
     }
 }
