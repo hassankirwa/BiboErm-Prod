@@ -41,6 +41,32 @@ class RequisitionSourceServiceTest extends TestCase
         $this->assertSame('6.000', $requisition->lines->first()->quantity);
     }
 
+    public function test_low_stock_source_includes_out_of_stock_items_without_minimum(): void
+    {
+        $item = $this->makeWarehouseItem(['min_stock_qty' => 0]);
+        // No stock levels → available 0, still eligible when min is unset/zero.
+
+        $source = app(RequisitionSourceService::class)->lowStockSource();
+        $match = collect($source)->firstWhere('warehouse_item_id', $item->id);
+
+        $this->assertNotNull($match);
+        $this->assertSame('out_of_stock', $match['stock_status']);
+        $this->assertSame('0.000', $match['available_qty']);
+        $this->assertSame('1.000', $match['quantity_to_requisition']);
+        $this->assertTrue($match['can_create_requisition']);
+    }
+
+    public function test_low_stock_source_excludes_in_stock_items_without_minimum(): void
+    {
+        $item = $this->makeWarehouseItem(['min_stock_qty' => 0]);
+        $this->makeStockLevel($item, 5, 0);
+
+        $source = app(RequisitionSourceService::class)->lowStockSource();
+        $match = collect($source)->firstWhere('warehouse_item_id', $item->id);
+
+        $this->assertNull($match);
+    }
+
     public function test_project_material_source_uses_unreserved_project_quantity(): void
     {
         $user = $this->makeUser();

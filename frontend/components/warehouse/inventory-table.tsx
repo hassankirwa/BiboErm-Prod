@@ -244,7 +244,11 @@ export function InventoryTable({ items }: { items: CatalogInventoryItem[] }) {
             const reserved = Number(item.quantity_reserved);
             const minStock = Number(item.min_stock_qty ?? 0);
             const unit = item.unit_of_measure ?? "";
-            const isLowStock = item.stock_status === "low_stock" || available < minStock;
+            const isLowStock =
+              item.stock_status === "low_stock" ||
+              item.stock_status === "out_of_stock" ||
+              available <= 0 ||
+              (minStock > 0 && available < minStock);
             const stockPercent = Math.min(
               100,
               Math.round((available / Math.max(minStock, 1)) * 100),

@@ -12,18 +12,21 @@ use App\Models\Procurement\GoodsReceipt;
 use App\Models\Procurement\ProcurementDelay;
 use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\PurchaseRequisition;
+use App\Services\Procurement\ProcurementAttentionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProcurementDashboardController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, ProcurementAttentionService $attention): JsonResponse
     {
         $this->authorize('viewAny', PurchaseRequisition::class);
 
         $pendingGrns = GoodsReceipt::query()
             ->whereIn('status', [GoodsReceiptStatus::Pending, GoodsReceiptStatus::Verifying])
             ->count();
+
+        $attentionSummary = $attention->summary();
 
         return response()->json([
             'data' => [
@@ -40,6 +43,10 @@ class ProcurementDashboardController extends Controller
                 'delays_this_week' => ProcurementDelay::query()
                     ->where('created_at', '>=', now()->startOfWeek())
                     ->count(),
+                'projects_awaiting_procurement' => $attentionSummary['projects_awaiting_procurement'],
+                'projects_with_material_shortages' => $attentionSummary['projects_with_material_shortages'],
+                'project_material_lines_needing_requisition' => $attentionSummary['project_material_lines_needing_requisition'],
+                'low_stock_items_needing_requisition' => $attentionSummary['low_stock_items_needing_requisition'],
             ],
         ]);
     }

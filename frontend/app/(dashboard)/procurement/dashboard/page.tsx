@@ -111,6 +111,13 @@ export default function ProcurementDashboardPage() {
       ]
     : [];
 
+  const materialsNeeding =
+    (stats?.project_material_lines_needing_requisition ?? 0) +
+    (stats?.low_stock_items_needing_requisition ?? 0);
+  const projectsWithShortages = stats?.projects_with_material_shortages ?? 0;
+  const lowStockNeeding = stats?.low_stock_items_needing_requisition ?? 0;
+  const projectLinesNeeding = stats?.project_material_lines_needing_requisition ?? 0;
+
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
@@ -122,6 +129,43 @@ export default function ProcurementDashboardPage() {
           <p className="text-sm text-muted-foreground">Loading dashboard…</p>
         ) : (
           <>
+          <>
+            {materialsNeeding > 0 ? (
+              <Card className="border-amber-300/80 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                      Materials need a requisition
+                    </p>
+                    <p className="mt-1 text-sm text-amber-900/80 dark:text-amber-100/80">
+                      {projectsWithShortages > 0
+                        ? `${projectsWithShortages} project${projectsWithShortages === 1 ? "" : "s"} · ${projectLinesNeeding} project material line${projectLinesNeeding === 1 ? "" : "s"}`
+                        : null}
+                      {projectsWithShortages > 0 && lowStockNeeding > 0 ? " · " : null}
+                      {lowStockNeeding > 0
+                        ? `${lowStockNeeding} low-stock item${lowStockNeeding === 1 ? "" : "s"}`
+                        : null}
+                      {" "}waiting to be ordered.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/procurement/project-materials"
+                      className="inline-flex h-9 items-center rounded-md border border-amber-400/60 bg-white px-3 text-sm font-medium text-amber-950 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-50 dark:hover:bg-amber-900"
+                    >
+                      Project materials
+                    </Link>
+                    <Link
+                      href="/procurement/requisitions/create?tab=project-materials"
+                      className="inline-flex h-9 items-center rounded-md bg-amber-700 px-3 text-sm font-medium text-white hover:bg-amber-800"
+                    >
+                      Create requisition
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-5">
               {cards.map((card) => (
                 <Card key={card.label}>

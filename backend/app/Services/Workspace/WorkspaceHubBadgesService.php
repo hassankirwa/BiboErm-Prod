@@ -13,6 +13,7 @@ use App\Models\Procurement\PurchaseOrder;
 use App\Models\Procurement\PurchaseRequisition;
 use App\Models\Production\ProductionOrder;
 use App\Models\User;
+use App\Services\Procurement\ProcurementAttentionService;
 use App\Services\Warehouse\Inventory\LowStockAlertService;
 use Carbon\Carbon;
 
@@ -20,6 +21,7 @@ class WorkspaceHubBadgesService
 {
     public function __construct(
         protected LowStockAlertService $lowStock,
+        protected ProcurementAttentionService $procurementAttention,
     ) {}
 
     /**
@@ -117,6 +119,9 @@ class WorkspaceHubBadgesService
             ->whereIn('status', [GoodsReceiptStatus::Pending, GoodsReceiptStatus::Verifying])
             ->count();
 
-        return $openRequisitions + $posAwaitingApproval + $pendingGrns;
+        return $openRequisitions
+            + $posAwaitingApproval
+            + $pendingGrns
+            + $this->procurementAttention->attentionCount();
     }
 }

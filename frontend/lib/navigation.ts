@@ -186,7 +186,11 @@ export const departments: Department[] = [
       { name: "Reports", path: "/site-ops/reports" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/site-ops/quotation/visits" }],
+      topItems: [
+        { name: "Home", path: "/site-ops/quotation/visits" },
+        { name: "Reports", path: "/site-ops/reports" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Lead capture",
@@ -263,7 +267,11 @@ export const departments: Department[] = [
       { name: "Design review", path: "/design/review" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/projects/design" }],
+      topItems: [
+        { name: "Home", path: "/projects/design" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Design",
@@ -294,7 +302,11 @@ export const departments: Department[] = [
       { name: "Quotation Review", path: "/quotation/review" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/quotation/proforma" }],
+      topItems: [
+        { name: "Home", path: "/quotation/proforma" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Quotation",
@@ -464,8 +476,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/production/schedule", permission: "production.view" },
-        { name: "Reports", path: "/analytics", permission: "analytics.view" },
-        { name: "Analytics", path: "/analytics", permission: "analytics.view" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
       ],
       groups: [
         {
@@ -551,6 +563,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/site-ops/quotation/my-visits" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
         {
           name: "Visit history",
           path: "/field/site-visits/history",
@@ -655,6 +669,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/qc/dashboard", permission: "qc.view" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
         { name: "Inspections", path: "/qc/inspections", permission: "qc.view" },
         { name: "Defects", path: "/qc/defects", permission: "qc.view" },
       ],
@@ -783,7 +799,27 @@ export const departments: Department[] = [
     name: "Analytics",
     icon: BarChart3,
     path: "/analytics",
-    subModules: [{ name: "Overview", path: "/analytics" }],
+    subModules: [
+      { name: "Overview", path: "/analytics" },
+      { name: "Reports", path: "/analytics/reports" },
+    ],
+    nav: {
+      topItems: [
+        { name: "Home", path: "/analytics" },
+        { name: "Reports", path: "/analytics/reports" },
+        { name: "Analytics", path: "/analytics" },
+      ],
+      groups: [
+        {
+          label: "Insights",
+          icon: BarChart3,
+          items: [
+            { name: "Overview", path: "/analytics" },
+            { name: "Reports", path: "/analytics/reports" },
+          ],
+        },
+      ],
+    },
   },
 ];
 

@@ -10,6 +10,7 @@ import {
   FileBarChart,
   PieChart,
   LayoutGrid,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -169,7 +170,156 @@ const topItemIcons: Record<string, ComponentType<{ className?: string }>> = {
   Home: Home,
   Reports: FileBarChart,
   Analytics: PieChart,
+  "Glass Prices": TrendingUp,
 };
+
+/** Top-level insight links shared across department sidebars. */
+const ANALYTICS_TOP_ITEM_NAMES = new Set(["Reports", "Analytics", "Glass Prices"]);
+
+function AnalyticsTopNav({
+  items,
+  pathname,
+  search = "",
+}: {
+  items: Array<{ name: string; path: string; exact?: boolean }>;
+  pathname: string;
+  search?: string;
+}) {
+  if (items.length === 0) return null;
+
+  const isGroupActive = items.some((item) =>
+    isDepartmentNavItemActive(pathname, item.path, item.exact, search),
+  );
+
+  return (
+    <Collapsible
+      defaultOpen={false}
+      className="group/analytics-top-collapsible"
+    >
+      <SidebarGroup className="shrink-0 p-0">
+        <SidebarGroupContent>
+          <SidebarMenu className="gap-0 px-3">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton
+                  className={cn(
+                    "sidebar-nav-item h-10 rounded-md px-3",
+                    isGroupActive && "sidebar-nav-item-active",
+                  )}
+                  tooltip="Analytics"
+                >
+                  <PieChart className="h-[18px] w-[18px] shrink-0" />
+                  <span>Analytics</span>
+                  <ChevronDown className="ml-auto h-4 w-4 text-neutral-400 transition-transform group-data-[state=open]/analytics-top-collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+            </SidebarMenuItem>
+
+            <CollapsibleContent>
+              <SidebarMenuSub className="ml-4 border-l-0 px-0 pl-5">
+                {items.map((item) => {
+                  const Icon = topItemIcons[item.name] ?? PieChart;
+                  const isActive = isDepartmentNavItemActive(
+                    pathname,
+                    item.path,
+                    item.exact,
+                    search,
+                  );
+                  return (
+                    <SidebarMenuSubItem key={`${item.path}-${item.name}`}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          "text-neutral-600 hover:text-neutral-900",
+                          isActive && "sidebar-sub-active",
+                        )}
+                      >
+                        <Link href={item.path}>
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span>{item.name}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  );
+                })}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
+function WorkspaceInsightsNav({
+  items,
+  pathname,
+}: {
+  items: Array<{
+    name: string;
+    href: string;
+    icon: ComponentType<{ className?: string }>;
+  }>;
+  pathname: string;
+}) {
+  if (items.length === 0) return null;
+
+  const isGroupActive = items.some((item) =>
+    isWorkspaceNavActive(pathname, item.href),
+  );
+
+  return (
+    <Collapsible
+      defaultOpen={false}
+      className="group/workspace-insights-collapsible"
+    >
+      <SidebarMenu className="gap-0 px-3">
+        <SidebarMenuItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton
+              className={cn(
+                "sidebar-nav-item h-10 rounded-md px-3",
+                isGroupActive && "sidebar-nav-item-active",
+              )}
+              tooltip="Analytics"
+            >
+              <PieChart className="h-[18px] w-[18px] shrink-0" />
+              <span>Analytics</span>
+              <ChevronDown className="ml-auto h-4 w-4 text-neutral-400 transition-transform group-data-[state=open]/workspace-insights-collapsible:rotate-180" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+        </SidebarMenuItem>
+
+        <CollapsibleContent>
+          <SidebarMenuSub className="ml-4 border-l-0 px-0 pl-5">
+            {items.map((item) => {
+              const ItemIcon = item.icon;
+              const isActive = isWorkspaceNavActive(pathname, item.href);
+              return (
+                <SidebarMenuSubItem key={item.href}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={isActive}
+                    className={cn(
+                      "text-neutral-600 hover:text-neutral-900",
+                      isActive && "sidebar-sub-active",
+                    )}
+                  >
+                    <Link href={item.href}>
+                      <ItemIcon className="h-4 w-4 shrink-0" />
+                      <span>{item.name}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenu>
+    </Collapsible>
+  );
+}
 
 function SidebarCollapseButton() {
   const { toggleSidebar } = useSidebar();
@@ -233,17 +383,7 @@ function WorkspaceContent({
             )}
             <SidebarGroup className="shrink-0 p-0">
               <SidebarGroupContent>
-                <SidebarMenu className="gap-1 px-3">
-                  {insightsItems.map((item) => (
-                    <NavItem
-                      key={item.href}
-                      href={item.href}
-                      name={item.name}
-                      icon={item.icon}
-                      isActive={isWorkspaceNavActive(pathname, item.href)}
-                    />
-                  ))}
-                </SidebarMenu>
+                <WorkspaceInsightsNav items={insightsItems} pathname={pathname} />
               </SidebarGroupContent>
             </SidebarGroup>
           </>
@@ -334,27 +474,38 @@ function DepartmentContent({
           <SidebarGroupContent>
             <SidebarMenu className="gap-1 px-3">
               {workspaceLink}
-              {nav.topItems.map((item) => {
-                const Icon = topItemIcons[item.name] ?? Home;
-                const isActive = isDepartmentNavItemActive(
-                  pathname,
-                  item.path,
-                  item.exact,
-                  search,
-                );
-                return (
-                  <NavItem
-                    key={item.name}
-                    href={item.path}
-                    name={item.name}
-                    icon={Icon}
-                    isActive={isActive}
-                  />
-                );
-              })}
+              {nav.topItems
+                .filter((item) => !ANALYTICS_TOP_ITEM_NAMES.has(item.name))
+                .map((item) => {
+                  const Icon = topItemIcons[item.name] ?? Home;
+                  const isActive = isDepartmentNavItemActive(
+                    pathname,
+                    item.path,
+                    item.exact,
+                    search,
+                  );
+                  return (
+                    <NavItem
+                      key={item.name}
+                      href={item.path}
+                      name={item.name}
+                      icon={Icon}
+                      isActive={isActive}
+                    />
+                  );
+                })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <AnalyticsTopNav
+          key={`${department.id}-analytics-top`}
+          items={nav.topItems.filter((item) =>
+            ANALYTICS_TOP_ITEM_NAMES.has(item.name),
+          )}
+          pathname={pathname}
+          search={search}
+        />
 
         <SidebarSeparator className="mx-3 my-3 shrink-0 bg-neutral-200" />
 
@@ -430,17 +581,7 @@ function DepartmentContent({
         {insightsItems.length > 0 ? (
           <SidebarGroup className="shrink-0 p-0">
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1 px-3">
-                {insightsItems.map((item) => (
-                  <NavItem
-                    key={item.href}
-                    href={item.href}
-                    name={item.name}
-                    icon={item.icon}
-                    isActive={isWorkspaceNavActive(pathname, item.href)}
-                  />
-                ))}
-              </SidebarMenu>
+              <WorkspaceInsightsNav items={insightsItems} pathname={pathname} />
             </SidebarGroupContent>
           </SidebarGroup>
         ) : null}

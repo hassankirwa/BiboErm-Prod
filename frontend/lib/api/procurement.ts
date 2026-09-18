@@ -116,6 +116,7 @@ export type LowStockRequisitionSourceItem = {
   available_qty: string;
   min_stock_qty: string;
   quantity_to_requisition: string;
+  stock_status?: "low_stock" | "out_of_stock";
   requisitions: Array<{ id: number; reference: string; status: string }>;
   can_create_requisition: boolean;
 };
@@ -375,6 +376,10 @@ export type ProcurementDashboard = {
   pending_grns: number;
   glass_queue: number;
   delays_this_week: number;
+  projects_awaiting_procurement?: number;
+  projects_with_material_shortages?: number;
+  project_material_lines_needing_requisition?: number;
+  low_stock_items_needing_requisition?: number;
 };
 
 export type ProcurementStockStatus = "in_stock" | "low_stock" | "out_of_stock";

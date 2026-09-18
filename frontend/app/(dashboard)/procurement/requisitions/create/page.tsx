@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { AppHeader } from "@/components/app-header";
 import { RequisitionCreateWorkspace } from "@/components/procurement/requisition-create-workspace";
 import { Button } from "@/components/ui/button";
 
-export default function CreateRequisitionPage() {
+function CreateRequisitionContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const initialTab =
+    tabParam === "project-materials" || tabParam === "low-stock"
+      ? tabParam
+      : "low-stock";
+
   return (
     <div className="flex min-w-0 w-full flex-col">
       <AppHeader
@@ -18,8 +27,16 @@ export default function CreateRequisitionPage() {
         }
       />
       <div className="p-6">
-        <RequisitionCreateWorkspace />
+        <RequisitionCreateWorkspace initialTab={initialTab} />
       </div>
     </div>
+  );
+}
+
+export default function CreateRequisitionPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+      <CreateRequisitionContent />
+    </Suspense>
   );
 }

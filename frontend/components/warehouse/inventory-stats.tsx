@@ -4,11 +4,16 @@ import { Package, AlertTriangle, ArrowDownToLine, ArrowUpFromLine } from "lucide
 
 export function InventoryStats({ items }: { items: CatalogInventoryItem[] }) {
   const totalItems = items.length;
-  const lowStockItems = items.filter(
-    (item) =>
+  const lowStockItems = items.filter((item) => {
+    const available = Number(item.quantity_available);
+    const minStock = Number(item.min_stock_qty ?? 0);
+    return (
       item.stock_status === "low_stock" ||
-      Number(item.quantity_available) < Number(item.min_stock_qty ?? 0),
-  );
+      item.stock_status === "out_of_stock" ||
+      available <= 0 ||
+      (minStock > 0 && available < minStock)
+    );
+  });
   const totalReserved = items.reduce(
     (acc, item) => acc + Number(item.quantity_reserved),
     0,
