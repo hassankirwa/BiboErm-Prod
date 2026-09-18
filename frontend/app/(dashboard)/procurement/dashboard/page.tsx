@@ -129,7 +129,6 @@ export default function ProcurementDashboardPage() {
           <p className="text-sm text-muted-foreground">Loading dashboard…</p>
         ) : (
           <>
-          <>
             {materialsNeeding > 0 ? (
               <Card className="border-amber-300/80 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30">
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
