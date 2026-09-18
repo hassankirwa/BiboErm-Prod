@@ -30,6 +30,7 @@ class DealFromQuotationService
         $title = $account->name.' — '.($quotation->quotation_number ?? 'Quotation');
 
         $kesTotal = $quotation->totalAmountKes();
+        $sourceLeadId = $this->resolveSourceLeadId($quotation, $account);
 
         $deal = Deal::query()->create([
             'reference' => 'DL-'.strtoupper(Str::random(8)),
@@ -39,7 +40,8 @@ class DealFromQuotationService
             'account_id' => $account->id,
             'contact_id' => $quotation->contact_id ?? $account->primary_contact_id,
             'primary_contact_id' => $quotation->contact_id ?? $account->primary_contact_id,
-            'source_lead_id' => $account->source_lead_id,
+            'source_lead_id' => $sourceLeadId,
+            'lead_id' => $sourceLeadId,
             'stage' => DealStage::QuotationSent->value,
             'status' => 'open',
             'amount' => $kesTotal,
@@ -56,13 +58,24 @@ class DealFromQuotationService
             $account->update(['status' => 'active_opportunity']);
         }
 
-        if ($account->source_lead_id) {
+        if ($sourceLeadId) {
             Lead::query()
-                ->whereKey($account->source_lead_id)
+                ->whereKey($sourceLeadId)
                 ->whereNull('converted_deal_id')
                 ->update(['converted_deal_id' => $deal->id]);
         }
 
         return $deal->fresh();
+    }
+
+    protected function resolveSourceLeadId(Quotation $quotation, Account $account): ?int
+    {
+        $quotation->loadMissing('designJob');
+
+        if ($quotation->designJob?->lead_id) {
+            return (int) $quotation->designJob->lead_id;
+        }
+
+        return $account->source_lead_id ? (int) $account->source_lead_id : null;
     }
 }

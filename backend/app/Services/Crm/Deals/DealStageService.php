@@ -6,9 +6,11 @@ use App\Enums\Crm\DealStage;
 use App\Enums\Crm\QuotationStatus;
 use App\Enums\Crm\SiteVisitStatus;
 use App\Models\Deal;
+use App\Models\Quotation;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
 use App\Services\Crm\Leads\LeadPipelineService;
+use App\Services\Crm\Quotations\QuotationCalculatorService;
 use Illuminate\Validation\ValidationException;
 
 class DealStageService
@@ -16,6 +18,7 @@ class DealStageService
     public function __construct(
         protected CrmAuditLogger $crmAudit,
         protected LeadPipelineService $leadPipeline,
+        protected QuotationCalculatorService $quotationCalculator,
     ) {}
 
     public function updateStage(Deal $deal, string $stage, User $user): Deal
@@ -48,15 +51,7 @@ class DealStageService
 
     public function markWon(Deal $deal, User $user, bool $overrideDeposit = false): Deal
     {
-        $hasAcceptedQuotation = $deal->quotations()
-            ->where('status', QuotationStatus::Accepted->value)
-            ->exists();
-
-        if (! $hasAcceptedQuotation) {
-            throw ValidationException::withMessages([
-                'quotation' => ['An accepted quotation is required before marking the deal as won.'],
-            ]);
-        }
+        $this->ensureAcceptedQuotationForWon($deal, $user);
 
         $oldValues = [
             'stage' => $deal->stage instanceof DealStage ? $deal->stage->value : (string) $deal->stage,
@@ -93,6 +88,39 @@ class DealStageService
         ]);
 
         return $deal->fresh()->load(['contact', 'account', 'owner']);
+    }
+
+    /**
+     * CRM mark-won is available after send; auto-accept the latest sent quote
+     * (same pattern as lead conversion) so users are not blocked by a separate accept step.
+     */
+    protected function ensureAcceptedQuotationForWon(Deal $deal, User $user): void
+    {
+        $hasAcceptedQuotation = $deal->quotations()
+            ->excludingReferenceCopies()
+            ->where('status', QuotationStatus::Accepted->value)
+            ->exists();
+
+        if ($hasAcceptedQuotation) {
+            return;
+        }
+
+        $sendable = $deal->quotations()
+            ->excludingReferenceCopies()
+            ->whereIn('status', [
+                QuotationStatus::Sent->value,
+                QuotationStatus::RevisionRequested->value,
+            ])
+            ->latest('id')
+            ->first();
+
+        if (! $sendable instanceof Quotation) {
+            throw ValidationException::withMessages([
+                'quotation' => ['An accepted quotation is required before marking the deal as won.'],
+            ]);
+        }
+
+        $this->quotationCalculator->accept($sendable, $user);
     }
 
     protected function assertCanTransitionTo(Deal $deal, string $targetStage): void
