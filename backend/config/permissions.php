@@ -167,7 +167,17 @@ return [
 
         'procurement_officer' => [
             'procurement.view', 'procurement.manage',
+            'procurement.dashboard.view',
+            'procurement.requisition.view', 'procurement.requisition.create',
+            'procurement.requisition.update',
+            'procurement.po.view', 'procurement.po.create', 'procurement.po.update', 'procurement.po.send',
             'procurement.grn.view', 'procurement.grn.create', 'procurement.grn.verify',
+            'procurement.glass.view', 'procurement.glass.manage',
+            'procurement.supplier.view', 'procurement.supplier.manage',
+            'procurement.driver.view', 'procurement.driver.manage',
+            'procurement.transport.manage',
+            'procurement.delay.log',
+            'procurement.watcher.manage',
             'warehouse.view',
             'warehouse.stock.view',
             'warehouse.locations.view',
@@ -239,6 +249,7 @@ return [
         'purchase_requisition' => ['view' => 'procurement.view', 'manage' => 'procurement.manage'],
         'purchase_order' => [
             'view' => 'procurement.view',
+            'create' => 'procurement.po.create',
             'manage' => 'procurement.manage',
             'approve' => 'procurement.approve',
         ],
