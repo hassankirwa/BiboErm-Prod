@@ -64,6 +64,7 @@ final class UserHomeRoute
             'finance' => '/finance/invoices',
             'it' => '/it/users',
             'projects' => '/projects',
+            'quotation' => '/quotation/proforma',
             'analytics' => '/analytics',
             default => '/crm',
         };
@@ -82,6 +83,7 @@ final class UserHomeRoute
             'finance' => 'finance',
             'it' => 'it',
             'project_management' => 'projects',
+            'quotation' => 'quotation',
             'operations' => 'analytics',
             default => null,
         };

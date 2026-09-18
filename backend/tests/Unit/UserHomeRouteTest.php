@@ -46,6 +46,13 @@ class UserHomeRouteTest extends FeatureTestCase
         $this->assertSame('/crm', UserHomeRoute::forUser($user));
     }
 
+    public function test_quotation_officer_lands_on_quotation_module(): void
+    {
+        $user = $this->userWithSyncedRole('quotation', 'quotation_officer');
+
+        $this->assertSame('/quotation/proforma', UserHomeRoute::forUser($user));
+    }
+
     public function test_it_admin_lands_on_workspace(): void
     {
         $user = $this->userWithSyncedRole('it', 'it_admin');

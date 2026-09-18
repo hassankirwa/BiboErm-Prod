@@ -308,6 +308,7 @@ return [
         'finance' => ['finance_officer'],
         'it' => ['it_admin', 'super_admin'],
         'project_management' => ['project_manager'],
+        'quotation' => ['quotation_officer'],
         'field_installation' => ['installation_lead', 'field_installation_engineer'],
         'operations' => ['operations_manager', 'field_officer', 'reception'],
         'reception' => ['reception'],
@@ -330,6 +331,11 @@ return [
                 'name' => 'Projects User',
                 'department_slug' => 'project_management',
                 'role' => 'project_manager',
+            ],
+            'quotation' => [
+                'name' => 'Quotation User',
+                'department_slug' => 'quotation',
+                'role' => 'quotation_officer',
             ],
             'warehouse' => [
                 'name' => 'Warehouse User',

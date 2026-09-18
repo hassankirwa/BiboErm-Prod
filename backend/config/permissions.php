@@ -93,6 +93,14 @@ return [
             'payroll.view',
         ],
 
+        'quotation_officer' => [
+            'quotations.view', 'quotations.create', 'quotations.send', 'quotations.approve',
+            'accounts.view',
+            'projects.view',
+            'site_visits.view',
+            'payroll.view',
+        ],
+
         'installation_lead' => [
             'field_installation.view', 'field_installation.manage', 'field_installation.log',
             'field_installation.deliver', 'field_installation.tools',
