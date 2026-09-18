@@ -95,9 +95,10 @@ jobs:
             --no-interaction \
             --prefer-dist \
             --optimize-autoloader
+          php artisan optimize:clear
           php artisan migrate --force
           php artisan db:seed --force
-          php artisan optimize:clear
+          php artisan permission:cache-reset || true
           php artisan config:cache
           php artisan route:cache
           php artisan view:cache
