@@ -511,4 +511,56 @@ class QuotationNegotiationTest extends TestCase
             'payment_reference' => 'MPESA-INLINE-001',
         ]);
     }
+
+    public function test_lead_show_surfaces_pre_send_quotation_without_deal(): void
+    {
+        $lead = \App\Models\Lead::query()->create([
+            'reference' => 'LD-NEG-PRESEND',
+            'lead_number' => 'LD-NEG-PRESEND',
+            'name' => 'Pre-send Lead',
+            'first_name' => 'Presend',
+            'status' => \App\Enums\Crm\LeadStatus::AccountCreated->value,
+            'converted_account_id' => $this->account->id,
+            'lead_owner_id' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->account->update(['source_lead_id' => $lead->id]);
+
+        $quotation = $this->createDraftQuotation();
+        $this->submitQuotationForReview($quotation);
+        $this->approveQuotation($quotation);
+
+        $quotation->refresh();
+        $this->assertNull($quotation->deal_id);
+        $this->assertSame(QuotationStatus::Approved->value, $quotation->status->value);
+
+        $response = $this->getJson("/api/v1/crm/leads/{$lead->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('data.latest_quotation.id', $quotation->id)
+            ->assertJsonPath('data.latest_quotation.status', QuotationStatus::Approved->value)
+            ->assertJsonMissingPath('data.sales_deal');
+    }
+
+    public function test_mark_won_auto_accepts_sent_quotation(): void
+    {
+        $quotation = $this->createDraftQuotation();
+        $this->sendPreparedQuotation($quotation)->assertOk();
+
+        $quotation->refresh();
+        $this->assertSame(QuotationStatus::Sent->value, $quotation->status->value);
+        $deal = Deal::query()->findOrFail($quotation->deal_id);
+
+        $this->postJson("/api/v1/crm/deals/{$deal->id}/mark-won")->assertOk();
+
+        $quotation->refresh();
+        $deal->refresh();
+
+        $this->assertSame(QuotationStatus::Accepted->value, $quotation->status->value);
+        $this->assertSame('won', $deal->status);
+        $this->assertSame(DealStage::Won->value, $deal->stage instanceof DealStage ? $deal->stage->value : $deal->stage);
+
+        $this->postJson("/api/v1/crm/deals/{$deal->id}/create-project")->assertCreated();
+    }
 }

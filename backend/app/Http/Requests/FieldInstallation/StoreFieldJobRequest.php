@@ -18,6 +18,7 @@ class StoreFieldJobRequest extends FormRequest
     {
         return [
             'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'project_wave_id' => ['nullable', 'integer', 'exists:project_waves,id'],
             'production_order_id' => ['nullable', 'integer', 'exists:production_orders,id'],
             'job_type' => ['nullable', Rule::enum(FieldJobType::class)],
             'team_lead_id' => ['nullable', 'integer', 'exists:users,id'],

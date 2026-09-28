@@ -93,6 +93,14 @@ return [
             'payroll.view',
         ],
 
+        'quotation_officer' => [
+            'quotations.view', 'quotations.create', 'quotations.send', 'quotations.approve',
+            'accounts.view',
+            'projects.view',
+            'site_visits.view',
+            'payroll.view',
+        ],
+
         'installation_lead' => [
             'field_installation.view', 'field_installation.manage', 'field_installation.log',
             'field_installation.deliver', 'field_installation.tools',
@@ -159,7 +167,17 @@ return [
 
         'procurement_officer' => [
             'procurement.view', 'procurement.manage',
+            'procurement.dashboard.view',
+            'procurement.requisition.view', 'procurement.requisition.create',
+            'procurement.requisition.update',
+            'procurement.po.view', 'procurement.po.create', 'procurement.po.update', 'procurement.po.send',
             'procurement.grn.view', 'procurement.grn.create', 'procurement.grn.verify',
+            'procurement.glass.view', 'procurement.glass.manage',
+            'procurement.supplier.view', 'procurement.supplier.manage',
+            'procurement.driver.view', 'procurement.driver.manage',
+            'procurement.transport.manage',
+            'procurement.delay.log',
+            'procurement.watcher.manage',
             'warehouse.view',
             'warehouse.stock.view',
             'warehouse.locations.view',
@@ -176,10 +194,10 @@ return [
 
         'hr_manager' => [
             'hr.view', 'hr.manage',
-            'employees.view', 'employees.update_hr_details', 'employees.approve',
+            'employees.view', 'employees.create', 'employees.import', 'employees.update_hr_details', 'employees.approve',
             'users.invite', 'users.view', 'users.update_identity',
             'profile_changes.review',
-            'leave.review', 'hr_documents.manage',
+            'leave.review', 'hr_requests.review', 'suggestions.review', 'hr_documents.manage',
             'payroll.view', 'payroll.manage',
         ],
 
@@ -231,6 +249,7 @@ return [
         'purchase_requisition' => ['view' => 'procurement.view', 'manage' => 'procurement.manage'],
         'purchase_order' => [
             'view' => 'procurement.view',
+            'create' => 'procurement.po.create',
             'manage' => 'procurement.manage',
             'approve' => 'procurement.approve',
         ],

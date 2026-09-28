@@ -11,15 +11,17 @@ use App\Models\Production\ProductionOrder;
 use App\Models\Project;
 use App\Models\QualityControl\QcInspection;
 use App\Services\Projects\ProjectStageService;
+use App\Services\QualityControl\QcInspectionService;
 
 /**
- * Post-fabrication QC pass marks the production order completed and moves the
- * project to qc_pre_installation when it is still earlier in the pipeline.
+ * Post-fabrication QC pass marks the production order completed (only when every
+ * opening has passed) and moves the project to qc_pre_installation.
  */
 class CompleteProductionOnPostFabQcPassed
 {
     public function __construct(
         protected ProjectStageService $stages,
+        protected QcInspectionService $qcInspections,
     ) {}
 
     public function handle(QcInspectionCompleted $event): void
@@ -41,7 +43,16 @@ class CompleteProductionOnPostFabQcPassed
         }
 
         $order = ProductionOrder::query()->find($inspection->production_order_id);
-        if ($order && $order->status !== ProductionOrderStatus::Completed) {
+        if (! $order) {
+            return;
+        }
+
+        // Wait until every opening (or the single job-level inspection) has passed.
+        if (! $this->qcInspections->hasPassedPostFabricationQc($order->project_id, $order->id)) {
+            return;
+        }
+
+        if ($order->status !== ProductionOrderStatus::Completed) {
             $order->update([
                 'status' => ProductionOrderStatus::Completed,
                 'actual_end' => $order->actual_end ?? now()->toDateString(),

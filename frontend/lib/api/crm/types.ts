@@ -258,6 +258,10 @@ export type ApiLead = {
   product_interests: string[] | null;
   estimated_budget: string | number | null;
   estimated_value: string | number | null;
+  amount_paid?: string | number | null;
+  quote_date?: string | null;
+  external_quote_no?: string | null;
+  is_historical?: boolean;
   need_site_visit: boolean | null;
   site_address: string | null;
   county_id: number | null;

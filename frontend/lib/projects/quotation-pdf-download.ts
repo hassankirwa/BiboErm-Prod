@@ -65,13 +65,20 @@ export async function downloadQuotationPdfFromElement(
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: captureWidth,
-        onclone: (clonedDocument: Document) => {
-          const clonedElement = clonedDocument.querySelector(`[${cloneMarker}]`);
-          if (!(clonedElement instanceof HTMLElement)) {
+        onclone: (clonedDocument: Document, clonedElement?: HTMLElement) => {
+          // html2canvas passes the cloned root as the 2nd arg; prefer it over
+          // attribute lookup (custom data attrs are not always copied reliably).
+          const root =
+            clonedElement instanceof HTMLElement
+              ? clonedElement
+              : clonedDocument.querySelector(`[${cloneMarker}]`);
+
+          if (!(root instanceof HTMLElement)) {
             throw new Error("Could not prepare quotation preview for PDF export.");
           }
-          prepareHtml2CanvasClone(element, clonedElement);
-          clonedElement.removeAttribute(cloneMarker);
+
+          prepareHtml2CanvasClone(element, root);
+          root.removeAttribute(cloneMarker);
         },
       },
       width: 277,

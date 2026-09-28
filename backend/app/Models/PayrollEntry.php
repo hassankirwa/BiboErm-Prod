@@ -11,10 +11,13 @@ class PayrollEntry extends Model
         'payroll_run_id',
         'user_id',
         'gross_salary',
+        'additions_total',
+        'shif',
         'nhif',
         'nssf',
         'paye',
         'other_deductions',
+        'line_items',
         'net_pay',
         'payslip_path',
     ];
@@ -23,10 +26,13 @@ class PayrollEntry extends Model
     {
         return [
             'gross_salary' => 'decimal:2',
+            'additions_total' => 'decimal:2',
+            'shif' => 'decimal:2',
             'nhif' => 'decimal:2',
             'nssf' => 'decimal:2',
             'paye' => 'decimal:2',
             'other_deductions' => 'decimal:2',
+            'line_items' => 'array',
             'net_pay' => 'decimal:2',
         ];
     }

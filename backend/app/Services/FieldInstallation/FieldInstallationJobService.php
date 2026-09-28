@@ -31,11 +31,21 @@ class FieldInstallationJobService
     public function create(User $actor, array $data): FieldInstallationJob
     {
         $project = Project::query()->findOrFail($data['project_id']);
-        $this->assertCanCreateForProject($project);
+        $waveId = isset($data['project_wave_id']) ? (int) $data['project_wave_id'] : null;
+        $this->assertCanCreateForProject($project, $waveId);
 
-        return DB::transaction(function () use ($actor, $data, $project) {
+        return DB::transaction(function () use ($actor, $data, $project, $waveId) {
             $jobType = $this->resolveJobType($project, $data['job_type'] ?? null);
             $productionOrderId = $data['production_order_id']
+                ?? ProductionOrder::query()
+                    ->where('project_id', $project->id)
+                    ->when(
+                        $waveId !== null,
+                        fn ($q) => $q->where('project_wave_id', $waveId),
+                        fn ($q) => $q->whereNull('project_wave_id'),
+                    )
+                    ->latest('id')
+                    ->value('id')
                 ?? ProductionOrder::query()
                     ->where('project_id', $project->id)
                     ->latest('id')
@@ -44,6 +54,7 @@ class FieldInstallationJobService
             $job = FieldInstallationJob::query()->create([
                 'reference' => $this->references->next(),
                 'project_id' => $project->id,
+                'project_wave_id' => $waveId,
                 'production_order_id' => $productionOrderId,
                 'job_type' => $jobType,
                 'status' => FieldJobStatus::Scheduled,
@@ -116,6 +127,12 @@ class FieldInstallationJobService
 
             $this->unitProgress->generateFromMeasurements($job);
 
+            if ($job->project_wave_id) {
+                \App\Models\ProjectWave::query()->whereKey($job->project_wave_id)->update([
+                    'status' => \App\Enums\Projects\ProjectWaveStatus::Installing->value,
+                ]);
+            }
+
             event(new FieldInstallationJobStarted(
                 jobId: $job->id,
                 projectId: $job->project_id,
@@ -172,6 +189,18 @@ class FieldInstallationJobService
             ));
 
             $this->audit->log('field.job_completed', $locked, newValues: ['status' => FieldJobStatus::Completed->value]);
+
+            if ($locked->project_wave_id) {
+                $wave = \App\Models\ProjectWave::query()->find($locked->project_wave_id);
+                if ($wave) {
+                    $wave->status = \App\Enums\Projects\ProjectWaveStatus::Complete;
+                    $wave->completion_percent = 100;
+                    $wave->save();
+                }
+                app(\App\Services\Projects\ProjectWaveService::class)->refreshProgress(
+                    Project::query()->findOrFail($locked->project_id)
+                );
+            }
 
             return $locked->fresh(['project', 'units', 'toolAssignments.toolIssuance']);
         });
@@ -242,7 +271,7 @@ class FieldInstallationJobService
             ->update(['removed_at' => now()]);
     }
 
-    public function assertCanCreateForProject(Project $project): void
+    public function assertCanCreateForProject(Project $project, ?int $projectWaveId = null): void
     {
         $installMode = $project->install_mode instanceof InstallMode
             ? $project->install_mode
@@ -264,18 +293,27 @@ class FieldInstallationJobService
             ]);
         }
 
-        $hasActive = FieldInstallationJob::query()
+        $query = FieldInstallationJob::query()
             ->where('project_id', $project->id)
             ->whereIn('status', [
                 FieldJobStatus::Scheduled->value,
                 FieldJobStatus::InProgress->value,
                 FieldJobStatus::OnHold->value,
-            ])
-            ->exists();
+            ]);
 
-        if ($hasActive) {
+        if ($projectWaveId === null) {
+            $query->whereNull('project_wave_id');
+        } else {
+            $query->where('project_wave_id', $projectWaveId);
+        }
+
+        if ($query->exists()) {
             throw ValidationException::withMessages([
-                'project_id' => ['Project already has an active field installation job.'],
+                'project_id' => [
+                    $projectWaveId
+                        ? 'This wave already has an active field installation job.'
+                        : 'Project already has an active field installation job.',
+                ],
             ]);
         }
     }
@@ -377,7 +415,9 @@ class FieldInstallationJobService
             ->where(function ($query): void {
                 $query->whereDoesntHave('toolIssuance')
                     ->orWhereHas('toolIssuance', function ($issuance): void {
-                        $issuance->whereNull('return_date');
+                        $issuance->whereNull('return_date')
+                            // Non-returnable consumables (nails, etc.) never block completion.
+                            ->whereHas('tool', fn ($tool) => $tool->where('is_returnable', true));
                     });
             })
             ->count();

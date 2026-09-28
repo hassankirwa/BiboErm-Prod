@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth\Concerns;
 
 use App\Models\User;
+use App\Support\SharedAccount;
 use App\Support\UserHomeRoute;
 
 trait SendsAuthResponses
@@ -31,6 +32,7 @@ trait SendsAuthResponses
                 'must_change_password' => (bool) $user->must_change_password,
                 'two_factor_enabled' => (bool) $user->two_factor_enabled,
                 'avatar_url' => $user->profile?->avatar_url,
+                'is_shared_account' => SharedAccount::isShared($user),
             ],
             'roles' => $user->getRoleNames()->values()->all(),
             'permissions' => $this->resolveAuthPermissions($user),

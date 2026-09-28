@@ -2,6 +2,7 @@
 
 import { useState, type RefObject } from "react";
 import { Button } from "@/components/ui/button";
+import { downloadQuotationPdf } from "@/lib/api/crm/quotations";
 import type { ApiQuotation } from "@/lib/api/crm/types";
 import {
   downloadQuotationPdfFromElement,
@@ -30,21 +31,33 @@ export function QuotationPdfDownloadButton({
   const [downloading, setDownloading] = useState(false);
 
   async function handleDownload() {
+    const resolvedFilename = filename ?? quotationPdfFilename(quotation);
     const element = targetRef.current;
-    if (!element) {
-      toast.error("Proforma quotation preview is not ready.");
-      return;
-    }
 
     setDownloading(true);
     try {
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      await downloadQuotationPdfFromElement(
-        element,
-        filename ?? quotationPdfFilename(quotation),
-      );
+      if (element) {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        try {
+          await downloadQuotationPdfFromElement(element, resolvedFilename);
+          toast.success("Proforma quotation PDF downloaded.");
+          return;
+        } catch (clientError) {
+          console.warn("Client PDF capture failed; trying server export.", clientError);
+          if (!quotation.id) {
+            throw clientError;
+          }
+        }
+      }
+
+      if (!quotation.id) {
+        toast.error("Proforma quotation preview is not ready.");
+        return;
+      }
+
+      await downloadQuotationPdf(quotation.id, resolvedFilename);
       toast.success("Proforma quotation PDF downloaded.");
     } catch (error) {
       console.error("Quotation PDF download failed:", error);

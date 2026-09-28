@@ -14,6 +14,7 @@ class ProductionOrder extends Model
     protected $fillable = [
         'reference',
         'project_id',
+        'project_wave_id',
         'parent_production_order_id',
         'status',
         'current_stage',
@@ -40,6 +41,11 @@ class ProductionOrder extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function wave(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ProjectWave::class, 'project_wave_id');
     }
 
     public function parentOrder(): BelongsTo

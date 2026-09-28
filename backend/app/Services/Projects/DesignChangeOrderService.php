@@ -62,7 +62,9 @@ class DesignChangeOrderService
             ->first();
 
         if ($existing) {
-            return $existing->loadMissing(['project', 'nonConformity', 'parentProductionOrder']);
+            $this->enrichDraftFromUnit($existing, $nc, $data);
+
+            return $existing->fresh(['project', 'nonConformity', 'parentProductionOrder', 'fieldUnit']);
         }
 
         return DB::transaction(function () use ($nc, $actor, $data) {
@@ -79,9 +81,15 @@ class DesignChangeOrderService
                 $scope = [(int) $nc->project_bom_line_id];
             }
 
+            $unitId = $nc->field_installation_unit_id
+                ?? ($data['field_installation_unit_id'] ?? null);
+
+            $measurementNotes = $this->seedUnitRemakeNotes($measurementNotes, $nc, $unitId);
+
             $dco = DesignChangeOrder::query()->create([
                 'project_id' => $nc->project_id,
                 'field_non_conformity_id' => $nc->id,
+                'field_installation_unit_id' => $unitId,
                 'status' => DesignChangeOrderStatus::Drafted,
                 'reason' => $data['reason'] ?? $nc->description ?? $nc->title,
                 'measurement_notes' => $measurementNotes,
@@ -90,8 +98,98 @@ class DesignChangeOrderService
                 'requested_by' => $actor->id,
             ]);
 
-            return $dco->fresh(['project', 'nonConformity', 'parentProductionOrder', 'requester']);
+            return $dco->fresh(['project', 'nonConformity', 'parentProductionOrder', 'requester', 'fieldUnit']);
         });
+    }
+
+    /**
+     * When NC listener creates a DCO first, fold in unit link / remake seed items from a later call.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function enrichDraftFromUnit(DesignChangeOrder $dco, FieldNonConformity $nc, array $data): void
+    {
+        if ($dco->status !== DesignChangeOrderStatus::Drafted) {
+            return;
+        }
+
+        $unitId = $dco->field_installation_unit_id
+            ?? $nc->field_installation_unit_id
+            ?? ($data['field_installation_unit_id'] ?? null);
+
+        $notes = is_array($dco->measurement_notes) ? $dco->measurement_notes : [];
+        $incoming = $data['measurement_notes'] ?? null;
+        if (is_string($incoming)) {
+            $incoming = ['notes' => $incoming];
+        }
+        if (is_array($incoming)) {
+            $notes = array_merge($notes, $incoming);
+        }
+
+        $hasItems = is_array($notes['items'] ?? null) && $notes['items'] !== [];
+        if (! $hasItems || ! $dco->field_installation_unit_id) {
+            $notes = $this->seedUnitRemakeNotes($notes, $nc, $unitId) ?? $notes;
+        }
+
+        $updates = [];
+        if ($unitId && ! $dco->field_installation_unit_id) {
+            $updates['field_installation_unit_id'] = $unitId;
+        }
+        if ($notes !== (is_array($dco->measurement_notes) ? $dco->measurement_notes : [])) {
+            $updates['measurement_notes'] = $notes;
+        }
+        if (! empty($data['reason']) && blank($dco->reason)) {
+            $updates['reason'] = $data['reason'];
+        }
+        if ($updates !== []) {
+            $dco->update($updates);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>|string|null  $measurementNotes
+     * @return array<string, mixed>|null
+     */
+    protected function seedUnitRemakeNotes(array|string|null $measurementNotes, FieldNonConformity $nc, mixed $unitId): ?array
+    {
+        if (is_string($measurementNotes)) {
+            $measurementNotes = ['notes' => $measurementNotes];
+        }
+        if (! $unitId) {
+            return is_array($measurementNotes) ? $measurementNotes : null;
+        }
+
+        $nc->loadMissing('fieldUnit');
+        $unit = $nc->fieldUnit;
+        $notesBase = is_array($measurementNotes) ? $measurementNotes : [];
+        $seedItems = is_array($notesBase['items'] ?? null) ? $notesBase['items'] : [];
+
+        if ($seedItems === [] && $unit) {
+            $label = trim((string) ($unit->unit_label ?? 'Opening'));
+            $seedItems[] = [
+                'id' => uniqid('dci_', true),
+                'description' => "Remake {$label}",
+                'qty' => max(1, (int) ($unit->quantity ?? 1)),
+                'unit' => 'each',
+                'change_type' => 'remake',
+                'done' => false,
+                'warehouse_item_id' => null,
+                'profile_code' => null,
+                'project_bom_line_id' => $nc->project_bom_line_id,
+                'cut_length_mm' => null,
+                'disposition' => 'remake',
+                'scrapped_to_offcut' => false,
+                'offcut_ids' => [],
+            ];
+        }
+
+        return array_merge($notesBase, [
+            'change_path' => $notesBase['change_path'] ?? 'full_remake',
+            'items' => $this->normalizeItems($seedItems),
+            'unit_label' => $notesBase['unit_label'] ?? $unit?->unit_label,
+            'unit_floor' => $notesBase['unit_floor'] ?? $unit?->unit_floor,
+            'room_location' => $notesBase['room_location'] ?? $unit?->room_location,
+        ]);
     }
 
     /**
@@ -495,7 +593,7 @@ class DesignChangeOrderService
 
     /**
      * @param  list<mixed>  $items
-     * @return list<array{id: string, description: string, qty: float|int, unit: string, change_type: string, done: bool}>
+     * @return list<array<string, mixed>>
      */
     protected function normalizeItems(array $items): array
     {
@@ -517,10 +615,258 @@ class DesignChangeOrderService
                     ? $item['change_type']
                     : 'remake',
                 'done' => (bool) ($item['done'] ?? false),
+                'warehouse_item_id' => isset($item['warehouse_item_id']) && is_numeric($item['warehouse_item_id'])
+                    ? (int) $item['warehouse_item_id']
+                    : null,
+                'profile_code' => isset($item['profile_code']) && trim((string) $item['profile_code']) !== ''
+                    ? trim((string) $item['profile_code'])
+                    : null,
+                'project_bom_line_id' => isset($item['project_bom_line_id']) && is_numeric($item['project_bom_line_id'])
+                    ? (int) $item['project_bom_line_id']
+                    : null,
+                'cut_length_mm' => isset($item['cut_length_mm']) && is_numeric($item['cut_length_mm'])
+                    ? (int) $item['cut_length_mm']
+                    : null,
+                'disposition' => in_array(($item['disposition'] ?? ''), ['remake', 'to_offcut', 'material_only'], true)
+                    ? $item['disposition']
+                    : (($item['change_type'] ?? '') === 'material' ? 'material_only' : 'remake'),
+                'scrapped_to_offcut' => (bool) ($item['scrapped_to_offcut'] ?? false),
+                'offcut_ids' => is_array($item['offcut_ids'] ?? null) ? array_values($item['offcut_ids']) : [],
             ];
         }
 
         return $normalized;
+    }
+
+    /**
+     * Send linked remake profile pieces from the parent production order to warehouse offcuts.
+     *
+     * @param  list<string>|null  $itemIds  Optional DCO item ids to scrap; null = all remake items with a profile link.
+     * @return array{offcuts: list<array<string, mixed>>, items: list<array<string, mixed>>}
+     */
+    public function scrapProfilesToOffcuts(DesignChangeOrder $dco, User $actor, ?array $itemIds = null): array
+    {
+        $dco->loadMissing(['parentProductionOrder.cuttingSheets', 'project']);
+
+        $notes = is_array($dco->measurement_notes) ? $dco->measurement_notes : [];
+        $items = is_array($notes['items'] ?? null) ? $notes['items'] : [];
+
+        if ($items === []) {
+            throw ValidationException::withMessages([
+                'items' => ['Add and link profile items before scraping to offcuts.'],
+            ]);
+        }
+
+        $parentOrder = $dco->parentProductionOrder;
+        if (! $parentOrder) {
+            throw ValidationException::withMessages([
+                'parent_production_order_id' => ['Link a parent production order before scraping profiles.'],
+            ]);
+        }
+
+        $filter = $itemIds !== null ? array_map('strval', $itemIds) : null;
+        $offcutLogger = app(\App\Services\Warehouse\Offcuts\OffcutLoggingService::class);
+        $created = [];
+
+        foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $id = (string) ($item['id'] ?? '');
+            if ($filter !== null && ! in_array($id, $filter, true)) {
+                continue;
+            }
+
+            $disposition = $item['disposition'] ?? 'remake';
+            if ($disposition === 'material_only') {
+                continue;
+            }
+
+            $warehouseItemId = isset($item['warehouse_item_id']) ? (int) $item['warehouse_item_id'] : null;
+            $profileCode = isset($item['profile_code']) ? trim((string) $item['profile_code']) : '';
+            if (! $warehouseItemId && $profileCode === '') {
+                throw ValidationException::withMessages([
+                    'items' => ["Item \"{$item['description']}\" must be linked to a profile before scrap."],
+                ]);
+            }
+
+            if (! empty($item['scrapped_to_offcut'])) {
+                continue;
+            }
+
+            $lengthMm = isset($item['cut_length_mm']) && is_numeric($item['cut_length_mm'])
+                ? (int) $item['cut_length_mm']
+                : null;
+
+            if (! $lengthMm || $lengthMm < 1) {
+                $sheet = $parentOrder->cuttingSheets
+                    ->first(function ($row) use ($warehouseItemId, $profileCode) {
+                        if ($warehouseItemId && (int) $row->warehouse_item_id === $warehouseItemId) {
+                            return true;
+                        }
+
+                        return $profileCode !== ''
+                            && strcasecmp((string) $row->profile_code, $profileCode) === 0;
+                    });
+                $lengthMm = $sheet?->cut_length_mm ?: $sheet?->planned_waste_mm ?: null;
+                if (! $warehouseItemId && $sheet) {
+                    $warehouseItemId = (int) $sheet->warehouse_item_id;
+                }
+            }
+
+            if (! $warehouseItemId || ! $lengthMm || $lengthMm < 1) {
+                throw ValidationException::withMessages([
+                    'items' => ["Could not resolve length/profile for \"{$item['description']}\". Set cut_length_mm and warehouse_item_id."],
+                ]);
+            }
+
+            $qty = max(1, (int) round((float) ($item['qty'] ?? 1)));
+            $offcut = $offcutLogger->logFromArray($actor, [
+                'item_id' => $warehouseItemId,
+                'length_mm' => $lengthMm,
+                'quantity_pieces' => $qty,
+                'storage_area' => \App\Enums\Warehouse\OffcutStorageArea::ProductionWorkspace->value,
+                'notes' => sprintf(
+                    'DCO #%d scrap — %s (%s)',
+                    $dco->id,
+                    $item['description'] ?? 'profile',
+                    $profileCode !== '' ? $profileCode : "item #{$warehouseItemId}",
+                ),
+            ], $dco->project_id);
+
+            $items[$index]['warehouse_item_id'] = $warehouseItemId;
+            $items[$index]['cut_length_mm'] = $lengthMm;
+            $items[$index]['scrapped_to_offcut'] = true;
+            $items[$index]['disposition'] = 'to_offcut';
+            $items[$index]['offcut_ids'] = array_values(array_unique(array_merge(
+                is_array($item['offcut_ids'] ?? null) ? $item['offcut_ids'] : [],
+                [$offcut->id],
+            )));
+
+            $created[] = [
+                'offcut_id' => $offcut->id,
+                'offcut_number' => $offcut->offcut_number,
+                'item_id' => $warehouseItemId,
+                'length_mm' => $lengthMm,
+                'quantity_pieces' => $qty,
+                'dco_item_id' => $id,
+            ];
+        }
+
+        if ($created === []) {
+            throw ValidationException::withMessages([
+                'items' => ['No profile items left to scrap (link profiles or clear already-scrapped flags).'],
+            ]);
+        }
+
+        $notes['items'] = $items;
+        $dco->measurement_notes = $notes;
+        $dco->save();
+
+        return [
+            'offcuts' => $created,
+            'items' => $items,
+            'design_change_order' => $dco->fresh([
+                'project',
+                'parentProductionOrder',
+                'remakeProductionOrder',
+                'fieldUnit',
+            ]),
+        ];
+    }
+
+    /**
+     * Create a production material request for remake/material DCO lines that have warehouse_item_id.
+     *
+     * @param  list<string>|null  $itemIds
+     */
+    public function requestRemakeMaterials(DesignChangeOrder $dco, User $actor, ?array $itemIds = null): \App\Models\Warehouse\MaterialRequest
+    {
+        $notes = is_array($dco->measurement_notes) ? $dco->measurement_notes : [];
+        $items = is_array($notes['items'] ?? null) ? $notes['items'] : [];
+        $filter = $itemIds !== null ? array_map('strval', $itemIds) : null;
+
+        $lines = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $id = (string) ($item['id'] ?? '');
+            if ($filter !== null && ! in_array($id, $filter, true)) {
+                continue;
+            }
+            $warehouseItemId = isset($item['warehouse_item_id']) ? (int) $item['warehouse_item_id'] : 0;
+            if ($warehouseItemId < 1) {
+                continue;
+            }
+            $qty = is_numeric($item['qty'] ?? null) ? (string) $item['qty'] : '1';
+            if (bccomp($qty, '0', 3) !== 1) {
+                continue;
+            }
+            $lines[] = [
+                'warehouse_item_id' => $warehouseItemId,
+                'quantity' => $qty,
+                'notes' => sprintf(
+                    'DCO #%d remake — %s%s',
+                    $dco->id,
+                    $item['description'] ?? 'item',
+                    ! empty($item['profile_code']) ? " ({$item['profile_code']})" : '',
+                ),
+            ];
+        }
+
+        if ($lines === []) {
+            throw ValidationException::withMessages([
+                'items' => ['Link at least one profile (warehouse_item_id) before requesting materials.'],
+            ]);
+        }
+
+        return app(\App\Services\Warehouse\MaterialRequests\MaterialRequestService::class)->create(
+            user: $actor,
+            projectId: (int) $dco->project_id,
+            lines: $lines,
+            source: \App\Enums\Warehouse\MaterialRequestSource::Production,
+            reason: sprintf('Design change remake DCO #%d', $dco->id),
+            notes: $dco->reason,
+        );
+    }
+
+    /**
+     * Profiles available from the parent production order cutting sheet for linking.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function availableProfiles(DesignChangeOrder $dco): array
+    {
+        $dco->loadMissing('parentProductionOrder.cuttingSheets.warehouseItem');
+        $order = $dco->parentProductionOrder;
+        if (! $order) {
+            return [];
+        }
+
+        $byKey = [];
+        foreach ($order->cuttingSheets as $sheet) {
+            $itemId = (int) $sheet->warehouse_item_id;
+            if ($itemId < 1) {
+                continue;
+            }
+            $key = $itemId.'|'.((string) $sheet->profile_code).'|'.((int) $sheet->cut_length_mm);
+            if (isset($byKey[$key])) {
+                $byKey[$key]['pieces'] += max(1, (int) $sheet->pieces);
+                continue;
+            }
+            $byKey[$key] = [
+                'warehouse_item_id' => $itemId,
+                'sku' => $sheet->warehouseItem?->sku,
+                'name' => $sheet->warehouseItem?->name,
+                'profile_code' => $sheet->profile_code,
+                'cut_length_mm' => $sheet->cut_length_mm,
+                'pieces' => max(1, (int) $sheet->pieces),
+                'project_bom_line_id' => $sheet->project_bom_line_id,
+            ];
+        }
+
+        return array_values($byKey);
     }
 
     protected function changePath(DesignChangeOrder $dco): ?string

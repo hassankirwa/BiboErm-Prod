@@ -7,6 +7,7 @@ use App\Enums\Warehouse\ItemCategory;
 use App\Enums\Warehouse\ReservationStatus;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\Warehouse\MaterialReleaseBatch;
 use App\Models\Warehouse\StockReservation;
 use App\Models\Warehouse\StockReservationLine;
 use App\Services\Production\ProductionOrderService;
@@ -17,6 +18,7 @@ use App\Services\Warehouse\Offcuts\OffcutAllocationService;
 use App\Services\Warehouse\WarehouseAuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class ProjectMaterialsReleaseService
 {
@@ -33,11 +35,15 @@ class ProjectMaterialsReleaseService
     /**
      * Hand reserved materials to production: subtract stock, record receiver, advance stage.
      *
+     * @param  list<array{item_id: int, quantity?: string|float|int|null}>|null  $lines
+     *         When null/empty → release all remaining (compat). When set → checklist partial release.
      * @return array{
      *     reservation: StockReservation,
      *     movement_id: int|null,
+     *     batch_id: int|null,
      *     offcut_lines: list<array<string, mixed>>,
-     *     project_stage: string
+     *     project_stage: string,
+     *     is_partial: bool
      * }
      */
     public function releaseForProduction(
@@ -45,6 +51,7 @@ class ProjectMaterialsReleaseService
         User $performer,
         int $receivedByUserId,
         ?string $notes = null,
+        ?array $lines = null,
     ): array {
         $receiver = User::query()->find($receivedByUserId);
         if (! $receiver) {
@@ -93,7 +100,10 @@ class ProjectMaterialsReleaseService
             ]);
         }
 
-        $offcutLines = $this->buildOffcutSummary($project->id, $reservation);
+        $quantitiesByItemId = $this->normalizeChecklistLines($lines, $reservation);
+        $isPartialChecklist = $quantitiesByItemId !== null;
+
+        $offcutLines = $this->buildOffcutSummary($project->id, $reservation, $quantitiesByItemId);
 
         return DB::transaction(function () use (
             $project,
@@ -102,8 +112,9 @@ class ProjectMaterialsReleaseService
             $notes,
             $reservation,
             $offcutLines,
+            $quantitiesByItemId,
+            $isPartialChecklist,
         ) {
-            // Assert / advance to materials_ready BEFORE consuming reservation remaining qty.
             $this->prepareProductionHandover(
                 project: $project->fresh(),
                 performer: $performer,
@@ -115,9 +126,21 @@ class ProjectMaterialsReleaseService
                 ->mapWithKeys(fn (StockReservationLine $line) => [$line->id => (string) $line->quantity_released])
                 ->all();
 
-            $updated = $this->fifoReservation->release($reservation);
+            try {
+                $updated = $quantitiesByItemId !== null
+                    ? $this->fifoReservation->release(
+                        reservation: $reservation,
+                        quantitiesByItemId: $quantitiesByItemId,
+                    )
+                    : $this->fifoReservation->release($reservation);
+            } catch (InvalidArgumentException $exception) {
+                throw ValidationException::withMessages([
+                    'lines' => [$exception->getMessage()],
+                ]);
+            }
 
             $movementLines = [];
+            $batchLineRows = [];
             foreach ($updated->lines as $line) {
                 $previous = $beforeReleased[$line->id] ?? '0';
                 $delta = bcsub((string) $line->quantity_released, $previous, 3);
@@ -129,18 +152,45 @@ class ProjectMaterialsReleaseService
                     'from_bin_id' => $line->bin_id,
                     'quantity' => $delta,
                 ];
+                $batchLineRows[] = [
+                    'stock_reservation_line_id' => $line->id,
+                    'item_id' => $line->item_id,
+                    'bin_id' => $line->bin_id,
+                    'quantity' => $delta,
+                ];
             }
 
-            $movementId = null;
-            if ($movementLines !== []) {
-                $movement = $this->movements->recordOutboundDocument(
-                    performer: $performer,
-                    lines: $movementLines,
-                    referenceType: 'project',
-                    referenceId: $project->id,
-                    notes: $notes ?? 'Warehouse materials released to production',
-                );
-                $movementId = $movement->id;
+            if ($movementLines === []) {
+                throw ValidationException::withMessages([
+                    'lines' => ['No quantity was released. Select items with remaining reserved stock.'],
+                ]);
+            }
+
+            $movement = $this->movements->recordOutboundDocument(
+                performer: $performer,
+                lines: $movementLines,
+                referenceType: 'project',
+                referenceId: $project->id,
+                notes: $notes ?? ($isPartialChecklist
+                    ? 'Warehouse checklist materials released to production'
+                    : 'Warehouse materials released to production'),
+            );
+
+            $isPartial = $updated->status === ReservationStatus::Partial;
+
+            $batch = MaterialReleaseBatch::query()->create([
+                'project_id' => $project->id,
+                'stock_reservation_id' => $updated->id,
+                'stock_movement_id' => $movement->id,
+                'released_by' => $performer->id,
+                'received_by' => $receiver->id,
+                'notes' => $notes,
+                'is_partial' => $isPartial,
+                'released_at' => now(),
+            ]);
+
+            foreach ($batchLineRows as $row) {
+                $batch->lines()->create($row);
             }
 
             $updated->received_by = $receiver->id;
@@ -148,6 +198,7 @@ class ProjectMaterialsReleaseService
             $updated->release_notes = $notes;
             $updated->save();
 
+            // Advance once any materials handed over (partial OK — production may commence).
             $this->transitionToMaterialsReleased(
                 project: $project->fresh(),
                 performer: $performer,
@@ -157,7 +208,9 @@ class ProjectMaterialsReleaseService
             $this->audit->materialsStagedForProduction($project->id, [
                 'reservation_id' => $updated->id,
                 'received_by' => $receiver->id,
-                'movement_id' => $movementId,
+                'movement_id' => $movement->id,
+                'batch_id' => $batch->id,
+                'is_partial' => $isPartial,
                 'notes' => $notes,
             ]);
 
@@ -169,16 +222,70 @@ class ProjectMaterialsReleaseService
                     'receivedByUser',
                     'reservedByUser',
                 ]),
-                'movement_id' => $movementId,
+                'movement_id' => $movement->id,
+                'batch_id' => $batch->id,
                 'offcut_lines' => $offcutLines,
                 'project_stage' => ProjectStage::MaterialsReleased->value,
+                'is_partial' => $isPartial,
             ];
         });
     }
 
     /**
-     * Move to materials_ready and ensure a production order while reservation still covers the BOM.
+     * @param  list<array{item_id: int, quantity?: string|float|int|null}>|null  $lines
+     * @return array<int, string>|null
      */
+    protected function normalizeChecklistLines(?array $lines, StockReservation $reservation): ?array
+    {
+        if ($lines === null || $lines === []) {
+            return null;
+        }
+
+        $remainingByItem = [];
+        foreach ($reservation->lines as $line) {
+            $itemId = (int) $line->item_id;
+            $remainingByItem[$itemId] = bcadd(
+                $remainingByItem[$itemId] ?? '0',
+                $line->remainingQuantity(),
+                3
+            );
+        }
+
+        $quantities = [];
+        foreach ($lines as $row) {
+            $itemId = (int) $row['item_id'];
+            if (! array_key_exists($itemId, $remainingByItem)) {
+                throw ValidationException::withMessages([
+                    'lines' => ["Item #{$itemId} is not on this project's reservation."],
+                ]);
+            }
+
+            $requested = array_key_exists('quantity', $row) && $row['quantity'] !== null && $row['quantity'] !== ''
+                ? bcadd((string) $row['quantity'], '0', 3)
+                : $remainingByItem[$itemId];
+
+            if (bccomp($requested, '0', 3) !== 1) {
+                continue;
+            }
+
+            if (bccomp($requested, $remainingByItem[$itemId], 3) === 1) {
+                throw ValidationException::withMessages([
+                    'lines' => ["Release quantity for item #{$itemId} exceeds remaining reserved ({$remainingByItem[$itemId]})."],
+                ]);
+            }
+
+            $quantities[$itemId] = bcadd($quantities[$itemId] ?? '0', $requested, 3);
+        }
+
+        if ($quantities === []) {
+            throw ValidationException::withMessages([
+                'lines' => ['Select at least one line with a positive quantity to release.'],
+            ]);
+        }
+
+        return $quantities;
+    }
+
     protected function prepareProductionHandover(
         Project $project,
         User $performer,
@@ -227,10 +334,14 @@ class ProjectMaterialsReleaseService
     }
 
     /**
+     * @param  array<int, string>|null  $quantitiesByItemId
      * @return list<array<string, mixed>>
      */
-    public function buildOffcutSummary(int $projectId, StockReservation $reservation): array
-    {
+    public function buildOffcutSummary(
+        int $projectId,
+        StockReservation $reservation,
+        ?array $quantitiesByItemId = null,
+    ): array {
         $summary = [];
 
         foreach ($reservation->lines as $line) {
@@ -240,7 +351,14 @@ class ProjectMaterialsReleaseService
                 continue;
             }
 
+            if ($quantitiesByItemId !== null && ! array_key_exists((int) $line->item_id, $quantitiesByItemId)) {
+                continue;
+            }
+
             $remaining = $line->remainingQuantity();
+            if ($quantitiesByItemId !== null) {
+                $remaining = $quantitiesByItemId[(int) $line->item_id] ?? $remaining;
+            }
 
             if (bccomp($remaining, '0', 3) !== 1) {
                 continue;

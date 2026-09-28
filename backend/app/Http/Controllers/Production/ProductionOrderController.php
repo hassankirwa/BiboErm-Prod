@@ -28,11 +28,15 @@ class ProductionOrderController extends Controller
         $this->orders->syncOrdersForMaterialsReadyProjects();
 
         $query = ProductionOrder::query()
-            ->with(['project', 'stageLogs', 'teams.user'])
+            ->with(['project', 'wave', 'stageLogs', 'teams.user'])
             ->orderBy('fifo_position');
 
         if ($projectId = $request->query('project_id')) {
             $query->where('project_id', $projectId);
+        }
+
+        if ($waveId = $request->query('project_wave_id')) {
+            $query->where('project_wave_id', $waveId);
         }
 
         if ($status = $request->query('status')) {
@@ -69,9 +73,45 @@ class ProductionOrderController extends Controller
             );
         }
 
-        $order->load(['project', 'stageLogs', 'teams.user', 'cuttingSheets', 'materialReleases']);
+        $order->load(['project', 'wave', 'stageLogs', 'teams.user', 'cuttingSheets', 'materialReleases']);
 
         return new ProductionOrderResource($order);
+    }
+
+    public function store(Request $request): ProductionOrderResource
+    {
+        $this->authorize('create', ProductionOrder::class);
+
+        $data = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'project_wave_id' => ['nullable', 'integer', 'exists:project_waves,id'],
+        ]);
+
+        $projectId = (int) $data['project_id'];
+        $waveId = isset($data['project_wave_id']) ? (int) $data['project_wave_id'] : null;
+
+        if ($waveId !== null) {
+            $waveBelongs = \App\Models\ProjectWave::query()
+                ->whereKey($waveId)
+                ->where('project_id', $projectId)
+                ->exists();
+            if (! $waveBelongs) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'project_wave_id' => ['Wave does not belong to this project.'],
+                ]);
+            }
+        }
+
+        $fifo = $this->orders->fifoSequenceForProject($projectId);
+        $order = $this->orders->ensureActiveOrder($projectId, max(1, $fifo), $waveId);
+
+        if (! $order) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'project_id' => ['Project is not ready for a production order (materials must be ready/released).'],
+            ]);
+        }
+
+        return new ProductionOrderResource($order->load(['project', 'wave']));
     }
 
     public function updateSchedule(UpdateScheduleRequest $request, ProductionOrder $order): ProductionOrderResource

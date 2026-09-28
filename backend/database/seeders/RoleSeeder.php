@@ -16,6 +16,7 @@ class RoleSeeder extends Seeder
         'sales_representative',
         'field_officer',
         'project_manager',
+        'quotation_officer',
         'production_manager',
         'warehouse_manager_accessories',
         'warehouse_manager_aluminium',

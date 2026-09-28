@@ -27,7 +27,8 @@ class ToolIssuanceResource extends JsonResource
                 'id' => $this->tool->id,
                 'tool_code' => $this->tool->tool_code,
                 'name' => $this->tool->name,
-                'tool_type' => $this->tool->tool_type,
+                'tool_type' => $this->tool->tool_type?->value ?? $this->tool->tool_type,
+                'is_returnable' => (bool) ($this->tool->is_returnable ?? true),
                 'tracking_mode' => $this->tool->tracking_mode?->value ?? $this->tool->tracking_mode,
             ] : null),
             'project' => $this->whenLoaded('project', fn () => $this->project ? [

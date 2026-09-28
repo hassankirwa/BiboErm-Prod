@@ -27,10 +27,13 @@ class UserProfile extends Model
     protected $fillable = [
         'user_id',
         'phone',
+        'phone_alt',
         'avatar_url',
         'avatar_path',
         'gender',
         'address',
+        'home_county',
+        'home_area',
         'emergency_contact_name',
         'emergency_contact_phone',
         'emergency_contact_relationship',

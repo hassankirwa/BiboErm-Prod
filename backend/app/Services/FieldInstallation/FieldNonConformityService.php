@@ -26,6 +26,7 @@ class FieldNonConformityService
 
             $nc = FieldNonConformity::query()->create([
                 'job_id' => $job->id,
+                'field_installation_unit_id' => $data['field_installation_unit_id'] ?? null,
                 'project_id' => $job->project_id,
                 'delivery_record_id' => $data['delivery_record_id'] ?? null,
                 'daily_log_id' => $data['daily_log_id'] ?? null,

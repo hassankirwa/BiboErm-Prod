@@ -21,7 +21,12 @@ import {
   approveDesignChangeOrder,
   createDesignChangeRemake,
   closeDesignChangeOrder,
+  listDesignChangeProfiles,
   logProjectDelay,
+  requestDesignChangeMaterials,
+  scrapDesignChangeToOffcuts,
+  updateDesignChangeOrder,
+  type DesignChangeProfileOption,
 } from "@/lib/api/projects";
 import {
   listProductionMisfits,
@@ -30,7 +35,7 @@ import {
 import { toast } from "sonner";
 
 const selectCls =
-  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm";
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm";
 
 export default function ProductionMisfitsPage() {
   const [items, setItems] = useState<ProductionMisfit[]>([]);
@@ -41,6 +46,8 @@ export default function ProductionMisfitsPage() {
   const [delayReason, setDelayReason] = useState("client_follow_up");
   const [delayNotes, setDelayNotes] = useState("");
   const [delaySaving, setDelaySaving] = useState(false);
+  const [profilesByDco, setProfilesByDco] = useState<Record<number, DesignChangeProfileOption[]>>({});
+  const [linkDraft, setLinkDraft] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
     const res = await listProductionMisfits();
@@ -53,6 +60,18 @@ export default function ProductionMisfitsPage() {
       .finally(() => setLoading(false));
   }, [reload]);
 
+  async function ensureProfiles(dcoId: number) {
+    if (profilesByDco[dcoId]) return profilesByDco[dcoId];
+    try {
+      const res = await listDesignChangeProfiles(dcoId);
+      setProfilesByDco((prev) => ({ ...prev, [dcoId]: res.data }));
+      return res.data;
+    } catch (e) {
+      toast.error(getApiErrorMessage(e, "Could not load cutting profiles."));
+      return [];
+    }
+  }
+
   async function runAction(key: string, fn: () => Promise<unknown>, success: string) {
     setBusyKey(key);
     try {
@@ -64,6 +83,49 @@ export default function ProductionMisfitsPage() {
     } finally {
       setBusyKey(null);
     }
+  }
+
+  async function linkProfile(item: ProductionMisfit, changeItemId: string) {
+    const dco = item.design_change_order;
+    if (!dco) return;
+    const key = `${dco.id}:${changeItemId}`;
+    const selected = linkDraft[key];
+    if (!selected) {
+      toast.error("Pick a profile from the parent cutting sheet.");
+      return;
+    }
+    const profiles = await ensureProfiles(dco.id);
+    const profile = profiles.find(
+      (p) =>
+        `${p.warehouse_item_id}|${p.profile_code ?? ""}|${p.cut_length_mm ?? ""}` === selected,
+    );
+    if (!profile) {
+      toast.error("Selected profile not found.");
+      return;
+    }
+    const items = (dco.change_items ?? []).map((row) =>
+      row.id === changeItemId
+        ? {
+            ...row,
+            description: row.description,
+            warehouse_item_id: profile.warehouse_item_id,
+            profile_code: profile.profile_code ?? null,
+            cut_length_mm: profile.cut_length_mm ?? null,
+            project_bom_line_id: profile.project_bom_line_id ?? null,
+            disposition: "remake" as const,
+            change_type: "remake" as const,
+          }
+        : {
+            ...row,
+            description: row.description,
+            change_type: (row as { change_type?: "remake" | "material" }).change_type ?? "remake",
+          },
+    );
+    await runAction(
+      `link-${key}`,
+      () => updateDesignChangeOrder(dco.id, { items }),
+      "Profile linked to remake item.",
+    );
   }
 
   async function submitDelay() {
@@ -130,7 +192,8 @@ export default function ProductionMisfitsPage() {
                       {[
                         item.project?.reference,
                         item.project?.name,
-                        item.unit_floor,
+                        item.unit_floor && `Floor ${item.unit_floor}`,
+                        item.room_location && `Room ${item.room_location}`,
                         item.product_type,
                         item.opening_ref && `Ref ${item.opening_ref}`,
                       ]
@@ -176,6 +239,113 @@ export default function ProductionMisfitsPage() {
                       </Link>{" "}
                       · {remake.status.replace(/_/g, " ")}
                     </p>
+                  ) : null}
+
+                  {dco ? (
+                    <div className="space-y-2 rounded-md border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Remake profiles (DCO #{dco.id})</p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void ensureProfiles(dco.id)}
+                        >
+                          Load cutting profiles
+                        </Button>
+                      </div>
+                      {(dco.change_items ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          No change items yet — open project design changes to add remake lines, then
+                          link each to a profile.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {(dco.change_items ?? []).map((row) => {
+                            const draftKey = `${dco.id}:${row.id}`;
+                            const linked = Boolean(row.warehouse_item_id);
+                            return (
+                              <li key={row.id} className="space-y-1 rounded border px-2 py-2 text-xs">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium">{row.description}</span>
+                                  <span className="text-muted-foreground">
+                                    {linked
+                                      ? `${row.profile_code ?? `Item #${row.warehouse_item_id}`}${
+                                          row.cut_length_mm ? ` · ${row.cut_length_mm}mm` : ""
+                                        }${row.scrapped_to_offcut ? " · scrapped" : ""}`
+                                      : "Not linked"}
+                                  </span>
+                                </div>
+                                {!linked ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    <select
+                                      className={selectCls}
+                                      value={linkDraft[draftKey] ?? ""}
+                                      onChange={(e) =>
+                                        setLinkDraft((prev) => ({
+                                          ...prev,
+                                          [draftKey]: e.target.value,
+                                        }))
+                                      }
+                                      onFocus={() => void ensureProfiles(dco.id)}
+                                    >
+                                      <option value="">Select profile…</option>
+                                      {(profilesByDco[dco.id] ?? []).map((p) => (
+                                        <option
+                                          key={`${p.warehouse_item_id}-${p.profile_code}-${p.cut_length_mm}`}
+                                          value={`${p.warehouse_item_id}|${p.profile_code ?? ""}|${p.cut_length_mm ?? ""}`}
+                                        >
+                                          {[p.profile_code || p.sku, p.name, p.cut_length_mm && `${p.cut_length_mm}mm`]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={busyKey === `link-${draftKey}`}
+                                      onClick={() => void linkProfile(item, row.id)}
+                                    >
+                                      Link profile
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyKey === `scrap-${dco.id}`}
+                          onClick={() =>
+                            void runAction(
+                              `scrap-${dco.id}`,
+                              () => scrapDesignChangeToOffcuts(dco.id),
+                              "Old profile pieces logged to offcuts.",
+                            )
+                          }
+                        >
+                          Scrap linked → offcuts
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyKey === `mats-${dco.id}`}
+                          onClick={() =>
+                            void runAction(
+                              `mats-${dco.id}`,
+                              () => requestDesignChangeMaterials(dco.id),
+                              "Material request created for remake profiles.",
+                            )
+                          }
+                        >
+                          Request remake materials
+                        </Button>
+                      </div>
+                    </div>
                   ) : null}
 
                   <div className="flex flex-wrap gap-2">

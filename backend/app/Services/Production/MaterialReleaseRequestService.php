@@ -4,6 +4,7 @@ namespace App\Services\Production;
 
 use App\Enums\Production\ProductionStage;
 use App\Enums\ProjectStage;
+use App\Enums\Warehouse\ItemCategory;
 use App\Enums\Warehouse\ReservationStatus;
 use App\Models\Production\ProductionMaterialRelease;
 use App\Models\Production\ProductionOrder;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Production fetches reserved stock when a pipeline stage starts (partial release by category).
- * Warehouse must have reserved materials first; PM stage materials_released authorizes pickup.
+ * Warehouse checklist may already have released some categories — only remaining qty is fetched.
  */
 class MaterialReleaseRequestService
 {
@@ -83,8 +84,24 @@ class MaterialReleaseRequestService
                 ]);
             }
 
-            // Warehouse already subtracted stock at materials release — do not double-consume.
-            if ($reservation->status === ReservationStatus::Released) {
+            $reservation->load(['lines.item']);
+
+            $categories = $this->stageRelease->categoriesForStage($warehouseStage);
+            $hasRemainingForStage = $this->hasRemainingForCategories($reservation, $categories);
+
+            // Fully released by warehouse checklist, or this stage's categories already handed over.
+            if ($reservation->status === ReservationStatus::Released || ! $hasRemainingForStage) {
+                ProductionMaterialRelease::query()->create([
+                    'production_order_id' => $order->id,
+                    'stock_reservation_line_id' => null,
+                    'stage' => $stage->value,
+                    'qty_released' => 0,
+                    'released_at' => now(),
+                    'released_by' => $user->id,
+                    'stock_movement_id' => null,
+                    'created_at' => now(),
+                ]);
+
                 return;
             }
 
@@ -98,6 +115,7 @@ class MaterialReleaseRequestService
 
             $reservation->refresh()->load('lines');
 
+            $created = 0;
             foreach ($reservation->lines as $line) {
                 $previous = $before[$line->id] ?? '0';
                 $delta = bcsub((string) $line->quantity_released, $previous, 3);
@@ -116,7 +134,41 @@ class MaterialReleaseRequestService
                     'stock_movement_id' => $result['movement_id'],
                     'created_at' => now(),
                 ]);
+                $created++;
             }
+
+            if ($created === 0) {
+                ProductionMaterialRelease::query()->create([
+                    'production_order_id' => $order->id,
+                    'stock_reservation_line_id' => null,
+                    'stage' => $stage->value,
+                    'qty_released' => 0,
+                    'released_at' => now(),
+                    'released_by' => $user->id,
+                    'stock_movement_id' => null,
+                    'created_at' => now(),
+                ]);
+            }
+        });
+    }
+
+    /**
+     * @param  list<ItemCategory>  $categories
+     */
+    private function hasRemainingForCategories(StockReservation $reservation, array $categories): bool
+    {
+        if ($categories === []) {
+            return false;
+        }
+
+        $values = array_map(fn (ItemCategory $c) => $c->value, $categories);
+
+        return $reservation->lines->contains(function (StockReservationLine $line) use ($values) {
+            $category = $line->item?->category;
+            $raw = $category instanceof ItemCategory ? $category->value : $category;
+
+            return in_array($raw, $values, true)
+                && bccomp($line->remainingQuantity(), '0', 3) === 1;
         });
     }
 

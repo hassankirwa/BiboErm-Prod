@@ -15,11 +15,15 @@ class ToolResource extends JsonResource
         }
         $issuedQty = $this->issuedQty();
 
+        $toolType = $this->tool_type;
+
         return [
             'id' => $this->id,
             'tool_code' => $this->tool_code,
             'name' => $this->name,
-            'tool_type' => $this->tool_type,
+            'tool_type' => $toolType?->value ?? $toolType,
+            'tool_type_label' => $toolType?->label(),
+            'is_returnable' => (bool) ($this->is_returnable ?? true),
             'condition' => $this->condition?->value ?? $this->condition,
             'purchase_date' => $this->purchase_date?->toDateString(),
             'is_active' => $this->is_active,

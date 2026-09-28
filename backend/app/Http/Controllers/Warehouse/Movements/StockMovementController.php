@@ -13,7 +13,7 @@ class StockMovementController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = StockMovement::query()
-            ->with(['lines.item', 'performer'])
+            ->with(['lines.item', 'lines.fromBin', 'lines.toBin', 'performer'])
             ->latest('performed_at');
 
         if ($type = $request->query('movement_type')) {

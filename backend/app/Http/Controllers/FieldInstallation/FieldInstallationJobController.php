@@ -26,11 +26,14 @@ class FieldInstallationJobController extends Controller
         $this->authorize('viewAny', FieldInstallationJob::class);
 
         $query = FieldInstallationJob::query()
-            ->with(['project', 'teamLead', 'activeMembers.user'])
+            ->with(['project', 'wave', 'teamLead', 'activeMembers.user'])
             ->latest();
 
         if ($request->filled('project_id')) {
             $query->where('project_id', $request->integer('project_id'));
+        }
+        if ($request->filled('project_wave_id')) {
+            $query->where('project_wave_id', $request->integer('project_wave_id'));
         }
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
@@ -58,6 +61,7 @@ class FieldInstallationJobController extends Controller
 
         $job = $fieldJob->load([
             'project',
+            'wave',
             'teamLead',
             'activeMembers.user',
             'units',

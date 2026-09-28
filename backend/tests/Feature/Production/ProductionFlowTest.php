@@ -613,6 +613,84 @@ class ProductionFlowTest extends TestCase
         ]);
     }
 
+    public function test_cutting_starts_when_aluminium_already_checklist_released(): void
+    {
+        $order = $this->createOrderInStage(ProductionStage::Cutting);
+        Project::query()->whereKey($order->project_id)->update([
+            'stage' => ProjectStage::MaterialsReleased,
+        ]);
+
+        $reservation = \App\Models\Warehouse\StockReservation::query()->create([
+            'reservation_number' => 'RSV-CHK-001',
+            'project_id' => $order->project_id,
+            'status' => \App\Enums\Warehouse\ReservationStatus::Partial,
+            'reserved_at' => now(),
+            'reserved_by' => $this->manager->id,
+            'fifo_sequence' => 1,
+        ]);
+
+        $aluminium = \App\Models\Warehouse\Item::query()->create([
+            'sku' => 'ALU-CHK-REL',
+            'name' => 'Checklist Aluminium',
+            'category' => \App\Enums\Warehouse\ItemCategory::AluminiumProfile,
+            'unit_of_measure' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $accessory = \App\Models\Warehouse\Item::query()->create([
+            'sku' => 'ACC-CHK-HOLD',
+            'name' => 'Checklist Accessory',
+            'category' => \App\Enums\Warehouse\ItemCategory::Accessory,
+            'unit_of_measure' => 'pcs',
+            'is_active' => true,
+        ]);
+
+        $binId = $this->createWarehouseBin();
+
+        \App\Models\Warehouse\StockReservationLine::query()->create([
+            'reservation_id' => $reservation->id,
+            'item_id' => $aluminium->id,
+            'bin_id' => $binId,
+            'quantity_reserved' => '8.000',
+            'quantity_released' => '8.000',
+        ]);
+
+        \App\Models\Warehouse\StockReservationLine::query()->create([
+            'reservation_id' => $reservation->id,
+            'item_id' => $accessory->id,
+            'bin_id' => $binId,
+            'quantity_reserved' => '4.000',
+            'quantity_released' => '0',
+        ]);
+
+        $this->mock(\App\Services\Warehouse\Reservations\StageMaterialReleaseService::class, function ($mock) {
+            $mock->shouldReceive('categoriesForStage')
+                ->andReturn([\App\Enums\Warehouse\ItemCategory::AluminiumProfile]);
+            $mock->shouldReceive('releaseForStage')->never();
+        });
+
+        $this->actingAs($this->manager, 'sanctum')
+            ->postJson("/api/v1/production/orders/{$order->id}/start-stage", [
+                'stage' => 'cutting',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('production_material_releases', [
+            'production_order_id' => $order->id,
+            'stock_reservation_line_id' => null,
+            'stage' => 'cutting',
+            'qty_released' => 0,
+        ]);
+
+        $reservation->refresh();
+        $this->assertSame(
+            \App\Enums\Warehouse\ReservationStatus::Partial,
+            $reservation->status,
+        );
+        $accLine = $reservation->lines()->where('item_id', $accessory->id)->first();
+        $this->assertSame('4.000', $accLine->remainingQuantity());
+    }
+
     public function test_start_stage_rejects_fetch_when_materials_not_staged(): void
     {
         $order = $this->createOrderInStage(ProductionStage::Cutting);

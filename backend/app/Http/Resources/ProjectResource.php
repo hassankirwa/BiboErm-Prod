@@ -42,6 +42,10 @@ class ProjectResource extends JsonResource
             'internal_notes' => $this->internal_notes,
             'stage_data' => $this->enrichedStageData(),
             'stage_readiness' => ProjectStageGate::readiness($this->resource),
+            'progress' => $this->when(
+                $this->relationLoaded('waves') || $request->boolean('include_progress'),
+                fn () => app(\App\Services\Projects\ProjectWaveService::class)->progressTree($this->resource)
+            ),
             'is_nairobi_two_phase' => $this->isNairobiTwoPhase(),
             'is_fabrication_only_nairobi' => false,
             'sales_rep' => new UserResource($this->whenLoaded('salesRep')),

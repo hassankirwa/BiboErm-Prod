@@ -50,6 +50,8 @@ import {
   Shield,
   HardDrive,
   ScrollText,
+  MessageSquarePlus,
+  HandCoins,
 } from "lucide-react";
 
 export type SubModule = {
@@ -184,7 +186,11 @@ export const departments: Department[] = [
       { name: "Reports", path: "/site-ops/reports" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/site-ops/quotation/visits" }],
+      topItems: [
+        { name: "Home", path: "/site-ops/quotation/visits" },
+        { name: "Reports", path: "/site-ops/reports" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Lead capture",
@@ -261,7 +267,11 @@ export const departments: Department[] = [
       { name: "Design review", path: "/design/review" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/projects/design" }],
+      topItems: [
+        { name: "Home", path: "/projects/design" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Design",
@@ -292,7 +302,11 @@ export const departments: Department[] = [
       { name: "Quotation Review", path: "/quotation/review" },
     ],
     nav: {
-      topItems: [{ name: "Home", path: "/quotation/proforma" }],
+      topItems: [
+        { name: "Home", path: "/quotation/proforma" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
+      ],
       groups: [
         {
           label: "Quotation",
@@ -354,9 +368,12 @@ export const departments: Department[] = [
     path: "/warehouse",
     subModules: [
       { name: "Inventory", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
+      { name: "Stock Check", path: "/warehouse/stock-take", permission: "warehouse.stocktake.view" },
       { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
+      { name: "Returns", path: "/warehouse/returns", permission: "warehouse.stock.receive" },
       { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
       { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
+      { name: "Additional Materials", path: "/warehouse/material-requests", permission: "warehouse.stock.view" },
       { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
       { name: "Reservations", path: "/warehouse/reservations", permission: "warehouse.reservations.view" },
       { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
@@ -375,9 +392,12 @@ export const departments: Department[] = [
           icon: Package,
           items: [
             { name: "Inventory", path: "/warehouse/inventory", permission: "warehouse.stock.view" },
+            { name: "Stock Check", path: "/warehouse/stock-take", permission: "warehouse.stocktake.view" },
             { name: "Receive", path: "/warehouse/receive", permission: "warehouse.stock.receive" },
+            { name: "Returns", path: "/warehouse/returns", permission: "warehouse.stock.receive" },
             { name: "Receiving Logs", path: "/warehouse/receiving-logs", permission: "warehouse.stock.receive" },
             { name: "Stock Movements", path: "/warehouse/movements", permission: "warehouse.stock.view" },
+            { name: "Additional Materials", path: "/warehouse/material-requests", permission: "warehouse.stock.view" },
             { name: "Offcuts", path: "/warehouse/offcuts", permission: "warehouse.offcuts.manage" },
             { name: "Reservations", path: "/warehouse/reservations", permission: "warehouse.reservations.view" },
             { name: "Tools", path: "/warehouse/tools", permission: "warehouse.tools.view" },
@@ -444,6 +464,7 @@ export const departments: Department[] = [
     subModules: [
       { name: "Schedule", path: "/production/schedule", permission: "production.view" },
       { name: "Orders", path: "/production/orders", permission: "production.view" },
+      { name: "Additional Materials", path: "/production/material-requests", permission: "production.view" },
       { name: "Misfits", path: "/production/misfits", permission: "production.view" },
       { name: "Cutting", path: "/production/cutting", permission: "production.view" },
       { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
@@ -462,8 +483,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/production/schedule", permission: "production.view" },
-        { name: "Reports", path: "/analytics", permission: "analytics.view" },
-        { name: "Analytics", path: "/analytics", permission: "analytics.view" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
       ],
       groups: [
         {
@@ -472,6 +493,7 @@ export const departments: Department[] = [
           items: [
             { name: "Schedule", path: "/production/schedule", permission: "production.view" },
             { name: "Orders", path: "/production/orders", permission: "production.view" },
+            { name: "Additional Materials", path: "/production/material-requests", permission: "production.view" },
             { name: "Misfits", path: "/production/misfits", permission: "production.view" },
             { name: "Cutting", path: "/production/cutting", permission: "production.view" },
             { name: "Fabrication", path: "/production/fabrication", permission: "production.view" },
@@ -549,6 +571,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/site-ops/quotation/my-visits" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
         {
           name: "Visit history",
           path: "/field/site-visits/history",
@@ -653,6 +677,8 @@ export const departments: Department[] = [
     nav: {
       topItems: [
         { name: "Home", path: "/qc/dashboard", permission: "qc.view" },
+        { name: "Reports", path: "/analytics" },
+        { name: "Analytics", path: "/analytics" },
         { name: "Inspections", path: "/qc/inspections", permission: "qc.view" },
         { name: "Defects", path: "/qc/defects", permission: "qc.view" },
       ],
@@ -678,8 +704,12 @@ export const departments: Department[] = [
     path: "/hr",
     subModules: [
       { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+      { name: "Staff import", path: "/hr/import", permission: "employees.import" },
       { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+      { name: "Settings", path: "/hr/settings", permission: "payroll.manage" },
       { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+      { name: "Requests", path: "/hr/requests", permission: "hr_requests.review" },
+      { name: "Suggestions", path: "/hr/suggestions", permission: "suggestions.review" },
       { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
     ],
     nav: {
@@ -694,8 +724,12 @@ export const departments: Department[] = [
           icon: UserCog,
           items: [
             { name: "Employees", path: "/hr/employees", permission: "employees.view" },
+            { name: "Staff import", path: "/hr/import", permission: "employees.import" },
             { name: "Payroll", path: "/hr/payroll", anyPermissions: ["payroll.manage", "payroll.view", "payroll.approve"] },
+            { name: "Settings", path: "/hr/settings", permission: "payroll.manage" },
             { name: "Leave", path: "/hr/leave", permission: "leave.review" },
+            { name: "Requests", path: "/hr/requests", permission: "hr_requests.review" },
+            { name: "Suggestions", path: "/hr/suggestions", permission: "suggestions.review" },
             { name: "Documents", path: "/hr/documents", permission: "hr_documents.manage" },
           ],
         },
@@ -773,7 +807,27 @@ export const departments: Department[] = [
     name: "Analytics",
     icon: BarChart3,
     path: "/analytics",
-    subModules: [{ name: "Overview", path: "/analytics" }],
+    subModules: [
+      { name: "Overview", path: "/analytics" },
+      { name: "Reports", path: "/analytics/reports" },
+    ],
+    nav: {
+      topItems: [
+        { name: "Home", path: "/analytics" },
+        { name: "Reports", path: "/analytics/reports" },
+        { name: "Analytics", path: "/analytics" },
+      ],
+      groups: [
+        {
+          label: "Insights",
+          icon: BarChart3,
+          items: [
+            { name: "Overview", path: "/analytics" },
+            { name: "Reports", path: "/analytics/reports" },
+          ],
+        },
+      ],
+    },
   },
 ];
 
@@ -1094,9 +1148,31 @@ export function filterWorkspaceInsightsNavItems(
   );
 }
 
-/** Self-service leave link shown in every department sidebar footer. */
+/** Self-service HR hub links shown in every department sidebar footer. */
+export const workspaceFooterNavGroup = {
+  name: "HR",
+  icon: UserCog,
+} as const;
+
 export const workspaceFooterNavItems = [
-  { name: "Leave", href: "/workspace/leave", icon: CalendarDays },
+  {
+    name: "Leave Requests",
+    href: "/workspace/leave",
+    icon: CalendarDays,
+    kind: "leave" as const,
+  },
+  {
+    name: "Advanced Requests",
+    href: "/workspace/advanced-requests",
+    icon: HandCoins,
+    kind: "advanced" as const,
+  },
+  {
+    name: "Suggestion Box",
+    href: "/workspace/suggestions",
+    icon: MessageSquarePlus,
+    kind: "suggestions" as const,
+  },
 ] as const;
 
 export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems {
@@ -1106,14 +1182,34 @@ export function filterWorkspaceFooterNavItems(): typeof workspaceFooterNavItems 
 /**
  * Self-service leave URL scoped to the active department so the sidebar stays
  * on the user's dashboard instead of switching to the workspace shell.
- * HR reuses its existing `/hr/leave` management page; the workspace hub and
- * analytics fall back to the shared `/workspace/leave` route.
+ * HR staff use `/workspace/leave` for self-service; `/hr/leave` stays the
+ * management inbox.
  */
 export function leaveHrefForDepartment(department: Department | null): string {
   if (!department) return "/workspace/leave";
-  if (department.id === "hr") return "/hr/leave";
-  if (department.id === "analytics") return "/workspace/leave";
+  if (department.id === "hr" || department.id === "analytics") {
+    return "/workspace/leave";
+  }
   return `${department.path}/leave`;
+}
+
+export function footerHrefForDepartment(
+  department: Department | null,
+  kind: (typeof workspaceFooterNavItems)[number]["kind"],
+): string {
+  if (kind === "leave") {
+    return leaveHrefForDepartment(department);
+  }
+  if (kind === "advanced") {
+    if (!department || department.id === "hr" || department.id === "analytics") {
+      return "/workspace/advanced-requests";
+    }
+    return `${department.path}/advanced-requests`;
+  }
+  if (!department || department.id === "hr" || department.id === "analytics") {
+    return "/workspace/suggestions";
+  }
+  return `${department.path}/suggestions`;
 }
 
 export function isWorkspaceNavActive(pathname: string, href: string): boolean {

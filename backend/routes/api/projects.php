@@ -6,6 +6,7 @@ use App\Http\Controllers\Crm\Quotations\ApproveQuotationController;
 use App\Http\Controllers\Crm\Quotations\SendQuotationController;
 use App\Http\Controllers\Crm\Quotations\SubmitQuotationForReviewController;
 use App\Http\Controllers\Projects\DesignChangeOrderController;
+use App\Http\Controllers\Projects\ProjectWaveController;
 use App\Http\Controllers\Projects\ProjectBomController;
 use App\Http\Controllers\Projects\ProjectController;
 use App\Http\Controllers\Projects\ProjectDesignController;
@@ -26,6 +27,9 @@ Route::post('design-change-orders/{dco}/release-to-production', [DesignChangeOrd
 Route::post('design-change-orders/{dco}/create-remake', [DesignChangeOrderController::class, 'createRemake']);
 Route::post('design-change-orders/{dco}/complete-minor', [DesignChangeOrderController::class, 'completeMinor']);
 Route::post('design-change-orders/{dco}/close', [DesignChangeOrderController::class, 'close']);
+Route::get('design-change-orders/{dco}/available-profiles', [DesignChangeOrderController::class, 'availableProfiles']);
+Route::post('design-change-orders/{dco}/scrap-to-offcuts', [DesignChangeOrderController::class, 'scrapToOffcuts']);
+Route::post('design-change-orders/{dco}/request-materials', [DesignChangeOrderController::class, 'requestMaterials']);
 
 Route::get('dashboard', [ProjectController::class, 'dashboard']);
 Route::get('pipeline', [ProjectController::class, 'pipeline']);
@@ -94,6 +98,10 @@ Route::prefix('{project}')->group(function () {
     Route::post('delays', [ProjectOperationsController::class, 'storeDelay']);
     Route::get('floors', [ProjectOperationsController::class, 'floors']);
     Route::post('floors', [ProjectOperationsController::class, 'storeFloor']);
+    Route::get('waves', [ProjectWaveController::class, 'index']);
+    Route::post('waves', [ProjectWaveController::class, 'store']);
+    Route::post('waves/bootstrap-from-measurements', [ProjectWaveController::class, 'bootstrap']);
+    Route::post('waves/{wave}/scopes', [ProjectWaveController::class, 'assignScopes']);
     Route::get('engineers', [ProjectOperationsController::class, 'engineers']);
     Route::post('engineers', [ProjectOperationsController::class, 'storeEngineer']);
     Route::delete('engineers/{engineer}', [ProjectOperationsController::class, 'destroyEngineer']);

@@ -21,6 +21,7 @@ export type ProductionOrder = {
   id: number;
   reference: string;
   project_id: number;
+  project_wave_id?: number | null;
   status: ProductionOrderStatus;
   current_stage: ProductionStageValue;
   current_stage_label?: string;
@@ -39,6 +40,12 @@ export type ProductionOrder = {
     completion_percent?: number;
     location_type?: string | null;
     install_mode?: string | null;
+  } | null;
+  wave?: {
+    id: number;
+    wave_number: number;
+    label: string | null;
+    status: string;
   } | null;
   stage_logs?: ProductionStageLog[];
   teams?: ProductionOrderTeam[];
@@ -194,6 +201,7 @@ export const ASSEMBLY_STAGES: ProductionStageValue[] = [
 
 export async function listProductionOrders(params?: {
   project_id?: number;
+  project_wave_id?: number;
   status?: string;
   per_page?: number;
   page?: number;
@@ -203,6 +211,16 @@ export async function listProductionOrders(params?: {
   return apiRequest<Paginated<ProductionOrder>>(
     `/production/orders${buildQuery(params)}`,
   );
+}
+
+export async function createProductionOrder(payload: {
+  project_id: number;
+  project_wave_id?: number | null;
+}) {
+  return apiRequest<{ data: ProductionOrder }>(`/production/orders`, {
+    method: "POST",
+    body: payload,
+  });
 }
 
 export async function getProductionOrder(id: number) {
@@ -379,10 +397,17 @@ export type ProductionMisfit = {
   opening_ref: string | null;
   product_type: string | null;
   unit_floor: string | null;
+  room_location?: string | null;
   misfit_notes: string | null;
   status: string;
   updated_at: string | null;
-  job: { id: number; reference: string; status: string } | null;
+  job: {
+    id: number;
+    reference: string;
+    status: string;
+    project_wave_id?: number | null;
+    wave?: { id: number; wave_number: number; label: string | null } | null;
+  } | null;
   project: { id: number; reference: string; name: string; stage: string } | null;
   non_conformity: {
     id: number;
@@ -397,7 +422,19 @@ export type ProductionMisfit = {
     id: number;
     status: string;
     reason: string | null;
+    change_items?: Array<{
+      id: string;
+      description: string;
+      qty?: number;
+      warehouse_item_id?: number | null;
+      profile_code?: string | null;
+      cut_length_mm?: number | null;
+      disposition?: string;
+      scrapped_to_offcut?: boolean;
+    }>;
+    change_path?: string | null;
     remake_production_order_id: number | null;
+    parent_production_order_id?: number | null;
     remake_production_order: {
       id: number;
       reference: string;

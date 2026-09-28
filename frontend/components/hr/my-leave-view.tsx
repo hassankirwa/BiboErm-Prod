@@ -6,7 +6,11 @@ import { LeaveRequestForm } from "@/components/hr/leave-request-form";
 import { LeaveRequestTable } from "@/components/hr/leave-request-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError } from "@/lib/api/client";
-import { fetchMyLeaveRequests, type LeaveRequest } from "@/lib/api/leave";
+import {
+  fetchMyLeaveRequests,
+  type LeaveBalance,
+  type LeaveRequest,
+} from "@/lib/api/leave";
 
 /**
  * Self-service leave requests. Rendered inside each department's route
@@ -14,6 +18,7 @@ import { fetchMyLeaveRequests, type LeaveRequest } from "@/lib/api/leave";
  */
 export function MyLeaveView() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [balance, setBalance] = useState<LeaveBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +28,7 @@ export function MyLeaveView() {
     try {
       const result = await fetchMyLeaveRequests();
       setRequests(result.data);
+      setBalance(result.balance);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -47,12 +53,48 @@ export function MyLeaveView() {
         </p>
       </div>
 
+      {balance && (
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Entitlement ({balance.year})</p>
+              <p className="text-2xl font-semibold">{balance.entitlement}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Used (approved)</p>
+              <p className="text-2xl font-semibold">{balance.used}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="text-2xl font-semibold">{balance.pending}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Remaining</p>
+              <p className="text-2xl font-semibold text-emerald-700">{balance.remaining}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {balance.available} available to request
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Request leave</CardTitle>
         </CardHeader>
         <CardContent>
-          <LeaveRequestForm onSubmitted={load} />
+          <LeaveRequestForm
+            onSubmitted={load}
+            remainingDays={balance?.remaining ?? null}
+            availableDays={balance?.available ?? null}
+          />
         </CardContent>
       </Card>
 

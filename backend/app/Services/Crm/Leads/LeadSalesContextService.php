@@ -15,26 +15,40 @@ class LeadSalesContextService
      * Returning-client leads share an account with prior opportunities; never
      * surface another lead's quote or deal just because the account matches.
      *
+     * Proformas are often created with deal_id null until send — resolve those
+     * via design job or first-opportunity account scope so CRM can "Send to client".
+     *
      * @return array{latest_quotation: Quotation|null, sales_deal: Deal|null}
      */
     public function resolve(Lead $lead): array
     {
-        $salesDeal = $this->dealForLead($lead);
+        $latestQuotation = $this->quotationForLead($lead);
+        $salesDeal = null;
 
-        if (! $salesDeal) {
-            return ['latest_quotation' => null, 'sales_deal' => null];
+        if ($latestQuotation?->deal_id) {
+            $salesDeal = Deal::query()->with('project')->find($latestQuotation->deal_id);
         }
 
-        $latestQuotation = Quotation::query()
-            ->where('deal_id', $salesDeal->id)
-            ->excludingReferenceCopies()
-            ->with(['deal.project', 'lines'])
-            ->latest('id')
-            ->first();
+        if (! $salesDeal) {
+            $salesDeal = $this->dealForLead($lead);
+        }
+
+        if (! $latestQuotation && $salesDeal) {
+            $latestQuotation = Quotation::query()
+                ->where('deal_id', $salesDeal->id)
+                ->excludingReferenceCopies()
+                ->with(['deal.project', 'lines'])
+                ->latest('id')
+                ->first();
+        }
+
+        if ($latestQuotation) {
+            $latestQuotation->loadMissing(['deal.project', 'lines']);
+        }
 
         return [
             'latest_quotation' => $latestQuotation,
-            'sales_deal' => $salesDeal->loadMissing('project'),
+            'sales_deal' => $salesDeal?->loadMissing('project'),
         ];
     }
 
@@ -49,6 +63,65 @@ class LeadSalesContextService
         if ($dealId) {
             $lead->update(['converted_deal_id' => $dealId]);
         }
+    }
+
+    protected function quotationForLead(Lead $lead): ?Quotation
+    {
+        $viaDesignJob = Quotation::query()
+            ->excludingReferenceCopies()
+            ->whereHas('designJob', fn ($query) => $query->where('lead_id', $lead->id))
+            ->with(['deal.project', 'lines'])
+            ->latest('id')
+            ->first();
+
+        if ($viaDesignJob) {
+            return $viaDesignJob;
+        }
+
+        $dealIds = Deal::query()
+            ->where(function ($query) use ($lead) {
+                $query->where('source_lead_id', $lead->id)
+                    ->orWhere('lead_id', $lead->id);
+
+                if ($lead->converted_deal_id) {
+                    $query->orWhere('id', $lead->converted_deal_id);
+                }
+            })
+            ->pluck('id');
+
+        if ($dealIds->isNotEmpty()) {
+            $viaDeal = Quotation::query()
+                ->whereIn('deal_id', $dealIds)
+                ->excludingReferenceCopies()
+                ->with(['deal.project', 'lines'])
+                ->latest('id')
+                ->first();
+
+            if ($viaDeal) {
+                return $viaDeal;
+            }
+        }
+
+        // Legacy / first-opportunity only: account.source_lead_id is this lead.
+        // Include deal_id-null drafts so CRM can send before a deal exists.
+        if (! $lead->converted_account_id) {
+            return null;
+        }
+
+        $accountSourceLeadId = Account::query()
+            ->whereKey($lead->converted_account_id)
+            ->value('source_lead_id');
+
+        if (! $accountSourceLeadId || (int) $accountSourceLeadId !== (int) $lead->id) {
+            return null;
+        }
+
+        return Quotation::query()
+            ->where('account_id', $lead->converted_account_id)
+            ->excludingReferenceCopies()
+            ->with(['deal.project', 'lines'])
+            ->latest('id')
+            ->first();
     }
 
     protected function dealForLead(Lead $lead): ?Deal

@@ -8,4 +8,5 @@ enum StockMovementType: string
     case Outbound = 'outbound';
     case Transfer = 'transfer';
     case Adjustment = 'adjustment';
+    case Return = 'return';
 }

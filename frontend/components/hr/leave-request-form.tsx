@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +22,36 @@ import {
 
 type LeaveRequestFormProps = {
   onSubmitted?: () => void;
+  remainingDays?: number | null;
+  availableDays?: number | null;
 };
 
-export function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps) {
+function daysBetween(start: string, end: string): number | null {
+  if (!start || !end) return null;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  if (endDate < startDate) return null;
+  const ms = endDate.getTime() - startDate.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
+}
+
+export function LeaveRequestForm({
+  onSubmitted,
+  remainingDays = null,
+  availableDays = null,
+}: LeaveRequestFormProps) {
   const [leaveType, setLeaveType] = useState<LeaveType>("annual");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const requestedDays = useMemo(
+    () => daysBetween(startDate, endDate),
+    [startDate, endDate]
+  );
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -60,6 +81,15 @@ export function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {(remainingDays != null || availableDays != null) && (
+        <p className="text-sm text-muted-foreground">
+          Annual leave remaining:{" "}
+          <span className="font-medium text-foreground">{remainingDays ?? "—"}</span>
+          {availableDays != null && availableDays !== remainingDays
+            ? ` (${availableDays} available after pending requests)`
+            : null}
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="leave_type">Leave type</Label>
@@ -99,6 +129,17 @@ export function LeaveRequestForm({ onSubmitted }: LeaveRequestFormProps) {
           </div>
         </div>
       </div>
+      {requestedDays != null && (
+        <p className="text-sm text-muted-foreground">
+          This request: <span className="font-medium text-foreground">{requestedDays}</span> day
+          {requestedDays === 1 ? "" : "s"}
+          {leaveType === "annual" &&
+          availableDays != null &&
+          requestedDays > availableDays
+            ? " — exceeds available annual leave"
+            : null}
+        </p>
+      )}
       <div className="space-y-2">
         <Label htmlFor="reason">Reason (optional)</Label>
         <Textarea

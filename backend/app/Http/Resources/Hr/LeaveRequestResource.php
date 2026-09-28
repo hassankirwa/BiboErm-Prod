@@ -22,6 +22,11 @@ class LeaveRequestResource extends JsonResource
             'leave_type' => $this->leave_type,
             'start_date' => $this->start_date?->toDateString(),
             'end_date' => $this->end_date?->toDateString(),
+            'days' => $this->days !== null
+                ? (int) $this->days
+                : ($this->start_date && $this->end_date
+                    ? $this->start_date->diffInDays($this->end_date) + 1
+                    : null),
             'reason' => $this->reason,
             'status' => $this->status,
             'reviewed_by' => $this->reviewed_by,

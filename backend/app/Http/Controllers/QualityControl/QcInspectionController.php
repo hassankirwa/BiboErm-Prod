@@ -52,10 +52,19 @@ class QcInspectionController extends Controller
             $query->where('field_installation_job_id', $request->integer('field_installation_job_id'));
         }
 
+        if ($request->filled('opening_code')) {
+            $query->where('opening_code', strtoupper(trim((string) $request->string('opening_code'))));
+        }
+
+        if ($request->filled('project_document_id')) {
+            $query->where('project_document_id', $request->integer('project_document_id'));
+        }
+
         if ($request->filled('search')) {
             $term = '%'.$request->string('search').'%';
             $query->where(function ($builder) use ($term) {
                 $builder->where('reference', 'like', $term)
+                    ->orWhere('opening_code', 'like', $term)
                     ->orWhereHas('project', fn ($q) => $q->where('name', 'like', $term)
                         ->orWhere('reference', 'like', $term));
             });

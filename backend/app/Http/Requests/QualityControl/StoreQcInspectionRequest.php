@@ -28,6 +28,8 @@ class StoreQcInspectionRequest extends FormRequest
             'warehouse_section_id' => ['nullable', 'integer'],
             'tool_id' => ['nullable', 'integer', 'exists:warehouse_tools,id'],
             'stage' => ['nullable', 'string', 'max:64'],
+            'opening_code' => ['nullable', 'string', 'max:64'],
+            'project_document_id' => ['nullable', 'integer', 'exists:project_documents,id'],
             'notes' => ['nullable', 'string'],
         ];
     }

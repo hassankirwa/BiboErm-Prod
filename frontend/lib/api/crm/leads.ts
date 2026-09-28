@@ -280,6 +280,55 @@ export async function importLeads(
   });
 }
 
+export type ImportHistoricalLeadRow = {
+  name: string;
+  phone?: string;
+  progress: string;
+  project_name?: string | null;
+  account_name?: string | null;
+  site_name?: string | null;
+  source?: string | null;
+  lead_source?: string | null;
+  estimated_value?: number | null;
+  total_quotation_amount?: number | null;
+  quote_date?: string | null;
+  external_quote_no?: string | null;
+  quote_no?: string | null;
+  series?: string | null;
+  door_window_series?: string | null;
+  total_sets?: string | number | null;
+  total_sqm?: string | number | null;
+  sales_rep?: string | null;
+  customer_feedback?: string | null;
+  remarks?: string | null;
+};
+
+export type ImportHistoricalLeadsResult = {
+  data: {
+    imported: number;
+    skipped: number;
+    leads: Array<{ id: number; lead_number: string; name: string }>;
+    skipped_rows: Array<{
+      reason: string;
+      name?: string | null;
+      phone?: string | null;
+      external_quote_no?: string | null;
+    }>;
+  };
+};
+
+export async function importHistoricalLeads(
+  leads: ImportHistoricalLeadRow[],
+): Promise<ImportHistoricalLeadsResult> {
+  return apiFetch<ImportHistoricalLeadsResult>(
+    "/api/v1/crm/leads/import-historical",
+    {
+      method: "POST",
+      json: { leads },
+    },
+  );
+}
+
 /** Upload attachment when backend exposes POST /api/v1/crm/leads/{id}/attachments */
 export async function uploadLeadAttachment(
   leadId: number,

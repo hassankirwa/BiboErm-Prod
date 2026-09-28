@@ -20,6 +20,7 @@ class DepartmentSeeder extends Seeder
         ['name' => 'Finance', 'slug' => 'finance', 'default_module' => 'finance'],
         ['name' => 'IT', 'slug' => 'it', 'default_module' => 'it'],
         ['name' => 'Project Management', 'slug' => 'project_management', 'default_module' => 'projects'],
+        ['name' => 'Quotation', 'slug' => 'quotation', 'default_module' => 'quotation'],
         ['name' => 'Operations / Admin', 'slug' => 'operations', 'default_module' => 'workspace'],
         ['name' => 'Reception', 'slug' => 'reception', 'default_module' => 'crm'],
         ['name' => 'Field Operations', 'slug' => 'field', 'default_module' => 'field'],

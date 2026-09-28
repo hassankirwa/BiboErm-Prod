@@ -14,6 +14,8 @@ Route::middleware('permission:production.view')->group(function () {
     Route::get('orders/{order}/teams', [ProductionTeamController::class, 'index']);
 });
 
+Route::middleware('permission:production.manage')->post('orders', [ProductionOrderController::class, 'store']);
+
 Route::middleware('permission:production.schedule.manage')->patch('orders/{order}/schedule', [ProductionOrderController::class, 'updateSchedule']);
 
 Route::middleware('permission:production.schedule.manage')->post('orders/{order}/teams', [ProductionTeamController::class, 'store']);

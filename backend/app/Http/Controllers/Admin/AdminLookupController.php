@@ -15,7 +15,7 @@ class AdminLookupController extends Controller
     {
         $departments = Department::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'slug']);
+            ->get(['id', 'name', 'slug', 'shared_email']);
 
         return response()->json($departments);
     }

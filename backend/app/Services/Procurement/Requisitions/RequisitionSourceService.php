@@ -44,9 +44,7 @@ class RequisitionSourceService
             ->get()
             ->groupBy('warehouse_item_id');
 
-        $query = Item::query()
-            ->where('is_active', true)
-            ->where('min_stock_qty', '>', 0);
+        $query = Item::query()->where('is_active', true);
 
         if ($category !== null) {
             $query->where('category', $category);
@@ -56,15 +54,26 @@ class RequisitionSourceService
             ->orderBy('name')
             ->get()
             ->map(function (Item $item) use ($availableByItem, $openRequisitionsByItem) {
-                $availableQty = (string) ($availableByItem[$item->id] ?? '0.000');
-                $minimumQty = (string) $item->min_stock_qty;
+                $availableQty = number_format((float) ($availableByItem[$item->id] ?? 0), 3, '.', '');
+                $minimumQty = number_format((float) ($item->min_stock_qty ?? 0), 3, '.', '');
+                $hasMinimum = bccomp($minimumQty, '0', 3) === 1;
+                $isOutOfStock = bccomp($availableQty, '0', 3) <= 0;
+                $isBelowMinimum = $hasMinimum && bccomp($availableQty, $minimumQty, 3) < 0;
 
-                if (bccomp($availableQty, $minimumQty, 3) >= 0) {
+                // Catalog imports default min_stock_qty to 0, so out-of-stock catalog
+                // rows must still be eligible for low-stock requisitions.
+                if (! $isBelowMinimum && ! $isOutOfStock) {
                     return null;
                 }
 
                 $openLines = $openRequisitionsByItem->get($item->id, collect());
-                $shortageQty = bcsub($minimumQty, $availableQty, 3);
+                $shortageQty = $hasMinimum
+                    ? bcsub($minimumQty, $availableQty, 3)
+                    : '1.000';
+
+                if (bccomp($shortageQty, '0', 3) <= 0) {
+                    $shortageQty = '1.000';
+                }
 
                 return [
                     'warehouse_item_id' => $item->id,
@@ -75,6 +84,7 @@ class RequisitionSourceService
                     'available_qty' => $availableQty,
                     'min_stock_qty' => $minimumQty,
                     'quantity_to_requisition' => $shortageQty,
+                    'stock_status' => $isOutOfStock ? 'out_of_stock' : 'low_stock',
                     'requisitions' => $this->summarizeRequisitions($openLines),
                     'can_create_requisition' => $openLines->isEmpty(),
                 ];

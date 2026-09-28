@@ -17,6 +17,16 @@ class StockMovementLineResource extends JsonResource
             'quantity' => $this->quantity,
             'unit_cost' => $this->unit_cost,
             'item' => new ItemResource($this->whenLoaded('item')),
+            'from_bin' => $this->whenLoaded('fromBin', fn () => $this->fromBin ? [
+                'id' => $this->fromBin->id,
+                'code' => $this->fromBin->code,
+                'name' => $this->fromBin->name,
+            ] : null),
+            'to_bin' => $this->whenLoaded('toBin', fn () => $this->toBin ? [
+                'id' => $this->toBin->id,
+                'code' => $this->toBin->code,
+                'name' => $this->toBin->name,
+            ] : null),
         ];
     }
 }

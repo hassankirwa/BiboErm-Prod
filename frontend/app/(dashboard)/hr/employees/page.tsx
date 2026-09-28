@@ -7,6 +7,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { PermissionGuard } from "@/components/auth/permission-guard";
 import { EmployeeStatusBadge, getPrimaryDepartment } from "@/components/hr/employee-status-badge";
 import { InviteEmployeeDialog } from "@/components/hr/invite-employee-dialog";
+import { AddEmployeeDialog } from "@/components/hr/add-employee-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -64,6 +65,7 @@ function EmployeesPageContent() {
   const searchParams = useSearchParams();
   const { hasPermission } = useAuth();
   const canInvite = hasPermission("users.invite");
+  const canCreate = hasPermission("employees.create");
 
   const filterParam = searchParams.get("filter") ?? "";
   const statusFilter = filterParam ? "" : (searchParams.get("status") ?? "");
@@ -185,20 +187,34 @@ function EmployeesPageContent() {
             Invite staff, review onboarding, and manage HR records.
           </p>
         </div>
-        {canInvite && (
-          <InviteEmployeeDialog
-            onSuccess={(result) => {
-              if (result.mail_sent) {
-                setSuccess(result.message);
-              } else {
-                const devHint = result.dev_mail?.temporary_password
-                  ? ` Temp password (dev): ${result.dev_mail.temporary_password}`
-                  : "";
-                setError(`${result.mail_warning ?? "Email was not sent."}${devHint}`);
-              }
-              loadEmployees();
-            }}
-          />
+        {(canInvite || canCreate) && (
+          <div className="flex flex-wrap gap-2">
+            {canCreate && (
+              <AddEmployeeDialog
+                onSuccess={(result) => {
+                  setSuccess(
+                    `Employee created (${result.email}). Temp password shown in dialog.`
+                  );
+                  loadEmployees();
+                }}
+              />
+            )}
+            {canInvite && (
+              <InviteEmployeeDialog
+                onSuccess={(result) => {
+                  if (result.mail_sent) {
+                    setSuccess(result.message);
+                  } else {
+                    const devHint = result.dev_mail?.temporary_password
+                      ? ` Temp password (dev): ${result.dev_mail.temporary_password}`
+                      : "";
+                    setError(`${result.mail_warning ?? "Email was not sent."}${devHint}`);
+                  }
+                  loadEmployees();
+                }}
+              />
+            )}
+          </div>
         )}
       </div>
 

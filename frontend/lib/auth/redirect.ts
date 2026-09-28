@@ -139,6 +139,10 @@ export function isWorkspaceSelfServicePath(pathname: string): boolean {
   return (
     pathname === "/workspace/leave" ||
     pathname.startsWith("/workspace/leave/") ||
+    pathname === "/workspace/advanced-requests" ||
+    pathname.startsWith("/workspace/advanced-requests/") ||
+    pathname === "/workspace/suggestions" ||
+    pathname.startsWith("/workspace/suggestions/") ||
     pathname === "/workspace/documents" ||
     pathname.startsWith("/workspace/documents/") ||
     pathname === "/workspace/payslips" ||

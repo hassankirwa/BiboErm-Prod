@@ -93,6 +93,7 @@ export function LeadConvertForm({ leadId }: { leadId: string }) {
       lead?.status,
       Boolean(linkedAccountId),
       lead?.pipeline_stage,
+      lead?.is_historical,
     );
 
   useEffect(() => {

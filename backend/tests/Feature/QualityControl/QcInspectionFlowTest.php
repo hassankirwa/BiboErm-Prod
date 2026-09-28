@@ -59,7 +59,7 @@ class QcInspectionFlowTest extends TestCase
             ->distinct('context')
             ->count('context');
 
-        $this->assertGreaterThanOrEqual(9, $contextCount);
+        $this->assertGreaterThanOrEqual(10, $contextCount);
     }
 
     public function test_grn_receiving_template_has_practical_checklist_items(): void
@@ -739,11 +739,18 @@ class QcInspectionFlowTest extends TestCase
         $created = app(\App\Services\QualityControl\QcInspectionService::class)
             ->createFromProductionStage($project->id, $order->id, 'finishing');
 
-        $this->assertNotNull($created);
-        $this->assertSame(QcInspectionContext::ProductionQcPostFabrication, $created->context);
-        $this->assertSame(QcInspectionResult::Pending, $created->result);
-        $this->assertNotNull($created->template_id);
-        $this->assertSame('Post-fabrication QC', $created->template?->name ?? QcChecklistTemplate::query()->find($created->template_id)?->name);
+        $this->assertCount(2, $created);
+        $postFab = $created->first(
+            fn ($i) => $i->context === QcInspectionContext::ProductionQcPostFabrication
+        );
+        $this->assertNotNull($postFab);
+        $this->assertSame(QcInspectionResult::Pending, $postFab->result);
+        $this->assertNotNull($postFab->template_id);
+        $this->assertSame(
+            'Post-fabrication QC',
+            $postFab->template?->name
+                ?? QcChecklistTemplate::query()->find($postFab->template_id)?->name
+        );
     }
 
     public function test_create_from_production_stage_does_not_reopen_completed_inspection(): void
@@ -760,16 +767,21 @@ class QcInspectionFlowTest extends TestCase
         ]);
 
         $service = app(\App\Services\QualityControl\QcInspectionService::class);
-        $first = $service->createFromProductionStage($project->id, $order->id, 'finishing');
-        $this->assertNotNull($first);
+        $firstBatch = $service->createFromProductionStage($project->id, $order->id, 'finishing');
+        $postFab = $firstBatch->first(
+            fn ($i) => $i->context === QcInspectionContext::ProductionQcPostFabrication
+        );
+        $this->assertNotNull($postFab);
 
-        $first->update(['result' => QcInspectionResult::Pass]);
+        $postFab->update(['result' => QcInspectionResult::Pass]);
 
         $second = $service->createFromProductionStage($project->id, $order->id, 'qc_post_fabrication');
         $third = $service->createFromProductionStage($project->id, $order->id, 'finishing');
 
-        $this->assertSame($first->id, $second?->id);
-        $this->assertSame($first->id, $third?->id);
+        $this->assertSame($postFab->id, $second->first()?->id);
+        $this->assertTrue(
+            $third->contains(fn ($i) => (int) $i->id === (int) $postFab->id)
+        );
         $this->assertSame(
             1,
             QcInspection::query()
@@ -824,8 +836,8 @@ class QcInspectionFlowTest extends TestCase
         $found = app(\App\Services\QualityControl\QcInspectionService::class)
             ->createFromProductionStage($project->id, $order->id, 'qc_post_fabrication');
 
-        $this->assertSame($pending->id, $found?->id);
-        $this->assertNotSame($completed->id, $found?->id);
+        $this->assertSame($pending->id, $found->first()?->id);
+        $this->assertNotSame($completed->id, $found->first()?->id);
         $this->assertSame(
             2,
             QcInspection::query()
@@ -833,6 +845,143 @@ class QcInspectionFlowTest extends TestCase
                 ->where('context', QcInspectionContext::ProductionQcPostFabrication)
                 ->count(),
         );
+    }
+
+    public function test_cutting_complete_creates_per_opening_in_process_qc(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject();
+        $this->attachDesignOpenings($project, ['SD-1', 'SD-2', 'SD-3', 'SD-4']);
+
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-CUT-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'cutting',
+            'fifo_position' => 1,
+        ]);
+
+        $created = app(\App\Services\QualityControl\QcInspectionService::class)
+            ->createFromProductionStage($project->id, $order->id, 'cutting');
+
+        $this->assertCount(4, $created);
+        $codes = $created->pluck('opening_code')->sort()->values()->all();
+        $this->assertSame(['SD-1', 'SD-2', 'SD-3', 'SD-4'], $codes);
+
+        foreach ($created as $inspection) {
+            $this->assertSame(QcInspectionContext::ProductionInProcess, $inspection->context);
+            $this->assertSame('cutting', $inspection->stage);
+            $this->assertSame(QcInspectionResult::Pending, $inspection->result);
+            $this->assertSame(
+                'Cutting QC',
+                QcChecklistTemplate::query()->find($inspection->template_id)?->name
+            );
+        }
+
+        // Soft: re-fire is idempotent
+        $again = app(\App\Services\QualityControl\QcInspectionService::class)
+            ->createFromProductionStage($project->id, $order->id, 'cutting');
+        $this->assertCount(4, $again);
+        $this->assertSame(
+            4,
+            QcInspection::query()
+                ->where('production_order_id', $order->id)
+                ->where('context', QcInspectionContext::ProductionInProcess)
+                ->where('stage', 'cutting')
+                ->count(),
+        );
+    }
+
+    public function test_post_fab_hard_gate_requires_all_openings_passed(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject();
+        $this->attachDesignOpenings($project, ['SD-1', 'SD-2']);
+
+        $order = \App\Models\Production\ProductionOrder::query()->create([
+            'reference' => 'PROD-GATE-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => 'in_progress',
+            'current_stage' => 'qc_post_fabrication',
+            'fifo_position' => 1,
+        ]);
+
+        $service = app(\App\Services\QualityControl\QcInspectionService::class);
+        $created = $service->createFromProductionStage($project->id, $order->id, 'qc_post_fabrication');
+        $this->assertCount(2, $created);
+
+        $this->assertFalse($service->hasPassedPostFabricationQc($project->id, $order->id));
+
+        $created->first()->update(['result' => QcInspectionResult::Pass]);
+        $this->assertFalse($service->hasPassedPostFabricationQc($project->id, $order->id));
+
+        $created->last()->update(['result' => QcInspectionResult::Pass]);
+        $this->assertTrue($service->hasPassedPostFabricationQc($project->id, $order->id));
+    }
+
+    public function test_site_receiving_and_installation_fan_out_per_opening(): void
+    {
+        $this->seed(QcDefaultChecklistsSeeder::class);
+
+        $project = $this->createProject(['stage' => ProjectStage::Installation]);
+        $this->attachDesignOpenings($project, ['SD-1', 'SD-4']);
+
+        $job = \App\Models\FieldInstallation\FieldInstallationJob::query()->create([
+            'reference' => 'FIJ-'.uniqid(),
+            'project_id' => $project->id,
+            'status' => \App\Enums\FieldInstallation\FieldJobStatus::InProgress,
+            'job_type' => \App\Enums\FieldInstallation\FieldJobType::NairobiSiteInstall,
+            'created_by' => $this->inspector->id,
+        ]);
+
+        $service = app(\App\Services\QualityControl\QcInspectionService::class);
+
+        $receiving = $service->createSiteReceiving($project->id, $job->id, 99);
+        $this->assertCount(2, $receiving);
+        $this->assertSame(['SD-1', 'SD-4'], $receiving->pluck('opening_code')->sort()->values()->all());
+        $this->assertTrue(
+            str_contains((string) $receiving->first()->notes, 'field_delivery_record_id:99')
+        );
+
+        $install = $service->createSiteInstallation($project->id, $job->id);
+        $this->assertCount(2, $install);
+        $this->assertSame(
+            QcInspectionContext::SiteInstallation,
+            $install->first()->context
+        );
+
+        $pre = $service->createSitePreInstallation($project->id);
+        $this->assertCount(2, $pre);
+        $this->assertSame(
+            QcInspectionContext::SitePreInstallation,
+            $pre->first()->context
+        );
+        $this->assertSame(
+            'Site pre-installation QC',
+            QcChecklistTemplate::query()->find($pre->first()->template_id)?->name
+        );
+    }
+
+    /**
+     * @param  list<string>  $codes
+     */
+    protected function attachDesignOpenings(Project $project, array $codes): void
+    {
+        foreach ($codes as $code) {
+            \App\Models\ProjectDocument::query()->create([
+                'project_id' => $project->id,
+                'type' => 'design',
+                'filename' => "{$code}.pdf",
+                'path' => "projects/{$project->id}/{$code}.pdf",
+                'version' => 1,
+                'metadata' => [
+                    'code' => $code,
+                    'source' => 'fabrication',
+                ],
+            ]);
+        }
     }
 
     protected function createProject(array $overrides = []): Project

@@ -10,6 +10,7 @@ class ProjectFloor extends Model
 {
     protected $fillable = [
         'project_id',
+        'project_scope_id',
         'floor_label',
         'section_notes',
         'completion_percent',
@@ -27,6 +28,11 @@ class ProjectFloor extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function scope(): BelongsTo
+    {
+        return $this->belongsTo(ProjectScope::class, 'project_scope_id');
     }
 
     public function bomLines(): HasMany

@@ -16,6 +16,7 @@ export type AuthUser = {
   must_change_password: boolean;
   two_factor_enabled: boolean;
   avatar_url: string | null;
+  is_shared_account?: boolean;
 };
 
 export type TwoFactorChallenge = {

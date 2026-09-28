@@ -4,6 +4,7 @@ namespace App\Models\Warehouse;
 
 use App\Enums\Warehouse\ToolCondition;
 use App\Enums\Warehouse\ToolTrackingMode;
+use App\Enums\Warehouse\ToolType;
 use App\Models\FieldInstallation\FieldToolAssignment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,6 +17,7 @@ class Tool extends Model
         'tool_code',
         'name',
         'tool_type',
+        'is_returnable',
         'condition',
         'purchase_date',
         'is_active',
@@ -29,8 +31,10 @@ class Tool extends Model
         return [
             'condition' => ToolCondition::class,
             'tracking_mode' => ToolTrackingMode::class,
+            'tool_type' => ToolType::class,
             'purchase_date' => 'date',
             'is_active' => 'boolean',
+            'is_returnable' => 'boolean',
             'total_qty' => 'integer',
             'qty_in_repair' => 'integer',
         ];
@@ -64,6 +68,11 @@ class Tool extends Model
     public function isQuantityTracked(): bool
     {
         return ($this->tracking_mode ?? ToolTrackingMode::Serialized)->isQuantity();
+    }
+
+    public function isReturnable(): bool
+    {
+        return (bool) ($this->is_returnable ?? true);
     }
 
     public function issuedQty(): int

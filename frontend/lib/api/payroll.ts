@@ -13,10 +13,13 @@ export type PayrollEntry = {
   period_month?: number;
   period_label?: string | null;
   gross_salary: number;
+  additions_total?: number;
+  shif?: number;
   nhif: number;
   nssf: number;
   paye: number;
   other_deductions: number;
+  line_items?: Array<{ code: string; name: string; kind: string; amount: number }>;
   net_pay: number;
   payslip_path: string | null;
   download_url: string | null;
@@ -88,13 +91,24 @@ export async function generatePayrollRun(
 export async function updatePayrollEntry(
   runId: number,
   entryId: number,
-  payload: { gross_salary?: number; other_deductions?: number }
+  payload: {
+    gross_salary?: number;
+    other_deductions?: number;
+    recalculate?: boolean;
+  }
 ): Promise<{ message: string; data: PayrollEntry }> {
   await ensureCsrfCookie();
   return apiRequest(`/hr/payroll-runs/${runId}/entries/${entryId}`, {
     method: "PATCH",
     body: payload,
   });
+}
+
+export async function recalculatePayrollEntry(
+  runId: number,
+  entryId: number
+): Promise<{ message: string; data: PayrollEntry }> {
+  return updatePayrollEntry(runId, entryId, { recalculate: true });
 }
 
 export async function submitPayrollRun(

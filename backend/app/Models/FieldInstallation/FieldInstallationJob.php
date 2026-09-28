@@ -16,6 +16,7 @@ class FieldInstallationJob extends Model
     protected $fillable = [
         'reference',
         'project_id',
+        'project_wave_id',
         'production_order_id',
         'job_type',
         'status',
@@ -48,6 +49,11 @@ class FieldInstallationJob extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function wave(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ProjectWave::class, 'project_wave_id');
     }
 
     public function productionOrder(): BelongsTo

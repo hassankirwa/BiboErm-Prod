@@ -241,6 +241,7 @@ class ToolIncidentService
             'tool_code' => $code,
             'name' => $attrs['name'] ?? ($damaged->name.' (replacement)'),
             'tool_type' => $attrs['tool_type'] ?? $damaged->tool_type,
+            'is_returnable' => $damaged->is_returnable ?? true,
             'condition' => ToolCondition::Good,
             'is_active' => true,
             'tracking_mode' => $damaged->tracking_mode,

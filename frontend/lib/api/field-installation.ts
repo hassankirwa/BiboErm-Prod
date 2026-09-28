@@ -14,6 +14,7 @@ export type FieldInstallationJob = {
   id: number;
   reference: string;
   project_id: number;
+  project_wave_id?: number | null;
   production_order_id: number | null;
   job_type: string;
   status: string;
@@ -34,6 +35,12 @@ export type FieldInstallationJob = {
     install_mode: string;
     stage: string;
   };
+  wave?: {
+    id: number;
+    wave_number: number;
+    label: string | null;
+    status: string;
+  } | null;
   team_lead?: { id: number; name: string } | null;
   members?: FieldJobMember[];
   units?: FieldInstallationUnit[];
@@ -183,11 +190,13 @@ export type FieldPhoto = {
 
 export async function listFieldJobs(params?: {
   project_id?: number;
+  project_wave_id?: number;
   status?: string;
   per_page?: number;
 }) {
   const search = new URLSearchParams();
   if (params?.project_id) search.set("project_id", String(params.project_id));
+  if (params?.project_wave_id) search.set("project_wave_id", String(params.project_wave_id));
   if (params?.status) search.set("status", params.status);
   if (params?.per_page) search.set("per_page", String(params.per_page));
   const q = search.toString();
@@ -204,6 +213,7 @@ export async function getFieldJob(id: number) {
 
 export async function createFieldJob(payload: {
   project_id: number;
+  project_wave_id?: number | null;
   job_type?: string;
   team_lead_id?: number;
   scheduled_start?: string;
@@ -361,6 +371,9 @@ export async function reportNonConformity(
     title: string;
     description: string;
     qty_affected?: number;
+    field_installation_unit_id?: number;
+    project_bom_line_id?: number;
+    warehouse_item_id?: number;
   },
 ) {
   return apiRequest<{ data: FieldNonConformity }>(
@@ -399,6 +412,7 @@ export async function createDesignChange(
     delivery_record_id?: number;
     daily_log_id?: number;
     warehouse_item_id?: number;
+    field_installation_unit_id?: number;
     reason?: string;
     measurement_notes?: Record<string, unknown> | string;
     scope_bom_line_ids?: number[];

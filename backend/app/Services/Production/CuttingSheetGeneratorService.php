@@ -9,6 +9,7 @@ use App\Models\ProjectBom;
 use App\Models\ProjectBomLine;
 use App\Models\User;
 use App\Models\Warehouse\Item;
+use App\Services\Projects\ProjectWaveService;
 use App\Services\Warehouse\Reservations\AluminiumBarCutPacker;
 use App\Services\Warehouse\Reservations\AluminiumBarDemandService;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,6 +21,7 @@ class CuttingSheetGeneratorService
         protected ProductionAuditLogger $audit,
         protected AluminiumBarDemandService $barDemand,
         protected AluminiumBarCutPacker $packer,
+        protected ProjectWaveService $waves,
     ) {}
 
     /**
@@ -52,9 +54,28 @@ class CuttingSheetGeneratorService
                     $query->where('line_type', 'aluminium_profile')
                         ->orWhereHas('warehouseItem', fn ($q) => $q->where('category', ItemCategory::AluminiumProfile->value));
                 })
-                ->with('warehouseItem.aluminiumProfile')
+                ->with(['warehouseItem.aluminiumProfile', 'floor'])
                 ->orderBy('sort_order')
                 ->get();
+
+            $order->loadMissing('wave');
+            $floorLabels = $this->waves->floorLabelsForWave($order->wave);
+            $waveId = $order->project_wave_id;
+            if ($floorLabels !== []) {
+                $normalized = array_map(fn ($label) => mb_strtolower(trim($label)), $floorLabels);
+                $scoped = $lines->filter(function (ProjectBomLine $line) use ($normalized, $waveId) {
+                    $floorLabel = $line->floor?->floor_label;
+                    if ($floorLabel === null || trim((string) $floorLabel) === '') {
+                        return $waveId === null;
+                    }
+
+                    return in_array(mb_strtolower(trim((string) $floorLabel)), $normalized, true);
+                });
+
+                if ($scoped->isNotEmpty()) {
+                    $lines = $scoped->values();
+                }
+            }
 
             $sortOrder = 0;
             $generatedAt = now();

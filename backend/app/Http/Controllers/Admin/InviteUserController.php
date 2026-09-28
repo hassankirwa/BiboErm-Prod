@@ -24,6 +24,7 @@ class InviteUserController extends Controller
             roleId: (int) $data['role_id'],
             additionalAssignments: $data['additional_assignments'],
             invitedBy: $actor,
+            departmentEmail: $data['department_email'] ?? null,
         );
 
         return response()->json($result->toArray(), JsonResponse::HTTP_CREATED);

@@ -30,10 +30,13 @@ class PayrollEntryResource extends JsonResource
                 return $run ? sprintf('%02d/%d', $run->period_month, $run->period_year) : null;
             }),
             'gross_salary' => (float) $this->gross_salary,
-            'nhif' => (float) $this->nhif,
+            'additions_total' => (float) ($this->additions_total ?? 0),
+            'shif' => (float) ($this->shif ?? 0),
+            'nhif' => (float) ($this->nhif ?? 0),
             'nssf' => (float) $this->nssf,
             'paye' => (float) $this->paye,
             'other_deductions' => (float) $this->other_deductions,
+            'line_items' => $this->line_items ?? [],
             'net_pay' => (float) $this->net_pay,
             'payslip_path' => $this->payslip_path,
             'download_url' => $this->payslip_path

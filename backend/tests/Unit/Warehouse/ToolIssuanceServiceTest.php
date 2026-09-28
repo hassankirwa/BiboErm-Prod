@@ -67,7 +67,8 @@ class ToolIssuanceServiceTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-QTY-001',
             'name' => 'Safety Helmets',
-            'tool_type' => 'PPE',
+            'tool_type' => 'safety',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Quantity,
@@ -104,7 +105,8 @@ class ToolIssuanceServiceTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-QTY-002',
             'name' => 'Harnesses',
-            'tool_type' => 'PPE',
+            'tool_type' => 'safety',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Quantity,
@@ -151,7 +153,8 @@ class ToolIssuanceServiceTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-QTY-DMG',
             'name' => 'Spirit Levels',
-            'tool_type' => 'Measuring',
+            'tool_type' => 'measuring',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Quantity,
@@ -189,7 +192,8 @@ class ToolIssuanceServiceTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-QTY-REP',
             'name' => 'Clamps',
-            'tool_type' => 'Fabrication',
+            'tool_type' => 'fabrication',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Quantity,

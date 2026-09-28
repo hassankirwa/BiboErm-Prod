@@ -114,6 +114,15 @@ class LeadPipelineService
 
     public function resolveLeadForQuotation(Quotation $quotation): ?Lead
     {
+        $quotation->loadMissing('designJob');
+
+        if ($quotation->designJob?->lead_id) {
+            $lead = Lead::query()->find($quotation->designJob->lead_id);
+            if ($lead) {
+                return $lead;
+            }
+        }
+
         if ($quotation->deal_id) {
             $deal = $quotation->relationLoaded('deal')
                 ? $quotation->deal

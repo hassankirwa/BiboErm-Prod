@@ -276,7 +276,8 @@ class FieldMeasurementUnitsAndStageGatesTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-WH-'.uniqid(),
             'name' => 'Warehouse Drill',
-            'tool_type' => 'Power',
+            'tool_type' => 'power_tool',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good->value,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Serialized->value,
@@ -488,7 +489,8 @@ class FieldMeasurementUnitsAndStageGatesTest extends TestCase
         $tool = Tool::query()->create([
             'tool_code' => 'TL-FI-'.uniqid(),
             'name' => 'Installation Drill',
-            'tool_type' => 'Power',
+            'tool_type' => 'power_tool',
+            'is_returnable' => true,
             'condition' => ToolCondition::Good->value,
             'is_active' => true,
             'tracking_mode' => ToolTrackingMode::Serialized->value,

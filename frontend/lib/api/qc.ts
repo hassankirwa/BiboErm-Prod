@@ -20,6 +20,7 @@ export const QC_INSPECTION_CONTEXTS = [
   "production_qc_post_fabrication",
   "production_in_process",
   "site_receiving",
+  "site_pre_installation",
   "site_installation",
   "snagging_signoff",
 ] as const;
@@ -139,6 +140,8 @@ export type QcInspection = {
   can_skip?: boolean;
   stage?: string | null;
   project_id?: number | null;
+  project_document_id?: number | null;
+  opening_code?: string | null;
   production_order_id?: number | null;
   goods_receipt_id?: number | null;
   field_installation_job_id?: number | null;
@@ -209,6 +212,7 @@ export const QC_CONTEXT_LABELS: Record<QcInspectionContext, string> = {
   production_qc_post_fabrication: "Post-fabrication QC",
   production_in_process: "In-process QC",
   site_receiving: "Site receiving",
+  site_pre_installation: "Site pre-installation",
   site_installation: "Site installation",
   snagging_signoff: "Snagging sign-off",
 };
@@ -296,6 +300,8 @@ export async function listQcInspections(params?: {
   goods_receipt_id?: number;
   production_order_id?: number;
   field_installation_job_id?: number;
+  opening_code?: string;
+  project_document_id?: number;
   search?: string;
   per_page?: number;
   page?: number;
@@ -311,6 +317,8 @@ export async function createQcInspection(payload: {
   context: QcInspectionContext;
   template_id?: number | null;
   project_id?: number | null;
+  project_document_id?: number | null;
+  opening_code?: string | null;
   production_order_id?: number | null;
   goods_receipt_id?: number | null;
   field_installation_job_id?: number | null;

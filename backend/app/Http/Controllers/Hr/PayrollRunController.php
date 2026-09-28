@@ -114,14 +114,19 @@ class PayrollRunController extends Controller
         $payrollRun->entries()->delete();
 
         foreach ($employees as $employee) {
-            $gross = (float) $employee->employeeProfile?->monthly_gross_salary;
-            $calculated = $this->calculator->calculate($gross);
+            $basic = (float) $employee->employeeProfile?->monthly_gross_salary;
+            $calculated = $this->calculator->calculate(
+                $basic,
+                0,
+                $employee,
+                (int) $payrollRun->period_year,
+                (int) $payrollRun->period_month,
+            );
 
             PayrollEntry::query()->create([
                 'payroll_run_id' => $payrollRun->id,
                 'user_id' => $employee->id,
                 ...$calculated,
-                'other_deductions' => 0,
             ]);
         }
 
@@ -151,21 +156,43 @@ class PayrollRunController extends Controller
         $validated = $request->validate([
             'gross_salary' => ['nullable', 'numeric', 'min:0'],
             'other_deductions' => ['nullable', 'numeric', 'min:0'],
+            'recalculate' => ['sometimes', 'boolean'],
         ]);
 
-        $gross = array_key_exists('gross_salary', $validated)
-            ? (float) $validated['gross_salary']
-            : (float) $payrollEntry->gross_salary;
-        $other = array_key_exists('other_deductions', $validated)
+        $employee = $payrollEntry->user()->with('employeeProfile')->first();
+        if (! $employee) {
+            abort(404);
+        }
+
+        $recalculate = (bool) ($validated['recalculate'] ?? false);
+        // Manual other is only an extra override; configured pay-component deductions
+        // are always pulled from the employee record during calculation.
+        $manualOther = array_key_exists('other_deductions', $validated)
             ? (float) $validated['other_deductions']
-            : (float) $payrollEntry->other_deductions;
+            : 0.0;
 
-        $calculated = $this->calculator->calculate($gross, $other);
+        if ($recalculate || ! array_key_exists('gross_salary', $validated)) {
+            $basic = (float) ($employee->employeeProfile?->monthly_gross_salary ?? 0);
+        } else {
+            $additionsTotal = (float) ($payrollEntry->additions_total ?? 0);
+            $basic = max(0, (float) $validated['gross_salary'] - $additionsTotal);
+        }
 
-        $payrollEntry->update([
-            ...$calculated,
-            'other_deductions' => $other,
-        ]);
+        if ($basic <= 0) {
+            throw ValidationException::withMessages([
+                'gross_salary' => [__('Employee monthly gross salary must be set before recalculating.')],
+            ]);
+        }
+
+        $calculated = $this->calculator->calculate(
+            $basic,
+            $manualOther,
+            $employee,
+            (int) $payrollRun->period_year,
+            (int) $payrollRun->period_month,
+        );
+
+        $payrollEntry->update($calculated);
 
         return response()->json([
             'message' => __('Payroll entry updated.'),

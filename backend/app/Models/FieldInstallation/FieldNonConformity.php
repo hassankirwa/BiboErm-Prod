@@ -15,6 +15,7 @@ class FieldNonConformity extends Model
 {
     protected $fillable = [
         'job_id',
+        'field_installation_unit_id',
         'project_id',
         'delivery_record_id',
         'daily_log_id',
@@ -51,6 +52,16 @@ class FieldNonConformity extends Model
     public function job(): BelongsTo
     {
         return $this->belongsTo(FieldInstallationJob::class, 'job_id');
+    }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(FieldInstallationUnit::class, 'field_installation_unit_id');
+    }
+
+    public function fieldUnit(): BelongsTo
+    {
+        return $this->belongsTo(FieldInstallationUnit::class, 'field_installation_unit_id');
     }
 
     public function project(): BelongsTo

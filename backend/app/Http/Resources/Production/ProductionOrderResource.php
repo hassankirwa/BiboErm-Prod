@@ -17,6 +17,7 @@ class ProductionOrderResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'project_id' => $this->project_id,
+            'project_wave_id' => $this->project_wave_id,
             'parent_production_order_id' => $this->parent_production_order_id,
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project->id,
@@ -29,6 +30,12 @@ class ProductionOrderResource extends JsonResource
                     ? $this->project->install_mode->value
                     : $this->project->install_mode,
             ]),
+            'wave' => $this->whenLoaded('wave', fn () => $this->wave ? [
+                'id' => $this->wave->id,
+                'wave_number' => $this->wave->wave_number,
+                'label' => $this->wave->label,
+                'status' => $this->wave->status?->value ?? $this->wave->status,
+            ] : null),
             'status' => $this->status?->value,
             'current_stage' => $this->current_stage?->value,
             'current_stage_label' => $this->current_stage?->label(),

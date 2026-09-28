@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             PermissionSeeder::class,
             RolePermissionSeeder::class,
+            PayrollSettingsSeeder::class,
             DefaultAdminSeeder::class,
             ModuleDemoUsersSeeder::class,
             FieldInstallationDemoUsersSeeder::class,

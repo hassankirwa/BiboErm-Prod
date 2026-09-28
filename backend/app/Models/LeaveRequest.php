@@ -41,6 +41,7 @@ class LeaveRequest extends Model
         'leave_type',
         'start_date',
         'end_date',
+        'days',
         'reason',
         'status',
         'reviewed_by',
@@ -53,6 +54,7 @@ class LeaveRequest extends Model
         return [
             'start_date' => 'date',
             'end_date' => 'date',
+            'days' => 'integer',
             'reviewed_at' => 'datetime',
         ];
     }

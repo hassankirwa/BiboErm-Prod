@@ -208,8 +208,26 @@ class WarehouseMasterDataSeeder extends Seeder
     private function seedTools(): void
     {
         $tools = [
-            ['tool_code' => 'TL-CUT-001', 'name' => 'Double Mitre Saw', 'tool_type' => 'Cutting'],
-            ['tool_code' => 'TL-DRLL-001', 'name' => 'Cordless Drill Set', 'tool_type' => 'Fabrication'],
+            [
+                'tool_code' => 'TL-CUT-001',
+                'name' => 'Double Mitre Saw',
+                'tool_type' => 'cutting',
+                'is_returnable' => true,
+            ],
+            [
+                'tool_code' => 'TL-DRLL-001',
+                'name' => 'Cordless Drill Set',
+                'tool_type' => 'power_tool',
+                'is_returnable' => true,
+            ],
+            [
+                'tool_code' => 'TL-NAIL-001',
+                'name' => 'Assorted Nails Box',
+                'tool_type' => 'fastener',
+                'is_returnable' => false,
+                'tracking_mode' => 'quantity',
+                'total_qty' => 500,
+            ],
         ];
 
         foreach ($tools as $tool) {
@@ -218,6 +236,10 @@ class WarehouseMasterDataSeeder extends Seeder
                 [
                     'name' => $tool['name'],
                     'tool_type' => $tool['tool_type'],
+                    'is_returnable' => $tool['is_returnable'],
+                    'tracking_mode' => $tool['tracking_mode'] ?? 'serialized',
+                    'total_qty' => $tool['total_qty'] ?? 1,
+                    'qty_in_repair' => 0,
                     'condition' => 'good',
                     'is_active' => true,
                 ]

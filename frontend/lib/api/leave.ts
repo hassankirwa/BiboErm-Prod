@@ -12,6 +12,7 @@ export type LeaveRequest = {
   leave_type: LeaveType;
   start_date: string;
   end_date: string;
+  days: number | null;
   reason: string | null;
   status: LeaveStatus;
   reviewed_by: number | null;
@@ -19,6 +20,15 @@ export type LeaveRequest = {
   reviewed_at: string | null;
   rejection_reason: string | null;
   created_at: string | null;
+};
+
+export type LeaveBalance = {
+  year: number;
+  entitlement: number;
+  used: number;
+  pending: number;
+  remaining: number;
+  available: number;
 };
 
 export const LEAVE_TYPE_OPTIONS: { value: LeaveType; label: string }[] = [
@@ -44,7 +54,10 @@ export type PaginatedLeaveRequests = {
   total: number;
 };
 
-export async function fetchMyLeaveRequests(): Promise<{ data: LeaveRequest[] }> {
+export async function fetchMyLeaveRequests(): Promise<{
+  data: LeaveRequest[];
+  balance: LeaveBalance;
+}> {
   return apiRequest("/leave-requests");
 }
 

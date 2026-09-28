@@ -49,7 +49,7 @@ export default function ProcurementProjectMaterialsPage() {
               <Link href="/procurement/requisitions">Requisitions</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/procurement/requisitions/create">Create requisition</Link>
+              <Link href="/procurement/requisitions/create?tab=project-materials">Create requisition</Link>
             </Button>
           </>
         }

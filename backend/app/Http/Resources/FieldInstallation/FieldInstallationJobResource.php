@@ -14,6 +14,7 @@ class FieldInstallationJobResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'project_id' => $this->project_id,
+            'project_wave_id' => $this->project_wave_id,
             'production_order_id' => $this->production_order_id,
             'job_type' => $this->job_type?->value ?? $this->job_type,
             'status' => $this->status?->value ?? $this->status,
@@ -30,6 +31,12 @@ class FieldInstallationJobResource extends JsonResource
             'created_by' => $this->created_by,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'wave' => $this->whenLoaded('wave', fn () => $this->wave ? [
+                'id' => $this->wave->id,
+                'wave_number' => $this->wave->wave_number,
+                'label' => $this->wave->label,
+                'status' => $this->wave->status?->value ?? $this->wave->status,
+            ] : null),
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project->id,
                 'reference' => $this->project->reference,

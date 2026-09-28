@@ -29,12 +29,19 @@ class FieldUnitProgressService
 
     public function generateFromMeasurements(FieldInstallationJob $job): int
     {
-        $job->loadMissing('project.floors');
+        $job->loadMissing(['project.floors', 'wave']);
 
         $lines = $this->resolveMeasurementLines($job->project);
+        $floorFilter = null;
+        if ($job->project_wave_id && $job->wave) {
+            $floorFilter = array_map(
+                fn ($label) => mb_strtolower(trim($label)),
+                app(\App\Services\Projects\ProjectWaveService::class)->floorLabelsForWave($job->wave),
+            );
+        }
         $created = 0;
 
-        DB::transaction(function () use ($job, $lines, &$created): void {
+        DB::transaction(function () use ($job, $lines, $floorFilter, &$created): void {
             FieldInstallationUnit::query()
                 ->where('job_id', $job->id)
                 ->whereNull('measurement_line_key')
@@ -52,6 +59,13 @@ class FieldUnitProgressService
                 $productType = $this->nullableTrim($line['product_type'] ?? null);
                 $unitFloor = $this->nullableTrim($line['unit_floor'] ?? null);
                 $roomLocation = $this->nullableTrim($line['room_location'] ?? null);
+
+                if ($floorFilter !== null && $floorFilter !== []) {
+                    if ($unitFloor === null || ! in_array(mb_strtolower($unitFloor), $floorFilter, true)) {
+                        continue;
+                    }
+                }
+
                 $quantity = max(1, (int) ($line['quantity'] ?? 1));
                 $sortOrder = (int) ($line['sort_order'] ?? $index);
                 $lineKey = $this->measurementLineKey($sortOrder, $ref, $index);

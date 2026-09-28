@@ -42,6 +42,7 @@ class StockTakeServiceTest extends TestCase
         $this->assertSame('accessories', $snapshot['filters']['deck']);
         $this->assertArrayHasKey('snapshot_at', $snapshot);
         $this->assertArrayHasKey('line_count', $snapshot);
+        $this->assertArrayHasKey('categories', $snapshot);
 
         $hingeLine = collect($snapshot['lines'])->first(
             fn (array $line) => $line['sku'] === 'ACC-HNG-001'
@@ -50,6 +51,22 @@ class StockTakeServiceTest extends TestCase
         $this->assertNotNull($hingeLine);
         $this->assertSame('240.000', $hingeLine['quantity_on_hand']);
         $this->assertSame('SEC-SLD', $hingeLine['section_code']);
+        $this->assertSame('accessory', $hingeLine['category']);
+    }
+
+    public function test_snapshot_by_category_lists_items_grouped(): void
+    {
+        $snapshot = $this->stockTake->snapshot($this->user, ['category' => 'accessory']);
+
+        $this->assertNotEmpty($snapshot['lines']);
+        $this->assertSame('accessory', $snapshot['filters']['category']);
+        $this->assertNotEmpty($snapshot['categories']);
+        $this->assertSame('accessory', $snapshot['categories'][0]['category']);
+        $this->assertSame('Accessories', $snapshot['categories'][0]['label']);
+
+        foreach ($snapshot['lines'] as $line) {
+            $this->assertSame('accessory', $line['category']);
+        }
     }
 
     public function test_variance_reports_difference_between_counted_and_system_qty(): void
@@ -61,12 +78,14 @@ class StockTakeServiceTest extends TestCase
             'item_id' => $item->id,
             'bin_id' => $bin->id,
             'counted_qty' => 235,
+            'variance_reason' => 'Damaged units',
         ]]);
 
         $this->assertSame(1, $report['summary']['lines_with_variance']);
         $this->assertSame('-5.000', $report['lines'][0]['variance']);
         $this->assertSame('decrease', $report['lines'][0]['direction']);
         $this->assertTrue($report['lines'][0]['has_variance']);
+        $this->assertSame('Damaged units', $report['lines'][0]['variance_reason']);
     }
 
     public function test_variance_shows_no_difference_when_counts_match_system(): void
@@ -94,6 +113,7 @@ class StockTakeServiceTest extends TestCase
             'item_id' => $item->id,
             'bin_id' => $bin->id,
             'counted_qty' => 235,
+            'variance_reason' => 'Physical count shortfall',
         ]], 'May stock-take');
 
         $this->assertInstanceOf(StockMovement::class, $movement);
@@ -101,6 +121,8 @@ class StockTakeServiceTest extends TestCase
         $this->assertSame('stock_take', $movement->reference_type);
         $this->assertStringStartsWith('SM-', $movement->movement_number);
         $this->assertStringContainsString('May stock-take', (string) $movement->notes);
+        $this->assertStringContainsString('Physical count shortfall', (string) $movement->notes);
+        $this->assertStringContainsString('ACC-HNG-001', (string) $movement->notes);
 
         $level = StockLevel::query()
             ->where('item_id', $item->id)
@@ -108,6 +130,21 @@ class StockTakeServiceTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('235.000', (string) $level->quantity_on_hand);
+    }
+
+    public function test_apply_requires_variance_reason(): void
+    {
+        $item = $this->itemBySku('ACC-HNG-001');
+        $bin = $this->binBySectionAndCode('SEC-SLD', 'BIN2');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Variance reason is required');
+
+        $this->stockTake->apply($this->user, [[
+            'item_id' => $item->id,
+            'bin_id' => $bin->id,
+            'counted_qty' => 235,
+        ]]);
     }
 
     public function test_apply_throws_when_there_are_no_variances(): void
@@ -122,6 +159,7 @@ class StockTakeServiceTest extends TestCase
             'item_id' => $item->id,
             'bin_id' => $bin->id,
             'counted_qty' => 240,
+            'variance_reason' => 'N/A',
         ]]);
     }
 }

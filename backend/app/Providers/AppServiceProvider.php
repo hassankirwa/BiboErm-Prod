@@ -28,6 +28,7 @@ use App\Listeners\Production\CreateProductionOrder;
 use App\Listeners\Production\NotifyProductionManagersOfNewOrder;
 use App\Listeners\QualityControl\CreateProductionQcInspection;
 use App\Listeners\QualityControl\CreateSiteInspectionOnFieldJobComplete;
+use App\Listeners\QualityControl\CreateSitePreInstallationOnProjectStage;
 use App\Listeners\QualityControl\CreateSiteReceivingInspectionOnDelivery;
 use App\Listeners\Projects\AdvanceProjectOnFieldDeliveryAccepted;
 use App\Listeners\Projects\CreateDesignChangeOrderOnMeasurementNc;
@@ -293,6 +294,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(ProductionStageCompleted::class, CreateProductionQcInspection::class);
         Event::listen(FieldInstallationCompleted::class, CreateSiteInspectionOnFieldJobComplete::class);
         Event::listen(FieldDeliveryRecorded::class, CreateSiteReceivingInspectionOnDelivery::class);
+        Event::listen(ProjectStageAdvanced::class, CreateSitePreInstallationOnProjectStage::class);
         Event::listen(QcInspectionCompleted::class, OnSiteInstallationQcCompleted::class);
         Event::listen(QcInspectionCompleted::class, CompleteProductionOnPostFabQcPassed::class);
     }

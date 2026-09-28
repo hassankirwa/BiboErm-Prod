@@ -365,8 +365,22 @@ class QcDefaultChecklistsSeeder extends Seeder
                 'context' => QcInspectionContext::SiteReceiving,
                 'items' => [
                     ['key' => 'glass_undamaged', 'label' => 'Glass undamaged — no chips or cracks', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 10],
-                    ['key' => 'count_match', 'label' => 'Received count matches packing list', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 20],
-                    ['key' => 'packing_intact', 'label' => 'Packing intact — no transit damage', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 30],
+                    ['key' => 'count_match', 'label' => 'Received count matches packing list for this opening', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 20],
+                    ['key' => 'packing_intact', 'label' => 'Packing intact — no transit damage', 'type' => 'photo_required_on_fail', 'required' => true, 'sort_order' => 30],
+                    ['key' => 'opening_labelled', 'label' => 'Opening / unit identity matches label (e.g. SD-4)', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 40],
+                ],
+            ],
+            [
+                'name' => 'Site pre-installation QC',
+                'context' => QcInspectionContext::SitePreInstallation,
+                'description' => 'Pre-install checklist before fixing this opening on site.',
+                'items' => [
+                    ['key' => 'opening_identity', 'label' => 'Correct opening / unit at install location', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 10],
+                    ['key' => 'protective_film', 'label' => 'Protective film / packing intact until ready to fit', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 20],
+                    ['key' => 'unit_undamaged', 'label' => 'Frame / sash free of transit damage', 'type' => 'photo_required_on_fail', 'required' => true, 'sort_order' => 30],
+                    ['key' => 'hardware_kit', 'label' => 'Hardware / accessories kit present for this opening', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 40],
+                    ['key' => 'opening_prepared', 'label' => 'Structural opening prepared — plumb, level, clean', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 50],
+                    ['key' => 'tools_ready', 'label' => 'Tools and sealants ready for install', 'type' => 'pass_fail', 'required' => true, 'sort_order' => 60],
                 ],
             ],
             [

@@ -39,6 +39,14 @@ return [
                 'mimes' => ['jpeg', 'jpg', 'png', 'webp'],
                 'image_only' => true,
             ],
+            'hr-employees' => [
+                'public' => true,
+                'max_kb' => (int) env('BIBO_HR_EMPLOYEE_PHOTO_MAX_KB', 4096),
+                'max_width' => (int) env('BIBO_HR_EMPLOYEE_PHOTO_MAX_WIDTH', 4096),
+                'max_height' => (int) env('BIBO_HR_EMPLOYEE_PHOTO_MAX_HEIGHT', 4096),
+                'mimes' => ['jpeg', 'jpg', 'png', 'webp', 'gif', 'bmp'],
+                'image_only' => true,
+            ],
             'warehouse-catalog' => [
                 'public' => true,
                 'max_kb' => (int) env('BIBO_WAREHOUSE_CATALOG_MAX_KB', 4096),
@@ -230,8 +238,10 @@ return [
     ],
 
     'hr' => [
-        'employee_number_prefix' => env('BIBO_EMPLOYEE_NUMBER_PREFIX', 'EMP'),
+        'employee_number_prefix' => env('BIBO_EMPLOYEE_NUMBER_PREFIX', 'BWD'),
         'employee_number_pad' => (int) env('BIBO_EMPLOYEE_NUMBER_PAD', 4),
+        'employee_number_hyphen' => filter_var(env('BIBO_EMPLOYEE_NUMBER_HYPHEN', false), FILTER_VALIDATE_BOOL),
+        'annual_leave_days' => (int) env('BIBO_ANNUAL_LEAVE_DAYS', 21),
     ],
 
     /*
@@ -298,6 +308,7 @@ return [
         'finance' => ['finance_officer'],
         'it' => ['it_admin', 'super_admin'],
         'project_management' => ['project_manager'],
+        'quotation' => ['quotation_officer'],
         'field_installation' => ['installation_lead', 'field_installation_engineer'],
         'operations' => ['operations_manager', 'field_officer', 'reception'],
         'reception' => ['reception'],
@@ -320,6 +331,11 @@ return [
                 'name' => 'Projects User',
                 'department_slug' => 'project_management',
                 'role' => 'project_manager',
+            ],
+            'quotation' => [
+                'name' => 'Quotation User',
+                'department_slug' => 'quotation',
+                'role' => 'quotation_officer',
             ],
             'warehouse' => [
                 'name' => 'Warehouse User',

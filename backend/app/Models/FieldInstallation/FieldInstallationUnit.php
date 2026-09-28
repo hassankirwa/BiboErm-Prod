@@ -24,6 +24,7 @@ class FieldInstallationUnit extends Model
         'quantity',
         'measurement_snapshot',
         'project_floor_id',
+        'project_scope_id',
         'unit_label',
         'status',
         'installed_at',
