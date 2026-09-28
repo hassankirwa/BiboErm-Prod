@@ -13,6 +13,16 @@ class ProductionOrderPolicy
 
     protected string $module = 'production_order';
 
+    public function viewAny(User $user): bool
+    {
+        return $this->canView($user);
+    }
+
+    public function create(User $user): bool
+    {
+        return $user->can('production.manage') || $this->canManage($user);
+    }
+
     public function view(User $user, ProductionOrder $order): bool
     {
         if (! $this->canView($user)) {

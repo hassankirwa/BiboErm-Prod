@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/app-header";
 import { ProductionCuttingSheetEditor } from "@/components/production/production-cutting-sheet-editor";
 import { ProductionGlassStatus } from "@/components/production/production-glass-status";
 import { ProductionMaterialReleasesPanel } from "@/components/production/production-material-releases-panel";
+import { MaterialRequestsWorkbench } from "@/components/warehouse/material-requests-workbench";
 import { ProductionOrderActions } from "@/components/production/production-order-actions";
 import { ProductionQcLinks } from "@/components/production/production-qc-links";
 import { ProductionStageBadge } from "@/components/production/production-stage-badge";
@@ -471,6 +472,13 @@ export default function ProductionOrderDetailPage({
                 />
               </CardContent>
             </Card>
+            <MaterialRequestsWorkbench
+              source="production"
+              title="Additional materials"
+              subtitle="Request extra materials for this project"
+              fixedProjectId={order.project_id}
+              showHeader={false}
+            />
             {!showGlassOnActive && (
               <Card>
                 <CardHeader>

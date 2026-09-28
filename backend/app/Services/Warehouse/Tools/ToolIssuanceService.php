@@ -57,15 +57,47 @@ class ToolIssuanceService
             $this->linkIssuanceToActiveFieldJob($issuance, $issuedBy);
         }
 
+        // Nails, consumables, etc. are issued and consumed — no return expected.
+        if (! $tool->isReturnable()) {
+            $this->consumeNonReturnable($tool, $issuance, $quantity);
+        }
+
         $this->audit->toolIssued($issuance->id, [
             'tool_id' => $tool->id,
             'tool_code' => $tool->tool_code,
             'issued_to' => $issuedTo->id,
             'project_id' => $projectId,
             'quantity' => $quantity,
+            'is_returnable' => $tool->isReturnable(),
         ]);
 
-        return $issuance;
+        return $issuance->fresh(['tool', 'issuedToUser', 'issuedByUser', 'project']);
+    }
+
+    /**
+     * Close the issuance immediately and permanently reduce stock for non-returnable items.
+     */
+    protected function consumeNonReturnable(Tool $tool, ToolIssuance $issuance, int $quantity): void
+    {
+        $issuance->return_date = now()->toDateString();
+        $issuance->condition_in = 'consumed';
+        $issuance->damage_notes = 'Non-returnable — consumed on issue.';
+        $issuance->save();
+
+        FieldToolAssignment::query()
+            ->where('tool_issuance_id', $issuance->id)
+            ->whereNull('returned_at')
+            ->update(['returned_at' => now()]);
+
+        if ($tool->isQuantityTracked()) {
+            $tool->total_qty = max(0, (int) $tool->total_qty - $quantity);
+            $tool->save();
+
+            return;
+        }
+
+        $tool->condition = ToolCondition::Retired;
+        $tool->save();
     }
 
     /**

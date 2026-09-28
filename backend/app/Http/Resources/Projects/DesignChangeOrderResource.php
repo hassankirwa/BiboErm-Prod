@@ -14,6 +14,7 @@ class DesignChangeOrderResource extends JsonResource
             'id' => $this->id,
             'project_id' => $this->project_id,
             'field_non_conformity_id' => $this->field_non_conformity_id,
+            'field_installation_unit_id' => $this->field_installation_unit_id,
             'status' => $this->status instanceof \BackedEnum ? $this->status->value : $this->status,
             'reason' => $this->reason,
             'measurement_notes' => $this->measurement_notes,
@@ -32,6 +33,17 @@ class DesignChangeOrderResource extends JsonResource
             'approved_by' => $this->approved_by,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'field_unit' => $this->whenLoaded('fieldUnit', fn () => $this->fieldUnit ? [
+                'id' => $this->fieldUnit->id,
+                'unit_label' => $this->fieldUnit->unit_label,
+                'unit_floor' => $this->fieldUnit->unit_floor,
+                'room_location' => $this->fieldUnit->room_location,
+                'opening_ref' => $this->fieldUnit->opening_ref,
+                'product_type' => $this->fieldUnit->product_type,
+                'status' => $this->fieldUnit->status instanceof \BackedEnum
+                    ? $this->fieldUnit->status->value
+                    : $this->fieldUnit->status,
+            ] : null),
             'project' => $this->whenLoaded('project', fn () => [
                 'id' => $this->project->id,
                 'reference' => $this->project->reference,

@@ -7,6 +7,7 @@ use App\Enums\QualityControl\QcInspectionResult;
 use App\Models\Procurement\GoodsReceipt;
 use App\Models\Production\ProductionOrder;
 use App\Models\Project;
+use App\Models\ProjectDocument;
 use App\Models\User;
 use App\Models\Warehouse\Tool;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,8 @@ class QcInspection extends Model
     protected $fillable = [
         'reference',
         'project_id',
+        'project_document_id',
+        'opening_code',
         'production_order_id',
         'goods_receipt_id',
         'field_installation_job_id',
@@ -81,6 +84,11 @@ class QcInspection extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function projectDocument(): BelongsTo
+    {
+        return $this->belongsTo(ProjectDocument::class);
     }
 
     public function productionOrder(): BelongsTo

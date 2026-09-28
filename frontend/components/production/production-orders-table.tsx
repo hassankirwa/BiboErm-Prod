@@ -33,6 +33,7 @@ export function ProductionOrdersTable({ orders, showFifo = true }: Props) {
           {showFifo && <TableHead>FIFO</TableHead>}
           <TableHead>Reference</TableHead>
           <TableHead>Project</TableHead>
+          <TableHead>Wave</TableHead>
           <TableHead>Stage</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Scheduled</TableHead>
@@ -46,6 +47,11 @@ export function ProductionOrdersTable({ orders, showFifo = true }: Props) {
             <TableCell className="font-medium">{order.reference}</TableCell>
             <TableCell>
               {order.project?.name ?? `Project #${order.project_id}`}
+            </TableCell>
+            <TableCell className="text-muted-foreground">
+              {order.wave
+                ? order.wave.label || `Wave ${order.wave.wave_number}`
+                : "—"}
             </TableCell>
             <TableCell>
               <ProductionStageBadge stage={order.current_stage} />

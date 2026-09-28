@@ -14,6 +14,7 @@ use App\Models\LeadPhoto;
 use App\Models\SiteVisit;
 use App\Models\User;
 use App\Services\Crm\CrmAuditLogger;
+use App\Support\Crm\LeadAccountEligibility;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -42,7 +43,7 @@ class AccountProvisioningService
 
         if (! $this->isEligibleForProvisioning($lead)) {
             throw ValidationException::withMessages([
-                'status' => ['Lead must be marked interested before provisioning an account.'],
+                'status' => ['Lead must be marked interested (or be a historical won client) before provisioning an account.'],
             ]);
         }
 
@@ -204,6 +205,10 @@ class AccountProvisioningService
 
     public function isEligibleForProvisioning(Lead $lead): bool
     {
+        if (LeadAccountEligibility::isHistoricalWonReadyForAccount($lead)) {
+            return true;
+        }
+
         $status = $lead->status instanceof LeadStatus ? $lead->status->value : (string) $lead->status;
 
         if ($status === LeadStatus::AccountCreated->value) {

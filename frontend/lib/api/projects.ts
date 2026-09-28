@@ -335,6 +335,7 @@ export type ProjectDetail = ProjectSummary & {
   internal_notes: string | null;
   stage_data?: ProjectStageData | null;
   stage_readiness?: ProjectStageReadiness;
+  progress?: ProjectProgressTree | null;
   is_nairobi_two_phase: boolean;
   /** @deprecated Always false — Nairobi is two-phase, not fabrication-only. */
   is_fabrication_only_nairobi?: boolean;
@@ -355,6 +356,46 @@ export type ProjectDetail = ProjectSummary & {
   }>;
   created_at?: string;
   updated_at?: string;
+};
+
+export type ProjectProgressRoom = {
+  id: number;
+  label: string;
+  room_key?: string | null;
+  completion_percent: number;
+  openings_total: number;
+  openings_done: number;
+  stage?: string | null;
+};
+
+export type ProjectProgressFloor = {
+  id: number;
+  type?: string;
+  label: string;
+  project_floor_id?: number | null;
+  completion_percent: number;
+  openings_total: number;
+  openings_done: number;
+  stage?: string | null;
+  rooms: ProjectProgressRoom[];
+  wave_id?: number;
+  wave_number?: number;
+};
+
+export type ProjectProgressWave = {
+  id: number;
+  wave_number: number;
+  label: string | null;
+  status: string;
+  stage?: string | null;
+  completion_percent: number;
+  floors: ProjectProgressFloor[];
+};
+
+export type ProjectProgressTree = {
+  waves: ProjectProgressWave[];
+  floors: ProjectProgressFloor[];
+  rooms: Array<ProjectProgressRoom & { floor_label?: string; wave_id?: number }>;
 };
 
 export type CreateProjectPayload = {
@@ -658,6 +699,42 @@ export async function getProject(id: number) {
   return apiRequest<{ data: ProjectDetail }>(`/projects/${id}`);
 }
 
+export async function getProjectWaves(projectId: number) {
+  return apiRequest<{ data: ProjectProgressTree }>(`/projects/${projectId}/waves`);
+}
+
+export async function bootstrapProjectWaves(projectId: number) {
+  return apiRequest<{
+    data: {
+      wave: { id: number; wave_number: number; label: string | null; status: string };
+      scopes_created: number;
+      floors_linked: number;
+      progress: ProjectProgressTree;
+    };
+  }>(`/projects/${projectId}/waves/bootstrap-from-measurements`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export async function createProjectWave(
+  projectId: number,
+  payload: { label?: string; scope_ids?: number[] },
+) {
+  return apiRequest<{
+    data: {
+      id: number;
+      wave_number: number;
+      label: string | null;
+      status: string;
+      scopes: Array<{ id: number; type: string; label: string }>;
+    };
+  }>(`/projects/${projectId}/waves`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export async function updateProject(id: number, payload: Partial<CreateProjectPayload>) {
   return apiRequest<{ data: ProjectDetail }>(`/projects/${id}`, {
     method: "PATCH",
@@ -701,12 +778,29 @@ export type DesignChangeItem = {
   unit: string;
   change_type: "remake" | "material" | string;
   done: boolean;
+  warehouse_item_id?: number | null;
+  profile_code?: string | null;
+  project_bom_line_id?: number | null;
+  cut_length_mm?: number | null;
+  disposition?: "remake" | "to_offcut" | "material_only" | string;
+  scrapped_to_offcut?: boolean;
+  offcut_ids?: number[];
 };
 
 export type DesignChangeOrder = {
   id: number;
   project_id: number;
   field_non_conformity_id: number | null;
+  field_installation_unit_id?: number | null;
+  field_unit?: {
+    id: number;
+    unit_label: string;
+    unit_floor?: string | null;
+    room_location?: string | null;
+    opening_ref?: string | null;
+    product_type?: string | null;
+    status?: string;
+  } | null;
   status: DesignChangeOrderStatus | string;
   reason: string | null;
   measurement_notes: Record<string, unknown> | string[] | null;
@@ -809,6 +903,11 @@ export async function updateDesignChangeOrder(
       unit?: string;
       change_type?: "remake" | "material";
       done?: boolean;
+      warehouse_item_id?: number | null;
+      profile_code?: string | null;
+      project_bom_line_id?: number | null;
+      cut_length_mm?: number | null;
+      disposition?: "remake" | "to_offcut" | "material_only";
     }>;
   },
 ) {
@@ -816,6 +915,71 @@ export async function updateDesignChangeOrder(
     `/projects/design-change-orders/${id}`,
     { method: "PATCH", body: payload },
   );
+}
+
+export type DesignChangeProfileOption = {
+  warehouse_item_id: number;
+  sku?: string | null;
+  name?: string | null;
+  profile_code?: string | null;
+  cut_length_mm?: number | null;
+  pieces?: number;
+  project_bom_line_id?: number | null;
+};
+
+export async function listDesignChangeProfiles(id: number) {
+  return apiRequest<{ data: DesignChangeProfileOption[] }>(
+    `/projects/design-change-orders/${id}/available-profiles`,
+  );
+}
+
+export async function scrapDesignChangeToOffcuts(
+  id: number,
+  payload?: { item_ids?: string[] },
+) {
+  return apiRequest<{
+    data: {
+      offcuts: Array<{
+        offcut_id: number;
+        offcut_number: string;
+        item_id: number;
+        length_mm: number;
+        quantity_pieces: number;
+        dco_item_id: string;
+      }>;
+      items: DesignChangeItem[];
+      design_change_order: DesignChangeOrder;
+    };
+  }>(`/projects/design-change-orders/${id}/scrap-to-offcuts`, {
+    method: "POST",
+    body: payload ?? {},
+  });
+}
+
+export async function requestDesignChangeMaterials(
+  id: number,
+  payload?: { item_ids?: string[] },
+) {
+  return apiRequest<{
+    data: {
+      material_request: {
+        id: number;
+        status: string;
+        project_id: number;
+        reason: string | null;
+        lines: Array<{
+          id: number;
+          warehouse_item_id: number;
+          quantity_requested: string;
+          notes: string | null;
+        }>;
+      };
+      design_change_order: DesignChangeOrder;
+    };
+  }>(`/projects/design-change-orders/${id}/request-materials`, {
+    method: "POST",
+    body: payload ?? {},
+  });
 }
 
 export async function releaseDesignChangeToProduction(id: number) {

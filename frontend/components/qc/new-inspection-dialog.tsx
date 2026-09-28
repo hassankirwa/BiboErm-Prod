@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +27,34 @@ import {
   type QcChecklistTemplate,
   type QcInspectionContext,
 } from "@/lib/api/qc";
-import { listProjects, projectLabel, type ProjectSummary } from "@/lib/api/projects";
+import {
+  getProjectDocuments,
+  listProjects,
+  projectLabel,
+  type ProjectDocument,
+  type ProjectSummary,
+} from "@/lib/api/projects";
 import { toast } from "sonner";
+
+type OpeningOption = {
+  code: string;
+  project_document_id: number | null;
+};
+
+function openingsFromDocuments(docs: ProjectDocument[]): OpeningOption[] {
+  const seen = new Set<string>();
+  const rows: OpeningOption[] = [];
+  for (const doc of docs) {
+    if (doc.type !== "design") continue;
+    const code = String(doc.metadata?.code ?? "")
+      .trim()
+      .toUpperCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    rows.push({ code, project_document_id: doc.id });
+  }
+  return rows.sort((a, b) => a.code.localeCompare(b.code));
+}
 
 type NewInspectionDialogProps = {
   open: boolean;
@@ -43,6 +69,8 @@ type NewInspectionDialogProps = {
   lockContext?: boolean;
   /** Limit which contexts appear in the picker. */
   allowedContexts?: QcInspectionContext[];
+  /** When true and openings exist, require selecting an opening. */
+  requireOpening?: boolean;
 };
 
 export function NewInspectionDialog({
@@ -56,6 +84,7 @@ export function NewInspectionDialog({
   defaultStage,
   lockContext = false,
   allowedContexts,
+  requireOpening = false,
 }: NewInspectionDialogProps) {
   const [context, setContext] = useState<QcInspectionContext>(
     defaultContext ?? "warehouse_receiving",
@@ -67,6 +96,8 @@ export function NewInspectionDialog({
   );
   const [productionOrderId, setProductionOrderId] = useState("");
   const [stage, setStage] = useState(defaultStage ?? "cutting");
+  const [openingKey, setOpeningKey] = useState("");
+  const [openings, setOpenings] = useState<OpeningOption[]>([]);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [templates, setTemplates] = useState<QcChecklistTemplate[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -77,9 +108,22 @@ export function NewInspectionDialog({
 
   const needsProject =
     context === "site_installation" ||
+    context === "site_pre_installation" ||
+    context === "site_receiving" ||
     context === "snagging_signoff" ||
     context.startsWith("production_");
   const needsProductionStage = context === "production_in_process";
+  const needsOpening =
+    requireOpening ||
+    context.startsWith("production_") ||
+    context === "site_receiving" ||
+    context === "site_pre_installation" ||
+    context === "site_installation";
+
+  const selectedOpening = useMemo(
+    () => openings.find((o) => o.code === openingKey) ?? null,
+    [openings, openingKey],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -97,6 +141,7 @@ export function NewInspectionDialog({
     if (defaultStage) {
       setStage(defaultStage);
     }
+    setOpeningKey("");
   }, [open, defaultContext, defaultGoodsReceiptId, defaultProjectId, defaultProductionOrderId, defaultStage]);
 
   useEffect(() => {
@@ -106,6 +151,23 @@ export function NewInspectionDialog({
       .then((res) => setProjects(res.data))
       .catch(() => setProjects([]));
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !projectId || !needsOpening) {
+      setOpenings([]);
+      return;
+    }
+
+    getProjectDocuments(Number(projectId))
+      .then((res) => {
+        const rows = openingsFromDocuments(res.data ?? []);
+        setOpenings(rows);
+        if (rows.length === 1) {
+          setOpeningKey(rows[0].code);
+        }
+      })
+      .catch(() => setOpenings([]));
+  }, [open, projectId, needsOpening]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,12 +192,19 @@ export function NewInspectionDialog({
   }, [open, context, projectId, stage, needsProductionStage]);
 
   const handleSubmit = async () => {
+    if (requireOpening && openings.length > 0 && !selectedOpening) {
+      toast.error("Select an opening (e.g. SD-4).");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await createQcInspection({
         context,
         template_id: templateId ? Number(templateId) : undefined,
         project_id: projectId ? Number(projectId) : undefined,
+        project_document_id: selectedOpening?.project_document_id ?? undefined,
+        opening_code: selectedOpening?.code ?? undefined,
         goods_receipt_id: goodsReceiptId ? Number(goodsReceiptId) : undefined,
         production_order_id: productionOrderId ? Number(productionOrderId) : undefined,
         stage: needsProductionStage ? stage : undefined,
@@ -235,6 +304,24 @@ export function NewInspectionDialog({
                   {projects.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {projectLabel(p)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {needsOpening && openings.length > 0 && (
+            <div className="space-y-2">
+              <Label>Opening</Label>
+              <Select value={openingKey || "none"} onValueChange={(v) => setOpeningKey(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select opening" />
+                </SelectTrigger>
+                <SelectContent>
+                  {!requireOpening && <SelectItem value="none">Whole job</SelectItem>}
+                  {openings.map((o) => (
+                    <SelectItem key={o.code} value={o.code}>
+                      {o.code}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -33,6 +33,7 @@ import { ProjectDetailProcurement } from "@/components/projects/project-detail-p
 import { ProjectProductionMeasurementsPanel } from "@/components/projects/project-production-measurements-panel";
 import { ProjectMaterialReserveAction } from "@/components/projects/project-material-reserve-action";
 import { ProjectMaterialReleaseAction } from "@/components/projects/project-material-release-action";
+import { ProjectWaveProgressBoard } from "@/components/projects/project-wave-progress-board";
 import {
   projectSiteAssessmentPath,
   projectTabPath,
@@ -72,6 +73,11 @@ export function ProjectDetailOverview({
 
   return (
     <div className="space-y-6">
+      <ProjectWaveProgressBoard
+        projectId={project.id}
+        initialProgress={project.progress ?? null}
+        onUpdated={onProjectUpdated}
+      />
       <Card>
           <CardHeader>
             <CardTitle className="text-base">Project summary</CardTitle>

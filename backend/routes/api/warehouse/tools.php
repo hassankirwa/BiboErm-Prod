@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('permission:warehouse.tools.view|warehouse.tools.manage')->group(function () {
     Route::get('tools', [ToolController::class, 'index']);
+    Route::get('tools/types', [ToolController::class, 'types']);
     Route::get('tools/issuances', [ToolIssuanceController::class, 'index']);
     Route::get('tools/incidents', [ToolIncidentController::class, 'index']);
 });

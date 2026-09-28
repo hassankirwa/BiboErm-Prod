@@ -64,15 +64,19 @@ export function ProjectDetailQc({ project }: ProjectDetailQcProps) {
   const stageHints: { stage: string; contexts: QcInspectionContext[] }[] = [
     {
       stage: "glass_assembly",
-      contexts: ["production_qc_post_fabrication"],
+      contexts: ["production_in_process", "production_qc_post_fabrication"],
     },
     {
       stage: "qc_pre_installation",
-      contexts: ["production_qc_post_fabrication"],
+      contexts: ["site_pre_installation", "production_qc_post_fabrication"],
+    },
+    {
+      stage: "in_transit",
+      contexts: ["site_receiving", "site_pre_installation"],
     },
     {
       stage: "installation",
-      contexts: ["site_installation"],
+      contexts: ["site_pre_installation", "site_installation"],
     },
     {
       stage: "site_qc",
@@ -135,7 +139,8 @@ export function ProjectDetailQc({ project }: ProjectDetailQcProps) {
             {relevantHint.contexts
               .map((ctx) => QC_CONTEXT_LABELS[ctx])
               .join(", ")}
-            . Inspections are advisory and do not block project stage changes.
+            . Factory and site QC run per opening (e.g. SD-4); only post-fab QC hard-gates
+            production completion.
           </CardContent>
         </Card>
       )}
@@ -148,6 +153,7 @@ export function ProjectDetailQc({ project }: ProjectDetailQcProps) {
           onOpenChange={setNewOpen}
           defaultProjectId={project.id}
           defaultContext={relevantHint?.contexts[0] ?? "production_qc_post_fabrication"}
+          requireOpening
           onCreated={(id) => {
             load();
             router.push(`/qc/inspections/${id}`);

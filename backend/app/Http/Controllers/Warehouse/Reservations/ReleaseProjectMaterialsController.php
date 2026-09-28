@@ -20,6 +20,9 @@ class ReleaseProjectMaterialsController extends Controller
         $data = $request->validate([
             'received_by' => ['required', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.item_id' => ['required_with:lines', 'integer', 'exists:warehouse_items,id'],
+            'lines.*.quantity' => ['nullable', 'numeric', 'gt:0'],
         ]);
 
         $result = $this->release->releaseForProduction(
@@ -27,14 +30,17 @@ class ReleaseProjectMaterialsController extends Controller
             performer: $request->user(),
             receivedByUserId: (int) $data['received_by'],
             notes: $data['notes'] ?? null,
+            lines: $data['lines'] ?? null,
         );
 
         return response()->json([
             'data' => [
                 'reservation' => new StockReservationResource($result['reservation']),
                 'movement_id' => $result['movement_id'],
+                'batch_id' => $result['batch_id'],
                 'offcut_lines' => $result['offcut_lines'],
                 'project_stage' => $result['project_stage'],
+                'is_partial' => $result['is_partial'],
             ],
         ]);
     }

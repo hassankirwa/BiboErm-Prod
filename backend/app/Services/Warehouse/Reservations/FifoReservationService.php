@@ -403,17 +403,52 @@ class FifoReservationService
         }
     }
 
-    public function release(StockReservation $reservation, ?string $quantity = null, ?array $itemIds = null): StockReservation
-    {
-        return DB::transaction(function () use ($reservation, $quantity, $itemIds) {
+    /**
+     * Release reserved stock (full remaining, filtered items, or per-item quantities).
+     *
+     * @param  list<int>|null  $itemIds  When set without $quantitiesByItemId, release remaining for these items.
+     * @param  array<int, string|float|int>|null  $quantitiesByItemId  item_id => qty to release now (spread across bins).
+     */
+    public function release(
+        StockReservation $reservation,
+        ?string $quantity = null,
+        ?array $itemIds = null,
+        ?array $quantitiesByItemId = null,
+    ): StockReservation {
+        return DB::transaction(function () use ($reservation, $quantity, $itemIds, $quantitiesByItemId) {
             $reservation->load('lines');
 
+            /** @var array<int, string> $remainingByItem */
+            $remainingByItem = [];
+            if ($quantitiesByItemId !== null) {
+                foreach ($quantitiesByItemId as $itemId => $qty) {
+                    $remainingByItem[(int) $itemId] = bcadd((string) $qty, '0', 3);
+                }
+            }
+
+            $filterIds = $itemIds;
+            if ($quantitiesByItemId !== null) {
+                $filterIds = array_keys($remainingByItem);
+            }
+
             foreach ($reservation->lines as $line) {
-                if ($itemIds && ! in_array($line->item_id, $itemIds, true)) {
+                $itemId = (int) $line->item_id;
+
+                if ($filterIds !== null && ! in_array($itemId, $filterIds, true)) {
                     continue;
                 }
 
-                $toRelease = $quantity ?? $line->remainingQuantity();
+                if ($quantitiesByItemId !== null) {
+                    $budget = $remainingByItem[$itemId] ?? '0';
+                    if (bccomp($budget, '0', 3) !== 1) {
+                        continue;
+                    }
+                    $lineRemaining = $line->remainingQuantity();
+                    $toRelease = bccomp($budget, $lineRemaining, 3) === 1 ? $lineRemaining : $budget;
+                    $remainingByItem[$itemId] = bcsub($budget, $toRelease, 3);
+                } else {
+                    $toRelease = $quantity ?? $line->remainingQuantity();
+                }
 
                 if (bccomp($toRelease, '0', 3) !== 1) {
                     continue;
@@ -441,11 +476,29 @@ class FifoReservationService
                 $line->save();
             }
 
+            if ($quantitiesByItemId !== null) {
+                foreach ($remainingByItem as $itemId => $left) {
+                    if (bccomp($left, '0', 3) === 1) {
+                        throw new InvalidArgumentException(
+                            "Unable to release full requested quantity for item #{$itemId} (short {$left})."
+                        );
+                    }
+                }
+            }
+
+            $reservation->refresh()->load('lines');
+
             $allReleased = $reservation->lines->every(
                 fn (StockReservationLine $line) => bccomp($line->remainingQuantity(), '0', 3) !== 1
             );
 
-            $reservation->status = $allReleased ? ReservationStatus::Released : ReservationStatus::Partial;
+            $anyReleased = $reservation->lines->contains(
+                fn (StockReservationLine $line) => bccomp((string) $line->quantity_released, '0', 3) === 1
+            );
+
+            $reservation->status = $allReleased
+                ? ReservationStatus::Released
+                : ($anyReleased ? ReservationStatus::Partial : $reservation->status);
             $reservation->save();
 
             return $reservation->fresh(['lines.item', 'lines.bin', 'project']);

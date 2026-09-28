@@ -160,6 +160,7 @@ class ProjectController extends Controller
                 'documents.uploader',
                 'engineers.user',
                 'floors',
+                'waves.scopes',
                 'delays.logger',
                 'stageLogs',
             ])

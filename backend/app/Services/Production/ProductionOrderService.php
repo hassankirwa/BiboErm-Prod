@@ -20,8 +20,11 @@ class ProductionOrderService
         protected ProductionAuditLogger $audit,
     ) {}
 
-    public function createFromMaterialsReady(int $projectId, int $fifoSequence): ?ProductionOrder
-    {
+    public function createFromMaterialsReady(
+        int $projectId,
+        int $fifoSequence,
+        ?int $projectWaveId = null,
+    ): ?ProductionOrder {
         $project = Project::query()->find($projectId);
 
         if (! $project || ! in_array($project->stage, [
@@ -31,14 +34,15 @@ class ProductionOrderService
             return null;
         }
 
-        if ($this->hasActiveOrderForProject($projectId)) {
+        if ($this->hasActiveOrderForProject($projectId, $projectWaveId)) {
             return null;
         }
 
-        return DB::transaction(function () use ($projectId, $fifoSequence) {
+        return DB::transaction(function () use ($projectId, $fifoSequence, $projectWaveId) {
             $order = ProductionOrder::query()->create([
                 'reference' => $this->references->next(),
                 'project_id' => $projectId,
+                'project_wave_id' => $projectWaveId,
                 'status' => ProductionOrderStatus::Scheduled,
                 'current_stage' => ProductionStage::MaterialPrep,
                 'fifo_position' => $fifoSequence,
@@ -46,6 +50,7 @@ class ProductionOrderService
 
             $this->audit->orderCreated($order, [
                 'project_id' => $projectId,
+                'project_wave_id' => $projectWaveId,
                 'fifo_position' => $fifoSequence,
             ]);
 
@@ -53,30 +58,47 @@ class ProductionOrderService
         });
     }
 
-    public function ensureActiveOrder(int $projectId, int $fifoSequence): ?ProductionOrder
-    {
-        $existing = $this->findActiveForProject($projectId);
+    public function ensureActiveOrder(
+        int $projectId,
+        int $fifoSequence,
+        ?int $projectWaveId = null,
+    ): ?ProductionOrder {
+        $existing = $this->findActiveForProject($projectId, $projectWaveId);
         if ($existing) {
             return $existing;
         }
 
-        return $this->createFromMaterialsReady($projectId, max(1, $fifoSequence));
+        return $this->createFromMaterialsReady($projectId, max(1, $fifoSequence), $projectWaveId);
     }
 
-    public function hasActiveOrderForProject(int $projectId): bool
+    public function hasActiveOrderForProject(int $projectId, ?int $projectWaveId = null): bool
     {
-        return ProductionOrder::query()
+        $query = ProductionOrder::query()
             ->where('project_id', $projectId)
-            ->whereIn('status', ProductionOrderStatus::activeValues())
-            ->exists();
+            ->whereIn('status', ProductionOrderStatus::activeValues());
+
+        if ($projectWaveId === null) {
+            $query->whereNull('project_wave_id');
+        } else {
+            $query->where('project_wave_id', $projectWaveId);
+        }
+
+        return $query->exists();
     }
 
-    public function findActiveForProject(int $projectId): ?ProductionOrder
+    public function findActiveForProject(int $projectId, ?int $projectWaveId = null): ?ProductionOrder
     {
-        return ProductionOrder::query()
+        $query = ProductionOrder::query()
             ->where('project_id', $projectId)
-            ->whereIn('status', ProductionOrderStatus::activeValues())
-            ->first();
+            ->whereIn('status', ProductionOrderStatus::activeValues());
+
+        if ($projectWaveId === null) {
+            $query->whereNull('project_wave_id');
+        } else {
+            $query->where('project_wave_id', $projectWaveId);
+        }
+
+        return $query->first();
     }
 
     /**

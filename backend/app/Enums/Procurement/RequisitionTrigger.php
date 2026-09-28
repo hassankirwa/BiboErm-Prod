@@ -9,5 +9,6 @@ enum RequisitionTrigger: string
     case LowStock = 'low_stock';
     case GlassOrder = 'glass_order';
     case ClientAddon = 'client_addon';
+    case AdditionalMaterial = 'additional_material';
     case Manual = 'manual';
 }

@@ -270,6 +270,44 @@ export function LeadDetailIntake({
           value={lead.requirement_description}
           className="sm:col-span-2 xl:col-span-3"
         />
+        {lead.is_historical ? (
+          <>
+            <CrmDetailField
+              label="Quote no."
+              value={lead.external_quote_no}
+            />
+            <CrmDetailField
+              label="Quote date"
+              value={
+                lead.quote_date
+                  ? formatDisplayDate(lead.quote_date.slice(0, 10))
+                  : null
+              }
+            />
+            <CrmDetailField
+              label="Amount paid"
+              value={
+                lead.amount_paid != null && lead.amount_paid !== ""
+                  ? Number(lead.amount_paid).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : null
+              }
+            />
+            <CrmDetailField
+              label="Quoted value"
+              value={
+                lead.estimated_value != null && lead.estimated_value !== ""
+                  ? Number(lead.estimated_value).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : null
+              }
+            />
+          </>
+        ) : null}
         <CrmDetailField
           label="Urgency"
           value={formatSlugLabel(lead.urgency, urgencyOptions)}

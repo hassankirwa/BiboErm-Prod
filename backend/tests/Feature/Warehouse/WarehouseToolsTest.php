@@ -24,11 +24,12 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
             ->postJson('/api/v1/warehouse/tools', [
                 'tool_code' => 'TL-TEST-001',
                 'name' => 'Test Crimping Tool',
-                'tool_type' => 'Fabrication',
+                'tool_type' => 'fabrication',
                 'condition' => 'good',
             ])
             ->assertCreated()
-            ->assertJsonFragment(['tool_code' => 'TL-TEST-001']);
+            ->assertJsonFragment(['tool_code' => 'TL-TEST-001'])
+            ->assertJsonFragment(['is_returnable' => true]);
     }
 
     public function test_issue_and_return_tool(): void
@@ -78,8 +79,9 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
         $create = $this->actingAsSanctum($manager)
             ->postJson('/api/v1/warehouse/tools', [
                 'tool_code' => 'TL-QTY-API',
-                'name' => 'Cable Ties Pack',
-                'tool_type' => 'Consumable',
+                'name' => 'Spirit Levels Pack',
+                'tool_type' => 'measuring',
+                'is_returnable' => true,
                 'tracking_mode' => 'quantity',
                 'total_qty' => 20,
             ])
@@ -136,6 +138,49 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
             ]);
     }
 
+    public function test_non_returnable_tool_is_consumed_on_issue(): void
+    {
+        $manager = $this->warehouseAluminiumManager();
+        $employee = $this->warehouseAccessoriesManager();
+        $project = $this->createTestProject();
+
+        $create = $this->actingAsSanctum($manager)
+            ->postJson('/api/v1/warehouse/tools', [
+                'tool_code' => 'TL-NAIL-API',
+                'name' => 'Assorted Nails',
+                'tool_type' => 'fastener',
+                'tracking_mode' => 'quantity',
+                'total_qty' => 100,
+            ])
+            ->assertCreated()
+            ->json('data');
+
+        $this->assertFalse($create['is_returnable']);
+        $toolId = $create['id'];
+
+        $this->actingAsSanctum($manager)
+            ->postJson("/api/v1/warehouse/tools/{$toolId}/issue", [
+                'issued_to' => $employee->id,
+                'project_id' => $project->id,
+                'quantity' => 40,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.available_qty', 60)
+            ->assertJsonPath('data.issued_qty', 0)
+            ->assertJsonPath('data.total_qty', 60);
+
+        $this->assertDatabaseHas('tool_issuances', [
+            'tool_id' => $toolId,
+            'quantity' => 40,
+            'condition_in' => 'consumed',
+        ]);
+
+        $this->assertDatabaseMissing('tool_issuances', [
+            'tool_id' => $toolId,
+            'return_date' => null,
+        ]);
+    }
+
     public function test_procurement_officer_cannot_issue_tools(): void
     {
         $user = $this->procurementOfficer();
@@ -157,6 +202,7 @@ class WarehouseToolsTest extends WarehouseFeatureTestCase
             ->postJson('/api/v1/warehouse/tools', [
                 'tool_code' => 'TL-FORBIDDEN',
                 'name' => 'Forbidden Tool',
+                'tool_type' => 'other',
             ])
             ->assertForbidden();
     }

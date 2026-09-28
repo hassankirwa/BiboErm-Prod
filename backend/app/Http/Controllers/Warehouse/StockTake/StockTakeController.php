@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Warehouse\StockTake;
 
+use App\Enums\Warehouse\ItemCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Warehouse\StockMovementResource;
 use App\Services\Warehouse\StockTake\StockTakeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 
 class StockTakeController extends Controller
@@ -16,11 +18,12 @@ class StockTakeController extends Controller
     ) {}
 
     /**
-     * Step 1 — generate a snapshot of system quantities per bin (WAREHOUSE.MD §15).
+     * Step 1 — snapshot system quantities, optionally scoped to a category.
      */
     public function snapshot(Request $request): JsonResponse
     {
         $filters = $request->validate([
+            'category' => ['nullable', 'string', Rule::enum(ItemCategory::class)],
             'deck' => ['nullable', 'string', 'max:30'],
             'section_id' => ['nullable', 'integer', 'exists:warehouse_sections,id'],
             'bin_id' => ['nullable', 'integer', 'exists:warehouse_bins,id'],
@@ -41,6 +44,7 @@ class StockTakeController extends Controller
             'lines.*.item_id' => ['required', 'integer', 'exists:warehouse_items,id'],
             'lines.*.bin_id' => ['required', 'integer', 'exists:warehouse_bins,id'],
             'lines.*.counted_qty' => ['required', 'numeric', 'min:0'],
+            'lines.*.variance_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         return response()->json(
@@ -50,6 +54,7 @@ class StockTakeController extends Controller
 
     /**
      * Step 3 — apply approved variances as adjustment movement(s) with reference_type stock_take.
+     * Each variance line must include variance_reason for the audit log.
      */
     public function apply(Request $request): StockMovementResource|JsonResponse
     {
@@ -59,6 +64,7 @@ class StockTakeController extends Controller
             'lines.*.item_id' => ['required', 'integer', 'exists:warehouse_items,id'],
             'lines.*.bin_id' => ['required', 'integer', 'exists:warehouse_bins,id'],
             'lines.*.counted_qty' => ['required', 'numeric', 'min:0'],
+            'lines.*.variance_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         try {

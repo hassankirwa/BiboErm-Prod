@@ -16,6 +16,8 @@ class QcInspectionResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'project_id' => $this->project_id,
+            'project_document_id' => $this->project_document_id,
+            'opening_code' => $this->opening_code,
             'project' => $this->whenLoaded('project', fn () => new QcProjectSummaryResource($this->project)),
             'defects_count' => $this->whenCounted('defects'),
             'production_order_id' => $this->production_order_id,

@@ -34,6 +34,22 @@ function stageLabel(stage: string | null | undefined): string | null {
   return null;
 }
 
+function inspectionLabel(inspection: QcInspection): string {
+  const parts: string[] = [];
+  if (inspection.opening_code) {
+    parts.push(inspection.opening_code);
+  }
+  const stage = stageLabel(inspection.stage);
+  if (stage) {
+    parts.push(stage);
+  } else {
+    parts.push(
+      QC_CONTEXT_LABELS[inspection.context as QcInspectionContext] ?? inspection.context,
+    );
+  }
+  return parts.join(" · ");
+}
+
 /** Map production order stage → QC inspection defaults. */
 export function qcDefaultsForProductionStage(currentStage?: string | null): {
   context: QcInspectionContext;
@@ -47,7 +63,6 @@ export function qcDefaultsForProductionStage(currentStage?: string | null): {
     };
   }
   if (currentStage === "qc_pre_check") {
-    // Legacy stage — prefer in-process QC rather than a dedicated pre-check.
     return { context: "production_in_process", lockContext: false };
   }
   if (currentStage && IN_PROCESS_STAGE_VALUES.has(currentStage)) {
@@ -90,7 +105,7 @@ export function ProductionQcLinks({
     setLoading(true);
     listQcInspections({
       production_order_id: productionOrderId,
-      per_page: 20,
+      per_page: 100,
     })
       .then((res) => {
         setInspections(
@@ -109,6 +124,17 @@ export function ProductionQcLinks({
     load();
   }, [load]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, QcInspection[]>();
+    for (const inspection of inspections) {
+      const key = inspection.opening_code?.trim() || "Job";
+      const list = map.get(key) ?? [];
+      list.push(inspection);
+      map.set(key, list);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [inspections]);
+
   if (!canViewQc) {
     return null;
   }
@@ -125,63 +151,70 @@ export function ProductionQcLinks({
     <div className="space-y-3">
       {isPostFabStage ? (
         <p className="text-xs text-muted-foreground">
-          After-assembly QC is required and cannot be skipped. Use the{" "}
-          <span className="font-medium text-foreground">Post-fabrication QC</span> checklist.
+          After-assembly QC is required for every opening and cannot be skipped. Pass all
+          openings before closing post-fabrication.
         </p>
-      ) : null}
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          In-process QC is created per opening when a stage completes (soft). Production can
+          continue; after-assembly QC remains the hard gate.
+        </p>
+      )}
 
       {inspections.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No production QC inspections yet. Pre-cutting QC is optional; after-assembly QC is
-          created when finishing completes — or start the correct inspection below.
+          No production QC inspections yet. Stage completion auto-creates pending checks per
+          opening — or start one below.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {inspections.map((inspection) => (
-            <li key={inspection.id} className="flex flex-wrap items-center gap-2 text-sm">
-              <Link
-                href={`/qc/inspections/${inspection.id}`}
-                className="font-medium text-primary hover:underline"
-              >
-                {inspection.reference}
-              </Link>
-              <Badge variant="outline">
-                {QC_CONTEXT_LABELS[inspection.context as QcInspectionContext] ??
-                  inspection.context}
-                {stageLabel(inspection.stage)
-                  ? ` · ${stageLabel(inspection.stage)}`
-                  : ""}
-              </Badge>
-              <Badge variant="secondary">{inspection.result}</Badge>
-              {inspection.template?.name ? (
-                <span className="text-xs text-muted-foreground">{inspection.template.name}</span>
-              ) : null}
-              {inspection.result === "pending" && (
-                <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                  <Link href={`/qc/inspections/${inspection.id}`}>Continue</Link>
-                </Button>
-              )}
-            </li>
+        <div className="space-y-4">
+          {grouped.map(([opening, rows]) => (
+            <div key={opening} className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {opening === "Job" ? "Whole job" : `Opening ${opening}`}
+              </p>
+              <ul className="space-y-2">
+                {rows.map((inspection) => (
+                  <li
+                    key={inspection.id}
+                    className="flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <Link
+                      href={`/qc/inspections/${inspection.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {inspection.reference}
+                    </Link>
+                    <Badge variant="outline">{inspectionLabel(inspection)}</Badge>
+                    <Badge variant="secondary">{inspection.result}</Badge>
+                    {inspection.template?.name ? (
+                      <span className="text-xs text-muted-foreground">
+                        {inspection.template.name}
+                      </span>
+                    ) : null}
+                    {inspection.result === "pending" && (
+                      <Button variant="link" size="sm" className="h-auto p-0" asChild>
+                        <Link href={`/qc/inspections/${inspection.id}`}>Continue</Link>
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {canInspectQc && (
         <div className="flex flex-wrap gap-2 pt-1">
-          {pendingForCurrentContext.length === 0 && (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setNewOpen(true)}>
-              <Plus className="h-4 w-4" />
-              {isPostFabStage
-                ? inspections.some((i) => i.context === "production_qc_post_fabrication")
-                  ? "Reopen after-assembly QC"
-                  : "Start after-assembly QC"
-                : "Start QC inspection"}
-            </Button>
-          )}
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setNewOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {isPostFabStage ? "Start opening after-assembly QC" : "Start QC for opening"}
+          </Button>
           {pendingForCurrentContext.length > 0 && isPostFabStage ? (
             <Button size="sm" asChild>
               <Link href={`/qc/inspections/${pendingForCurrentContext[0].id}`}>
-                Continue after-assembly QC
+                Continue pending ({pendingForCurrentContext.length})
               </Link>
             </Button>
           ) : null}
@@ -195,6 +228,7 @@ export function ProductionQcLinks({
           defaultContext={defaults.context}
           defaultStage={defaults.stage}
           lockContext={defaults.lockContext}
+          requireOpening
           allowedContexts={
             isPostFabStage
               ? ["production_qc_post_fabrication"]

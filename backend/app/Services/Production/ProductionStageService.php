@@ -4,15 +4,12 @@ namespace App\Services\Production;
 
 use App\Enums\Production\ProductionOrderStatus;
 use App\Enums\Production\ProductionStage;
-use App\Enums\QualityControl\QcInspectionContext;
-use App\Enums\QualityControl\QcInspectionResult;
 use App\Enums\Warehouse\OffcutStorageArea;
 use App\Events\Production\ProductionStageCompleted;
 use App\Models\Production\CuttingSheet;
 use App\Models\Production\ProductionOrder;
 use App\Models\Production\ProductionOrderTeam;
 use App\Models\Production\ProductionStageLog;
-use App\Models\QualityControl\QcInspection;
 use App\Models\User;
 use App\Services\Media\FileStorageService;
 use App\Services\QualityControl\QcInspectionService;
@@ -437,19 +434,10 @@ class ProductionStageService
 
     private function assertPostFabricationQcPassed(ProductionOrder $order): void
     {
-        $passed = QcInspection::query()
-            ->where('production_order_id', $order->id)
-            ->where('context', QcInspectionContext::ProductionQcPostFabrication)
-            ->whereIn('result', [
-                QcInspectionResult::Pass,
-                QcInspectionResult::ConditionalPass,
-            ])
-            ->exists();
-
-        if (! $passed) {
+        if (! $this->qcInspections->hasPassedPostFabricationQc($order->project_id, $order->id)) {
             throw ValidationException::withMessages([
                 'qc' => [
-                    'Complete and pass after-assembly (post-fabrication) QC before closing this stage. This QC cannot be skipped.',
+                    'Complete and pass after-assembly (post-fabrication) QC for every opening before closing this stage. This QC cannot be skipped.',
                 ],
             ]);
         }

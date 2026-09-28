@@ -2,6 +2,7 @@
 
 namespace App\Support\Crm;
 
+use App\Enums\Crm\LeadPipelineStage;
 use App\Models\Lead;
 
 class LeadAccountEligibility
@@ -23,12 +24,32 @@ class LeadAccountEligibility
         $status = $lead->status?->value ?? (string) $lead->status;
 
         return in_array(strtolower($status), self::ACCOUNT_READY_STATUSES, true)
-            || $lead->converted_account_id !== null;
+            || $lead->converted_account_id !== null
+            || self::isHistoricalWonReadyForAccount($lead);
     }
 
     public static function hasProvisionedAccount(Lead $lead): bool
     {
         return $lead->converted_account_id !== null
             || strtolower((string) ($lead->status?->value ?? $lead->status)) === 'account_created';
+    }
+
+    /**
+     * Historical Won leads (imported from quotation register) may provision
+     * an account when the client returns — without going through interested.
+     */
+    public static function isHistoricalWonReadyForAccount(Lead $lead): bool
+    {
+        if ($lead->converted_account_id !== null) {
+            return false;
+        }
+
+        if (! (bool) $lead->is_historical) {
+            return false;
+        }
+
+        $stage = $lead->pipeline_stage?->value ?? (string) ($lead->pipeline_stage ?? '');
+
+        return strtolower($stage) === LeadPipelineStage::DealWon->value;
     }
 }

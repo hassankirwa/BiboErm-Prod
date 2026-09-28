@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
+import { Download, Plus } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,18 +17,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createTool,
   issueTool,
   listToolIncidents,
   listToolIssuances,
+  listToolTypes,
   listTools,
   returnTool,
   updateToolIncident,
   type Tool,
   type ToolIncident,
   type ToolIssuance,
+  type ToolTypeOption,
 } from "@/lib/api/warehouse";
 import { listProjects, type ProjectSummary } from "@/lib/api/projects";
 import { fetchUsers, type ApiUserDetail } from "@/lib/api/users";
@@ -53,8 +65,28 @@ const INSTALL_STAGES = new Set([
   "snagging",
 ]);
 
+const EMPTY_FORM = {
+  tool_code: "",
+  name: "",
+  tool_type: "",
+  is_returnable: true,
+  condition: "good",
+  purchase_date: "",
+  tracking_mode: "serialized" as "serialized" | "quantity",
+  total_qty: "1",
+};
+
 function formatStage(stage?: string | null) {
   return (stage ?? "—").replace(/_/g, " ");
+}
+
+function toolTypeLabel(tool: Tool, types: ToolTypeOption[]) {
+  return (
+    tool.tool_type_label ??
+    types.find((t) => t.value === tool.tool_type)?.label ??
+    tool.tool_type ??
+    "—"
+  );
 }
 
 export default function WarehouseToolsPage() {
@@ -89,15 +121,14 @@ export default function WarehouseToolsPage() {
     project_id: "",
     selected: {},
   });
-  const [form, setForm] = useState({
-    tool_code: "",
-    name: "",
-    tool_type: "",
-    condition: "good",
-    purchase_date: "",
-    tracking_mode: "serialized" as "serialized" | "quantity",
-    total_qty: "1",
-  });
+  const [addOpen, setAddOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [toolTypes, setToolTypes] = useState<ToolTypeOption[]>([]);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [returnableFilter, setReturnableFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const resetIssueForm = () => {
     setIssuingToolId(null);
@@ -120,11 +151,16 @@ export default function WarehouseToolsPage() {
 
   const loadTools = useCallback(() => {
     setLoading(true);
-    listTools()
+    listTools({
+      tool_type: typeFilter !== "all" ? typeFilter : undefined,
+      is_returnable:
+        returnableFilter === "all" ? undefined : returnableFilter === "returnable",
+      search: search || undefined,
+    })
       .then((res) => setItems(res.data))
       .catch((error: Error) => toast.error(error.message || "Failed to load tools."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [typeFilter, returnableFilter, search]);
 
   const loadIssuances = useCallback(() => {
     setIssuancesLoading(true);
@@ -149,8 +185,19 @@ export default function WarehouseToolsPage() {
   }, [loadTools, loadIssuances, loadIncidents]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
     reloadAll();
   }, [reloadAll]);
+
+  useEffect(() => {
+    listToolTypes()
+      .then((res) => setToolTypes(res.data))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     Promise.all([fetchUsers({ status: "active" }), listProjects({ per_page: 100 })])
@@ -257,30 +304,68 @@ export default function WarehouseToolsPage() {
   };
 
   const submit = async () => {
+    if (!form.tool_code || !form.name || !form.tool_type) {
+      toast.error("Code, name, and tool type are required.");
+      return;
+    }
+    setCreating(true);
     try {
       await createTool({
         tool_code: form.tool_code,
         name: form.name,
-        tool_type: form.tool_type || undefined,
+        tool_type: form.tool_type,
+        is_returnable: form.is_returnable,
         condition: form.condition,
         purchase_date: form.purchase_date || undefined,
         tracking_mode: form.tracking_mode,
         total_qty: form.tracking_mode === "quantity" ? Number(form.total_qty) || 1 : 1,
       });
       toast.success("Tool created.");
-      setForm({
-        tool_code: "",
-        name: "",
-        tool_type: "",
-        condition: "good",
-        purchase_date: "",
-        tracking_mode: "serialized",
-        total_qty: "1",
-      });
+      setForm(EMPTY_FORM);
+      setAddOpen(false);
       reloadAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create tool.");
+    } finally {
+      setCreating(false);
     }
+  };
+
+  const setToolType = (value: string) => {
+    const option = toolTypes.find((t) => t.value === value);
+    setForm((current) => ({
+      ...current,
+      tool_type: value,
+      is_returnable: option?.default_returnable ?? true,
+      tracking_mode:
+        option && !option.default_returnable ? "quantity" : current.tracking_mode,
+    }));
+  };
+
+  const exportExcel = () => {
+    if (items.length === 0) {
+      toast.info("No tools to export.");
+      return;
+    }
+    const rows = items.map((tool) => ({
+      Code: tool.tool_code,
+      Name: tool.name,
+      Type: toolTypeLabel(tool, toolTypes),
+      Returnable: tool.is_returnable ? "Yes" : "No",
+      Mode: tool.tracking_mode,
+      Total: tool.total_qty ?? 1,
+      Available: tool.available_qty ?? 0,
+      "On site": tool.on_site_qty ?? 0,
+      Repair: tool.qty_in_repair ?? 0,
+      Condition: tool.condition ?? "",
+      Status: tool.is_issued ? "Issued" : "Available",
+      "Purchase date": tool.purchase_date ?? "",
+    }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "Tools");
+    XLSX.writeFile(book, `warehouse-tools-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Excel downloaded.");
   };
 
   const handleIssue = async () => {
@@ -453,7 +538,10 @@ export default function WarehouseToolsPage() {
     tool.condition !== "lost" &&
     tool.condition !== "retired" &&
     tool.condition !== "damaged";
-  const canReturn = (tool: Tool) => Boolean(tool.active_issuance?.id);
+  const canReturn = (tool: Tool) =>
+    Boolean(tool.is_returnable !== false && tool.active_issuance?.id);
+  const isReturnableIssuance = (row: ToolIssuance) =>
+    row.tool?.is_returnable !== false;
   const returningTool =
     items.find((tool) => tool.active_issuance?.id === returningIssuanceId) ??
     items.find((tool) => tool.id === issuances.find((i) => i.id === returningIssuanceId)?.tool_id) ??
@@ -495,141 +583,155 @@ export default function WarehouseToolsPage() {
           </TabsList>
 
           <TabsContent value="register" className="space-y-4">
-            <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Register tool</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Input
-                    placeholder="Tool code"
-                    value={form.tool_code}
-                    onChange={(event) => setForm((current) => ({ ...current, tool_code: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Tool name"
-                    value={form.name}
-                    onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Tool type"
-                    value={form.tool_type}
-                    onChange={(event) => setForm((current) => ({ ...current, tool_type: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Condition"
-                    value={form.condition}
-                    onChange={(event) => setForm((current) => ({ ...current, condition: event.target.value }))}
-                  />
-                  <select
-                    className={selectClassName}
-                    value={form.tracking_mode}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        tracking_mode: event.target.value as "serialized" | "quantity",
-                      }))
-                    }
-                  >
-                    <option value="serialized">Serialized (1 unit)</option>
-                    <option value="quantity">Quantity tracked</option>
-                  </select>
-                  {form.tracking_mode === "quantity" ? (
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="Total quantity"
-                      value={form.total_qty}
-                      onChange={(event) => setForm((current) => ({ ...current, total_qty: event.target.value }))}
-                    />
-                  ) : null}
-                  <Input
-                    type="date"
-                    value={form.purchase_date}
-                    onChange={(event) => setForm((current) => ({ ...current, purchase_date: event.target.value }))}
-                  />
-                  <Button className="w-full" disabled={!form.tool_code || !form.name} onClick={submit}>
-                    Register tool
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+                <div>
                   <CardTitle>Tool register</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <p className="text-sm text-muted-foreground">Loading tools…</p>
-                  ) : (
-                    <div className="rounded-md border border-border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Tool</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Mode</TableHead>
-                            <TableHead>Total</TableHead>
-                            <TableHead>Avail</TableHead>
-                            <TableHead>On site</TableHead>
-                            <TableHead>Repair</TableHead>
-                            <TableHead>Condition</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {items.map((tool) => (
-                            <TableRow key={tool.id}>
-                              <TableCell>
-                                <div className="font-medium">{tool.name}</div>
-                                <div className="text-xs text-muted-foreground">{tool.tool_code}</div>
-                              </TableCell>
-                              <TableCell>{tool.tool_type ?? "—"}</TableCell>
-                              <TableCell className="capitalize">{tool.tracking_mode ?? "serialized"}</TableCell>
-                              <TableCell>{tool.total_qty ?? 1}</TableCell>
-                              <TableCell>{tool.available_qty ?? 0}</TableCell>
-                              <TableCell>{tool.on_site_qty ?? 0}</TableCell>
-                              <TableCell>{tool.qty_in_repair ?? 0}</TableCell>
-                              <TableCell>{tool.condition ?? "—"}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="secondary"
-                                  className={
-                                    tool.is_issued ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                                  }
+                  <p className="text-sm text-muted-foreground">
+                    Full catalog of tools and consumables. Add via modal so the list stays wide.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={loading || items.length === 0}
+                    onClick={exportExcel}
+                  >
+                    <Download className="h-4 w-4" />
+                    Excel
+                  </Button>
+                  <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add tool
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+                  <Input
+                    className="h-9 max-w-xs"
+                    placeholder="Search code or name…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="h-9 w-[200px]">
+                      <SelectValue placeholder="Tool type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All types</SelectItem>
+                      {toolTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={returnableFilter} onValueChange={setReturnableFilter}>
+                    <SelectTrigger className="h-9 w-[180px]">
+                      <SelectValue placeholder="Returnable" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All items</SelectItem>
+                      <SelectItem value="returnable">Returnable</SelectItem>
+                      <SelectItem value="consumable">Non-returnable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {loading ? (
+                  <p className="text-sm text-muted-foreground">Loading tools…</p>
+                ) : items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No tools match these filters. Add a tool to get started.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tool</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Returnable</TableHead>
+                          <TableHead>Mode</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Avail</TableHead>
+                          <TableHead>On site</TableHead>
+                          <TableHead>Repair</TableHead>
+                          <TableHead>Condition</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((tool) => (
+                          <TableRow key={tool.id}>
+                            <TableCell>
+                              <div className="font-medium">{tool.name}</div>
+                              <div className="text-xs text-muted-foreground">{tool.tool_code}</div>
+                            </TableCell>
+                            <TableCell>{toolTypeLabel(tool, toolTypes)}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={
+                                  tool.is_returnable
+                                    ? "bg-success/10 text-success"
+                                    : "bg-muted text-muted-foreground"
+                                }
+                              >
+                                {tool.is_returnable ? "Yes" : "No — consume"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="capitalize">
+                              {tool.tracking_mode ?? "serialized"}
+                            </TableCell>
+                            <TableCell>{tool.total_qty ?? 1}</TableCell>
+                            <TableCell>{tool.available_qty ?? 0}</TableCell>
+                            <TableCell>{tool.on_site_qty ?? 0}</TableCell>
+                            <TableCell>{tool.qty_in_repair ?? 0}</TableCell>
+                            <TableCell>{tool.condition ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={
+                                  tool.is_issued
+                                    ? "bg-warning/10 text-warning"
+                                    : "bg-success/10 text-success"
+                                }
+                              >
+                                {tool.is_issued ? "Issued" : "Available"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="space-x-2 text-right">
+                              {canReturn(tool) ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => openReturnDialog(tool.active_issuance!.id)}
                                 >
-                                  {tool.is_issued ? "Issued" : "Available"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="space-x-2 text-right">
-                                {canReturn(tool) ? (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => openReturnDialog(tool.active_issuance!.id)}
-                                  >
-                                    Return
-                                  </Button>
-                                ) : null}
-                                {canIssue(tool) ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openIssueForTool(tool.id)}
-                                  >
-                                    Issue
-                                  </Button>
-                                ) : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                                  Return
+                                </Button>
+                              ) : null}
+                              {canIssue(tool) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openIssueForTool(tool.id)}
+                                >
+                                  {tool.is_returnable ? "Issue" : "Issue / consume"}
+                                </Button>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="issuances" className="space-y-4">
@@ -696,9 +798,13 @@ export default function WarehouseToolsPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" onClick={() => openReturnDialog(row.id)}>
-                                Return
-                              </Button>
+                              {isReturnableIssuance(row) ? (
+                                <Button size="sm" onClick={() => openReturnDialog(row.id)}>
+                                  Return
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Consumed</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -878,12 +984,16 @@ export default function WarehouseToolsPage() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => openReturnDialog(row.id)}
-                                      >
-                                        Return
-                                      </Button>
+                                      {isReturnableIssuance(row) ? (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => openReturnDialog(row.id)}
+                                        >
+                                          Return
+                                        </Button>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">Consumed</span>
+                                      )}
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -1016,6 +1126,137 @@ export default function WarehouseToolsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open);
+          if (!open) setForm(EMPTY_FORM);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add tool</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <Label>Tool code</Label>
+                <Input
+                  placeholder="e.g. TL-DRLL-002"
+                  value={form.tool_code}
+                  onChange={(e) => setForm((c) => ({ ...c, tool_code: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Condition</Label>
+                <select
+                  className={selectClassName}
+                  value={form.condition}
+                  onChange={(e) => setForm((c) => ({ ...c, condition: e.target.value }))}
+                >
+                  <option value="good">Good</option>
+                  <option value="fair">Fair</option>
+                  <option value="damaged">Damaged</option>
+                  <option value="retired">Retired</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                placeholder="Tool name"
+                value={form.name}
+                onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Tool type</Label>
+              <Select value={form.tool_type || undefined} onValueChange={setToolType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {toolTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-start gap-3 rounded-md border border-border px-3 py-2">
+              <Checkbox
+                checked={form.is_returnable}
+                onCheckedChange={(checked) =>
+                  setForm((c) => ({
+                    ...c,
+                    is_returnable: checked === true,
+                    tracking_mode:
+                      checked === true ? c.tracking_mode : "quantity",
+                  }))
+                }
+              />
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">Returnable</p>
+                <p className="text-xs text-muted-foreground">
+                  Uncheck for nails, fasteners, and other consumables. Issuing them
+                  deducts stock immediately — no return required.
+                </p>
+              </div>
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <Label>Tracking mode</Label>
+                <select
+                  className={selectClassName}
+                  value={form.tracking_mode}
+                  disabled={!form.is_returnable}
+                  onChange={(e) =>
+                    setForm((c) => ({
+                      ...c,
+                      tracking_mode: e.target.value as "serialized" | "quantity",
+                    }))
+                  }
+                >
+                  <option value="serialized">Serialized (1 unit)</option>
+                  <option value="quantity">Quantity tracked</option>
+                </select>
+              </div>
+              <div>
+                <Label>Purchase date</Label>
+                <Input
+                  type="date"
+                  value={form.purchase_date}
+                  onChange={(e) => setForm((c) => ({ ...c, purchase_date: e.target.value }))}
+                />
+              </div>
+            </div>
+            {form.tracking_mode === "quantity" || !form.is_returnable ? (
+              <div>
+                <Label>Total quantity</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.total_qty}
+                  onChange={(e) => setForm((c) => ({ ...c, total_qty: e.target.value }))}
+                />
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={creating} onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={creating || !form.tool_code || !form.name || !form.tool_type}
+              onClick={() => void submit()}
+            >
+              {creating ? "Saving…" : "Save tool"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={returningIssuanceId !== null}
@@ -1220,7 +1461,8 @@ export default function WarehouseToolsPage() {
                           <div className="truncate text-sm font-medium">{tool.name}</div>
                           <div className="truncate text-xs text-muted-foreground">
                             {tool.tool_code} · avail {tool.available_qty ?? 0}
-                            {tool.tool_type ? ` · ${tool.tool_type}` : ""}
+                            {tool.tool_type ? ` · ${toolTypeLabel(tool, toolTypes)}` : ""}
+                            {tool.is_returnable === false ? " · consume" : ""}
                           </div>
                         </div>
                         {tool.tracking_mode === "quantity" ? (

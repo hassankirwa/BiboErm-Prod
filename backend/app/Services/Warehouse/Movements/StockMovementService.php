@@ -51,6 +51,33 @@ class StockMovementService
     }
 
     /**
+     * Return surplus/extra project materials back into warehouse bins.
+     *
+     * @param  array<int, array{item_id: int, to_bin_id: int, quantity: string|float}>  $lines
+     */
+    public function returnStock(
+        User $performer,
+        array $lines,
+        ?int $projectId = null,
+        ?string $notes = null,
+    ): StockMovement {
+        return $this->execute(
+            type: StockMovementType::Return,
+            performer: $performer,
+            lines: array_map(fn (array $line) => [
+                'item_id' => $line['item_id'],
+                'from_bin_id' => null,
+                'to_bin_id' => $line['to_bin_id'],
+                'quantity' => (string) $line['quantity'],
+                'unit_cost' => null,
+            ], $lines),
+            referenceType: $projectId ? 'project' : null,
+            referenceId: $projectId,
+            notes: $notes,
+        );
+    }
+
+    /**
      * @param  array<int, array{item_id: int, from_bin_id: int, to_bin_id: int, quantity: string|float}>  $lines
      */
     public function transfer(User $performer, array $lines, ?string $notes = null): StockMovement
@@ -201,6 +228,7 @@ class StockMovementService
                 StockMovementType::Outbound => $this->audit->stockIssued($movement->id, ['movement_number' => $movement->movement_number]),
                 StockMovementType::Transfer => $this->audit->stockTransferred($movement->id, ['movement_number' => $movement->movement_number]),
                 StockMovementType::Adjustment => $this->audit->stockAdjusted($movement->id, ['movement_number' => $movement->movement_number]),
+                StockMovementType::Return => $this->audit->stockReturned($movement->id, ['movement_number' => $movement->movement_number]),
             };
 
             foreach ($lines as $line) {

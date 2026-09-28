@@ -192,6 +192,7 @@ Route::prefix('v1')->group(function () {
         require __DIR__.'/api/warehouse/master-data.php';
         require __DIR__.'/api/warehouse/tools.php';
         require __DIR__.'/api/warehouse/stock-take.php';
+        require __DIR__.'/api/warehouse/material-requests.php';
     });
 
     Route::middleware(['auth:sanctum', 'active', 'device.trusted'])

@@ -17,6 +17,8 @@ import {
   createDesignChangeRemake,
   listDesignChangeOrders,
   releaseDesignChangeToProduction,
+  requestDesignChangeMaterials,
+  scrapDesignChangeToOffcuts,
   updateDesignChangeOrder,
   type DesignChangeItem,
   type DesignChangeOrder,
@@ -250,6 +252,13 @@ export function ProjectDetailDesignChanges({ projectId }: Props) {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                {dco.field_unit ? (
+                  <span>
+                    Opening: {dco.field_unit.unit_label}
+                    {dco.field_unit.unit_floor ? ` · ${dco.field_unit.unit_floor}` : ""}
+                    {dco.field_unit.room_location ? ` · ${dco.field_unit.room_location}` : ""}
+                  </span>
+                ) : null}
                 <span>Parent PO: {dco.parent_production_order_id ?? "—"}</span>
                 <span>
                   Remake PO:{" "}
@@ -307,6 +316,7 @@ export function ProjectDetailDesignChanges({ projectId }: Props) {
                           <th className="px-3 py-2 font-medium">Item</th>
                           <th className="px-3 py-2 font-medium">Qty</th>
                           <th className="px-3 py-2 font-medium">Type</th>
+                          <th className="px-3 py-2 font-medium">Profile</th>
                           {editable ? <th className="px-3 py-2 font-medium" /> : null}
                         </tr>
                       </thead>
@@ -316,6 +326,17 @@ export function ProjectDetailDesignChanges({ projectId }: Props) {
                             <td className="px-3 py-2">{item.description}</td>
                             <td className="px-3 py-2">{item.qty}</td>
                             <td className="px-3 py-2 capitalize">{item.change_type}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">
+                              {item.warehouse_item_id
+                                ? [
+                                    item.profile_code,
+                                    item.cut_length_mm && `${item.cut_length_mm}mm`,
+                                    item.scrapped_to_offcut && "scrapped",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ") || `Item #${item.warehouse_item_id}`
+                                : "Not linked — use Production → Misfits"}
+                            </td>
                             {editable ? (
                               <td className="px-3 py-2 text-right">
                                 <Button
@@ -422,38 +443,73 @@ export function ProjectDetailDesignChanges({ projectId }: Props) {
                 ) : null}
 
                 {path === "full_remake" &&
-                !dco.remake_production_order_id &&
                 !["closed", "cancelled", "drafted"].includes(String(dco.status)) ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      className={selectCls + " w-44"}
-                      value={startStage}
-                      onChange={(e) =>
-                        setStartStages((prev) => ({ ...prev, [dco.id]: e.target.value }))
-                      }
-                    >
-                      {START_STAGES.map((stage) => (
-                        <option key={stage.value} value={stage.value}>
-                          Start: {stage.label}
-                        </option>
-                      ))}
-                    </select>
-                    <Button
-                      size="sm"
-                      disabled={busyId === dco.id}
-                      onClick={() =>
-                        void run(
-                          dco.id,
-                          () =>
-                            createDesignChangeRemake(dco.id, {
-                              start_stage: startStage,
-                            }),
-                          "Remake PO created.",
-                        )
-                      }
-                    >
-                      Create remake PO
-                    </Button>
+                    {items.some((i) => i.warehouse_item_id && !i.scrapped_to_offcut) ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === dco.id}
+                        onClick={() =>
+                          void run(
+                            dco.id,
+                            () => scrapDesignChangeToOffcuts(dco.id),
+                            "Old profile pieces logged to offcuts.",
+                          )
+                        }
+                      >
+                        Scrap to offcuts
+                      </Button>
+                    ) : null}
+                    {items.some((i) => i.warehouse_item_id) ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === dco.id}
+                        onClick={() =>
+                          void run(
+                            dco.id,
+                            () => requestDesignChangeMaterials(dco.id),
+                            "Remake material request created.",
+                          )
+                        }
+                      >
+                        Request remake materials
+                      </Button>
+                    ) : null}
+                    {!dco.remake_production_order_id ? (
+                      <>
+                        <select
+                          className={selectCls + " w-44"}
+                          value={startStage}
+                          onChange={(e) =>
+                            setStartStages((prev) => ({ ...prev, [dco.id]: e.target.value }))
+                          }
+                        >
+                          {START_STAGES.map((stage) => (
+                            <option key={stage.value} value={stage.value}>
+                              Start: {stage.label}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          disabled={busyId === dco.id}
+                          onClick={() =>
+                            void run(
+                              dco.id,
+                              () =>
+                                createDesignChangeRemake(dco.id, {
+                                  start_stage: startStage,
+                                }),
+                              "Remake PO created.",
+                            )
+                          }
+                        >
+                          Create remake PO
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 

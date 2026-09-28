@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Crm\Leads\BulkImportHistoricalLeadsController;
 use App\Http\Controllers\Crm\Leads\BulkImportLeadsController;
 use App\Http\Controllers\Crm\Leads\ConvertLeadController;
 use App\Http\Controllers\Crm\Leads\LeadController;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('permission:leads.view')->get('leads', [LeadController::class, 'index']);
 Route::middleware('permission:leads.create')->post('leads', [LeadController::class, 'store']);
 Route::middleware('permission:leads.create')->post('leads/import', BulkImportLeadsController::class);
+Route::middleware('permission:leads.create')->post('leads/import-historical', BulkImportHistoricalLeadsController::class);
 Route::middleware('permission:leads.view')->get('leads/{lead}', [LeadController::class, 'show']);
 Route::middleware('permission:leads.update')->put('leads/{lead}', [LeadController::class, 'update']);
 Route::middleware('permission:leads.delete')->delete('leads/{lead}', [LeadController::class, 'destroy']);

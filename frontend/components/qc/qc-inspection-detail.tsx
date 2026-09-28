@@ -301,6 +301,12 @@ export function QCInspectionDetail({
             <Badge variant="outline">
               {QC_CONTEXT_LABELS[inspection.context] ?? inspection.context}
             </Badge>
+            {inspection.opening_code ? (
+              <Badge variant="secondary">{inspection.opening_code}</Badge>
+            ) : null}
+            {inspection.stage && inspection.stage !== inspection.context ? (
+              <Badge variant="outline">{inspection.stage}</Badge>
+            ) : null}
             <Badge
               variant={
                 inspection.result === "pass"
@@ -313,6 +319,13 @@ export function QCInspectionDetail({
               {inspection.result}
             </Badge>
           </div>
+          {inspection.opening_code ? (
+            <p className="text-sm text-muted-foreground">
+              Opening:{" "}
+              <span className="font-medium text-foreground">{inspection.opening_code}</span>
+              {inspection.stage ? ` · Stage: ${inspection.stage}` : null}
+            </p>
+          ) : null}
           {inspection.template?.name ? (
             <p className="text-sm text-muted-foreground">
               Checklist: <span className="font-medium text-foreground">{inspection.template.name}</span>

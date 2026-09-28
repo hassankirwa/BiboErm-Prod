@@ -262,15 +262,21 @@ export function FieldJobDetail({ jobId }: Props) {
     });
   }, [units, floorFilter, typeFilter]);
   const unitsByFloor = useMemo(() => {
-    const groups = new Map<string, FieldInstallationUnit[]>();
+    const groups = new Map<string, Map<string, FieldInstallationUnit[]>>();
     const sorted = [...filteredUnits].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
     for (const unit of sorted) {
-      const key = floorKey(unit);
-      const list = groups.get(key) ?? [];
+      const floor = floorKey(unit);
+      const room = unit.room_location?.trim() || "Unspecified room";
+      const floorMap = groups.get(floor) ?? new Map<string, FieldInstallationUnit[]>();
+      const list = floorMap.get(room) ?? [];
       list.push(unit);
-      groups.set(key, list);
+      floorMap.set(room, list);
+      groups.set(floor, floorMap);
     }
-    return Array.from(groups.entries());
+    return Array.from(groups.entries()).map(([floor, rooms]) => [
+      floor,
+      Array.from(rooms.entries()),
+    ] as const);
   }, [filteredUnits]);
   const allOpeningsDone = useMemo(() => {
     if (units.length === 0) return false;
@@ -283,15 +289,36 @@ export function FieldJobDetail({ jobId }: Props) {
   const openingStats = useMemo(() => {
     const floors = new Set<string>();
     const byType: Record<string, number> = {};
+    const byFloorRoom: Array<{
+      floor: string;
+      room: string;
+      total: number;
+      done: number;
+    }> = [];
+    const rollup = new Map<string, { total: number; done: number }>();
     for (const unit of units) {
       floors.add(floorKey(unit));
       const type = unit.product_type?.trim() || "Other";
       byType[type] = (byType[type] ?? 0) + (unit.quantity ?? 1);
+      const room = unit.room_location?.trim() || "Unspecified room";
+      const key = `${floorKey(unit)}||${room}`;
+      const bucket = rollup.get(key) ?? { total: 0, done: 0 };
+      bucket.total += 1;
+      if (unit.status === "installed" || unit.status === "waived") bucket.done += 1;
+      rollup.set(key, bucket);
     }
+    for (const [key, stats] of rollup.entries()) {
+      const [floor, room] = key.split("||");
+      byFloorRoom.push({ floor, room, total: stats.total, done: stats.done });
+    }
+    byFloorRoom.sort((a, b) =>
+      a.floor === b.floor ? a.room.localeCompare(b.room) : a.floor.localeCompare(b.floor),
+    );
     return {
       floors: floors.size,
       total: units.length,
       byType,
+      byFloorRoom,
       toolsOnSite: assignments.filter((a) => !a.returned_at && !a.tool_issuance?.return_date).length,
       toolsTotal: assignments.length,
       deliveries: deliveries.length,
@@ -497,17 +524,34 @@ export function FieldJobDetail({ jobId }: Props) {
       });
 
       try {
-        await reportNonConformity(jobId, {
+        await createDesignChange(jobId, {
           nc_type: "dimension_mismatch",
           severity: "major",
           title: `Misfit: ${unit.unit_label}`,
-          description: notes,
+          description: [
+            notes,
+            unit.unit_floor ? `Floor: ${unit.unit_floor}` : null,
+            unit.room_location ? `Room: ${unit.room_location}` : null,
+            unit.opening_ref ? `Opening: ${unit.opening_ref}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          field_installation_unit_id: unit.id,
+          reason: `Misfit / plan change — ${unit.unit_label}`,
+          measurement_notes: {
+            notes,
+            unit_label: unit.unit_label,
+            unit_floor: unit.unit_floor,
+            room_location: unit.room_location,
+            opening_ref: unit.opening_ref,
+            product_type: unit.product_type,
+          },
         });
       } catch (ncError) {
         toast.warning(
           getApiErrorMessage(
             ncError,
-            "Opening marked as misfit, but NC could not be created.",
+            "Opening marked as misfit, but design change could not be created.",
           ),
         );
       }
@@ -750,6 +794,14 @@ export function FieldJobDetail({ jobId }: Props) {
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Reference</span><span>{job.reference}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Project</span><span className="text-right">{job.project?.name ?? `Project #${job.project_id}`}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Project ref</span><span>{job.project?.reference ?? "—"}</span></div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">Wave</span>
+                  <span>
+                    {job.wave
+                      ? job.wave.label || `Wave ${job.wave.wave_number}`
+                      : "—"}
+                  </span>
+                </div>
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Job type</span><span className="capitalize">{job.job_type.replace(/_/g, " ")}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Install mode</span><span className="capitalize">{(job.project?.install_mode ?? "—").replace(/_/g, " ")}</span></div>
                 <div className="flex justify-between gap-4"><span className="text-muted-foreground">Team lead</span><span>{job.team_lead?.name ?? "—"}</span></div>
@@ -1167,6 +1219,29 @@ export function FieldJobDetail({ jobId }: Props) {
               <CardTitle className="text-base">Openings (site measurements)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {openingStats.byFloorRoom.length > 0 ? (
+                <div className="space-y-2 rounded-md border p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Floor → room progress
+                  </p>
+                  <ul className="space-y-1.5 text-sm">
+                    {openingStats.byFloorRoom.map((row) => (
+                      <li
+                        key={`${row.floor}-${row.room}`}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span>
+                          {row.floor} · {row.room}
+                        </span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {row.done}/{row.total} done
+                          {row.done === row.total && row.total > 0 ? " ✓" : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-[140px]">
                   <Label>Floor</Label>
@@ -1199,9 +1274,14 @@ export function FieldJobDetail({ jobId }: Props) {
               {units.length > 0 && unitsByFloor.length === 0 && (
                 <p className="text-sm text-muted-foreground">No openings match these filters.</p>
               )}
-              {unitsByFloor.map(([floor, floorUnits]) => (
-                <div key={floor} className="space-y-2">
+              {unitsByFloor.map(([floor, rooms]) => (
+                <div key={floor} className="space-y-3">
                   <h3 className="text-sm font-semibold">{floor}</h3>
+                  {rooms.map(([room, floorUnits]) => (
+                    <div key={`${floor}-${room}`} className="space-y-2 pl-2">
+                      <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {room}
+                      </h4>
                   {floorUnits.map((unit) => {
                     const thumbs = unitPhotos(unit, photos);
                     const snap = unit.measurement_snapshot;
@@ -1218,7 +1298,6 @@ export function FieldJobDetail({ jobId }: Props) {
                               {[
                                 unit.product_type,
                                 unit.opening_ref && `Ref ${unit.opening_ref}`,
-                                unit.room_location,
                                 unit.quantity && unit.quantity > 1 ? `Qty ${unit.quantity}` : null,
                                 dims,
                               ]
@@ -1371,6 +1450,8 @@ export function FieldJobDetail({ jobId }: Props) {
                       </div>
                     );
                   })}
+                    </div>
+                  ))}
                 </div>
               ))}
             </CardContent>

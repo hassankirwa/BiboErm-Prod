@@ -13,6 +13,7 @@ enum QcInspectionContext: string
     case ProductionQcPostFabrication = 'production_qc_post_fabrication';
     case ProductionInProcess = 'production_in_process';
     case SiteReceiving = 'site_receiving';
+    case SitePreInstallation = 'site_pre_installation';
     case SiteInstallation = 'site_installation';
     case SnaggingSignoff = 'snagging_signoff';
 

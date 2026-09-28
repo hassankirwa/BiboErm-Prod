@@ -207,10 +207,18 @@ export function hasProvisionedAccount(status: string | null | undefined): boolea
 export function canProvisionAccountFromLead(
   status: string | null | undefined,
   hasLinkedAccount: boolean,
-  _pipelineStage?: string | null,
+  pipelineStage?: string | null,
+  isHistorical?: boolean | null,
 ): boolean {
   if (hasLinkedAccount) return false;
   const normalized = (status ?? "new").toLowerCase();
+  const stage = (pipelineStage ?? "").toLowerCase();
+
+  // Historical Won clients can create an account when they return.
+  if (isHistorical && stage === "deal_won") {
+    return true;
+  }
+
   // Accounts are for interested clients only — not at first contact.
   if (normalized === "interested") {
     return true;

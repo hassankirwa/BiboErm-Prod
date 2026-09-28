@@ -5,15 +5,13 @@ namespace App\Services\Projects;
 use App\Enums\FieldInstallation\FieldJobStatus;
 use App\Enums\InstallMode;
 use App\Enums\ProjectStage;
-use App\Enums\QualityControl\QcInspectionContext;
-use App\Enums\QualityControl\QcInspectionResult;
 use App\Events\Projects\ProjectStageAdvanced;
 use App\Models\FieldInstallation\FieldInstallationJob;
 use App\Models\Project;
 use App\Models\ProjectStageLog;
-use App\Models\QualityControl\QcInspection;
 use App\Models\User;
 use App\Services\Audit\OwenAuditLogger;
+use App\Services\QualityControl\QcInspectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -46,6 +44,7 @@ class ProjectStageService
 
     public function __construct(
         protected OwenAuditLogger $audit,
+        protected QcInspectionService $qcInspections,
     ) {}
 
     public function initialize(Project $project, ?User $actor = null, array $context = []): Project
@@ -309,13 +308,6 @@ class ProjectStageService
 
     protected function hasPassedSiteInstallationQc(Project $project): bool
     {
-        return QcInspection::query()
-            ->where('project_id', $project->id)
-            ->where('context', QcInspectionContext::SiteInstallation)
-            ->whereIn('result', [
-                QcInspectionResult::Pass->value,
-                QcInspectionResult::ConditionalPass->value,
-            ])
-            ->exists();
+        return $this->qcInspections->hasPassedSiteInstallationQc($project->id);
     }
 }

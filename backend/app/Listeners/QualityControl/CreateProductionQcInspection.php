@@ -6,9 +6,8 @@ use App\Events\Production\ProductionStageCompleted;
 use App\Services\QualityControl\QcInspectionService;
 
 /**
- * Auto-create the mandatory post-fabrication QC inspection when finishing
- * completes (order enters qc_post_fabrication), or when that stage itself completes
- * as a safety net.
+ * Soft-auto-create per-opening stage QC when a production stage completes
+ * (cutting → finishing in-process; finishing also seeds post-fab).
  */
 class CreateProductionQcInspection
 {

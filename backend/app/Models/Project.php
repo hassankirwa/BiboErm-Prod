@@ -148,6 +148,16 @@ class Project extends Model
         return $this->hasMany(ProjectFloor::class)->orderBy('sort_order');
     }
 
+    public function waves(): HasMany
+    {
+        return $this->hasMany(ProjectWave::class)->orderBy('wave_number');
+    }
+
+    public function scopes(): HasMany
+    {
+        return $this->hasMany(ProjectScope::class)->orderBy('sort_order');
+    }
+
     public function siteVisits(): HasMany
     {
         return $this->hasMany(SiteVisit::class);

@@ -1296,6 +1296,37 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
 
             {activityButtons}
 
+            {canProvisionAccountFromLead(
+              status,
+              Boolean(linkedAccountId),
+              lead?.pipeline_stage,
+              lead?.is_historical,
+            ) ? (
+
+              <PermissionGate permission="leads.update">
+
+                <Button
+
+                  size="sm"
+
+                  className="h-9"
+
+                  disabled={disabled || actionLoading}
+
+                  onClick={() => void handleProvisionAccount()}
+
+                >
+
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+
+                  Create Account
+
+                </Button>
+
+              </PermissionGate>
+
+            ) : null}
+
             <LeadQuotationActions
               latestQuotation={lead?.latest_quotation}
               salesDeal={lead?.sales_deal ?? lead?.converted_deal ?? undefined}
@@ -1343,6 +1374,10 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     lead?.sales_deal,
 
     lead?.converted_deal,
+
+    lead?.pipeline_stage,
+
+    lead?.is_historical,
 
     reloadLead,
 
@@ -1423,6 +1458,7 @@ export function LeadDetailView({ leadId }: { leadId: string }) {
     status,
     Boolean(headerAccountId),
     lead?.pipeline_stage,
+    lead?.is_historical,
   );
   const convertLabel = showCreateDealAfterDeposit
     ? "Create Deal"

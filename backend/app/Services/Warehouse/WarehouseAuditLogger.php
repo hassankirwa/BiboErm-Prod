@@ -60,6 +60,26 @@ class WarehouseAuditLogger
         $this->log('offcut.consumed', 'offcut_piece', $offcutId, $context);
     }
 
+    public function stockReturned(int $movementId, array $context = []): void
+    {
+        $this->log('stock.returned', 'stock_movement', $movementId, $context);
+    }
+
+    public function materialRequestCreated(int $requestId, array $context = []): void
+    {
+        $this->log('material_request.created', 'material_request', $requestId, $context);
+    }
+
+    public function materialRequestFulfilled(int $requestId, array $context = []): void
+    {
+        $this->log('material_request.fulfilled', 'material_request', $requestId, $context);
+    }
+
+    public function materialRequestRejected(int $requestId, array $context = []): void
+    {
+        $this->log('material_request.rejected', 'material_request', $requestId, $context);
+    }
+
     public function toolIssued(int $issuanceId, array $context = []): void
     {
         $this->log('tool.issued', 'tool_issuance', $issuanceId, $context);

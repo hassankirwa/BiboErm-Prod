@@ -3,6 +3,7 @@
 namespace App\Models\Projects;
 
 use App\Enums\Projects\DesignChangeOrderStatus;
+use App\Models\FieldInstallation\FieldInstallationUnit;
 use App\Models\FieldInstallation\FieldNonConformity;
 use App\Models\Production\ProductionOrder;
 use App\Models\Project;
@@ -16,6 +17,7 @@ class DesignChangeOrder extends Model
     protected $fillable = [
         'project_id',
         'field_non_conformity_id',
+        'field_installation_unit_id',
         'status',
         'reason',
         'measurement_notes',
@@ -46,6 +48,11 @@ class DesignChangeOrder extends Model
     public function nonConformity(): BelongsTo
     {
         return $this->belongsTo(FieldNonConformity::class, 'field_non_conformity_id');
+    }
+
+    public function fieldUnit(): BelongsTo
+    {
+        return $this->belongsTo(FieldInstallationUnit::class, 'field_installation_unit_id');
     }
 
     public function remeasureSiteVisit(): BelongsTo

@@ -100,6 +100,8 @@ export type StockMovementLine = {
   quantity: string;
   unit_cost: string | null;
   item?: WarehouseItem;
+  from_bin?: WarehouseBin | null;
+  to_bin?: WarehouseBin | null;
   fromBin?: WarehouseBin | null;
   toBin?: WarehouseBin | null;
 };
@@ -158,6 +160,8 @@ export type Tool = {
   tool_code: string;
   name: string;
   tool_type: string | null;
+  tool_type_label?: string | null;
+  is_returnable: boolean;
   condition: string | null;
   purchase_date: string | null;
   is_active: boolean;
@@ -179,6 +183,12 @@ export type Tool = {
   } | null;
 };
 
+export type ToolTypeOption = {
+  value: string;
+  label: string;
+  default_returnable: boolean;
+};
+
 export type ToolIssuance = {
   id: number;
   tool_id: number;
@@ -197,7 +207,8 @@ export type ToolIssuance = {
     tool_code: string;
     name: string;
     tool_type: string | null;
-    tracking_mode?: string;
+    is_returnable?: boolean;
+    tracking_mode?: "serialized" | "quantity" | string | null;
   } | null;
   project?: {
     id: number;
@@ -450,6 +461,17 @@ export async function receiveStock(payload: {
   });
 }
 
+export async function returnStock(payload: {
+  project_id?: number;
+  notes?: string;
+  lines: Array<{ item_id: number; to_bin_id: number; quantity: number }>;
+}) {
+  return apiRequest<{ data: StockMovement }>("/warehouse/movements/return", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export async function issueStock(payload: {
   project_id?: number;
   notes?: string;
@@ -459,6 +481,98 @@ export async function issueStock(payload: {
     method: "POST",
     body: payload,
   });
+}
+
+// --- Additional material requests ---
+
+export type MaterialRequestLine = {
+  id: number;
+  warehouse_item_id: number;
+  quantity_requested: string;
+  quantity_fulfilled: string;
+  notes?: string | null;
+  item?: {
+    id: number;
+    sku: string;
+    name: string;
+    unit_of_measure?: string | null;
+    category?: string | null;
+  } | null;
+};
+
+export type MaterialRequest = {
+  id: number;
+  project_id: number;
+  source: "warehouse" | "production" | string;
+  status: "pending" | "fulfilled" | "partial" | "rejected" | string;
+  reason: string | null;
+  notes: string | null;
+  requested_by: number;
+  fulfilled_by: number | null;
+  fulfilled_at: string | null;
+  stock_movement_id: number | null;
+  purchase_requisition_id: number | null;
+  created_at?: string | null;
+  project?: {
+    id: number;
+    reference: string;
+    name: string;
+    stage?: string;
+  } | null;
+  requester?: { id: number; name: string } | null;
+  fulfiller?: { id: number; name: string } | null;
+  lines?: MaterialRequestLine[];
+  purchase_requisition?: {
+    id: number;
+    reference: string;
+    status?: string;
+  } | null;
+  stock_movement?: { id: number; movement_number: string } | null;
+};
+
+export async function listMaterialRequests(params?: {
+  status?: string;
+  project_id?: number;
+  source?: string;
+  per_page?: number;
+}) {
+  return apiRequest<Paginated<MaterialRequest>>(
+    `/warehouse/material-requests${buildQuery(params)}`,
+  );
+}
+
+export async function createMaterialRequest(payload: {
+  project_id: number;
+  source?: "warehouse" | "production";
+  reason?: string;
+  notes?: string;
+  lines: Array<{ warehouse_item_id: number; quantity: number; notes?: string }>;
+}) {
+  return apiRequest<{ data: MaterialRequest }>("/warehouse/material-requests", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function fulfillMaterialRequest(
+  id: number,
+  payload: {
+    notes?: string;
+    draft_shortage_requisition?: boolean;
+    lines: Array<{ line_id: number; from_bin_id: number; quantity: number }>;
+  },
+) {
+  return apiRequest<{ data: MaterialRequest }>(
+    `/warehouse/material-requests/${id}/fulfill`,
+    { method: "POST", body: payload },
+  );
+}
+
+export async function rejectMaterialRequest(id: number, notes?: string) {
+  return apiRequest<{ data: MaterialRequest }>(
+    `/warehouse/material-requests/${id}/reject`,
+    { method: "POST", body: { notes } },
+  );
 }
 
 export async function listOffcuts(params?: {
@@ -505,8 +619,17 @@ export async function getOffcutAnalytics(params?: { from?: string; to?: string }
   return apiRequest<{ data: OffcutAnalytics }>(`/warehouse/offcuts/analytics${buildQuery(params)}`);
 }
 
-export async function listTools(params?: { active_only?: boolean }) {
+export async function listTools(params?: {
+  active_only?: boolean;
+  tool_type?: string;
+  is_returnable?: boolean;
+  search?: string;
+}) {
   return apiRequest<{ data: Tool[] }>(`/warehouse/tools${buildQuery(params)}`);
+}
+
+export async function listToolTypes() {
+  return apiRequest<{ data: ToolTypeOption[] }>("/warehouse/tools/types");
 }
 
 export async function listToolIssuances(params?: {
@@ -522,7 +645,8 @@ export async function listToolIssuances(params?: {
 export async function createTool(payload: {
   tool_code: string;
   name: string;
-  tool_type?: string;
+  tool_type: string;
+  is_returnable?: boolean;
   condition?: string;
   purchase_date?: string;
   tracking_mode?: "serialized" | "quantity";
@@ -1514,6 +1638,18 @@ export const RESERVATION_STATUSES = [
   "cancelled",
 ] as const;
 
+export type StockReservationLine = {
+  id: number;
+  item_id: number;
+  bin_id: number;
+  quantity_reserved: string;
+  quantity_released: string;
+  quantity_remaining: string;
+  bom_line_ref?: string | null;
+  item?: WarehouseItem;
+  bin?: WarehouseBin;
+};
+
 export type StockReservation = {
   id: number;
   reservation_number: string;
@@ -1528,14 +1664,7 @@ export type StockReservation = {
   fifo_sequence: number | null;
   fifo_order?: number | null;
   notes: string | null;
-  lines?: Array<{
-    id: number;
-    item_id: number;
-    bin_id: number;
-    quantity: string;
-    item?: WarehouseItem;
-    bin?: WarehouseBin;
-  }>;
+  lines?: StockReservationLine[];
   project?: { id: number; reference: string; name: string; fifo_order?: number | null };
 };
 
@@ -1570,16 +1699,28 @@ export type ProjectMaterialsReleaseOffcutLine = {
   note: string;
 };
 
+export type ProjectMaterialsReleaseLine = {
+  item_id: number;
+  quantity?: number | string;
+};
+
 export type ProjectMaterialsReleaseResult = {
   reservation: StockReservation;
   movement_id: number | null;
+  batch_id?: number | null;
   offcut_lines: ProjectMaterialsReleaseOffcutLine[];
   project_stage: string;
+  is_partial?: boolean;
 };
 
 export async function releaseProjectMaterials(
   projectId: number,
-  payload: { received_by: number; notes?: string },
+  payload: {
+    received_by: number;
+    notes?: string;
+    /** Omit for full remaining release; set for checklist partial release. */
+    lines?: ProjectMaterialsReleaseLine[];
+  },
 ) {
   return apiRequest<{ data: ProjectMaterialsReleaseResult }>(
     `/warehouse/projects/${projectId}/release-materials`,
@@ -1590,16 +1731,27 @@ export async function releaseProjectMaterials(
   );
 }
 
-// --- Stock take ---
+// --- Stock take / stock check reconciliation ---
 
 export type StockTakeSnapshotLine = {
   item_id: number;
   bin_id: number;
   sku: string | null;
   item_name: string | null;
+  category: string | null;
   bin_code: string | null;
+  unit_of_measure?: string | null;
+  section_code?: string | null;
   system_qty: string;
   quantity_reserved?: string;
+  is_synthetic?: boolean;
+};
+
+export type StockTakeCategoryGroup = {
+  category: string;
+  label: string;
+  line_count: number;
+  lines: StockTakeSnapshotLine[];
 };
 
 export type StockTakeVarianceLine = {
@@ -1607,12 +1759,14 @@ export type StockTakeVarianceLine = {
   bin_id: number;
   sku: string | null;
   item_name: string | null;
+  category?: string | null;
   bin_code: string | null;
   system_qty: string;
   counted_qty: string;
   variance: string;
   direction: "increase" | "decrease" | "none";
   has_variance: boolean;
+  variance_reason?: string | null;
   quantity_reserved?: string;
 };
 
@@ -1621,12 +1775,33 @@ type StockTakeSnapshotApiLine = {
   bin_id: number;
   sku: string | null;
   item_name: string | null;
+  category?: string | null;
   bin_code: string | null;
+  unit_of_measure?: string | null;
+  section_code?: string | null;
   quantity_on_hand: string;
   quantity_reserved?: string;
+  is_synthetic?: boolean;
 };
 
+function mapSnapshotLine(line: StockTakeSnapshotApiLine): StockTakeSnapshotLine {
+  return {
+    item_id: line.item_id,
+    bin_id: line.bin_id,
+    sku: line.sku,
+    item_name: line.item_name,
+    category: line.category ?? null,
+    bin_code: line.bin_code,
+    unit_of_measure: line.unit_of_measure,
+    section_code: line.section_code,
+    system_qty: line.quantity_on_hand,
+    quantity_reserved: line.quantity_reserved,
+    is_synthetic: line.is_synthetic,
+  };
+}
+
 export async function stockTakeSnapshot(params?: {
+  category?: string;
   deck?: string;
   section_id?: number;
   bin_id?: number;
@@ -1635,30 +1810,39 @@ export async function stockTakeSnapshot(params?: {
     snapshot_at: string;
     line_count: number;
     lines: StockTakeSnapshotApiLine[];
+    categories?: Array<{
+      category: string;
+      label: string;
+      line_count: number;
+      lines: StockTakeSnapshotApiLine[];
+    }>;
   }>(`/warehouse/stock-take/snapshot${buildQuery(params)}`);
 
   return {
     data: {
       snapshot_at: raw.snapshot_at,
       line_count: raw.line_count,
-      lines: raw.lines.map(
-        (line): StockTakeSnapshotLine => ({
-          item_id: line.item_id,
-          bin_id: line.bin_id,
-          sku: line.sku,
-          item_name: line.item_name,
-          bin_code: line.bin_code,
-          system_qty: line.quantity_on_hand,
-          quantity_reserved: line.quantity_reserved,
+      lines: raw.lines.map(mapSnapshotLine),
+      categories: (raw.categories ?? []).map(
+        (group): StockTakeCategoryGroup => ({
+          category: group.category,
+          label: group.label,
+          line_count: group.line_count,
+          lines: group.lines.map(mapSnapshotLine),
         }),
       ),
     },
   };
 }
 
-export async function stockTakeVariance(payload: {
-  lines: Array<{ item_id: number; bin_id: number; counted_qty: number }>;
-}) {
+export type StockTakeCountPayload = {
+  item_id: number;
+  bin_id: number;
+  counted_qty: number;
+  variance_reason?: string;
+};
+
+export async function stockTakeVariance(payload: { lines: StockTakeCountPayload[] }) {
   const raw = await apiRequest<{
     snapshot_at: string;
     summary: Record<string, string | number>;
@@ -1667,12 +1851,14 @@ export async function stockTakeVariance(payload: {
       bin_id: number;
       sku: string | null;
       item_name: string | null;
+      category?: string | null;
       bin_code: string | null;
       system_qty: string;
       counted_qty: string;
       variance: string;
       direction: StockTakeVarianceLine["direction"];
       has_variance: boolean;
+      variance_reason?: string | null;
       quantity_reserved?: string;
     }>;
   }>("/warehouse/stock-take/variance", {
@@ -1685,7 +1871,7 @@ export async function stockTakeVariance(payload: {
 
 export async function stockTakeApply(payload: {
   notes?: string;
-  lines: Array<{ item_id: number; bin_id: number; counted_qty: number }>;
+  lines: StockTakeCountPayload[];
 }) {
   return apiRequest<{ data: StockMovement }>("/warehouse/stock-take/apply", {
     method: "POST",

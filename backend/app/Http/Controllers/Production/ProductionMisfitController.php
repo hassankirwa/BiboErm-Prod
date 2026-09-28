@@ -28,15 +28,32 @@ class ProductionMisfitController extends Controller
             ->where('status', FieldUnitStatus::Snagged->value)
             ->with([
                 'job.project',
+                'job.wave',
             ])
             ->latest('updated_at')
             ->get();
 
+        $unitIds = $units->pluck('id')->all();
         $projectIds = $units->pluck('job.project_id')->filter()->unique()->values();
         $jobIds = $units->pluck('job_id')->filter()->unique()->values();
 
-        $ncs = FieldNonConformity::query()
+        $ncsByUnit = FieldNonConformity::query()
+            ->whereIn('field_installation_unit_id', $unitIds)
+            ->whereIn('nc_type', [
+                NonConformityType::DimensionMismatch->value,
+                NonConformityType::WrongMeasurement->value,
+            ])
+            ->whereIn('status', [
+                NonConformityStatus::Open->value,
+                NonConformityStatus::Acknowledged->value,
+            ])
+            ->latest('reported_at')
+            ->get()
+            ->groupBy('field_installation_unit_id');
+
+        $ncsByJob = FieldNonConformity::query()
             ->whereIn('job_id', $jobIds)
+            ->whereNull('field_installation_unit_id')
             ->whereIn('nc_type', [
                 NonConformityType::DimensionMismatch->value,
                 NonConformityType::WrongMeasurement->value,
@@ -49,8 +66,20 @@ class ProductionMisfitController extends Controller
             ->get()
             ->groupBy('job_id');
 
-        $dcos = DesignChangeOrder::query()
+        $dcosByUnit = DesignChangeOrder::query()
+            ->whereIn('field_installation_unit_id', $unitIds)
+            ->whereNotIn('status', [
+                DesignChangeOrderStatus::Closed->value,
+                DesignChangeOrderStatus::Cancelled->value,
+            ])
+            ->with(['remakeProductionOrder', 'nonConformity'])
+            ->latest('id')
+            ->get()
+            ->groupBy('field_installation_unit_id');
+
+        $dcosByProject = DesignChangeOrder::query()
             ->whereIn('project_id', $projectIds)
+            ->whereNull('field_installation_unit_id')
             ->whereNotIn('status', [
                 DesignChangeOrderStatus::Closed->value,
                 DesignChangeOrderStatus::Cancelled->value,
@@ -60,22 +89,37 @@ class ProductionMisfitController extends Controller
             ->get()
             ->groupBy('project_id');
 
-        $rows = $units->map(function (FieldInstallationUnit $unit) use ($ncs, $dcos) {
+        $rows = $units->map(function (FieldInstallationUnit $unit) use ($ncsByUnit, $ncsByJob, $dcosByUnit, $dcosByProject) {
             $job = $unit->job;
             $project = $job?->project;
-            $jobNcs = $ncs->get($unit->job_id, collect());
-            $matchedNc = $jobNcs->first(function (FieldNonConformity $nc) use ($unit) {
-                $hay = mb_strtolower(($nc->title ?? '').' '.($nc->description ?? ''));
-                $needle = mb_strtolower($unit->unit_label ?? '');
 
-                return $needle !== '' && str_contains($hay, $needle);
-            }) ?? $jobNcs->first();
+            $matchedNc = $ncsByUnit->get($unit->id)?->first();
+            if (! $matchedNc) {
+                $jobNcs = $ncsByJob->get($unit->job_id, collect());
+                $matchedNc = $jobNcs->first(function (FieldNonConformity $nc) use ($unit) {
+                    $hay = mb_strtolower(($nc->title ?? '').' '.($nc->description ?? ''));
+                    $needle = mb_strtolower($unit->unit_label ?? '');
 
-            $projectDcos = $dcos->get($project?->id, collect());
-            $matchedDco = $matchedNc
-                ? $projectDcos->firstWhere('field_non_conformity_id', $matchedNc->id)
-                : null;
-            $matchedDco ??= $projectDcos->first();
+                    return $needle !== '' && str_contains($hay, $needle);
+                }) ?? $jobNcs->first();
+            }
+
+            $matchedDco = $dcosByUnit->get($unit->id)?->first();
+            if (! $matchedDco && $matchedNc) {
+                $matchedDco = DesignChangeOrder::query()
+                    ->where('field_non_conformity_id', $matchedNc->id)
+                    ->whereNotIn('status', [
+                        DesignChangeOrderStatus::Closed->value,
+                        DesignChangeOrderStatus::Cancelled->value,
+                    ])
+                    ->with(['remakeProductionOrder', 'nonConformity'])
+                    ->latest('id')
+                    ->first();
+            }
+            $matchedDco ??= $dcosByProject->get($project?->id)?->first();
+
+            $notes = is_array($matchedDco?->measurement_notes) ? $matchedDco->measurement_notes : [];
+            $changeItems = is_array($notes['items'] ?? null) ? $notes['items'] : [];
 
             return [
                 'unit_id' => $unit->id,
@@ -83,6 +127,7 @@ class ProductionMisfitController extends Controller
                 'opening_ref' => $unit->opening_ref,
                 'product_type' => $unit->product_type,
                 'unit_floor' => $unit->unit_floor,
+                'room_location' => $unit->room_location,
                 'misfit_notes' => $unit->misfit_notes ?? $unit->snag_notes,
                 'status' => $unit->status?->value ?? $unit->status,
                 'updated_at' => $unit->updated_at?->toIso8601String(),
@@ -90,6 +135,12 @@ class ProductionMisfitController extends Controller
                     'id' => $job->id,
                     'reference' => $job->reference,
                     'status' => $job->status?->value ?? $job->status,
+                    'project_wave_id' => $job->project_wave_id,
+                    'wave' => $job->wave ? [
+                        'id' => $job->wave->id,
+                        'wave_number' => $job->wave->wave_number,
+                        'label' => $job->wave->label,
+                    ] : null,
                 ] : null,
                 'project' => $project ? [
                     'id' => $project->id,
@@ -110,7 +161,10 @@ class ProductionMisfitController extends Controller
                     'id' => $matchedDco->id,
                     'status' => $matchedDco->status?->value ?? $matchedDco->status,
                     'reason' => $matchedDco->reason,
+                    'change_items' => $changeItems,
+                    'change_path' => $notes['change_path'] ?? null,
                     'remake_production_order_id' => $matchedDco->remake_production_order_id,
+                    'parent_production_order_id' => $matchedDco->parent_production_order_id,
                     'remake_production_order' => $matchedDco->remakeProductionOrder ? [
                         'id' => $matchedDco->remakeProductionOrder->id,
                         'reference' => $matchedDco->remakeProductionOrder->reference,

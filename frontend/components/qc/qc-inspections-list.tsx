@@ -89,6 +89,7 @@ export function QCInspectionsList({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[140px]">Reference</TableHead>
+              <TableHead>Opening</TableHead>
               <TableHead>Context</TableHead>
               <TableHead>Project</TableHead>
               <TableHead>Inspector</TableHead>
@@ -116,8 +117,20 @@ export function QCInspectionsList({
                     </Link>
                   </TableCell>
                   <TableCell>
+                    {inspection.opening_code ? (
+                      <Badge variant="secondary" className="font-normal">
+                        {inspection.opening_code}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge variant="outline" className="font-normal">
                       {contextLabel}
+                      {inspection.stage && inspection.stage !== inspection.context
+                        ? ` · ${inspection.stage}`
+                        : ""}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-[180px] truncate">

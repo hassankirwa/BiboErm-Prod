@@ -41,6 +41,7 @@ class FieldDesignChangeController extends Controller
             'project_bom_line_id' => ['nullable', 'integer', 'exists:project_bom_lines,id'],
             'warehouse_item_id' => ['nullable', 'integer'],
             'qty_affected' => ['nullable', 'numeric', 'min:0'],
+            'field_installation_unit_id' => ['nullable', 'integer', 'exists:field_installation_units,id'],
             'reason' => ['nullable', 'string'],
             'measurement_notes' => ['nullable'],
             'scope_bom_line_ids' => ['nullable', 'array'],
@@ -57,6 +58,7 @@ class FieldDesignChangeController extends Controller
             'project_bom_line_id',
             'warehouse_item_id',
             'qty_affected',
+            'field_installation_unit_id',
         ])->all();
 
         $nc = $this->nonConformities->report($fieldJob, $request->user(), $ncPayload);
