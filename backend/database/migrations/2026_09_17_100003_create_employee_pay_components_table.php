@@ -24,7 +24,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['user_id', 'kind']);
-            $table->index(['user_id', 'effective_from', 'effective_to']);
+            $table->index(
+                ['user_id', 'effective_from', 'effective_to'],
+                'employee_pay_components_effective_dates_index'
+            );
         });
     }
 

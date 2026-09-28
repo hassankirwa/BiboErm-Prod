@@ -26,7 +26,10 @@ return new class extends Migration
         Schema::create('warehouse_material_release_batch_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('batch_id')->constrained('warehouse_material_release_batches')->cascadeOnDelete();
-            $table->foreignId('stock_reservation_line_id')->nullable()->constrained('stock_reservation_lines')->nullOnDelete();
+            $table->foreignId('stock_reservation_line_id')->nullable()->constrained(
+                'stock_reservation_lines',
+                indexName: 'wmr_batch_lines_reservation_line_fk'
+            )->nullOnDelete();
             $table->foreignId('item_id')->constrained('warehouse_items')->restrictOnDelete();
             $table->foreignId('bin_id')->nullable()->constrained('warehouse_bins')->nullOnDelete();
             $table->decimal('quantity', 12, 3);
