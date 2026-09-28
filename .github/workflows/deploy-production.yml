@@ -1,27 +1,21 @@
 name: Deploy production
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
-    types:
-      - closed
+      - prod
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: production-deployment
+  group: bibo-production-deployment
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy merged development branch
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
-      github.event.pull_request.head.ref == 'development')
+    name: Deploy prod to cPanel
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 30
@@ -30,13 +24,14 @@ jobs:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-      DEPLOY_PATH: /var/www/bibo-erm
+      DEPLOY_PATH: /home/biboco/bibo-erm
 
     steps:
-      - name: Check out main
+      - name: Check out prod
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: prod
+          fetch-depth: 1
 
       - name: Configure SSH
         env:
@@ -58,52 +53,37 @@ jobs:
           DEPLOY_PORT="${DEPLOY_PORT:-22}"
           echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
 
-      - name: Synchronize application files
-        run: |
-          set -euo pipefail
-          rsync --archive --compress --delete --itemize-changes \
-            --exclude='/.git/' \
-            --exclude='/.github/' \
-            --exclude='/ecosystem.config.cjs' \
-            --exclude='/backend/.env' \
-            --exclude='/backend/storage/' \
-            --exclude='/backend/vendor/' \
-            --exclude='/frontend/.env' \
-            --exclude='/frontend/.next/' \
-            --exclude='/frontend/node_modules/' \
-            --exclude='/storage/' \
-            -e "ssh -p $DEPLOY_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes" \
-            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
-
-      - name: Install, migrate, cache, and restart
+      - name: Verify SSH access
         run: |
           set -euo pipefail
           ssh -p "$DEPLOY_PORT" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'REMOTE'
+            "test -d '$DEPLOY_PATH' && test -f '$DEPLOY_PATH/backend/artisan'"
+
+      - name: Synchronize prod source
+        run: |
           set -euo pipefail
+          rsync --archive --compress --delete-after --itemize-changes \
+            --exclude='/.git/' \
+            --exclude='/.github/' \
+            --exclude='/backend/.env' \
+            --exclude='/backend/storage/' \
+            --exclude='/backend/vendor/' \
+            --exclude='/frontend/.env.local' \
+            --exclude='/frontend/.env.production' \
+            --exclude='/frontend/.next/' \
+            --exclude='/frontend/node_modules/' \
+            --exclude='/storage/' \
+            -e "ssh -p $DEPLOY_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
 
-          cd "$DEPLOY_PATH/frontend"
-          npm install --no-audit --no-fund
-          npm run build
-
-          cd "$DEPLOY_PATH/backend"
-          composer install \
-            --no-dev \
-            --no-interaction \
-            --prefer-dist \
-            --optimize-autoloader
-          php artisan optimize:clear
-          php artisan migrate --force
-          php artisan db:seed --force
-          php artisan permission:cache-reset || true
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
-
-          pm2 reload "$DEPLOY_PATH/ecosystem.config.cjs" \
-            --only bibo-erm \
-            --update-env
-          REMOTE
+      - name: Build and activate release
+        run: |
+          set -euo pipefail
+          ssh -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH' && bash deploy/cpanel/deploy-production.sh"

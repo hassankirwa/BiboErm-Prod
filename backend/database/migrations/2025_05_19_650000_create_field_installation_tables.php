@@ -56,7 +56,10 @@ return new class extends Migration
             $table->timestamp('submitted_at');
             $table->timestamps();
 
-            $table->unique(['job_id', 'log_date', 'submitted_by']);
+            $table->unique(
+                ['job_id', 'log_date', 'submitted_by'],
+                'fi_daily_logs_job_date_submitter_unique'
+            );
             $table->index(['job_id', 'log_date']);
         });
 
