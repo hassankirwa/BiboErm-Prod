@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -110,22 +110,21 @@ export function DepartmentRoleAssignmentPicker({
     setPickerError(null);
   };
 
-  const handleAdd = () => {
+  const handleRoleChange = (value: string) => {
+    setRoleId(value);
     setPickerError(null);
 
-    if (!departmentId || !roleId) {
-      setPickerError("Select a department and role first.");
-      return;
-    }
+    if (!departmentId) return;
 
-    const key = `${departmentId}-${roleId}`;
+    const key = `${departmentId}-${value}`;
     if (assignmentKeys.has(key)) {
       setPickerError("This department and role combination is already added.");
+      setRoleId("");
       return;
     }
 
     const department = departments.find((d) => String(d.id) === departmentId);
-    const role = roles.find((r) => String(r.id) === roleId);
+    const role = roles.find((r) => String(r.id) === value);
 
     if (!department || !role) return;
 
@@ -153,8 +152,8 @@ export function DepartmentRoleAssignmentPicker({
     <div className="space-y-3">
       <Label>Department & role assignments</Label>
       <p className="text-xs text-muted-foreground">
-        Add one or more department and role pairs. The first assignment is the
-        user&apos;s primary department.
+        Select a department and role to add the assignment automatically. The
+        first assignment is the user&apos;s primary department.
       </p>
 
       {(lookupError || pickerError) && (
@@ -163,7 +162,7 @@ export function DepartmentRoleAssignmentPicker({
         </div>
       )}
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:items-end">
         <div className="min-w-0 space-y-2">
           <Label className="text-xs text-muted-foreground">Department</Label>
           <Select
@@ -188,7 +187,7 @@ export function DepartmentRoleAssignmentPicker({
           <Label className="text-xs text-muted-foreground">Role</Label>
           <Select
             value={roleId}
-            onValueChange={setRoleId}
+            onValueChange={handleRoleChange}
             disabled={disabled || !departmentId || loadingRoles}
           >
             <SelectTrigger className="w-full min-w-0">
@@ -212,16 +211,6 @@ export function DepartmentRoleAssignmentPicker({
           </Select>
         </div>
 
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleAdd}
-          disabled={disabled || !departmentId || !roleId || loadingRoles}
-          className="sm:mb-0"
-        >
-          <Plus className="size-4" />
-          Add
-        </Button>
       </div>
 
       {assignments.length > 0 && (
